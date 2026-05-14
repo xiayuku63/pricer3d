@@ -24,3 +24,8 @@
 2026-05-15 01:03:47 | INFO  | ip=127.0.0.1 method=GET path=/api/auth/me status=200 duration_ms=1.42 rid=f168a45ef6794ad487588dc8abcfee93
 2026-05-15 01:03:47 | INFO  | ip=127.0.0.1 method=GET path=/api/user/settings status=200 duration_ms=1.58 rid=329639b45abc4dfda23f6c0b46958e52
 2026-05-15 01:06:21 | INFO  | event=shutdown
+2026-05-15 01:15:28 | INFO  | ip=testclient method=GET path=/healthz status=200 duration_ms=0.84 rid=816cb306db2e486dafa1475f1284290f
+2026-05-15 01:15:28 | INFO  | ip=testclient method=GET path=/healthz status=200 duration_ms=0.74 rid=64dfc52c200d435dad029d6b5f193e8b
+2026-05-15 01:15:28 | INFO  | ip=testclient method=GET path=/healthz status=200 duration_ms=0.75 rid=a682a8fde59b494c82de2f41617601c7
+2026-05-15 01:15:28 | INFO  | ip=testclient method=GET path=/healthz status=200 duration_ms=0.73 rid=a30fcf16c9d44f91b5afcecb6f16e684
+2026-05-15 01:15:28 | INFO  | ip=testclient method=GET path=/healthz status=200 duration_ms=0.56 rid=1fe4cc1aa0e8442a9f285b20205c10e5

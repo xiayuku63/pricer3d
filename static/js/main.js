@@ -1088,6 +1088,7 @@
                 loadSlicerPresetSelection();
                 renderAuthUI();
                 await fetchUserSettings();
+                loadQuoteHistory();
                 closeLoginModal();
                 errorMsg.textContent = '';
                 errorContainer.classList.add('hidden');
@@ -1794,6 +1795,8 @@
                 mergeResultsByFilename(data.results || []);
                 renderResultsTable();
                 recalcSummaryFromCurrentResults();
+                // Reload history after successful quote
+                setTimeout(loadQuoteHistory, 500);
             }
 
             function renderResultsTable() {
@@ -2278,4 +2281,51 @@
                     fileInput.dispatchEvent(new Event('change'));
                 });
             }
+
+            // ── Quote history ──
+            const historyContainer = document.getElementById('history-container');
+            const historyTbody = document.getElementById('history-tbody');
+            const historyRefreshBtn = document.getElementById('history-refresh-btn');
+
+            async function loadQuoteHistory() {
+                if (!authToken) { historyContainer.classList.add('hidden'); return; }
+                historyContainer.classList.remove('hidden');
+                try {
+                    const resp = await fetch('/api/quote/history?limit=50', {
+                        headers: { 'Authorization': `Bearer ${authToken}` }
+                    });
+                    if (!resp.ok) return;
+                    const data = await resp.json();
+                    if (!data.items || data.items.length === 0) {
+                        historyTbody.innerHTML = '<tr><td class="px-3 py-4 text-gray-400 text-center" colspan="9">暂无历史记录</td></tr>';
+                        return;
+                    }
+                    historyTbody.innerHTML = data.items.map(item => {
+                        const ts = item.created_at ? new Date(item.created_at + 'Z').toLocaleString('zh-CN') : '-';
+                        const statusBadge = item.status === 'success'
+                            ? '<span class="text-green-600 font-medium">✓ 成功</span>'
+                            : `<span class="text-red-500 font-medium" title="${escapeHtml(item.error_msg || '')}">✗ 失败</span>`;
+                        return `<tr class="border-t border-gray-100 hover:bg-gray-50">
+                            <td class="px-3 py-2 text-gray-500">${ts}</td>
+                            <td class="px-3 py-2 max-w-[120px] truncate" title="${escapeHtml(item.filename)}">${escapeHtml(item.filename)}</td>
+                            <td class="px-3 py-2">${escapeHtml(item.material)}</td>
+                            <td class="px-3 py-2">${item.quantity}</td>
+                            <td class="px-3 py-2">${item.volume_cm3}</td>
+                            <td class="px-3 py-2">${item.weight_g}</td>
+                            <td class="px-3 py-2">${formatTimeHMS(item.estimated_time_h)}</td>
+                            <td class="px-3 py-2 font-medium text-indigo-600">¥${item.cost_cny}</td>
+                            <td class="px-3 py-2">${statusBadge}</td>
+                        </tr>`;
+                    }).join('');
+                } catch (e) {
+                    historyTbody.innerHTML = '<tr><td class="px-3 py-4 text-gray-400 text-center" colspan="9">加载失败</td></tr>';
+                }
+            }
+
+            if (historyRefreshBtn) {
+                historyRefreshBtn.addEventListener('click', loadQuoteHistory);
+            }
+
+            // Auto-load history after login
+            const origLogin = typeof doLogin === 'function' ? doLogin : null;
         });
