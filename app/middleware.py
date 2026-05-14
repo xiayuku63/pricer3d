@@ -1,0 +1,70 @@
+"""Security middleware – rate limiting, request IDs, security headers."""
+
+import uuid
+import time
+
+from fastapi import Request
+from fastapi.responses import JSONResponse
+
+from .config import (
+    IS_PRODUCTION,
+    AUTH_RATE_LIMIT_PER_MIN,
+    QUOTE_RATE_LIMIT_PER_MIN,
+    CAPTCHA_RATE_LIMIT_PER_MIN,
+    VERIFY_SEND_RATE_LIMIT_PER_10MIN,
+)
+from .rate_limiter import SimpleRateLimiter
+from .metrics import InMemoryMetrics
+from .utils import get_client_ip
+
+rate_limiter = SimpleRateLimiter()
+metrics = InMemoryMetrics()
+
+
+async def security_middleware(request: Request, call_next):
+    request.state.request_id = uuid.uuid4().hex
+    path = request.url.path
+    method = request.method.upper()
+    client_ip = get_client_ip(request)
+
+    # Rate limiting by endpoint
+    if path in {"/api/auth/login", "/api/auth/register"} and method == "POST":
+        if not rate_limiter.is_allowed(f"auth:{client_ip}", AUTH_RATE_LIMIT_PER_MIN):
+            resp = JSONResponse(status_code=429, content={"detail": "请求过于频繁，请稍后再试"})
+            resp.headers["X-Request-ID"] = request.state.request_id
+            return resp
+    if path == "/api/auth/register/check" and method == "POST":
+        if not rate_limiter.is_allowed(f"auth_check:{client_ip}", AUTH_RATE_LIMIT_PER_MIN):
+            resp = JSONResponse(status_code=429, content={"detail": "请求过于频繁，请稍后再试"})
+            resp.headers["X-Request-ID"] = request.state.request_id
+            return resp
+    if path == "/api/auth/verify/send" and method == "POST":
+        if not rate_limiter.is_allowed(f"verify_send_ip:{client_ip}", VERIFY_SEND_RATE_LIMIT_PER_10MIN, window_seconds=600):
+            resp = JSONResponse(status_code=429, content={"detail": "请求过于频繁，请稍后再试"})
+            resp.headers["X-Request-ID"] = request.state.request_id
+            return resp
+    if path == "/api/auth/captcha" and method == "GET":
+        if not rate_limiter.is_allowed(f"captcha:{client_ip}", CAPTCHA_RATE_LIMIT_PER_MIN):
+            resp = JSONResponse(status_code=429, content={"detail": "请求过于频繁，请稍后再试"})
+            resp.headers["X-Request-ID"] = request.state.request_id
+            return resp
+    if path == "/api/quote" and method == "POST":
+        if not rate_limiter.is_allowed(f"quote:{client_ip}", QUOTE_RATE_LIMIT_PER_MIN):
+            resp = JSONResponse(status_code=429, content={"detail": "报价请求过于频繁，请稍后再试"})
+            resp.headers["X-Request-ID"] = request.state.request_id
+            return resp
+
+    started = time.time()
+    response = await call_next(request)
+    duration_ms = (time.time() - started) * 1000.0
+    try:
+        metrics.record(path=path, status_code=int(getattr(response, "status_code", 0) or 0), duration_ms=duration_ms)
+    except Exception:
+        pass
+    response.headers["X-Request-ID"] = request.state.request_id
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    if IS_PRODUCTION:
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response

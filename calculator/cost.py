@@ -21,7 +21,7 @@ def calculate_weight(volume, material_density):
     return volume * material_density / 1000  # mm³ -> cm³ -> g
 
 def merge_pricing_config(raw_config):
-    from main import DEFAULT_PRICING_CONFIG
+    from app.config import DEFAULT_PRICING_CONFIG
     if not raw_config:
         return dict(DEFAULT_PRICING_CONFIG)
     merged = dict(DEFAULT_PRICING_CONFIG)
@@ -241,7 +241,8 @@ def calculate_cost(
     perimeters: Optional[int] = None,
     current_user: Optional[dict] = None,
 ):
-    from main import normalize_materials, DEFAULT_MATERIALS, _sanitize_filename_component, _user_base_dir, _date_folder_utc
+    from app.utils import normalize_materials, _sanitize_filename_component, _user_base_dir, _date_folder_utc
+    from app.config import DEFAULT_MATERIALS
     materials = normalize_materials(user_materials)
     spec = next((m for m in materials if m["name"] == material), None) or DEFAULT_MATERIALS[0]
     cfg = merge_pricing_config(pricing_config)
@@ -550,7 +551,8 @@ async def process_single_file(
     perimeters: Optional[int] = None,
     current_user: Optional[dict] = None,
 ):
-    from main import SUPPORTED_EXTENSIONS, MAX_FILE_SIZE_BYTES, _sanitize_filename_component, _user_base_dir, _date_folder_utc
+    from app.config import SUPPORTED_EXTENSIONS, MAX_FILE_SIZE_BYTES
+    from app.utils import _sanitize_filename_component, _user_base_dir, _date_folder_utc
     from parser.geometry import calculate_geometry
 
     filename = file.filename or "unnamed_file"
