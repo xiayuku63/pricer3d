@@ -30,8 +30,6 @@ class LoginRequest(BaseModel):
 class VerifySendRequest(BaseModel):
     channel: str = Field(..., min_length=4, max_length=10)
     target: str = Field(..., min_length=3, max_length=254)
-    captcha_id: str = Field(..., min_length=8, max_length=80)
-    captcha_code: str = Field(..., min_length=4, max_length=10)
 
 
 class VerifyConfirmRequest(BaseModel):
@@ -41,7 +39,7 @@ class VerifyConfirmRequest(BaseModel):
 
 
 class RegisterCheckRequest(BaseModel):
-    field: str = Field(..., min_length=3, max_length=10)
+    field: str = Field(..., min_length=5, max_length=20)
     value: str = Field(..., min_length=1, max_length=254)
 
 
