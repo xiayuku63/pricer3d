@@ -1,5 +1,7 @@
 """Quote route and formula validation."""
 
+import asyncio
+import concurrent.futures
 import json
 import logging
 from typing import List, Optional
@@ -8,7 +10,7 @@ from fastapi import Depends, FastAPI, UploadFile, File, Form, HTTPException, Req
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from .config import DEFAULT_MATERIALS, DEFAULT_PRICING_CONFIG, MAX_FILES_PER_REQUEST
+from .config import DEFAULT_MATERIALS, DEFAULT_PRICING_CONFIG, MAX_FILES_PER_REQUEST, QUOTE_CONCURRENCY
 from .database import get_db_conn
 from .deps import get_current_user, get_membership_effective
 from .audit import write_audit_event, get_idempotency_key_from_request, try_get_idempotent_response, save_idempotent_response
@@ -90,33 +92,29 @@ async def get_quote(
                 if slicer_preset is None:
                     raise HTTPException(status_code=400, detail="切片预设不存在或无权限")
 
-        results = []
-        for file in files:
-            try:
-                result = await process_single_file(
-                    file,
-                    material,
-                    layer_height,
-                    infill,
-                    quantity,
-                    color,
-                    user_materials,
-                    pricing_config,
-                    slicer_preset=slicer_preset,
-                    perimeters=wall_count,
-                    current_user=current_user,
-                )
-                results.append(result)
-            except Exception as e:
-                logger.error(f"处理文件 {file.filename} 时发生未捕获的错误: {str(e)}", exc_info=True)
-                results.append({
-                    "filename": file.filename,
-                    "status": "failed",
-                    "error": f"INTERNAL_ERROR: {str(e)}",
-                    "cost_cny": 0,
-                    "weight_g": 0,
-                    "estimated_time_h": 0,
-                })
+        # Parallel file processing with concurrency limit
+        _semaphore = asyncio.Semaphore(max(1, QUOTE_CONCURRENCY))
+
+        async def process_one(file):
+            async with _semaphore:
+                try:
+                    return await asyncio.to_thread(
+                        _process_single_file_sync,
+                        file, material, layer_height, infill, quantity, color,
+                        user_materials, pricing_config, slicer_preset, wall_count, current_user,
+                    )
+                except Exception as e:
+                    fname = file.filename or "unknown"
+                    logger.error(f"处理文件 {fname} 时发生未捕获的错误: {str(e)}", exc_info=True)
+                    return {
+                        "filename": fname,
+                        "status": "failed",
+                        "error": f"INTERNAL_ERROR: {str(e)}",
+                        "cost_cny": 0, "weight_g": 0, "estimated_time_h": 0,
+                    }
+
+        tasks = [process_one(f) for f in files]
+        results = await asyncio.gather(*tasks)
 
         success_items = [item for item in results if item.get("status") == "success"]
         failed_items = [item for item in results if item.get("status") == "failed"]
@@ -195,6 +193,34 @@ async def validate_formula(payload: FormulaValidateRequest, current_user=Depends
 
 
 # ── Quote history ──
+
+
+def _process_single_file_sync(
+    file: UploadFile,
+    material: str,
+    layer_height: float,
+    infill: int,
+    quantity: int,
+    color: str,
+    user_materials: List[dict],
+    pricing_config: dict,
+    slicer_preset: Optional[dict] = None,
+    perimeters: Optional[int] = None,
+    current_user: Optional[dict] = None,
+):
+    """Synchronous wrapper for process_single_file — runs in thread pool."""
+    import asyncio as _asyncio
+    # Read file content synchronously (UploadFile can be read in thread)
+    loop = _asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(
+            process_single_file(
+                file, material, layer_height, infill, quantity, color,
+                user_materials, pricing_config, slicer_preset, perimeters, current_user,
+            )
+        )
+    finally:
+        loop.close()
 
 def _save_quote_history(user_id: int, results: list) -> None:
     """Save quote results to history table."""

@@ -14,12 +14,12 @@ from .config import (
     CAPTCHA_RATE_LIMIT_PER_MIN,
     VERIFY_SEND_RATE_LIMIT_PER_10MIN,
 )
-from .rate_limiter import SimpleRateLimiter
+from .rate_limiter import PersistentRateLimiter
 from .metrics import InMemoryMetrics
 from .utils import get_client_ip
 from .logging_config import log_request
 
-rate_limiter = SimpleRateLimiter()
+rate_limiter = PersistentRateLimiter()
 metrics = InMemoryMetrics()
 logger = logging.getLogger("pricer3d")
 

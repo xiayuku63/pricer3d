@@ -29,6 +29,12 @@ async def lifespan(app: FastAPI):
     init_db()
     _uploads_base_dir()
     _outputs_base_dir()
+    # Restore rate limit state from DB
+    try:
+        from .middleware import rate_limiter
+        rate_limiter.restore_state()
+    except Exception:
+        pass
     logger.info("pricer3d startup complete, env=%s", APP_ENV)
 
     yield  # App runs here
@@ -80,6 +86,7 @@ def create_app() -> FastAPI:
     from .routes_auth import (
         get_captcha, get_captcha_image, send_verify_code, confirm_verify_code,
         check_register_exists, register, login, auth_me,
+        password_reset_request, password_reset_confirm,
     )
     from .routes_user import get_user_settings, update_user_settings, change_password
     from .routes_slicer import (
@@ -109,6 +116,8 @@ def create_app() -> FastAPI:
     app.post("/api/auth/register")(register)
     app.post("/api/auth/login")(login)
     app.get("/api/auth/me")(auth_me)
+    app.post("/api/auth/password/reset/request")(password_reset_request)
+    app.post("/api/auth/password/reset/confirm")(password_reset_confirm)
 
     # user
     app.get("/api/user/settings")(get_user_settings)

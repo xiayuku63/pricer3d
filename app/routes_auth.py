@@ -17,6 +17,8 @@ from .config import (
     IS_PRODUCTION,
 )
 from .models import RegisterRequest, LoginRequest, VerifySendRequest, VerifyConfirmRequest, RegisterCheckRequest
+from pydantic import BaseModel, Field
+from .database import get_db_conn
 from .utils import (
     normalize_email,
     normalize_phone,
@@ -311,3 +313,77 @@ async def auth_me(current_user=Depends(get_current_user)):
     except Exception as e:
         logger.error(f"获取用户信息失败: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"INTERNAL_ERROR: 获取用户信息失败 ({str(e)})")
+
+
+# ── Password Reset ──
+
+class ResetRequestModel(BaseModel):
+    email: str = Field(..., min_length=3, max_length=254)
+    captcha_id: str = Field(..., min_length=8, max_length=80)
+    captcha_code: str = Field(..., min_length=4, max_length=10)
+
+
+class ResetConfirmModel(BaseModel):
+    email: str = Field(..., min_length=3, max_length=254)
+    code: str = Field(..., min_length=4, max_length=10)
+    new_password: str = Field(..., min_length=6, max_length=100)
+
+
+async def password_reset_request(payload: ResetRequestModel, request: Request):
+    """Request password reset email."""
+    verify_captcha_or_raise(payload.captcha_id, payload.captcha_code)
+    email = normalize_email(payload.email)
+    user = get_user_by_email(email)
+    # Always return success to avoid email enumeration
+    if not user:
+        masked = mask_email(email)
+        write_audit_event(action="auth.reset.request_no_user", request=request, detail={"email_masked": masked})
+        return {"status": "sent", "message": "若该邮箱已注册，重置邮件已发送"}
+
+    if not is_smtp_configured():
+        if not IS_PRODUCTION:
+            # Dev mode: return code directly
+            code, row_id = create_verification_code(channel="email", target=email)
+            write_audit_event(action="auth.reset.request", request=request, user=user)
+            return {"status": "sent", "dev_code": code, "expires_in": VERIFY_CODE_TTL_SECONDS}
+        raise HTTPException(status_code=500, detail="邮件服务未配置")
+
+    code, row_id = create_verification_code(channel="email", target=email)
+    try:
+        send_email_verification_code(email, code)
+    except Exception:
+        delete_verification_code_row(row_id)
+        raise HTTPException(status_code=500, detail="邮件发送失败，请稍后重试")
+
+    write_audit_event(action="auth.reset.request", request=request, user=user)
+    resp = {"status": "sent", "expires_in": VERIFY_CODE_TTL_SECONDS}
+    if not IS_PRODUCTION:
+        resp["dev_code"] = code
+    return resp
+
+
+async def password_reset_confirm(payload: ResetConfirmModel, request: Request):
+    """Confirm password reset with verification code."""
+    new_password = validate_password_or_raise(payload.new_password)
+    email = normalize_email(payload.email)
+
+    if not consume_verification_code(channel="email", target=email, code=payload.code):
+        raise HTTPException(status_code=400, detail="验证码错误或已过期")
+
+    user = get_user_by_email(email)
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+
+    from .auth import get_password_hash
+    new_hash = get_password_hash(new_password)
+    with get_db_conn() as conn:
+        conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (new_hash, int(user["id"])))
+        conn.commit()
+
+    # Clear login failures for this user
+    clear_login_failures(str(user["username"]) or "")
+    if email:
+        clear_login_failures(email)
+
+    write_audit_event(action="auth.reset.confirm", request=request, user=user)
+    return {"status": "ok", "message": "密码已重置，请使用新密码登录"}

@@ -205,6 +205,16 @@ def init_db() -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_quote_history_user_id ON quote_history (user_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_quote_history_created_at ON quote_history (created_at)")
 
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS rate_limit_state (
+                rate_key TEXT PRIMARY KEY,
+                bucket_json TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+
         plans_count = conn.execute("SELECT COUNT(*) AS c FROM membership_plans").fetchone()
         if not plans_count or int(plans_count["c"] or 0) == 0:
             now_iso = datetime.now(timezone.utc).isoformat()

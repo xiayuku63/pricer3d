@@ -98,3 +98,35 @@ class TestRateLimitRecovery:
         for _ in range(5):
             resp = client.get("/healthz")
             assert resp.status_code == 200
+
+
+class TestPasswordReset:
+    def test_reset_request_requires_captcha(self):
+        resp = client.post("/api/auth/password/reset/request", json={
+            "email": "test@example.com",
+            "captcha_id": "fake",
+            "captcha_code": "ABCD",
+        })
+        # Either 400 (bad captcha) or 422 (validation) 
+        assert resp.status_code in {400, 422}
+
+    def test_reset_confirm_invalid_code(self):
+        resp = client.post("/api/auth/password/reset/confirm", json={
+            "email": "test@example.com",
+            "code": "000000",
+            "new_password": "NewTest123",
+        })
+        assert resp.status_code in {400, 422}
+
+
+class TestConcurrencyConfig:
+    def test_quote_concurrency_env(self):
+        from app.config import QUOTE_CONCURRENCY
+        assert QUOTE_CONCURRENCY >= 1
+
+
+class TestErrorNotifier:
+    def test_notifier_exists(self):
+        from app.error_notify import error_notifier, notify_critical
+        assert error_notifier is not None
+        assert callable(notify_critical)
