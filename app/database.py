@@ -182,6 +182,29 @@ def init_db() -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_payment_orders_status ON payment_orders (status)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_payment_orders_created_at ON payment_orders (created_at)")
 
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS quote_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                filename TEXT NOT NULL,
+                material TEXT NOT NULL,
+                color TEXT,
+                quantity INTEGER NOT NULL DEFAULT 1,
+                volume_cm3 REAL,
+                weight_g REAL,
+                estimated_time_h REAL,
+                cost_cny REAL,
+                dimensions TEXT,
+                status TEXT NOT NULL DEFAULT 'success',
+                error_msg TEXT,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_quote_history_user_id ON quote_history (user_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_quote_history_created_at ON quote_history (created_at)")
+
         plans_count = conn.execute("SELECT COUNT(*) AS c FROM membership_plans").fetchone()
         if not plans_count or int(plans_count["c"] or 0) == 0:
             now_iso = datetime.now(timezone.utc).isoformat()

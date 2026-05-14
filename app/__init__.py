@@ -94,7 +94,7 @@ def create_app() -> FastAPI:
     from .routes_billing import (
         billing_plans, billing_checkout, billing_orders, billing_mock_complete, billing_webhook,
     )
-    from .routes_quote import get_quote, validate_formula
+    from .routes_quote import get_quote, validate_formula, quote_history
     from .routes_pages import (
         index, register_page, legal_terms, legal_privacy, admin_users_page,
         pay_mock, healthz, readyz,
@@ -143,6 +143,7 @@ def create_app() -> FastAPI:
 
     # quote
     app.post("/api/quote")(get_quote)
+    app.get("/api/quote/history")(quote_history)
     app.post("/api/formula/validate")(validate_formula)
 
     # pages

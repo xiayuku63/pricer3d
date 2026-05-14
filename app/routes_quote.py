@@ -168,6 +168,7 @@ async def get_quote(
         )
         if idem_key:
             save_idempotent_response(int(current_user["id"]), request, idem_key, 200, payload)
+        _save_quote_history(int(current_user["id"]), results)
         return payload
     except HTTPException:
         raise
@@ -191,3 +192,72 @@ async def validate_formula(payload: FormulaValidateRequest, current_user=Depends
         "total": {"ok": total_ok, "error": total_err, "used_vars": total_vars},
         "aliases": FORMULA_ALIAS_TO_CANONICAL,
     }
+
+
+# ── Quote history ──
+
+def _save_quote_history(user_id: int, results: list) -> None:
+    """Save quote results to history table."""
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc).isoformat()
+    with get_db_conn() as conn:
+        for item in results:
+            conn.execute(
+                """INSERT INTO quote_history
+                   (user_id, filename, material, color, quantity, volume_cm3, weight_g,
+                    estimated_time_h, cost_cny, dimensions, status, error_msg, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    user_id,
+                    str(item.get("filename") or "")[:200],
+                    str(item.get("material") or "")[:40],
+                    str(item.get("color") or "")[:40],
+                    int(item.get("quantity") or 1),
+                    round(float(item.get("volume_cm3") or 0), 2),
+                    round(float(item.get("weight_g") or 0), 2),
+                    round(float(item.get("estimated_time_h") or 0), 2),
+                    round(float(item.get("cost_cny") or 0), 2),
+                    str(item.get("dimensions") or "")[:80],
+                    str(item.get("status") or "success")[:20],
+                    str(item.get("error") or "")[:300] if item.get("status") != "success" else None,
+                    now,
+                ),
+            )
+        conn.commit()
+
+
+async def quote_history(limit: int = 20, offset: int = 0, current_user=Depends(get_current_user)):
+    """Get quote history for current user."""
+    safe_limit = max(1, min(int(limit), 100))
+    safe_offset = max(0, int(offset))
+    uid = int(current_user["id"])
+    with get_db_conn() as conn:
+        total_row = conn.execute(
+            "SELECT COUNT(*) as c FROM quote_history WHERE user_id = ?", (uid,)
+        ).fetchone()
+        rows = conn.execute(
+            """SELECT id, filename, material, color, quantity, volume_cm3, weight_g,
+                      estimated_time_h, cost_cny, dimensions, status, error_msg, created_at
+               FROM quote_history WHERE user_id = ?
+               ORDER BY id DESC LIMIT ? OFFSET ?""",
+            (uid, safe_limit, safe_offset),
+        ).fetchall()
+    items = []
+    for r in rows:
+        items.append({
+            "id": r["id"],
+            "filename": r["filename"],
+            "material": r["material"],
+            "color": r["color"],
+            "quantity": r["quantity"],
+            "volume_cm3": round(float(r["volume_cm3"] or 0), 2),
+            "weight_g": round(float(r["weight_g"] or 0), 2),
+            "estimated_time_h": round(float(r["estimated_time_h"] or 0), 2),
+            "cost_cny": round(float(r["cost_cny"] or 0), 2),
+            "dimensions": r["dimensions"],
+            "status": r["status"],
+            "error_msg": r["error_msg"],
+            "created_at": r["created_at"],
+        })
+    total = int(total_row["c"] or 0) if total_row else 0
+    return {"items": items, "total": total, "limit": safe_limit, "offset": safe_offset}

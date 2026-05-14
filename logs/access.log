@@ -1,3 +1,18 @@
 2026-05-15 00:56:57 | INFO  | event=startup env=development
 2026-05-15 00:56:59 | INFO  | ip=127.0.0.1 method=GET path=/healthz status=200 duration_ms=1.37 rid=a539fa5b2c8a4380ab685fe2ed54e0c1
 2026-05-15 00:56:59 | INFO  | ip=127.0.0.1 method=GET path=/readyz status=200 duration_ms=1.59 rid=b7ba284431474e25b5d93b6a911037d7
+2026-05-15 00:59:55 | INFO  | event=shutdown
+2026-05-15 00:59:56 | INFO  | event=startup env=development
+2026-05-15 00:59:58 | INFO  | ip=127.0.0.1 method=GET path=/ status=200 duration_ms=0.92 rid=952626797b45451486afe9908d8a3ef2
+2026-05-15 00:59:58 | INFO  | ip=127.0.0.1 method=GET path=/register status=200 duration_ms=0.45 rid=6f441e476df249249fe2fdbb0141e97c
+2026-05-15 00:59:58 | INFO  | ip=127.0.0.1 method=GET path=/admin/users status=200 duration_ms=0.40 rid=cc1058b38b8f4b6fa324b912168c73a1
+2026-05-15 01:01:17 | INFO  | ip=127.0.0.1 method=GET path=/ status=200 duration_ms=0.59 rid=309bb3f6e10d459c8cf7db13e07f5cfe
+2026-05-15 01:01:17 | INFO  | ip=127.0.0.1 method=GET path=/static/js/main.js status=200 duration_ms=10.37 rid=d49af513e2f04edabf2b9ae3cfc3218e
+2026-05-15 01:01:17 | INFO  | ip=127.0.0.1 method=GET path=/api/auth/me status=200 duration_ms=1.78 rid=1506be8e51c34d4890e14bb17293e8ab
+2026-05-15 01:01:17 | INFO  | ip=127.0.0.1 method=GET path=/api/user/settings status=200 duration_ms=2.65 rid=d6b3a809f12843858404b8c85843478a
+2026-05-15 01:01:18 | INFO  | ip=127.0.0.1 method=GET path=/api/slicer/presets status=200 duration_ms=1.85 rid=1d8a4b0292b54bc88f3b0c929c75f2f6
+2026-05-15 01:03:27 | INFO  | event=shutdown
+2026-05-15 01:03:28 | INFO  | event=startup env=development
+2026-05-15 01:03:30 | INFO  | ip=127.0.0.1 method=GET path=/healthz status=200 duration_ms=1.45 rid=e544e80172a947159f6bcafe751751c3
+2026-05-15 01:03:30 | INFO  | ip=127.0.0.1 method=GET path=/static/js/main.js status=200 duration_ms=2.43 rid=b6fe018b1ab84184ab773507d662c8a0
+2026-05-15 01:03:30 | INFO  | ip=127.0.0.1 method=GET path=/static/js/register.js status=200 duration_ms=0.73 rid=9c690c2dc9ee4cbab8195263332991b6
