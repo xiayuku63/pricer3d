@@ -6,7 +6,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.exceptions import RequestValidationError
 
 from .config import ALLOWED_ORIGINS, IS_PRODUCTION, APP_ENV
@@ -128,12 +128,12 @@ def create_app() -> FastAPI:
     app.post("/api/formula/validate")(validate_formula)
 
     # pages
-    app.get("/", response_class="text/html")(index)
-    app.get("/register", response_class="text/html")(register_page)
-    app.get("/legal/terms", response_class="text/html")(legal_terms)
-    app.get("/legal/privacy", response_class="text/html")(legal_privacy)
-    app.get("/admin/users", response_class="text/html")(admin_users_page)
-    app.get("/pay/mock", response_class="text/html")(pay_mock)
+    app.get("/", response_class=HTMLResponse)(index)
+    app.get("/register", response_class=HTMLResponse)(register_page)
+    app.get("/legal/terms", response_class=HTMLResponse)(legal_terms)
+    app.get("/legal/privacy", response_class=HTMLResponse)(legal_privacy)
+    app.get("/admin/users", response_class=HTMLResponse)(admin_users_page)
+    app.get("/pay/mock", response_class=HTMLResponse)(pay_mock)
 
     # health
     app.get("/healthz")(healthz)
