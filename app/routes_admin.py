@@ -16,6 +16,7 @@ from .audit import write_audit_event
 from .middleware import metrics
 from .database import merge_pricing_config
 from .auth import get_user_by_id
+from .backup import create_backup, list_backups, cleanup_old_backups
 from calculator.cost import validate_formula_expression
 
 
@@ -272,3 +273,29 @@ async def admin_cleanup(request: Request, current_user=Depends(get_current_user)
         conn.commit()
     write_audit_event(action="admin.maintenance.cleanup", request=request, user=current_user, detail={"deleted": deleted})
     return {"status": "ok", "deleted": deleted, "audit_retention_days": AUDIT_RETENTION_DAYS}
+
+
+# ---------- Backup ----------
+
+async def admin_backup_create(request: Request, current_user=Depends(get_current_user)):
+    require_admin(current_user)
+    try:
+        info = create_backup()
+        write_audit_event(action="admin.backup.create", request=request, user=current_user, detail=info)
+        return {"status": "ok", **info}
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"备份失败: {str(e)}")
+
+
+async def admin_backup_list(current_user=Depends(get_current_user)):
+    require_admin(current_user)
+    return {"items": list_backups()}
+
+
+async def admin_backup_cleanup(request: Request, current_user=Depends(get_current_user)):
+    require_admin(current_user)
+    deleted = cleanup_old_backups()
+    write_audit_event(action="admin.backup.cleanup", request=request, user=current_user, detail={"deleted": deleted})
+    return {"status": "ok", "deleted": deleted}

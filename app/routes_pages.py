@@ -6,8 +6,12 @@ import os
 from fastapi import HTTPException
 from fastapi.responses import HTMLResponse
 
+import time
+
 from .config import APP_ENV, TERMS_VERSION, PRIVACY_VERSION
 from .database import get_db_conn
+
+_START_TIME = time.time()
 
 
 async def index():
@@ -171,13 +175,30 @@ def pay_mock(order_no: str = ""):
 
 
 def healthz():
-    return {"status": "ok", "env": APP_ENV}
+    import shutil
+    disk = shutil.disk_usage(".")
+    return {
+        "status": "ok",
+        "env": APP_ENV,
+        "uptime_seconds": round(time.time() - _START_TIME, 1),
+        "disk_free_mb": round(disk.free / (1024 * 1024), 1),
+    }
 
 
 def readyz():
+    import shutil
     try:
         with get_db_conn() as conn:
-            conn.execute("SELECT 1").fetchone()
-        return {"status": "ok", "db": "ok", "env": APP_ENV}
+            row = conn.execute("SELECT COUNT(*) as c FROM users").fetchone()
+            user_count = int(row["c"] or 0) if row else 0
+        disk = shutil.disk_usage(".")
+        return {
+            "status": "ok",
+            "db": "ok",
+            "env": APP_ENV,
+            "uptime_seconds": round(time.time() - _START_TIME, 1),
+            "user_count": user_count,
+            "disk_free_mb": round(disk.free / (1024 * 1024), 1),
+        }
     except Exception:
         raise HTTPException(status_code=503, detail="服务未就绪")

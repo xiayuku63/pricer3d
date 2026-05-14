@@ -2,6 +2,7 @@
 
 import os
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -11,12 +12,34 @@ from fastapi.exceptions import RequestValidationError
 
 from .config import ALLOWED_ORIGINS, IS_PRODUCTION, APP_ENV
 from .middleware import security_middleware
+from .logging_config import setup_logging
 
 logger = logging.getLogger("uvicorn.error")
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup and shutdown lifecycle."""
+    # Startup
+    from .database import init_db
+    from .utils import _uploads_base_dir, _outputs_base_dir
+
+    pricer_logger = setup_logging()
+    pricer_logger.info("event=startup env=%s", APP_ENV)
+    init_db()
+    _uploads_base_dir()
+    _outputs_base_dir()
+    logger.info("pricer3d startup complete, env=%s", APP_ENV)
+
+    yield  # App runs here
+
+    # Shutdown
+    pricer_logger.info("event=shutdown")
+    logger.info("pricer3d shutting down")
+
+
 def create_app() -> FastAPI:
-    app = FastAPI(title="3D Printing Quoting System DEMO")
+    app = FastAPI(title="3D Printing Quoting System DEMO", lifespan=lifespan)
 
     # exception handlers
     @app.exception_handler(RequestValidationError)
@@ -53,15 +76,6 @@ def create_app() -> FastAPI:
     # security middleware
     app.middleware("http")(security_middleware)
 
-    # startup via lifespan
-    @app.on_event("startup")
-    def on_startup():
-        from .database import init_db
-        from .utils import _uploads_base_dir, _outputs_base_dir
-        init_db()
-        _uploads_base_dir()
-        _outputs_base_dir()
-
     # ─── register routes ───
     from .routes_auth import (
         get_captcha, get_captcha_image, send_verify_code, confirm_verify_code,
@@ -75,6 +89,7 @@ def create_app() -> FastAPI:
     from .routes_admin import (
         admin_get_defaults, admin_set_defaults_from_me, admin_list_users,
         admin_update_user_membership, admin_list_audit, admin_metrics, admin_cleanup,
+        admin_backup_create, admin_backup_list, admin_backup_cleanup,
     )
     from .routes_billing import (
         billing_plans, billing_checkout, billing_orders, billing_mock_complete, billing_webhook,
@@ -115,6 +130,9 @@ def create_app() -> FastAPI:
     app.get("/api/admin/audit")(admin_list_audit)
     app.get("/api/admin/metrics")(admin_metrics)
     app.post("/api/admin/maintenance/cleanup")(admin_cleanup)
+    app.post("/api/admin/maintenance/backup")(admin_backup_create)
+    app.get("/api/admin/maintenance/backup")(admin_backup_list)
+    app.post("/api/admin/maintenance/backup/cleanup")(admin_backup_cleanup)
 
     # billing
     app.get("/api/billing/plans")(billing_plans)
