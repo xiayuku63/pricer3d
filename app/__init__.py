@@ -53,7 +53,7 @@ def create_app() -> FastAPI:
     # security middleware
     app.middleware("http")(security_middleware)
 
-    # startup
+    # startup via lifespan
     @app.on_event("startup")
     def on_startup():
         from .database import init_db
