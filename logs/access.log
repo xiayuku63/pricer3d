@@ -51,3 +51,10 @@
 2026-05-15 01:24:50 | INFO  | ip=testclient method=GET path=/healthz status=200 duration_ms=0.48 rid=799c620497ee4d0fa6dbb2da8fb8c611
 2026-05-15 01:24:50 | INFO  | ip=testclient method=POST path=/api/auth/password/reset/request status=422 duration_ms=0.66 rid=8690805e561940bd80dc4b547c3d21e0
 2026-05-15 01:24:50 | INFO  | ip=testclient method=POST path=/api/auth/password/reset/confirm status=400 duration_ms=1.00 rid=e2669ef792c14aeebb457860a135a0ab
+2026-05-15 01:44:04 | INFO  | ip=testclient method=GET path=/healthz status=200 duration_ms=0.94 rid=5c1ed8a9dc5a442286a6d29e42f2bdb2
+2026-05-15 01:44:04 | INFO  | ip=testclient method=GET path=/healthz status=200 duration_ms=0.63 rid=40945f117d0d4320bb2fbc564849fbe4
+2026-05-15 01:44:04 | INFO  | ip=testclient method=GET path=/healthz status=200 duration_ms=0.92 rid=b6e5963b04304041a0e8065345ca96b9
+2026-05-15 01:44:04 | INFO  | ip=testclient method=GET path=/healthz status=200 duration_ms=0.63 rid=dfa97e672b904aa39b45fd0184e2930e
+2026-05-15 01:44:04 | INFO  | ip=testclient method=GET path=/healthz status=200 duration_ms=0.78 rid=6882a2e3920142ea9a188590d9bd7d70
+2026-05-15 01:44:04 | INFO  | ip=testclient method=POST path=/api/auth/password/reset/request status=422 duration_ms=0.63 rid=b2aaf0d79a374f5aad25a12b83bf66ed
+2026-05-15 01:44:04 | INFO  | ip=testclient method=POST path=/api/auth/password/reset/confirm status=400 duration_ms=1.06 rid=dc2ad342bb12459b8bbd77b76b33bda2
