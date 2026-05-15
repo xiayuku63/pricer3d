@@ -1256,9 +1256,13 @@
                         targetPane.classList.add('block');
                     }
                     if (userCenterSaveBtn) {
-                        userCenterSaveBtn.classList.toggle('hidden', tabId === 'security');
+                        userCenterSaveBtn.classList.toggle('hidden', tabId === 'security' || tabId === 'history');
                     }
-                    if (tabId === 'security') {
+                    const ucFooterEl = document.getElementById('uc-footer');
+                    if (ucFooterEl) {
+                        ucFooterEl.classList.toggle('hidden', tabId === 'history');
+                    }
+                    if (tabId === 'security' || tabId === 'history') {
                         userCenterMsg.classList.add('hidden');
                     }
                 });
@@ -2282,14 +2286,14 @@
                 });
             }
 
-            // ── Quote history ──
-            const historyContainer = document.getElementById('history-container');
-            const historyTbody = document.getElementById('history-tbody');
-            const historyRefreshBtn = document.getElementById('history-refresh-btn');
+            // ── Quote history (in user center tab) ──
+            const ucHistoryTbody = document.getElementById('uc-history-tbody');
+            const ucHistoryRefreshBtn = document.getElementById('uc-history-refresh-btn');
+            let historyLoaded = false;
 
             async function loadQuoteHistory() {
-                if (!authToken) { historyContainer.classList.add('hidden'); return; }
-                historyContainer.classList.remove('hidden');
+                if (!authToken || !ucHistoryTbody) return;
+                historyLoaded = true;
                 try {
                     const resp = await fetch('/api/quote/history?limit=50', {
                         headers: { 'Authorization': `Bearer ${authToken}` }
@@ -2297,34 +2301,43 @@
                     if (!resp.ok) return;
                     const data = await resp.json();
                     if (!data.items || data.items.length === 0) {
-                        historyTbody.innerHTML = '<tr><td class="px-3 py-4 text-gray-400 text-center" colspan="9">暂无历史记录</td></tr>';
+                        ucHistoryTbody.innerHTML = '<tr><td class="px-2 py-4 text-gray-400 text-center" colspan="9">暂无历史记录</td></tr>';
                         return;
                     }
-                    historyTbody.innerHTML = data.items.map(item => {
+                    ucHistoryTbody.innerHTML = data.items.map(item => {
                         const ts = item.created_at ? new Date(item.created_at + 'Z').toLocaleString('zh-CN') : '-';
                         const statusBadge = item.status === 'success'
                             ? '<span class="text-green-600 font-medium">✓ 成功</span>'
                             : `<span class="text-red-500 font-medium" title="${escapeHtml(item.error_msg || '')}">✗ 失败</span>`;
                         return `<tr class="border-t border-gray-100 hover:bg-gray-50">
-                            <td class="px-3 py-2 text-gray-500">${ts}</td>
-                            <td class="px-3 py-2 max-w-[120px] truncate" title="${escapeHtml(item.filename)}">${escapeHtml(item.filename)}</td>
-                            <td class="px-3 py-2">${escapeHtml(item.material)}</td>
-                            <td class="px-3 py-2">${item.quantity}</td>
-                            <td class="px-3 py-2">${item.volume_cm3}</td>
-                            <td class="px-3 py-2">${item.weight_g}</td>
-                            <td class="px-3 py-2">${formatTimeHMS(item.estimated_time_h)}</td>
-                            <td class="px-3 py-2 font-medium text-indigo-600">¥${item.cost_cny}</td>
-                            <td class="px-3 py-2">${statusBadge}</td>
+                            <td class="px-2 py-2 text-gray-500">${ts}</td>
+                            <td class="px-2 py-2 max-w-[120px] truncate" title="${escapeHtml(item.filename)}">${escapeHtml(item.filename)}</td>
+                            <td class="px-2 py-2">${escapeHtml(item.material)}</td>
+                            <td class="px-2 py-2">${item.quantity}</td>
+                            <td class="px-2 py-2">${item.volume_cm3}</td>
+                            <td class="px-2 py-2">${item.weight_g}</td>
+                            <td class="px-2 py-2">${formatTimeHMS(item.estimated_time_h)}</td>
+                            <td class="px-2 py-2 font-medium text-indigo-600">¥${item.cost_cny}</td>
+                            <td class="px-2 py-2">${statusBadge}</td>
                         </tr>`;
                     }).join('');
                 } catch (e) {
-                    historyTbody.innerHTML = '<tr><td class="px-3 py-4 text-gray-400 text-center" colspan="9">加载失败</td></tr>';
+                    ucHistoryTbody.innerHTML = '<tr><td class="px-2 py-4 text-gray-400 text-center" colspan="9">加载失败</td></tr>';
                 }
             }
 
-            if (historyRefreshBtn) {
-                historyRefreshBtn.addEventListener('click', loadQuoteHistory);
+            if (ucHistoryRefreshBtn) {
+                ucHistoryRefreshBtn.addEventListener('click', loadQuoteHistory);
             }
+
+            // Auto-load history when switching to history tab in user center
+            document.querySelectorAll('.uc-tab-btn[data-uc-tab="history"]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    if (!historyLoaded && authToken) {
+                        loadQuoteHistory();
+                    }
+                });
+            });
 
             // Auto-load history after login
             const origLogin = typeof doLogin === 'function' ? doLogin : null;

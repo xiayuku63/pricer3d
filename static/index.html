@@ -129,36 +129,6 @@
                 <p class="text-sm text-red-700 font-medium" id="error-msg"></p>
             </div>
 
-            <!-- 报价历史 -->
-            <div id="history-container" class="mt-6 hidden">
-                <div class="flex items-center justify-between mb-2">
-                    <h3 class="text-lg leading-6 font-medium text-gray-900">📜 报价历史</h3>
-                    <button id="history-refresh-btn" type="button" class="text-xs px-3 py-1.5 border border-gray-300 text-gray-600 rounded-md hover:bg-gray-50">刷新</button>
-                </div>
-                <div class="bg-white overflow-hidden shadow rounded-lg border border-gray-200">
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full text-xs text-left border-collapse">
-                            <thead class="bg-gray-100 text-gray-600">
-                                <tr>
-                                    <th class="px-3 py-2">时间</th>
-                                    <th class="px-3 py-2">文件名</th>
-                                    <th class="px-3 py-2">材料</th>
-                                    <th class="px-3 py-2">数量</th>
-                                    <th class="px-3 py-2">体积(cm³)</th>
-                                    <th class="px-3 py-2">重量(g)</th>
-                                    <th class="px-3 py-2">时间</th>
-                                    <th class="px-3 py-2">费用(¥)</th>
-                                    <th class="px-3 py-2">状态</th>
-                                </tr>
-                            </thead>
-                            <tbody id="history-tbody" class="bg-white">
-                                <tr><td class="px-3 py-4 text-gray-400 text-center" colspan="9">暂无历史记录</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
             <!-- 登录弹窗 -->
             <div id="login-modal" class="hidden fixed inset-0 z-50">
                 <div id="login-backdrop" class="absolute inset-0 bg-black/50"></div>
@@ -298,6 +268,7 @@
                                 <button type="button" data-uc-tab="costs" class="uc-tab-btn w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900">成本与时间</button>
                                 <button type="button" data-uc-tab="slicer" class="uc-tab-btn w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900">切片配置</button>
                                 <button type="button" data-uc-tab="security" class="uc-tab-btn w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900">账号安全</button>
+                                <button type="button" data-uc-tab="history" class="uc-tab-btn w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900">📜 报价历史</button>
                             </div>
                             
                             <!-- 右侧内容区 -->
@@ -591,7 +562,35 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="px-4 py-3 border-t border-gray-200 flex justify-between items-center bg-gray-50">
+                                <div id="uc-tab-history" class="uc-tab-pane hidden space-y-4">
+                                    <div class="flex items-center justify-between">
+                                        <h5 class="text-sm font-medium text-gray-700">报价历史记录</h5>
+                                        <button id="uc-history-refresh-btn" type="button" class="text-xs px-3 py-1.5 border border-gray-300 text-gray-600 rounded-md hover:bg-gray-50">刷新</button>
+                                    </div>
+                                    <div class="overflow-x-auto border border-gray-200 rounded-lg">
+                                        <table class="min-w-full text-xs text-left border-collapse">
+                                            <thead class="bg-gray-100 text-gray-600">
+                                                <tr>
+                                                    <th class="px-2 py-2">时间</th>
+                                                    <th class="px-2 py-2">文件名</th>
+                                                    <th class="px-2 py-2">材料</th>
+                                                    <th class="px-2 py-2">数量</th>
+                                                    <th class="px-2 py-2">体积(cm³)</th>
+                                                    <th class="px-2 py-2">重量(g)</th>
+                                                    <th class="px-2 py-2">时间</th>
+                                                    <th class="px-2 py-2">费用(¥)</th>
+                                                    <th class="px-2 py-2">状态</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="uc-history-tbody">
+                                                <tr><td class="px-2 py-4 text-gray-400 text-center" colspan="9">暂无历史记录</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="px-4 py-3 border-t border-gray-200 flex justify-between items-center bg-gray-50" id="uc-footer">
                             <div class="text-xs text-gray-500">提示：修改密码后需重新登录</div>
                             <div class="flex items-center gap-4">
                                 <p id="user-center-msg" class="text-xs text-green-600 hidden">保存成功</p>
