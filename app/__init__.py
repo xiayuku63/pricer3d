@@ -7,12 +7,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, HTMLResponse
-from fastapi.exceptions import RequestValidationError
+from fastapi.responses import HTMLResponse
 
 from .config import ALLOWED_ORIGINS, IS_PRODUCTION, APP_ENV
 from .middleware import security_middleware
 from .logging_config import setup_logging
+from .errors import register_exception_handlers
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -45,26 +45,10 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="3D Printing Quoting System DEMO", lifespan=lifespan)
+    app = FastAPI(title="pricer3d — 3D Printing Quoting System", lifespan=lifespan)
 
-    # exception handlers
-    @app.exception_handler(RequestValidationError)
-    async def validation_exception_handler(request, exc):
-        return JSONResponse(
-            status_code=422,
-            content={"detail": "输入参数不合法，请检查后重试"},
-        )
-
-    @app.exception_handler(Exception)
-    async def unhandled_exception_handler(request, exc):
-        from fastapi import HTTPException, Request
-        if isinstance(exc, HTTPException):
-            return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
-        logger.exception("Unhandled server error on path %s", request.url.path)
-        return JSONResponse(
-            status_code=500,
-            content={"detail": f"服务器内部错误: {str(exc)}"},
-        )
+    # exception handlers (unified {code, message, data} format)
+    register_exception_handlers(app)
 
     # static files
     os.makedirs("static", exist_ok=True)
