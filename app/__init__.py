@@ -90,6 +90,10 @@ def create_app() -> FastAPI:
         index, register_page, legal_terms, legal_privacy, admin_users_page,
         pay_mock, healthz, readyz,
     )
+    from .schemas.auth import TokenResponse, CaptchaResponse
+    from .schemas.quote import QuoteResponse, FormulaValidateRequest, QuoteHistoryItem
+    from .schemas.common import PaginatedData
+    from .schemas.user import MembershipPlan, BillingOrder
 
     # auth
     app.get("/api/auth/captcha")(get_captcha)
@@ -99,7 +103,7 @@ def create_app() -> FastAPI:
     app.post("/api/auth/register/check")(check_register_exists)
     app.post("/api/auth/register")(register)
     app.post("/api/auth/login")(login)
-    app.get("/api/auth/me")(auth_me)
+    app.get("/api/auth/me", response_model=dict)(auth_me)
     app.post("/api/auth/password/reset/request")(password_reset_request)
     app.post("/api/auth/password/reset/confirm")(password_reset_confirm)
 
@@ -128,16 +132,16 @@ def create_app() -> FastAPI:
     app.post("/api/admin/maintenance/backup/cleanup")(admin_backup_cleanup)
 
     # billing
-    app.get("/api/billing/plans")(billing_plans)
-    app.post("/api/billing/checkout")(billing_checkout)
-    app.get("/api/billing/orders")(billing_orders)
+    app.get("/api/billing/plans", response_model=PaginatedData[MembershipPlan])(billing_plans)
+    app.post("/api/billing/checkout", response_model=dict)(billing_checkout)
+    app.get("/api/billing/orders", response_model=PaginatedData[BillingOrder])(billing_orders)
     app.post("/api/billing/mock/complete")(billing_mock_complete)
     app.post("/api/billing/webhook")(billing_webhook)
 
     # quote
-    app.post("/api/quote")(get_quote)
-    app.get("/api/quote/history")(quote_history)
-    app.post("/api/formula/validate")(validate_formula)
+    app.post("/api/quote", response_model=QuoteResponse)(get_quote)
+    app.get("/api/quote/history", response_model=PaginatedData[QuoteHistoryItem])(quote_history)
+    app.post("/api/formula/validate", response_model=dict)(validate_formula)
 
     # pages
     app.get("/", response_class=HTMLResponse)(index)
