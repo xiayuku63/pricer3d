@@ -202,3 +202,18 @@ def readyz():
         }
     except Exception:
         raise HTTPException(status_code=503, detail="服务未就绪")
+
+
+def version():
+    """Return application version from VERSION file."""
+    import os
+    version_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "VERSION")
+    try:
+        with open(version_file, "r") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    return {"version": line, "env": APP_ENV}
+    except Exception:
+        pass
+    return {"version": "unknown", "env": APP_ENV}

@@ -88,7 +88,7 @@ def create_app() -> FastAPI:
     from .routes_quote import get_quote, validate_formula, quote_history
     from .routes_pages import (
         index, register_page, legal_terms, legal_privacy, admin_users_page,
-        pay_mock, healthz, readyz,
+        pay_mock, healthz, readyz, version,
     )
     from .schemas.auth import TokenResponse, CaptchaResponse
     from .schemas.quote import QuoteResponse, FormulaValidateRequest, QuoteHistoryItem
@@ -154,5 +154,6 @@ def create_app() -> FastAPI:
     # health
     app.get("/healthz")(healthz)
     app.get("/readyz")(readyz)
+    app.get("/api/version")(version)
 
     return app
