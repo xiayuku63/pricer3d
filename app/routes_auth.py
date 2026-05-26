@@ -293,9 +293,12 @@ async def login(payload: LoginRequest, request: Request):
             "identifier": (payload.identifier or "").strip()[:120],
             "terms_version": TERMS_VERSION,
             "privacy_version": PRIVACY_VERSION,
+            "remember_me": payload.remember_me,
         },
     )
-    access_token = create_access_token(user_id=user["id"], username=user["username"])
+    # remember_me: 720h (30d); default: 24h
+    expire_hours = 720 if payload.remember_me else 24
+    access_token = create_access_token(user_id=user["id"], username=user["username"], expire_hours=expire_hours)
     return {
         "access_token": access_token,
         "token_type": "bearer",

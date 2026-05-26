@@ -3,6 +3,7 @@
 
 const TOKEN_STORAGE_KEY = "demo_access_token_v1";
 const USER_STORAGE_KEY = "demo_user_v1";
+const SAVED_USERNAME_KEY = "demo_saved_username_v1";
 const SLICER_PRESET_STORAGE_PREFIX = "demo_slicer_preset_id_v1_";
 
 // ── Auth state ──
@@ -166,6 +167,13 @@ export function saveUserSession() {
 export function clearUserSession() {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
     localStorage.removeItem(USER_STORAGE_KEY);
+}
+
+export function saveLastUsername(identifier) {
+    try { localStorage.setItem(SAVED_USERNAME_KEY, (identifier || '').trim()); } catch (e) {}
+}
+export function getLastUsername() {
+    try { return localStorage.getItem(SAVED_USERNAME_KEY) || ''; } catch (e) { return ''; }
 }
 
 // ── API helpers ──

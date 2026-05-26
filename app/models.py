@@ -25,6 +25,7 @@ class LoginRequest(BaseModel):
     captcha_code: str = Field(..., min_length=4, max_length=10)
     accept_terms: bool
     accept_privacy: bool
+    remember_me: bool = False
 
 
 class VerifySendRequest(BaseModel):

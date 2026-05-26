@@ -6,6 +6,7 @@ import {
     authFetch, quoteOptions,
     pendingQuoteFiles, setPendingQuoteFiles,
     selectedFilesMap, thumbnailMap, currentResults, setCurrentResults,
+    saveLastUsername, getLastUsername,
 } from './state.js';
 import { fetchUserSettings, updateDropdowns } from './settings.js';
 import { fetchPrinterModels, fetchSlicerPresets } from './presets.js';
@@ -240,8 +241,11 @@ export function openLoginModal() {
     showLoginView();
     _hideBannerSuccess();
     if (loginModal) loginModal.classList.remove('hidden');
+    // Auto-fill last used username
     const usernameEl = document.getElementById('login-username');
-    if (usernameEl) setTimeout(() => usernameEl.focus(), 100);
+    const saved = getLastUsername();
+    if (usernameEl && saved && !usernameEl.value) usernameEl.value = saved;
+    if (usernameEl) setTimeout(() => { usernameEl.focus(); usernameEl.select(); }, 100);
     refreshLoginCaptcha();
 }
 
@@ -356,6 +360,7 @@ export async function handleLoginSubmit() {
                 identifier, password,
                 captcha_id: currentCaptchaId, captcha_code: captchaCode,
                 accept_terms: true, accept_privacy: true,
+                remember_me: document.getElementById('login-remember-me')?.checked ?? true,
             })
         });
         const data = await response.json();
@@ -478,6 +483,8 @@ export async function handleAuthSuccess(data) {
     } catch (e) {}
 
     saveUserSession();
+    // Remember the username for next login auto-fill
+    if (data.user?.username) saveLastUsername(data.user.username);
     loadSlicerPresetSelection();
     renderAuthUI();
     await fetchUserSettings();
