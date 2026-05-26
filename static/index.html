@@ -173,7 +173,7 @@
                         <div id="login-view" class="px-6 pb-6 space-y-3.5">
                             <div>
                                 <label for="login-username" class="block text-xs font-medium text-gray-700 mb-1">用户名 / 邮箱 / 手机号</label>
-                                <input id="login-username" type="text" autocomplete="username"
+                                <input id="login-username" type="text" name="username" autocomplete="username"
                                     class="block w-full px-3 py-[7px] text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-shadow placeholder:text-gray-400"
                                     placeholder="请输入账号" />
                                 <p id="login-username-err" class="hidden text-[11px] text-red-500 mt-0.5"></p>
@@ -183,7 +183,7 @@
                                     <label for="login-password" class="text-xs font-medium text-gray-700">密码</label>
                                     <button type="button" id="forgot-password-link" class="text-[11px] text-indigo-600 hover:text-indigo-800 hover:underline bg-transparent border-0 cursor-pointer">忘记密码？</button>
                                 </div>
-                                <input id="login-password" type="password" autocomplete="current-password"
+                                <input id="login-password" type="password" name="password" autocomplete="current-password"
                                     class="block w-full px-3 py-[7px] text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-shadow placeholder:text-gray-400"
                                     placeholder="请输入密码" />
                                 <p id="login-password-err" class="hidden text-[11px] text-red-500 mt-0.5"></p>
@@ -192,7 +192,7 @@
                                 <label for="login-captcha-code" class="block text-xs font-medium text-gray-700 mb-1">验证码</label>
                                 <div class="flex gap-2">
                                     <input id="login-captcha-code" type="text" maxlength="4" autocomplete="off" autocapitalize="off" spellcheck="false"
-                                        class="flex-1 px-3 py-[7px] text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-shadow placeholder:text-gray-400 tracking-[0.3em] text-center"
+                                        class="flex-1 px-3 py-[7px] text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-shadow placeholder:text-gray-400 tracking-[0.3em]"
                                         placeholder="4 位验证码" />
                                     <img id="login-captcha-img" alt="验证码" title="点击刷新"
                                         class="h-[38px] w-[100px] border border-gray-200 rounded-md bg-gray-50 cursor-pointer hover:border-gray-300 object-contain" />
@@ -232,7 +232,7 @@
                                 <label for="reset-request-captcha" class="block text-xs font-medium text-gray-700 mb-1">验证码</label>
                                 <div class="flex gap-2">
                                     <input id="reset-request-captcha" type="text" maxlength="4" autocomplete="off" autocapitalize="off" spellcheck="false"
-                                        class="flex-1 px-3 py-[7px] text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-shadow placeholder:text-gray-400 tracking-[0.3em] text-center"
+                                        class="flex-1 px-3 py-[7px] text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-shadow placeholder:text-gray-400 tracking-[0.3em]"
                                         placeholder="4 位验证码" />
                                     <img id="reset-request-captcha-img" alt="验证码" title="点击刷新"
                                         class="h-[38px] w-[100px] border border-gray-200 rounded-md bg-gray-50 cursor-pointer hover:border-gray-300 object-contain" />

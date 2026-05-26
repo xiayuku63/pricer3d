@@ -9,7 +9,7 @@ services:
       - .:/app
       - /app/venv
       - /app/__pycache__
-      - 3d-quote_pricer3d_data:/app/data
+      - pricer3d_data:/app/data
     env_file:
       - .env
     environment:
