@@ -260,7 +260,7 @@ export function refreshBatchColorDropdown() {
     const material = materialSelect.value;
     const colorInput = container.querySelector('.row-color-value');
     const currentColor = colorInput ? colorInput.value : quoteOptions.color;
-    const rendered = renderColorDropdown(material, currentColor);
+    const rendered = renderColorDropdown(material, currentColor, true);
     container.innerHTML = rendered.html;
 }
 
