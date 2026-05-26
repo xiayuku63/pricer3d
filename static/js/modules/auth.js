@@ -70,6 +70,13 @@ function _wireLoginForm() {
     // Submit button
     if (loginSubmitBtn) loginSubmitBtn.addEventListener('click', handleLoginSubmit);
 
+    // Prevent native form submission (triggers password manager detection)
+    const loginForm = document.getElementById('login-view');
+    if (loginForm) loginForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        handleLoginSubmit();
+    });
+
     // ── Forgot password flow ──
     const forgotLink = document.getElementById('forgot-password-link');
     if (forgotLink) forgotLink.addEventListener('click', showResetRequestView);
@@ -366,6 +373,17 @@ export async function handleLoginSubmit() {
         const data = await response.json();
         if (!response.ok) throw new Error(data.detail || '登录失败');
         await handleAuthSuccess(data);
+        // Tell browser password manager to save credentials
+        try {
+            if (window.PasswordCredential && navigator.credentials) {
+                const cred = new PasswordCredential({
+                    id: identifier,
+                    password: password,
+                    name: (data.user && data.user.username) || identifier,
+                });
+                await navigator.credentials.store(cred);
+            }
+        } catch (_) { /* password manager not available */ }
     } catch (err) {
         _showBannerError(err.message || '登录失败，请重试');
         await refreshLoginCaptcha();
