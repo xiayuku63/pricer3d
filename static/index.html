@@ -62,7 +62,26 @@
                             </div>
                         </dl>
 
-                        <div class="mt-6 overflow-x-auto">
+                        <!-- 批量设置工具栏 -->
+                        <div id="batch-edit-bar" class="mt-4 flex items-center gap-3 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                            <span class="text-xs font-medium text-indigo-700 whitespace-nowrap">批量设置：</span>
+                            <div class="flex items-center gap-1.5">
+                                <label class="text-[11px] text-gray-600">材料</label>
+                                <select id="batch-material" class="text-[11px] border border-gray-300 rounded px-2 py-1 bg-white"></select>
+                            </div>
+                            <div class="flex items-center gap-1.5" id="batch-color-cell">
+                                <label class="text-[11px] text-gray-600">颜色</label>
+                                <div id="batch-color-dropdown"></div>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <label class="text-[11px] text-gray-600">数量</label>
+                                <input id="batch-quantity" type="number" min="1" value="1" class="w-16 text-[11px] border border-gray-300 rounded px-2 py-1" />
+                            </div>
+                            <button id="batch-apply-btn" type="button" class="text-[11px] px-3 py-1.5 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors whitespace-nowrap">应用到全部</button>
+                            <span id="batch-msg" class="text-[11px] text-indigo-600 hidden"></span>
+                        </div>
+
+                        <div class="mt-4 overflow-x-auto">
                             <table class="min-w-full text-[11px] text-left border border-gray-200 rounded-md overflow-hidden whitespace-nowrap">
                                 <thead class="bg-gray-100 text-gray-700">
                                     <tr>
@@ -750,6 +769,6 @@
     </div>
 
     <!-- 将表单处理逻辑拆分 -->
-    <script type="module" src="/static/js/main.js?v=18"></script>
+    <script type="module" src="/static/js/main.js?v=19"></script>
 </body>
 </html>

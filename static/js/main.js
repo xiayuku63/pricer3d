@@ -54,6 +54,7 @@ import {
     mergeResultsByFilename, normalizeResultsWithCurrentOptions,
     reQuoteAllSelectedFiles, renderResultsTable, recalcSummaryFromCurrentResults,
     handleRowEditChange, refreshOptionsSummary, setOpenLoginModalRef,
+    refreshBatchMaterialDropdown, refreshBatchColorDropdown, batchApplyToAll,
 } from './modules/quote.js';
 import {
     initPreview, buildStlThumbnail, buildNonStlThumbnail,
@@ -305,6 +306,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     if (dom.optionsCloseBtn) dom.optionsCloseBtn.addEventListener('click', () => dom.optionsModal.classList.add('hidden'));
     if (dom.optionsBackdrop) dom.optionsBackdrop.addEventListener('click', () => dom.optionsModal.classList.add('hidden'));
+
+    // Batch edit bar
+    const batchMaterial = document.getElementById('batch-material');
+    const batchApplyBtn = document.getElementById('batch-apply-btn');
+    const batchQuantity = document.getElementById('batch-quantity');
+    if (batchMaterial) batchMaterial.addEventListener('change', refreshBatchColorDropdown);
+    if (batchApplyBtn) batchApplyBtn.addEventListener('click', batchApplyToAll);
+    if (batchQuantity) {
+        batchQuantity.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); batchApplyToAll(); }
+        });
+    }
 
     // Open options modal
     const openOptionsTrigger = document.querySelector('[data-open-options]');

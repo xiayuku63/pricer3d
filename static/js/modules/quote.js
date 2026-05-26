@@ -244,6 +244,76 @@ export function renderResultsTable() {
     });
 }
 
+// ── Batch edit bar ──
+export function refreshBatchMaterialDropdown() {
+    const sel = document.getElementById('batch-material');
+    if (!sel) return;
+    sel.innerHTML = MATERIAL_OPTIONS.map(m => `<option value="${m.name}">${m.name}</option>`).join('');
+    sel.value = quoteOptions.material;
+    refreshBatchColorDropdown();
+}
+
+export function refreshBatchColorDropdown() {
+    const container = document.getElementById('batch-color-dropdown');
+    const materialSelect = document.getElementById('batch-material');
+    if (!container || !materialSelect) return;
+    const material = materialSelect.value;
+    const colorInput = container.querySelector('.row-color-value');
+    const currentColor = colorInput ? colorInput.value : quoteOptions.color;
+    const rendered = renderColorDropdown(material, currentColor);
+    container.innerHTML = rendered.html;
+}
+
+export async function batchApplyToAll() {
+    const { errorContainer, errorMsg } = dom;
+    const materialSelect = document.getElementById('batch-material');
+    const colorContainer = document.getElementById('batch-color-dropdown');
+    const quantityInput = document.getElementById('batch-quantity');
+    const msgEl = document.getElementById('batch-msg');
+    if (!materialSelect || !colorContainer || !quantityInput) return;
+
+    const material = materialSelect.value;
+    const colorInput = colorContainer.querySelector('.row-color-value');
+    const color = colorInput ? colorInput.value : '';
+    const quantity = Number.parseInt(quantityInput.value, 10);
+
+    if (!Number.isFinite(quantity) || quantity < 1) {
+        if (errorMsg) { errorMsg.textContent = '数量必须大于等于 1'; errorContainer.classList.remove('hidden'); }
+        return;
+    }
+
+    if (!currentResults.length) {
+        if (errorMsg) { errorMsg.textContent = '没有可批量设置的文件，请先上传文件并报价'; errorContainer.classList.remove('hidden'); }
+        return;
+    }
+
+    if (errorContainer) errorContainer.classList.add('hidden');
+
+    // Update all currentResults
+    const allowedColors = getColorsForMaterial(material);
+    setCurrentResults(currentResults.map(item => {
+        if (!item || !item.filename) return item;
+        return { ...item, material, color, quantity };
+    }));
+
+    // Update quoteOptions as well
+    quoteOptions.material = material;
+    quoteOptions.color = color;
+    quoteOptions.quantity = quantity;
+    refreshOptionsSummary();
+
+    // Show progress message
+    if (msgEl) { msgEl.textContent = '重算中...'; msgEl.classList.remove('hidden'); }
+
+    // Trigger re-quote for all files
+    try {
+        await reQuoteAllSelectedFiles('批量设置');
+        if (msgEl) { msgEl.textContent = `已应用：${material} / ${color} / ×${quantity}`; }
+    } catch (err) {
+        if (msgEl) { msgEl.textContent = '部分重算失败'; }
+    }
+}
+
 // ── Row editing ──
 const _rowEditTimers = new Map();
 const _rowEditSignals = new Map();

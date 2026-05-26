@@ -12,7 +12,7 @@ import {
 } from './state.js';
 import { openLoginModal } from './auth.js';
 import { renderSlicerPresetsUI, fetchSlicerPresets } from './presets.js';
-import { refreshOptionsSummary, normalizeResultsWithCurrentOptions, renderResultsTable, recalcSummaryFromCurrentResults, reQuoteAllSelectedFiles } from './quote.js';
+import { refreshOptionsSummary, normalizeResultsWithCurrentOptions, renderResultsTable, recalcSummaryFromCurrentResults, reQuoteAllSelectedFiles, refreshBatchMaterialDropdown } from './quote.js';
 
 let dom = {};
 
@@ -46,6 +46,7 @@ export function updateDropdowns() {
         quoteOptions.color = rendered.selected;
     }
     refreshOptionsSummary();
+    refreshBatchMaterialDropdown();
 }
 
 export function refreshQuoteColorDropdowns() {
