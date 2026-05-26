@@ -80,13 +80,13 @@ export function renderUserCenterUI() {
     if (materialsTbody) {
         materialsTbody.innerHTML = MATERIAL_OPTIONS.map((m, idx) => `
             <tr>
-                <td class="px-2 py-2"><input type="text" class="w-full border-gray-300 rounded-sm text-xs px-1 py-1" value="${escapeHtml(m.name)}" data-idx="${idx}" data-field="name"></td>
-                <td class="px-2 py-2"><input type="text" class="w-full border-gray-300 rounded-sm text-xs px-1 py-1" value="${escapeHtml(m.brand || '通用')}" data-idx="${idx}" data-field="brand"></td>
-                <td class="px-2 py-2"><input type="number" step="0.01" class="w-full border-gray-300 rounded-sm text-xs px-1 py-1" value="${m.density}" data-idx="${idx}" data-field="density"></td>
-                <td class="px-2 py-2"><input type="number" step="0.01" class="w-full border-gray-300 rounded-sm text-xs px-1 py-1" value="${m.price_per_kg}" data-idx="${idx}" data-field="price_per_kg"></td>
+                <td class="px-2 py-2"><input type="text" class="w-full border-gray-400 rounded-sm text-xs px-1 py-1" value="${escapeHtml(m.name)}" data-idx="${idx}" data-field="name"></td>
+                <td class="px-2 py-2"><input type="text" class="w-full border-gray-400 rounded-sm text-xs px-1 py-1" value="${escapeHtml(m.brand || '通用')}" data-idx="${idx}" data-field="brand"></td>
+                <td class="px-2 py-2"><input type="number" step="0.01" class="w-full border-gray-400 rounded-sm text-xs px-1 py-1" value="${m.density}" data-idx="${idx}" data-field="density"></td>
+                <td class="px-2 py-2"><input type="number" step="0.01" class="w-full border-gray-400 rounded-sm text-xs px-1 py-1" value="${m.price_per_kg}" data-idx="${idx}" data-field="price_per_kg"></td>
                 <td class="px-2 py-2">
                     <div class="flex flex-wrap items-center gap-1">
-                        ${materialColorsArray(m).map(c => `<span class="w-4 h-4 rounded-sm border border-gray-300 inline-block cursor-pointer" style="background:${c.hex}" title="${escapeHtml(c.name)}" data-color-idx="${idx}" data-color-hex="${c.hex}"></span>`).join('')}
+                        ${materialColorsArray(m).map(c => `<span class="w-4 h-4 rounded-sm border border-gray-400 inline-block cursor-pointer" style="background:${c.hex}" title="${escapeHtml(c.name)}" data-color-idx="${idx}" data-color-hex="${c.hex}"></span>`).join('')}
                         <button type="button" class="text-xs text-indigo-600 hover:text-indigo-800 edit-colors-btn" data-idx="${idx}">编辑</button>
                     </div>
                 </td>
@@ -154,7 +154,7 @@ export function openColorEditor(materialIdx) {
     if (list) {
         list.innerHTML = colors.map(c => `
             <div class="flex items-center gap-2 p-1.5 bg-gray-50 rounded-md">
-                <span class="w-6 h-6 rounded-sm border border-gray-300 flex-shrink-0" style="background:${c.hex}"></span>
+                <span class="w-6 h-6 rounded-sm border border-gray-400 flex-shrink-0" style="background:${c.hex}"></span>
                 <span class="text-xs flex-1 font-mono">${c.hex}</span>
                 <button type="button" class="text-red-400 hover:text-red-600 text-xs remove-color-btn" data-color-hex="${c.hex}">×</button>
             </div>

@@ -97,7 +97,7 @@ export function formatColorLabel(colorKey) {
     if (!obj) return String(colorKey || '');
     const hex = obj.hex;
     if (!hex) return escapeHtml(obj.name || String(colorKey || ''));
-    return `<span class="inline-flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded-sm border border-gray-300 inline-block" style="background:${hex}"></span><span class="font-mono text-[11px]">${hex}</span></span>`;
+    return `<span class="inline-flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded-sm border border-gray-400 inline-block" style="background:${hex}"></span><span class="font-mono text-[11px]">${hex}</span></span>`;
 }
 
 export function normalizeColorToken(token) {
@@ -266,14 +266,14 @@ export function renderColorDropdown(name, selectedColor, compact) {
         return '<button type="button" class="color-dd-item flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-gray-50 border-b border-gray-100 last:border-0 text-left'
             + (c.hex === safeHex ? ' bg-indigo-50' : '')
             + '" data-color-hex="' + hex + '">'
-            + '<span class="w-5 h-5 rounded-sm border border-gray-300 flex-shrink-0" style="background:' + hex + '"></span>'
+            + '<span class="w-5 h-5 rounded-sm border border-gray-400 flex-shrink-0" style="background:' + hex + '"></span>'
             + '<span class="flex-1 font-mono text-xs">' + hex + '</span>'
             + '</button>';
     }).join('');
 
     if (compact) {
         const html = '<div class="color-dd-wrapper relative inline-block">'
-            + '<button type="button" class="color-dd-trigger flex items-center gap-1 px-1.5 py-0.5 border border-gray-300 rounded text-[11px] bg-white hover:border-gray-400 min-w-[36px]">'
+            + '<button type="button" class="color-dd-trigger flex items-center gap-1 px-1.5 py-0.5 border border-gray-400 rounded text-[11px] bg-white hover:border-gray-400 min-w-[36px]">'
             + '<span class="color-dd-swatch w-3.5 h-3.5 rounded-sm flex-shrink-0" style="background:' + safeHex + '"></span>'
             + '<svg class="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>'
             + '</button>'
@@ -286,8 +286,8 @@ export function renderColorDropdown(name, selectedColor, compact) {
     }
 
     const html = '<div class="color-dd-wrapper relative">'
-        + '<button type="button" class="color-dd-trigger flex items-center gap-2 w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white hover:border-gray-400">'
-        + '<span class="color-dd-swatch w-5 h-5 rounded-sm border border-gray-300 flex-shrink-0" style="background:' + safeHex + '"></span>'
+        + '<button type="button" class="color-dd-trigger flex items-center gap-2 w-full px-3 py-2 border border-gray-400 rounded-md text-sm bg-white hover:border-gray-400">'
+        + '<span class="color-dd-swatch w-5 h-5 rounded-sm border border-gray-400 flex-shrink-0" style="background:' + safeHex + '"></span>'
         + '<span class="color-dd-label flex-1 text-left font-mono text-xs">' + safeHex + '</span>'
         + '<svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>'
         + '</button>'
