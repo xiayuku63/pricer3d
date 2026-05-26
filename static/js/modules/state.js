@@ -274,7 +274,7 @@ export function renderColorDropdown(name, selectedColor, compact) {
     if (compact) {
         const html = '<div class="color-dd-wrapper relative inline-block">'
             + '<button type="button" class="color-dd-trigger flex items-center gap-1 px-1.5 py-0.5 border border-gray-400 rounded text-[11px] bg-white hover:border-gray-400 min-w-[36px]">'
-            + '<span class="color-dd-swatch w-3.5 h-3.5 rounded-sm flex-shrink-0" style="background:' + safeHex + '"></span>'
+            + '<span class="color-dd-swatch w-3.5 h-3.5 rounded-sm border border-gray-400 flex-shrink-0" style="background:' + safeHex + '"></span>'
             + '<svg class="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>'
             + '</button>'
             + '<div class="color-dd-list hidden absolute z-30 left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto min-w-[140px]">'
