@@ -2,7 +2,7 @@
 import {
     authToken, setAuthToken, currentUser, setCurrentUser,
     currentCaptchaId, currentCaptchaUrl, setCaptchaId, setCaptchaUrl,
-    saveUserSession, clearUserSession, loadSlicerPresetSelection,
+    saveUserSession, clearUserSession, loadUserSession, loadSlicerPresetSelection,
     authFetch, quoteOptions,
     pendingQuoteFiles, setPendingQuoteFiles,
     selectedFilesMap, thumbnailMap, currentResults, setCurrentResults,
