@@ -82,7 +82,7 @@ SYSTEM_SLICER_PRESET_ID = 0
 
 DEFAULT_COLORS = [
     {"name": "白色", "hex": "#ffffff"},
-    {"name": "黑色", "hex": "#1a1a1a"},
+    {"name": "黑色", "hex": "#000000"},
     {"name": "灰色", "hex": "#808080"},
     {"name": "红色", "hex": "#dc2626"},
     {"name": "蓝色", "hex": "#2563eb"},

@@ -376,7 +376,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     if (dom.addMaterialBtn) dom.addMaterialBtn.addEventListener('click', () => {
-        MATERIAL_OPTIONS.push({ name: "NewMaterial", brand: "通用", density: 1.0, price_per_kg: 200.0, colors: [{ name: "白色", hex: "#ffffff" }] });
+        MATERIAL_OPTIONS.push({ name: "NewMaterial", brand: "通用", density: 1.0, price_per_kg: 200.0, colors: [{ name: "黑色", hex: "#000000" }] });
         renderUserCenterUI();
     });
 

@@ -35,7 +35,7 @@ export let slicerPresets = [];
 // ── Default materials (only used when not logged in / no user settings) ──
 const DEFAULT_COLORS = [
     { name: '白色', hex: '#ffffff' },
-    { name: '黑色', hex: '#1a1a1a' },
+    { name: '黑色', hex: '#000000' },
     { name: '灰色', hex: '#808080' },
     { name: '红色', hex: '#dc2626' },
     { name: '蓝色', hex: '#2563eb' },
@@ -215,7 +215,7 @@ export function getMaterialByName(name) {
 export function getColorsForMaterial(name) {
     const material = getMaterialByName(name);
     const colors = material && Array.isArray(material.colors) ? material.colors : [];
-    return colors.length ? colors : COLOR_OPTIONS;
+    return colors.length ? colors : [{ name: '黑色', hex: '#000000' }];
 }
 
 export function isColorInAllowedColors(color, allowedColors) {
