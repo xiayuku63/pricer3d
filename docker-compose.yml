@@ -19,5 +19,5 @@ services:
       - DB_PATH=/app/data/app.db
 
 volumes:
-  3d-quote_pricer3d_data:
+  pricer3d_pricer3d_data:
     external: true
