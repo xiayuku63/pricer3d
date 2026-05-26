@@ -288,7 +288,7 @@ export function renderColorDropdown(name, selectedColor, compact) {
             + '" data-color-hex="' + (c.hex || c.name) + '" data-color-name="' + escapeHtml(c.name) + '">'
             + '<span class="w-5 h-5 rounded-sm border border-gray-300 flex-shrink-0" style="background:' + hexBg + '"></span>'
             + '<span class="flex-1">' + escapeHtml(label) + '</span>'
-            + (c.hex ? '<span class="text-[10px] text-gray-400 font-mono">' + c.hex + '</span>' : '')
+            + (c.hex && c.name !== c.hex ? '<span class="text-[10px] text-gray-400 font-mono">' + c.hex + '</span>' : '')
             + '</button>';
     }).join('');
 

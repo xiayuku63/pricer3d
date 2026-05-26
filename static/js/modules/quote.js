@@ -289,23 +289,24 @@ export async function batchApplyToAll() {
 
     if (errorContainer) errorContainer.classList.add('hidden');
 
-    // Update all currentResults
-    const allowedColors = getColorsForMaterial(material);
+    // 1) 先更新模型数据
     setCurrentResults(currentResults.map(item => {
         if (!item || !item.filename) return item;
         return { ...item, material, color, quantity };
     }));
 
-    // Update quoteOptions as well
+    // 2) 更新报价选项
     quoteOptions.material = material;
     quoteOptions.color = color;
     quoteOptions.quantity = quantity;
     refreshOptionsSummary();
 
-    // Show progress message
-    if (msgEl) { msgEl.textContent = '重算中...'; msgEl.classList.remove('hidden'); }
+    // 3) 立即刷新表格，让用户看到修改后的参数
+    renderResultsTable();
+    recalcSummaryFromCurrentResults();
 
-    // Trigger re-quote for all files
+    // 4) 后台重新计算精确报价
+    if (msgEl) { msgEl.textContent = '重算中...'; msgEl.classList.remove('hidden'); }
     try {
         await reQuoteAllSelectedFiles('批量设置');
         if (msgEl) { msgEl.textContent = `已应用：${material} / ${color} / ×${quantity}`; }
