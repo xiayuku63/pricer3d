@@ -1,6 +1,6 @@
-"""orientation_math — 纯数学工具函数。
+"""3D rotation math utilities for orientation optimization.
 
-从 orientation.py 拆分出：斐波那契球面采样、罗德里格斯旋转、面片对齐。
+Pure math functions with no project dependencies — safe for any module to import.
 """
 
 import math
@@ -8,7 +8,7 @@ import numpy as np
 
 
 def fibonacci_sphere_sampling(n: int) -> np.ndarray:
-    """在单位球面上均匀分布 n 个采样点。"""
+    """Generate n nearly-uniform points on the unit sphere using Fibonacci spiral."""
     points = np.zeros((n, 3))
     phi = math.pi * (3.0 - math.sqrt(5.0))
     for i in range(n):
@@ -20,7 +20,7 @@ def fibonacci_sphere_sampling(n: int) -> np.ndarray:
 
 
 def rodrigues_rotation(axis: np.ndarray, angle: float) -> np.ndarray:
-    """绕任意轴旋转 angle 弧度，返回 3×3 旋转矩阵。"""
+    """Rodrigues rotation formula — rotate around an arbitrary axis."""
     axis = np.asarray(axis, dtype=np.float64)
     axis_norm = float(np.linalg.norm(axis))
     if axis_norm < 1e-12:
@@ -38,7 +38,7 @@ def rodrigues_rotation(axis: np.ndarray, angle: float) -> np.ndarray:
 
 
 def align_face_to_z(normal: np.ndarray) -> np.ndarray:
-    """计算使面法向量对齐到 Z 轴的旋转矩阵。"""
+    """Compute rotation matrix that aligns a face normal to +Z axis."""
     normal = np.asarray(normal, dtype=np.float64)
     n2 = float(np.linalg.norm(normal))
     if n2 < 1e-12:
@@ -54,7 +54,7 @@ def align_face_to_z(normal: np.ndarray) -> np.ndarray:
 
 
 def rotation_to_euler(R: np.ndarray) -> dict:
-    """旋转矩阵 → 欧拉角 (度)。返回 {"x", "y", "z"}。"""
+    """Convert a 3x3 or 4x4 rotation matrix to Euler angles (degrees)."""
     if R.shape == (4, 4):
         R3 = R[:3, :3].astype(np.float64)
     else:
@@ -77,7 +77,7 @@ def rotation_to_euler(R: np.ndarray) -> dict:
 
 
 def rotation_from_up_vector(up: np.ndarray) -> np.ndarray:
-    """计算使 up 向量对齐到 Z 轴的 4×4 变换矩阵。"""
+    """Compute 4x4 rotation matrix so that the given up vector points to +Z."""
     z = np.array([0.0, 0.0, 1.0], dtype=np.float64)
     up = np.asarray(up, dtype=np.float64)
     norm = float(np.linalg.norm(up))

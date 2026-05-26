@@ -74,15 +74,16 @@ export function initViewer(previewContainerEl, previewPlaceholderEl) {
     window._BED_CENTER = BED_HALF;
 
     renderer.domElement.addEventListener('click', (event) => {
-        if (!faceClickCallback || !currentMesh) return;
+        if (!currentMesh) return;
         const rect = renderer.domElement.getBoundingClientRect();
         mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
         mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
         raycaster.setFromCamera(mouse, camera);
-        // Lay on Face cluster 命中检测（通过全局回调）
+        // Lay on Face cluster 命中检测（通过全局回调）— 需在 faceClickCallback 检查之前
         if (typeof window.__onLayFaceClick === 'function') {
             if (window.__onLayFaceClick(raycaster)) return;
         }
+        if (!faceClickCallback) return;
         if (highlightMode && highlightGroup && highlightGroup.children.length > 0) {
             const intersects = raycaster.intersectObjects(highlightGroup.children, false);
             if (intersects.length > 0) {
