@@ -24,6 +24,8 @@ from .config import (
     SMTP_FROM,
     SMTP_USE_SSL,
     SMTP_USE_TLS,
+    RESEND_API_KEY,
+    VERIFY_CODE_TTL_SECONDS,
     VERIFY_CODE_TTL_SECONDS,
     VERIFY_CODE_MAX_ATTEMPTS,
     VERIFY_SEND_COOLDOWN_SECONDS,
@@ -184,6 +186,8 @@ def consume_verification_code(channel: str, target: str, code: str) -> bool:
 # ---------- SMTP email ----------
 
 def is_smtp_configured() -> bool:
+    if RESEND_API_KEY:
+        return True
     if not SMTP_HOST:
         return False
     if SMTP_USE_SSL and SMTP_PORT <= 0:
@@ -193,8 +197,43 @@ def is_smtp_configured() -> bool:
     return True
 
 
+def send_email_via_resend(to_email: str, code: str) -> tuple[bool, str]:
+    """Send via Resend API. Returns (ok, error_message)."""
+    import logging
+    logger = logging.getLogger(__name__)
+    try:
+        import resend
+        resend.api_key = RESEND_API_KEY
+        html_body = f"""\
+<div style="max-width:480px;margin:0 auto;padding:24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb">
+  <h2 style="color:#4f46e5;margin:0 0 16px">3D打印自动报价系统</h2>
+  <p style="color:#374151;font-size:14px;line-height:1.6">您正在进行邮箱验证，验证码如下：</p>
+  <div style="background:#eef2ff;border-radius:8px;padding:20px;text-align:center;margin:20px 0">
+    <span style="font-size:28px;font-weight:700;letter-spacing:6px;color:#4f46e5;font-family:'Courier New',monospace">{code}</span>
+  </div>
+  <p style="color:#6b7280;font-size:12px;line-height:1.6">有效期：{int(VERIFY_CODE_TTL_SECONDS)} 秒<br>如非本人操作，请忽略本邮件。</p>
+</div>"""
+        resend.Emails.send({
+            "from": "noreply@pricer3d.top",
+            "to": [to_email],
+            "subject": "邮箱验证码 - 3D打印自动报价系统",
+            "html": html_body,
+        })
+        return True, ""
+    except Exception as e:
+        msg = str(e)[:200]
+        logger.error(f"Resend send failed to {to_email}: {e}")
+        return False, msg
+
+
 def send_email_verification_code(to_email: str, code: str) -> None:
     import os
+    # Resend 优先
+    if RESEND_API_KEY:
+        ok, err = send_email_via_resend(to_email, code)
+        if not ok:
+            raise RuntimeError(err or "邮件发送失败，请稍后重试")
+        return
     if not is_smtp_configured():
         raise RuntimeError("SMTP 未配置")
     from_addr = (SMTP_FROM or SMTP_USER or "").strip()

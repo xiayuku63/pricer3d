@@ -12,3 +12,4 @@ python-docx
 openpyxl
 sqlalchemy
 alembic
+resend

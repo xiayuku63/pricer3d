@@ -33,6 +33,10 @@
         let emailTimer = null;
         let phoneTimer = null;
 
+        function apiErrorMsg(data) {
+            return data.message || data.detail || '操作失败';
+        }
+
         function showMsg(text, type = "error") {
             msgEl.textContent = text;
             msgEl.className = type === "ok" ? "text-xs text-green-600" : "text-xs text-red-600";
@@ -79,7 +83,7 @@
                     body: JSON.stringify({ field, value: v }),
                 });
                 const data = await res.json();
-                if (!res.ok) throw new Error(data.detail || '检查失败');
+                if (!res.ok) throw new Error(data.message || data.detail || '检查失败');
                 return data;
             } catch (e) {
                 return { valid: false, exists: false, message: e.message || '检查失败', failed: true };
@@ -154,7 +158,7 @@
             try {
                 const res = await fetch('/api/auth/captcha');
                 const data = await res.json();
-                if (!res.ok) throw new Error(data.detail || '验证码获取失败');
+                if (!res.ok) throw new Error(data.message || data.detail || '验证码获取失败');
                 captchaId = data.captcha_id || "";
                 captchaUrl = data.image_url || "";
                 if (captchaUrl) captchaImgEl.src = `${captchaUrl}?t=${Date.now()}`;
@@ -168,7 +172,7 @@
         }
 
         function passwordStrongEnough(pw) {
-            return pw.length >= 6 && /[A-Za-z]/.test(pw) && /\d/.test(pw);
+            return pw.length >= 8 && /[A-Za-z]/.test(pw) && /\d/.test(pw);
         }
 
         function setRegisterChannel(ch) {
@@ -194,9 +198,13 @@
                     body: JSON.stringify({ channel, target })
                 });
                 const data = await res.json();
-                if (!res.ok) throw new Error(data.detail || '发送失败');
+                if (!res.ok) throw new Error(data.message || data.detail || '发送失败');
                 if (data.dev_code) {
-                    showMsg(`验证码已发送（开发模式）：${data.dev_code}`, 'ok');
+                    let msg = `验证码已发送（开发模式）：${data.dev_code}`;
+                    if (data.email_warning) {
+                        msg += ` ⚠️ ${data.email_warning}`;
+                    }
+                    showMsg(msg, 'ok');
                 } else {
                     showMsg('验证码已发送，请查收', 'ok');
                 }
@@ -206,6 +214,11 @@
         }
 
         sendEmailBtn.addEventListener('click', () => {
+            const acceptLegal = !!(acceptLegalEl && acceptLegalEl.checked);
+            if (!acceptLegal) {
+                showMsg('请先勾选同意《用户协议》和《隐私政策》', 'error');
+                return;
+            }
             const email = (emailEl.value || '').trim();
             if (!email) {
                 showMsg('请输入邮箱', 'error');
@@ -221,6 +234,11 @@
         });
 
         sendPhoneBtn.addEventListener('click', () => {
+            const acceptLegal = !!(acceptLegalEl && acceptLegalEl.checked);
+            if (!acceptLegal) {
+                showMsg('请先勾选同意《用户协议》和《隐私政策》', 'error');
+                return;
+            }
             const phone = (phoneEl.value || '').trim();
             if (!phone) {
                 showMsg('请输入手机号', 'error');
@@ -271,7 +289,7 @@
             const acceptLegal = !!(acceptLegalEl && acceptLegalEl.checked);
 
             if (!username) return showMsg('请输入用户名', 'error');
-            if (!passwordStrongEnough(password)) return showMsg('密码至少6位且必须包含字母和数字', 'error');
+            if (!passwordStrongEnough(password)) return showMsg('密码至少8位且必须包含字母和数字', 'error');
             if (!captchaId || !captchaCode) {
                 await refreshCaptcha();
                 return showMsg('请完成图形验证码', 'error');
@@ -310,7 +328,7 @@
                     })
                 });
                 const data = await res.json();
-                if (!res.ok) throw new Error(data.detail || '注册失败');
+                if (!res.ok) throw new Error(data.message || data.detail || '注册失败');
                 localStorage.setItem(TOKEN_STORAGE_KEY, data.access_token || "");
                 localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data.user || {}));
                 window.location.href = '/';

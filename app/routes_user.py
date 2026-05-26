@@ -18,11 +18,17 @@ from calculator.cost import validate_formula_expression
 logger = logging.getLogger(__name__)
 
 
+class ColorItem(BaseModel):
+    name: str = Field(..., min_length=1, max_length=40)
+    hex: str = Field(default="", max_length=7)
+
+
 class MaterialItem(BaseModel):
     name: str = Field(..., min_length=1, max_length=40)
+    brand: Optional[str] = Field(default="通用", max_length=40)
     density: float = Field(..., gt=0, le=10)
     price_per_kg: float = Field(..., ge=0, le=100000)
-    colors: List[str] = Field(default_factory=list, max_length=30)
+    colors: List = Field(default_factory=list, max_length=30)  # List[ColorItem|str]
 
 
 class PricingConfig(BaseModel):

@@ -11,7 +11,6 @@ import logging
 from typing import List, Optional
 from fastapi import UploadFile, Request
 
-from parser.slicer import run_bambu_slice, bambu_support_diff_stats
 from parser.prusa_slicer import run_prusa_slice, prusa_support_diff_stats
 
 logger = logging.getLogger(__name__)
@@ -215,18 +214,6 @@ def validate_formula_expression(expr: str) -> tuple[bool, str, list[str]]:
     return True, "", sorted(used_vars)
 
 
-def _bambu_sets_from_quote_params(layer_height_mm: float, infill_percent: int, perimeters: Optional[int]) -> dict[str, str]:
-    d = {
-        "sliceHeight": str(layer_height_mm),
-        "sliceFillSparse": str(max(0.0, min(1.0, infill_percent / 100.0)))
-    }
-    if perimeters is not None:
-        d["sliceShells"] = str(perimeters)
-        d["sliceTopShells"] = str(perimeters)
-        d["sliceBottomShells"] = str(perimeters)
-    return d
-
-
 def calculate_cost(
     volume_mm3,
     surface_area_mm2,
@@ -240,6 +227,7 @@ def calculate_cost(
     slicer_preset: Optional[dict] = None,
     perimeters: Optional[int] = None,
     current_user: Optional[dict] = None,
+    auto_orient: bool = False,
 ):
     from app.utils import normalize_materials, _sanitize_filename_component, _user_base_dir, _date_folder_utc
     from app.config import DEFAULT_MATERIALS
@@ -282,7 +270,33 @@ def calculate_cost(
     difficulty_multiplier = 1.0 + (difficulty_coefficient * difficulty_score)
     difficulty_markup_percent = max(0.0, (difficulty_multiplier - 1.0) * 100.0)
 
-    # Determine which slicer to use
+    # ── 自动朝向优化 (Lay on Face) ──
+    orientation_info: dict = {}
+    _oriented_tmp_path: Optional[str] = None
+    if auto_orient and model_path and os.path.exists(model_path):
+        try:
+            from calculator.orientation import get_best_face_for_slicing
+            orient_result = get_best_face_for_slicing(model_path)
+            oriented_path = orient_result.get("oriented_path")
+            if oriented_path and oriented_path != model_path:
+                _oriented_tmp_path = oriented_path
+                logger.info(
+                    "自动朝向优化: 得分=%.1f 旋转=%s → %s",
+                    orient_result.get("score", 0),
+                    orient_result.get("euler_angles_deg", {}),
+                    os.path.basename(oriented_path),
+                )
+                orientation_info = {
+                    "auto_orient_score": orient_result.get("score"),
+                    "euler_angles_deg": orient_result.get("euler_angles_deg"),
+                    "selected_face_area": orient_result.get("face", {}).get("area") if orient_result.get("face") else None,
+                    "tune_report": orient_result.get("tune_report"),
+                }
+                model_path = oriented_path
+        except Exception as e:
+            logger.warning("自动朝向优化失败，使用原始朝向: %s", e)
+
+    # Determine whether to use PrusaSlicer
     raw_prusa = cfg.get("use_prusaslicer")
     use_prusaslicer = False
     try:
@@ -290,19 +304,12 @@ def calculate_cost(
     except Exception:
         use_prusaslicer = str(raw_prusa or "").strip().lower() in {"1", "true", "yes", "y", "on"}
 
-    raw_bambu = cfg.get("use_bambu") or cfg.get("use_kirimoto") or cfg.get("use_curaengine")
-    use_bambu = False
-    try:
-        use_bambu = bool(int(raw_bambu))
-    except Exception:
-        use_bambu = str(raw_bambu or "").strip().lower() in {"1", "true", "yes", "y", "on"}
-
-    bambu_support_mode = str(cfg.get("bambu_support_mode") or cfg.get("kirimoto_support_mode") or cfg.get("curaengine_support_mode") or "diff").strip().lower() or "diff"
+    support_mode = str(cfg.get("support_mode") or "diff").strip().lower() or "diff"
 
     slicer_time_s = None
     slicer_filament_g_per_part = None
     preset_used = None
-    bambu_error_msg = None
+    slicer_error_msg = None
     prusaslicer_used = False
     support_weight_g_per_part = 0.0
 
@@ -312,7 +319,7 @@ def calculate_cost(
             logger.info(f"PrusaSlicer enabled, slicing: {model_path}")
             prusaslicer_used = True
 
-            # Convert 3MF to STL for PrusaSlicer (it can't read Bambu-format 3MF)
+            # Convert 3MF to STL for PrusaSlicer
             actual_slice_path = model_path
             _tmp_3mf_stl = None
             if model_path.lower().endswith(".3mf"):
@@ -324,7 +331,7 @@ def calculate_cost(
 
             # Load printer profile for slicing
             _printer_profile = None
-            printer_id = cfg.get("printer_model", "") or "bambu_a1"
+            printer_id = cfg.get("printer_model", "") or ""
             if printer_id:
                 from app.printers import PRINTER_MODELS
                 for pm in PRINTER_MODELS:
@@ -338,7 +345,7 @@ def calculate_cost(
             os.makedirs(outputs_job_dir, exist_ok=True)
 
             output_gcode = os.path.join(outputs_job_dir, f"{output_prefix}.gcode")
-            if bambu_support_mode == "diff":
+            if support_mode == "diff":
                 st = prusa_support_diff_stats(
                     actual_slice_path,
                     layer_height=layer_height_mm,
@@ -358,10 +365,8 @@ def calculate_cost(
                 if st.get("filament_g") is not None and float(st["filament_g"]) > 0:
                     slicer_filament_g_per_part = float(st["filament_g"])
                 elif st.get("filament_cm3") is not None and float(st["filament_cm3"]) > 0:
-                    # Calculate weight from volume if density wasn't set
                     filament_cm3 = float(st["filament_cm3"])
                     slicer_filament_g_per_part = filament_cm3 * spec["density"]
-                # Capture preset info from PrusaSlicer result
                 if not preset_used and st.get("preset_used"):
                     preset_used = str(st["preset_used"])
             else:
@@ -375,7 +380,6 @@ def calculate_cost(
                     printer_profile_path=_printer_profile,
                 )
                 if stats.get("time_s", 0) > 0:
-                    # Apply PrusaSlicer time correction factor
                     correction = float(cfg.get("prusa_time_correction") or 1.0)
                     if correction <= 0 or correction > 5:
                         correction = 1.0
@@ -392,78 +396,12 @@ def calculate_cost(
             logger.error(f"PrusaSlicer failed for {model_path}: {e}")
             slicer_time_s = None
             slicer_filament_g_per_part = None
-            bambu_error_msg = f"PrusaSlicer: {e}"
+            slicer_error_msg = f"PrusaSlicer: {e}"
             # Clean up 3MF temp STL
             if _tmp_3mf_stl and os.path.exists(_tmp_3mf_stl):
                 try: os.unlink(_tmp_3mf_stl)
                 except OSError: pass
 
-    # ---- Bambu Studio (fallback, requires display/Wayland) ----
-    if use_bambu and model_path and os.path.exists(model_path):
-        preset_tmp_path = None
-        try:
-            logger.info(f"Bambu Slicer enabled, slicing: {model_path}")
-            base_name = os.path.splitext(os.path.basename(model_path))[0]
-            output_prefix = _sanitize_filename_component(base_name, fallback="model", max_len=60)
-            user_folder = f"user_{current_user['id']}_{current_user['username']}" if current_user else "anonymous"
-            outputs_job_dir = os.path.join(_user_base_dir(), user_folder, "outputs", _date_folder_utc(), output_prefix)
-            os.makedirs(outputs_job_dir, exist_ok=True)
-
-            extra_loads: list[str] = []
-            extra_sets = _bambu_sets_from_quote_params(layer_height_mm, infill_percent, perimeters)
-            if slicer_preset and isinstance(slicer_preset, dict) and slicer_preset.get("content"):
-                try:
-                    ext = str(slicer_preset.get("ext") or ".json").strip().lower()
-                    if ext not in {".json", ".ini", ".cfg"}:
-                        ext = ".json"
-                    raw_content = slicer_preset.get("content")
-                    if isinstance(raw_content, str):
-                        preset_data = raw_content
-                    else:
-                        import json as _json
-                        preset_data = _json.dumps(raw_content)
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=ext, mode="w", encoding="utf-8") as tf:
-                        tf.write(preset_data)
-                        preset_tmp_path = tf.name
-                    extra_loads.append(preset_tmp_path)
-                    preset_used = str(slicer_preset.get("name") or "") or None
-                except Exception:
-                    preset_tmp_path = None
-            if bambu_support_mode == "diff":
-                st = bambu_support_diff_stats(
-                    model_path,
-                    extra_loads=extra_loads if extra_loads else None,
-                    extra_sets=extra_sets,
-                    output_dir=outputs_job_dir,
-                    output_prefix=output_prefix,
-                )
-                support_weight_g_per_part = float(st.get("support_g") or 0.0)
-                slicer_time_s = int(st.get("estimated_time_s")) if st.get("estimated_time_s") is not None else None
-                if st.get("filament_g") is not None:
-                    try:
-                        slicer_filament_g_per_part = float(st.get("filament_g") or 0.0)
-                    except Exception:
-                        slicer_filament_g_per_part = None
-            else:
-                output_3mf_path = os.path.join(outputs_job_dir, f"{output_prefix}.gcode.3mf")
-                st = run_bambu_slice(model_path, output_3mf_path, extra_loads=extra_loads if extra_loads else None, extra_sets=extra_sets)
-                slicer_time_s = int(st.get("estimated_time_s")) if st.get("estimated_time_s") is not None else None
-                if st.get("filament_g") is not None:
-                    try:
-                        slicer_filament_g_per_part = float(st.get("filament_g") or 0.0)
-                    except Exception:
-                        slicer_filament_g_per_part = None
-        except Exception as e:
-            logger.error(f"Bambu Slicer failed for {model_path}: {e}")
-            slicer_time_s = None
-            slicer_filament_g_per_part = None
-            bambu_error_msg = str(e)
-        finally:
-            try:
-                if preset_tmp_path and os.path.exists(preset_tmp_path):
-                    os.remove(preset_tmp_path)
-            except Exception:
-                pass
     if slicer_filament_g_per_part is not None and slicer_filament_g_per_part > 0:
         support_percent = 0.0
         effective_weight_g = float(slicer_filament_g_per_part) * (1.0 + max(0.0, waste_percent) / 100.0)
@@ -541,25 +479,27 @@ def calculate_cost(
         "support_weight_g_per_part": round(support_weight_g_per_part, 3),
         "support_price_per_g": round(support_price_per_g, 4),
         "support_cost_per_part_cny": round(support_cost_per_part_cny, 2),
-        "bambu_used": bool(use_bambu and slicer_time_s is not None),
         "prusaslicer_used": bool(prusaslicer_used and slicer_time_s is not None),
-        "slicer_used": "prusaslicer" if (prusaslicer_used and slicer_time_s is not None) else ("bambu" if (use_bambu and slicer_time_s is not None) else None),
-        "bambu_error": bambu_error_msg,
-        "bambu_filament_g_per_part": round(float(slicer_filament_g_per_part), 3) if slicer_filament_g_per_part is not None else None,
+        "slicer_used": "prusaslicer" if (prusaslicer_used and slicer_time_s is not None) else None,
+        "slicer_error": slicer_error_msg,
         "slicer_filament_g_per_part": round(float(slicer_filament_g_per_part), 3) if slicer_filament_g_per_part is not None else None,
-        "bambu_preset_used": preset_used,
         "slicer_preset_used": preset_used,
-        "bambu_sets": _bambu_sets_from_quote_params(layer_height_mm, infill_percent, perimeters) if use_bambu else {},
-        "bambu_estimated_time_s": int(slicer_time_s) if slicer_time_s is not None else None,
         "slicer_estimated_time_s": int(slicer_time_s) if slicer_time_s is not None else None,
-        "bambu_time_correction": float(cfg.get("prusa_time_correction") or 1.0),
         "prusa_time_correction": float(cfg.get("prusa_time_correction") or 1.0),
         "setup_fee_cny": round(setup_fee, 2),
         "min_job_fee_cny": round(min_job_fee, 2),
         "subtotal_cny": round(subtotal, 2),
         "unit_cost_formula": unit_formula,
         "total_cost_formula": total_formula,
+        **({k: v for k, v in orientation_info.items()} if orientation_info else {}),
     }
+
+    # Cleanup temp oriented model
+    if _oriented_tmp_path and os.path.exists(_oriented_tmp_path):
+        try:
+            os.unlink(_oriented_tmp_path)
+        except OSError:
+            pass
 
     return round(unit_cost, 2), round(model_weight_g, 2), round(unit_time_h, 3), round(total, 2), round(effective_weight_g, 2), round(total_time_h, 3), breakdown
 
@@ -576,6 +516,7 @@ async def process_single_file(
     slicer_preset: Optional[dict] = None,
     perimeters: Optional[int] = None,
     current_user: Optional[dict] = None,
+    auto_orient: bool = False,
 ):
     from app.config import SUPPORTED_EXTENSIONS, MAX_FILE_SIZE_BYTES
     from app.utils import _sanitize_filename_component, _user_base_dir, _date_folder_utc
@@ -605,7 +546,6 @@ async def process_single_file(
         job_id = uuid.uuid4().hex
         
         user_folder = f"user_{current_user['id']}_{current_user['username']}" if current_user else "anonymous"
-        # 结构: user/user_1_admin/uploads/20260421/8f3c..._model/8f3c..._model.stl
         uploads_day_dir = os.path.join(_user_base_dir(), user_folder, "uploads", _date_folder_utc(), f"{job_id}_{safe_stem}")
         os.makedirs(uploads_day_dir, exist_ok=True)
         
@@ -635,12 +575,13 @@ async def process_single_file(
             slicer_preset=slicer_preset,
             perimeters=perimeters,
             current_user=current_user,
+            auto_orient=auto_orient,
         )
         total_weight = round(model_weight_g * quantity, 2)
         try:
             filament_g = None
             if isinstance(breakdown, dict):
-                filament_g = breakdown.get("slicer_filament_g_per_part") or breakdown.get("bambu_filament_g_per_part")
+                filament_g = breakdown.get("slicer_filament_g_per_part")
             if filament_g is not None:
                 total_weight = round(float(filament_g) * quantity, 2)
         except Exception:

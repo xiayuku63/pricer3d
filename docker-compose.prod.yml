@@ -13,8 +13,6 @@ services:
       - .env.prod
     environment:
       - APP_ENV=production
-      - BAMBU_EXECUTABLE=/usr/local/bin/bambu-studio
-      - BAMBU_PROFILE_DIR=/app/profiles/bambu
       - UPLOADS_DIR=/app/data/uploads
       - OUTPUTS_DIR=/app/data/outputs
       - USER_DATA_DIR=/app/data/user

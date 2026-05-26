@@ -11,7 +11,7 @@ from .settings import get_settings
 EMAIL_PATTERN = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,255}$")
 PHONE_PATTERN = re.compile(r"^\+?[0-9]{7,15}$")
 USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9_.-]{3,50}$")
-PASSWORD_MIN_LENGTH = 6
+PASSWORD_MIN_LENGTH = 8
 PASSWORD_MAX_LENGTH = 100
 
 # ── Settings singleton (eager) ──
@@ -37,6 +37,9 @@ SMTP_PASSWORD = _settings.smtp_password
 SMTP_FROM = _settings.smtp_from
 SMTP_USE_TLS = _settings.smtp_use_tls
 SMTP_USE_SSL = _settings.smtp_use_ssl
+
+RESEND_API_KEY = _settings.resend_api_key
+SHOW_DEV_CODES = _settings.show_dev_codes
 
 TERMS_VERSION = _settings.terms_version
 PRIVACY_VERSION = _settings.privacy_version
@@ -77,11 +80,22 @@ MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024
 
 SYSTEM_SLICER_PRESET_ID = 0
 
-DEFAULT_COLORS = ["White", "Black", "Gray", "Red", "Blue"]
+DEFAULT_COLORS = [
+    {"name": "白色", "hex": "#ffffff"},
+    {"name": "黑色", "hex": "#1a1a1a"},
+    {"name": "灰色", "hex": "#808080"},
+    {"name": "红色", "hex": "#dc2626"},
+    {"name": "蓝色", "hex": "#2563eb"},
+    {"name": "绿色", "hex": "#16a34a"},
+    {"name": "黄色", "hex": "#ca8a04"},
+    {"name": "橙色", "hex": "#ea580c"},
+    {"name": "紫色", "hex": "#9333ea"},
+    {"name": "粉色", "hex": "#db2777"},
+]
 DEFAULT_MATERIALS = [
-    {"name": "PLA", "density": 1.24, "price_per_kg": 200.0, "colors": DEFAULT_COLORS},
-    {"name": "ABS", "density": 1.04, "price_per_kg": 250.0, "colors": DEFAULT_COLORS},
-    {"name": "Resin", "density": 1.11, "price_per_kg": 800.0, "colors": DEFAULT_COLORS},
+    {"name": "PLA", "brand": "通用", "density": 1.24, "price_per_kg": 200.0, "colors": DEFAULT_COLORS},
+    {"name": "ABS", "brand": "通用", "density": 1.04, "price_per_kg": 250.0, "colors": DEFAULT_COLORS},
+    {"name": "Resin", "brand": "通用", "density": 1.11, "price_per_kg": 800.0, "colors": DEFAULT_COLORS},
 ]
 DEFAULT_UNIT_COST_FORMULA = "((effective_weight_g * (price_per_kg / 1000.0)) + (unit_time_h * machine_hourly_rate_cny) + post_process_fee_per_part_cny) * difficulty_multiplier + support_cost_per_part_cny"
 DEFAULT_TOTAL_COST_FORMULA = "max((unit_cost_cny * quantity) + setup_fee_cny, min_job_fee_cny)"
@@ -95,10 +109,9 @@ DEFAULT_PRICING_CONFIG = {
     "difficulty_coefficient": 0.25,
     "difficulty_ratio_low": 0.8,
     "difficulty_ratio_high": 4.0,
-    "use_bambu": 0,
-    "use_prusaslicer": 0,
+    "use_prusaslicer": 1,
     "prusa_time_correction": 0.44,
-    "bambu_support_mode": "diff",
+    "support_mode": "diff",
     "support_price_per_g": 0.0,
     "time_overhead_min": 5.0,
     "time_vol_min_per_cm3": 0.8,

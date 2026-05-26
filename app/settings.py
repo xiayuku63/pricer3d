@@ -38,6 +38,12 @@ class Settings(BaseSettings):
     smtp_use_tls: bool = True
     smtp_use_ssl: bool = False
 
+    # ── Resend ──
+    resend_api_key: str = ""
+
+    # ── Dev ──
+    show_dev_codes: bool = True
+
     # ── Payment ──
     payment_provider: str = "mock"
 
@@ -61,7 +67,7 @@ class Settings(BaseSettings):
     login_failed_max_attempts: int = 6
     login_failed_window_seconds: int = 900
     login_lock_seconds: int = 900
-    jwt_expire_hours: int = 24
+    jwt_expire_hours: int = 720  # 30 days
 
     # ── Idempotency ──
     idempotency_ttl_seconds: int = 86400

@@ -146,10 +146,19 @@ def normalize_materials(raw_materials, fallback_colors: Optional[List[str]] = No
             price_per_kg = price * 1000.0
         raw_colors = m.get("colors")
         if isinstance(raw_colors, list):
-            colors = [str(c).strip() for c in raw_colors if str(c).strip()]
+            colors = []
+            for c in raw_colors:
+                if isinstance(c, dict):
+                    colors.append({"name": str(c.get("name", c.get("hex", ""))).strip(), "hex": str(c.get("hex", "")).strip()})
+                else:
+                    val = str(c).strip()
+                    if val:
+                        colors.append({"name": val, "hex": ""})
+            colors = [c for c in colors if c["name"]]
         else:
-            colors = list(effective_fallback_colors)
-        normalized.append({"name": name, "density": density, "price_per_kg": price_per_kg, "colors": colors})
+            fallback = fallback_colors or DEFAULT_COLORS
+            colors = [{"name": str(f).strip(), "hex": ""} for f in fallback if str(f).strip()]
+        normalized.append({"name": name, "brand": str(m.get("brand", "通用") or "通用").strip(), "density": density, "price_per_kg": price_per_kg, "colors": colors})
     return normalized or DEFAULT_MATERIALS
 
 

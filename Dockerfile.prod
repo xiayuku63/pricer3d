@@ -5,34 +5,8 @@ RUN sed -i 's|http://archive.ubuntu.com|http://mirrors.aliyun.com|g; s|http://se
     apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-venv python3-pip \
     ca-certificates \
-    xvfb libfuse2t64 \
-    libwebkit2gtk-4.1-0 libosmesa6 \
-    ffmpeg \
+    prusa-slicer \
     && rm -rf /var/lib/apt/lists/*
-
-# PrusaSlicer
-RUN apt-get update && apt-get install -y --no-install-recommends prusa-slicer \
-    && rm -rf /var/lib/apt/lists/*
-
-# Bambu Studio AppImage (optional)
-COPY bambu.AppImage /tmp/
-RUN if [ "$(stat -c%s /tmp/bambu.AppImage 2>/dev/null || echo 0)" -gt 10000000 ]; then \
-        echo "Installing Bambu Studio from AppImage..."; \
-        chmod +x /tmp/bambu.AppImage && \
-        cd /tmp && /tmp/bambu.AppImage --appimage-extract && \
-        mkdir -p /opt/bambu-studio && \
-        cp -r /tmp/squashfs-root/* /opt/bambu-studio/ && \
-        rm -rf /tmp/squashfs-root /tmp/bambu.AppImage; \
-    else \
-        echo "bambu.AppImage too small or missing, Bambu Studio will be unavailable"; \
-        echo '#!/bin/sh\necho bambu-studio not available; exit 1' > /usr/local/bin/bambu-studio; \
-        chmod +x /usr/local/bin/bambu-studio; \
-    fi
-
-RUN if [ -d /opt/bambu-studio ]; then \
-        BIN=$(find /opt/bambu-studio -name "bambu-studio" -type f | head -1); \
-        [ -n "$BIN" ] && chmod +x "$BIN" && ln -sf "$BIN" /usr/local/bin/bambu-studio; \
-    fi
 
 WORKDIR /app
 COPY requirements.txt .

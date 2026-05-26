@@ -2,6 +2,7 @@
 
 import time
 import secrets
+import logging
 from typing import Optional, List
 
 from fastapi import Request, Depends, HTTPException
@@ -21,6 +22,7 @@ from .config import (
     TERMS_VERSION,
     PRIVACY_VERSION,
     IS_PRODUCTION,
+    SHOW_DEV_CODES,
 )
 from .models import RegisterRequest, LoginRequest, VerifySendRequest, VerifyConfirmRequest, RegisterCheckRequest
 from pydantic import BaseModel, Field
@@ -80,7 +82,10 @@ async def get_captcha(request: Request):
     expires_at = time.time() + CAPTCHA_TTL_SECONDS
     ct, img = captcha_image_bytes(text)
     captcha_store.put(captcha_id=captcha_id, answer=text, expires_at=expires_at, image_bytes=img, image_content_type=ct)
-    return {"captcha_id": captcha_id, "image_url": f"/api/auth/captcha/image/{captcha_id}", "expires_in": CAPTCHA_TTL_SECONDS}
+    resp = {"captcha_id": captcha_id, "image_url": f"/api/auth/captcha/image/{captcha_id}", "expires_in": CAPTCHA_TTL_SECONDS}
+    if SHOW_DEV_CODES:
+        resp["dev_answer"] = text
+    return resp
 
 
 async def get_captcha_image(captcha_id: str):
@@ -108,11 +113,17 @@ async def send_verify_code(payload: VerifySendRequest, request: Request):
         try:
             if is_smtp_configured():
                 send_email_verification_code(target, code)
-        except Exception:
-            delete_verification_code_row(row_id)
-            raise HTTPException(status_code=500, detail="邮箱验证码发送失败，请稍后重试")
+        except Exception as e:
+            if IS_PRODUCTION:
+                delete_verification_code_row(row_id)
+                raise HTTPException(status_code=500, detail="邮箱验证码发送失败，请稍后重试")
+            # dev: 继续返回 dev_code，不阻塞流程
+            resp = {"status": "sent", "channel": channel, "target": target, "expires_in": VERIFY_CODE_TTL_SECONDS, "email_warning": str(e)}
+            if SHOW_DEV_CODES:
+                resp["dev_code"] = code
+            return resp
     resp = {"status": "sent", "channel": channel, "target": target, "expires_in": VERIFY_CODE_TTL_SECONDS}
-    if not IS_PRODUCTION:
+    if SHOW_DEV_CODES:
         resp["dev_code"] = code
     masked = mask_email(target) if channel == "email" else mask_phone(target) if channel == "phone" else None
     write_audit_event(
@@ -347,23 +358,35 @@ async def password_reset_request(payload: ResetRequestModel, request: Request):
         return {"status": "sent", "message": "若该邮箱已注册，重置邮件已发送"}
 
     if not is_smtp_configured():
-        if not IS_PRODUCTION:
-            # Dev mode: return code directly
-            code, row_id = create_verification_code(channel="email", target=email)
-            write_audit_event(action="auth.reset.request", request=request, user=user)
-            return {"status": "sent", "dev_code": code, "expires_in": VERIFY_CODE_TTL_SECONDS}
-        raise HTTPException(status_code=500, detail="邮件服务未配置")
+        # Dev fallback: return code directly
+        code, row_id = create_verification_code(channel="email", target=email)
+        write_audit_event(action="auth.reset.request", request=request, user=user)
+        resp = {"status": "sent", "expires_in": VERIFY_CODE_TTL_SECONDS}
+        if SHOW_DEV_CODES:
+            resp["dev_code"] = code
+        return resp
 
     code, row_id = create_verification_code(channel="email", target=email)
     try:
         send_email_verification_code(email, code)
-    except Exception:
+    except Exception as e:
+        err_msg = str(e) or type(e).__name__
+        logger.warning(f"Password reset email failed for {mask_email(email)}: {err_msg}")
+        # Always return the code in dev mode, with error context
+        if SHOW_DEV_CODES:
+            write_audit_event(action="auth.reset.request_dev_fallback", request=request, user=user)
+            return {
+                "status": "fallback",
+                "message": f"邮件发送失败：{err_msg}",
+                "dev_code": code,
+                "expires_in": VERIFY_CODE_TTL_SECONDS,
+            }
         delete_verification_code_row(row_id)
-        raise HTTPException(status_code=500, detail="邮件发送失败，请稍后重试")
+        raise HTTPException(status_code=500, detail=f"邮件发送失败：{err_msg}")
 
     write_audit_event(action="auth.reset.request", request=request, user=user)
     resp = {"status": "sent", "expires_in": VERIFY_CODE_TTL_SECONDS}
-    if not IS_PRODUCTION:
+    if SHOW_DEV_CODES:
         resp["dev_code"] = code
     return resp
 

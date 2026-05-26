@@ -14,34 +14,7 @@ log "3D Printing Quoting System — Docker Deploy"
 log "Pulling latest code..."
 git pull origin main
 
-# 2. Check Bambu AppImage
-if [ -f bambu.AppImage ]; then
-    SIZE=$(stat -c%s bambu.AppImage 2>/dev/null || echo 0)
-    if [ "$SIZE" -gt 10000000 ]; then
-        ok "bambu.AppImage: ${SIZE} bytes"
-    else
-        err "bambu.AppImage too small (${SIZE} bytes), trying download..."
-        rm -f bambu.AppImage
-    fi
-fi
-
-if [ ! -f bambu.AppImage ]; then
-    log "Downloading Bambu Studio AppImage..."
-    if [ -f deploy/download_bambu.sh ]; then
-        bash deploy/download_bambu.sh || {
-            err "Auto-download failed."
-            echo "  Download from: https://github.com/bambulab/BambuStudio/releases"
-            echo "  Rename to bambu.AppImage and scp to this directory."
-            echo "  scp bambu.AppImage root@47.106.102.208:~/3d-quote/"
-            exit 1
-        }
-    else
-        err "download_bambu.sh not found!"
-        exit 1
-    fi
-fi
-
-# 3. Build & start
+# 2. Build & start
 log "Building Docker image..."
 docker compose build
 

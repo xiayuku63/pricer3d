@@ -6,12 +6,13 @@ services:
     ports:
       - "127.0.0.1:5000:5000"
     volumes:
+      - .:/app
+      - /app/venv
+      - /app/__pycache__
       - 3d-quote_pricer3d_data:/app/data
     env_file:
       - .env
     environment:
-      - BAMBU_EXECUTABLE=/usr/local/bin/bambu-studio
-      - BAMBU_PROFILE_DIR=/app/profiles/bambu
       - UPLOADS_DIR=/app/data/uploads
       - OUTPUTS_DIR=/app/data/outputs
       - USER_DATA_DIR=/app/data/user

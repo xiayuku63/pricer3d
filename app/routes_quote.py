@@ -34,9 +34,9 @@ async def get_quote(
     slicer_preset_id: Optional[int] = Form(default=None),
     quantity: int = Form(1, ge=1, le=5000),
     color: str = Form("White", min_length=1, max_length=40),
-    use_bambu: Optional[bool] = Form(default=None),
     use_prusaslicer: Optional[bool] = Form(default=None),
     printer_model: Optional[str] = Form(default=None),
+    auto_orient: Optional[bool] = Form(default=False),
     current_user=Depends(get_current_user),
 ):
     from .config import MEMBER_DISCOUNT_PERCENT
@@ -65,8 +65,6 @@ async def get_quote(
         user_materials = json.loads(row["materials"]) if row and row["materials"] else DEFAULT_MATERIALS
         pricing_config = json.loads(row["pricing_config"]) if row and row["pricing_config"] else DEFAULT_PRICING_CONFIG
 
-        if use_bambu is not None:
-            pricing_config["use_bambu"] = use_bambu
         if use_prusaslicer is not None:
             pricing_config["use_prusaslicer"] = use_prusaslicer
         if printer_model is not None:
@@ -81,7 +79,13 @@ async def get_quote(
         if selected_material:
             raw_colors = selected_material.get("colors", [])
             if isinstance(raw_colors, list):
-                allowed_colors = [str(c).strip() for c in raw_colors if str(c).strip()]
+                for c in raw_colors:
+                    if isinstance(c, dict):
+                        allowed_colors.append(str(c.get("hex", "")).strip())
+                        allowed_colors.append(str(c.get("name", "")).strip())
+                    else:
+                        allowed_colors.append(str(c).strip())
+                allowed_colors = [a for a in allowed_colors if a]
         if allowed_colors and color not in allowed_colors:
             raise HTTPException(status_code=400, detail="颜色参数不合法")
 
@@ -105,6 +109,7 @@ async def get_quote(
                         _process_single_file_sync,
                         file, material, layer_height, infill, quantity, color,
                         user_materials, pricing_config, slicer_preset, wall_count, current_user,
+                        auto_orient,
                     )
                 except Exception as e:
                     fname = file.filename or "unknown"
@@ -210,6 +215,7 @@ def _process_single_file_sync(
     slicer_preset: Optional[dict] = None,
     perimeters: Optional[int] = None,
     current_user: Optional[dict] = None,
+    auto_orient: bool = False,
 ):
     """Synchronous wrapper for process_single_file — runs in thread pool."""
     import asyncio as _asyncio
@@ -220,6 +226,7 @@ def _process_single_file_sync(
             process_single_file(
                 file, material, layer_height, infill, quantity, color,
                 user_materials, pricing_config, slicer_preset, perimeters, current_user,
+                auto_orient,
             )
         )
     finally:

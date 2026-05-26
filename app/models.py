@@ -62,10 +62,9 @@ class PricingConfig(BaseModel):
     difficulty_ratio_high: float = 4.0
     unit_cost_formula: str = ""
     total_cost_formula: str = ""
-    use_bambu: Optional[int] = 0
     use_prusaslicer: Optional[int] = 0
     prusa_time_correction: Optional[float] = 0.44
-    bambu_support_mode: Optional[str] = "diff"
+    support_mode: Optional[str] = "diff"
     support_price_per_g: Optional[float] = 0.0
     time_overhead_min: Optional[float] = 5.0
     time_vol_min_per_cm3: Optional[float] = 0.8

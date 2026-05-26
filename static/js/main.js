@@ -1,2081 +1,582 @@
-        import { initViewer, renderSTL, buildPlaceholderThumbnail, updateViewerSize } from './modules/viewer.js';
-        import { initQuoteHistory, loadQuoteHistory } from './modules/history.js';
-        import { STLLoader } from 'three/addons/loaders/STLLoader.js';
-        import * as THREE from 'three';
+// ── main.js — Application orchestrator ──
+// All business logic lives in modules/. This file only:
+//   1. Imports modules
+//   2. Collects DOM refs
+//   3. Inits each module with its DOM refs
+//   4. Wires up event listeners
+//   5. Starts the app
+//
+//   Modules:  auth | settings | presets | membership | quote | preview | orientation-ui
+//   Shared:   state.js (all app state + utilities)
+//   Three.js: viewer.js | layface.js (already modular)
 
+import { initViewer, renderSTL, buildPlaceholderThumbnail, updateViewerSize,
+    camera, renderer, controls, clearCurrentMesh, currentMesh,
+    lookAtView, applyOrientationRotation, resetOrientation,
+    setupFaceClickHandler, highlightFaces, resetHighlight, fitCameraToMesh,
+} from './modules/viewer.js';
+import { renderClusters, clearClusters, setClusterHover, intersectClusters, placeFaceOnBed, isClusterMode } from './modules/layface.js';
+import { initQuoteHistory, loadQuoteHistory } from './modules/history.js';
 
-        document.addEventListener('DOMContentLoaded', () => {
-            const MAX_FILES = 20;
-            const MAX_FILE_SIZE = 100 * 1024 * 1024;
-            const ALLOWED_EXTENSIONS = ['.stl', '.stp', '.step', '.obj', '.3mf'];
+import {
+    authToken, currentUser, setCurrentUser, setAuthToken,
+    currentResults, setCurrentResults, selectedFilesMap, thumbnailMap,
+    quoteOptions, pendingQuoteFiles, setPendingQuoteFiles, COLOR_OPTIONS,
+    PRICING_CONFIG, MATERIAL_OPTIONS, setMaterialOptions,
+    loadUserSession, clearUserSession, saveUserSession, loadSlicerPresetSelection,
+    saveSlicerPresetSelection, formatColorLabel, formatTimeHMS, escapeHtml,
+    renderColorDropdown, getColorsForMaterial, colorToObj,
+    authFetch,
+} from './modules/state.js';
 
-            const form = document.getElementById('quote-form');
-            const fileInput = document.getElementById('file-upload');
-            const fileNameDisplay = document.getElementById('file-name');
-            const resultContainer = document.getElementById('result-container');
-            const errorContainer = document.getElementById('error-container');
-            const errorMsg = document.getElementById('error-msg');
-            const openLoginBtn = document.getElementById('open-login-btn');
-            const userMenu = document.getElementById('user-menu');
-            const userMenuBtn = document.getElementById('user-menu-btn');
-            const userDropdown = document.getElementById('user-dropdown');
-            const openMembershipBtn = document.getElementById('open-membership-btn');
-            const openAdminUsersBtn = document.getElementById('open-admin-users-btn');
-            const openUserCenterBtn = document.getElementById('open-user-center-btn');
-            const logoutBtn = document.getElementById('logout-btn');
-            const loginModal = document.getElementById('login-modal');
-            const loginBackdrop = document.getElementById('login-backdrop');
-            const loginCloseBtn = document.getElementById('login-close-btn');
-            const loginUsername = document.getElementById('login-username');
-            const loginPassword = document.getElementById('login-password');
-            const loginCaptchaImg = document.getElementById('login-captcha-img');
-            const loginCaptchaCode = document.getElementById('login-captcha-code');
-            const loginCaptchaRefreshBtn = document.getElementById('login-captcha-refresh-btn');
-            const loginAcceptLegal = document.getElementById('login-accept-legal');
-            const loginSubmitBtn = document.getElementById('login-submit-btn');
-            const registerSubmitBtn = document.getElementById('register-submit-btn');
-            const loginError = document.getElementById('login-error');
+import {
+    initAuth, refreshLoginCaptcha, openLoginModal, closeLoginModal,
+    renderAuthUI, handleLoginSubmit, handleAuthSuccess, handleLogout,
+    initializeAuth,
+} from './modules/auth.js';
+import {
+    initSettings, fetchUserSettings, updateDropdowns, refreshQuoteColorDropdowns,
+    buildPrinterOptionsHtml, renderUserCenterUI,
+    syncPricingFromInputs, openColorEditor, closeColorEditor,
+    addColorToMaterial, removeColorFromMaterial, validateCurrentFormulas,
+    saveUserSettings, setAsDefaults, changePassword,
+} from './modules/settings.js';
+import {
+    initPresets, preloadPrinterSelectors, fetchPrinterModels, fetchSlicerPresets,
+    renderSlicerPresetsUI, uploadSlicerPreset, generateSlicerPreset, deleteSlicerPreset,
+} from './modules/presets.js';
+import {
+    initMembership, openMembershipModal, closeMembershipModal,
+    refreshMembershipStatus, toggleMembershipOrders,
+} from './modules/membership.js';
+import {
+    initQuote, quoteSingleFileWithOptions, quoteSelectedFiles,
+    mergeResultsByFilename, normalizeResultsWithCurrentOptions,
+    reQuoteAllSelectedFiles, renderResultsTable, recalcSummaryFromCurrentResults,
+    handleRowEditChange, refreshOptionsSummary, setOpenLoginModalRef,
+} from './modules/quote.js';
+import {
+    initPreview, buildStlThumbnail, buildNonStlThumbnail,
+    ensureThumbnailForFile, buildThumbnails,
+    openPreviewModal, closePreviewModal, previewByFilename, setupViewCube,
+} from './modules/preview.js';
+import {
+    initOrientationUI, syncOrientationFromMesh,
+    centerModel, resetOrientationHandler, toggleLayFace, submitTraining,
+} from './modules/orientation-ui.js';
 
-            const membershipModal = document.getElementById('membership-modal');
-            const membershipBackdrop = document.getElementById('membership-backdrop');
-            const membershipCloseBtn = document.getElementById('membership-close-btn');
-            const membershipPlans = document.getElementById('membership-plans');
-            const membershipMsg = document.getElementById('membership-msg');
-            const membershipRefreshBtn = document.getElementById('membership-refresh-btn');
-            const membershipOrdersBtn = document.getElementById('membership-orders-btn');
-            const membershipOrders = document.getElementById('membership-orders');
-            const membershipOrdersTbody = document.getElementById('membership-orders-tbody');
-            const optionsSummary = document.getElementById('options-summary');
-            const optionsModal = document.getElementById('options-modal');
-            const optionsBackdrop = document.getElementById('options-backdrop');
-            const optionsCloseBtn = document.getElementById('options-close-btn');
-            const optionsSaveBtn = document.getElementById('options-save-btn');
-            const optMaterial = document.getElementById('opt-material');
-            const optColor = document.getElementById('opt-color');
-            const optQuantity = document.getElementById('opt-quantity');
-            const previewModal = document.getElementById('preview-modal');
-            const previewBackdrop = document.getElementById('preview-backdrop');
-            const previewCloseBtn = document.getElementById('preview-close-btn');
-            const previewContainer = document.getElementById('preview-container');
-            const previewPlaceholder = document.getElementById('preview-placeholder');
-            const batchResultsBody = document.getElementById('batch-results-body');
-            
-            const userCenterModal = document.getElementById('user-center-modal');
-            const userCenterBackdrop = document.getElementById('user-center-backdrop');
-            const userCenterCloseBtn = document.getElementById('user-center-close-btn');
-            const userCenterSetDefaultsBtn = document.getElementById('user-center-set-defaults-btn');
-            const userCenterSaveBtn = document.getElementById('user-center-save-btn');
-            const materialsTbody = document.getElementById('materials-tbody');
-            const addMaterialBtn = document.getElementById('add-material-btn');
-            const ucTabBtns = document.querySelectorAll('.uc-tab-btn');
-            const ucTabPanes = document.querySelectorAll('.uc-tab-pane');
-            const ucOldPassword = document.getElementById('uc-old-password');
-            const ucNewPassword = document.getElementById('uc-new-password');
-            const ucConfirmPassword = document.getElementById('uc-confirm-password');
-            const ucPasswordMsg = document.getElementById('uc-password-msg');
-            const ucChangePasswordBtn = document.getElementById('uc-change-password-btn');
-            const formulaResetBtn = document.getElementById('formula-reset-btn');
-            const formulaValidateBtn = document.getElementById('formula-validate-btn');
-            const formulaValidateMsg = document.getElementById('formula-validate-msg');
-            const formulaVarsToggleBtn = document.getElementById('formula-vars-toggle-btn');
-            const formulaVarsPanel = document.getElementById('formula-vars-panel');
-            const userCenterMsg = document.getElementById('user-center-msg');
-            const cfgMachineHourlyRate = document.getElementById('cfg-machine-hourly-rate');
-            const cfgSetupFee = document.getElementById('cfg-setup-fee');
-            const cfgMinJobFee = document.getElementById('cfg-min-job-fee');
-            const cfgMaterialWaste = document.getElementById('cfg-material-waste');
-            const cfgSupportPercent = document.getElementById('cfg-support-percent');
-            const cfgPostPerPart = document.getElementById('cfg-post-per-part');
-            const cfgTimeOverheadMin = document.getElementById('cfg-time-overhead-min');
-            const cfgTimeVolMinPerCm3 = document.getElementById('cfg-time-vol-min-per-cm3');
-            const cfgDifficultyCoefficient = document.getElementById('cfg-difficulty-coefficient');
-            const cfgDifficultyRatioLow = document.getElementById('cfg-difficulty-ratio-low');
-            const cfgDifficultyRatioHigh = document.getElementById('cfg-difficulty-ratio-high');
-            const cfgSupportPricePerG = document.getElementById('cfg-support-price-per-g');
-            const cfgUnitCostFormula = document.getElementById('cfg-unit-cost-formula');
-            const cfgTotalCostFormula = document.getElementById('cfg-total-cost-formula');
-            const slicerPresetFileInput = document.getElementById('slicer-preset-file');
-            const slicerPresetUploadBtn = document.getElementById('slicer-preset-upload-btn');
-            const slicerPresetsRefreshBtn = document.getElementById('slicer-presets-refresh-btn');
-            const slicerPresetsMsg = document.getElementById('slicer-presets-msg');
-            const slicerPresetsTbody = document.getElementById('slicer-presets-tbody');
-            const cfgSlicerPresetId = document.getElementById('cfg-slicer-preset-id');
-            
-            const genPresetName = document.getElementById('gen-preset-name');
-            const genBedWidth = document.getElementById('gen-bed-width');
-            const genBedDepth = document.getElementById('gen-bed-depth');
-            const genBedHeight = document.getElementById('gen-bed-height');
-            const genNozzleSize = document.getElementById('gen-nozzle-size');
-    const genInfill = document.getElementById('gen-infill');
-    const genWallCount = document.getElementById('gen-wall-count');
-            const slicerPresetGenerateBtn = document.getElementById('slicer-preset-generate-btn');
-            
-            const selectedFilesMap = new Map();
-            const thumbnailMap = new Map();
-            let currentResults = [];
-            let pendingQuoteFiles = null;
-            const COLOR_LABELS = {
-                White: "白色",
-                Black: "黑色",
-                Gray: "灰色",
-                Red: "红色",
-                Blue: "蓝色",
-            };
-            const COLOR_KEYS_BY_LABEL = Object.fromEntries(
-                Object.entries(COLOR_LABELS).map(([k, v]) => [v, k])
-            );
+// ═══════════════════════════════════════════════
+//  App entry point
+// ═══════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+    const MAX_FILES = 20;
+    const MAX_FILE_SIZE = 100 * 1024 * 1024;
+    const ALLOWED_EXTENSIONS = ['.stl', '.stp', '.step', '.obj', '.3mf'];
 
-            function formatColorLabel(colorKey) {
-                return COLOR_LABELS[colorKey] || colorKey;
-            }
+    // ── Collect ALL DOM refs ──
+    const $ = (id) => document.getElementById(id);
+    const dom = {
+        // Auth
+        openLoginBtn: $('open-login-btn'),
+        userMenu: $('user-menu'), userMenuBtn: $('user-menu-btn'), userDropdown: $('user-dropdown'),
+        openMembershipBtn: $('open-membership-btn'), openAdminUsersBtn: $('open-admin-users-btn'),
+        openUserCenterBtn: $('open-user-center-btn'), logoutBtn: $('logout-btn'),
+        loginModal: $('login-modal'), loginBackdrop: $('login-backdrop'),
+        loginUsername: $('login-username'), loginPassword: $('login-password'),
+        loginCaptchaImg: $('login-captcha-img'), loginCaptchaCode: $('login-captcha-code'),
+        loginAcceptLegal: $('login-accept-legal'), loginSubmitBtn: $('login-submit-btn'),
+        loginError: $('login-error'),
 
-            function normalizeColorToken(token) {
-                const trimmed = String(token || "").trim();
-                if (!trimmed) return "";
-                if (COLOR_KEYS_BY_LABEL[trimmed]) return COLOR_KEYS_BY_LABEL[trimmed];
-                if (COLOR_LABELS[trimmed]) return trimmed;
-                return trimmed;
-            }
+        // Membership
+        membershipModal: $('membership-modal'), membershipBackdrop: $('membership-backdrop'),
+        membershipCloseBtn: $('membership-close-btn'), membershipPlans: $('membership-plans'),
+        membershipMsg: $('membership-msg'), membershipRefreshBtn: $('membership-refresh-btn'),
+        membershipOrdersBtn: $('membership-orders-btn'), membershipOrders: $('membership-orders'),
+        membershipOrdersTbody: $('membership-orders-tbody'),
 
-            function escapeHtml(value) {
-                const s = String(value ?? "");
-                return s
-                    .replace(/&/g, "&amp;")
-                    .replace(/</g, "&lt;")
-                    .replace(/>/g, "&gt;")
-                    .replace(/"/g, "&quot;")
-                    .replace(/'/g, "&#39;");
-            }
-            const quoteOptions = {
-                material: "PLA",
-                color: "White",
-                quantity: 1,
-                slicer_preset_id: null,
-            };
-            let MATERIAL_OPTIONS = [
-                 { name: "PLA", density: 1.24, price_per_kg: 200.0, colors: ["White", "Black", "Gray", "Red", "Blue"] },
-                 { name: "ABS", density: 1.04, price_per_kg: 250.0, colors: ["White", "Black", "Gray", "Red", "Blue"] },
-                 { name: "Resin", density: 1.11, price_per_kg: 800.0, colors: ["White", "Black", "Gray", "Red", "Blue"] }
-            ];
-            let COLOR_OPTIONS = ["White", "Black", "Gray", "Red", "Blue"];
-            let PRICING_CONFIG = {
-                machine_hourly_rate_cny: 15.0,
-                setup_fee_cny: 0.0,
-                min_job_fee_cny: 0.0,
-                material_waste_percent: 5.0,
-                support_percent_of_model: 0.0,
-                post_process_fee_per_part_cny: 0.0,
-                difficulty_coefficient: 0.25,
-                difficulty_ratio_low: 0.8,
-                difficulty_ratio_high: 4.0,
-                use_bambu: 0,
-                bambu_support_mode: 'diff',
-                support_price_per_g: 0.0,
-                time_overhead_min: 5.0,
-                time_vol_min_per_cm3: 0.8,
-                time_area_min_per_cm2: 0.0,
-                time_ref_layer_height_mm: 0.2,
-                time_layer_height_exponent: 1.0,
-                time_ref_infill_percent: 20.0,
-                time_infill_coefficient: 1.0,
-                unit_cost_formula: '((effective_weight_g * (price_per_kg / 1000.0)) + (unit_time_h * machine_hourly_rate_cny) + post_process_fee_per_part_cny) * difficulty_multiplier + support_cost_per_part_cny',
-                total_cost_formula: 'max((unit_cost_cny * quantity) + setup_fee_cny, min_job_fee_cny)',
-            };
-            const TOKEN_STORAGE_KEY = "demo_access_token_v1";
-            const USER_STORAGE_KEY = "demo_user_v1";
-            const SLICER_PRESET_STORAGE_PREFIX = "demo_slicer_preset_id_v1_";
-            let currentUser = null;
-            let authToken = "";
-            let currentCaptchaId = "";
-            let currentCaptchaUrl = "";
-            let slicerPresets = [];
+        // Quote options
+        optionsSummary: $('options-summary'), optionsModal: $('options-modal'),
+        optionsBackdrop: $('options-backdrop'), optionsCloseBtn: $('options-close-btn'),
+        optionsSaveBtn: $('options-save-btn'), optMaterial: $('opt-material'),
+        optColor: $('opt-color'), optQuantity: $('opt-quantity'),
 
-            function formatTimeHMS(hours) {
-                if (!hours || isNaN(hours)) return '00h00m00s';
-                const totalSeconds = Math.round(hours * 3600);
-                const h = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
-                const m = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
-                const s = (totalSeconds % 60).toString().padStart(2, '0');
-                return `${h}h${m}m${s}s`;
-            }
+        // Preview
+        previewModal: $('preview-modal'), previewBackdrop: $('preview-backdrop'),
+        viewCube: $('view-cube'), previewCloseBtn: $('preview-close-btn'),
+        previewContainer: $('preview-container'), previewPlaceholder: $('preview-placeholder'),
 
-            async function refreshLoginCaptcha() {
-                try {
-                    const res = await fetch('/api/auth/captcha', { method: 'GET' });
-                    const data = await res.json();
-                    if (!res.ok) {
-                        throw new Error(data.detail || '验证码获取失败');
-                    }
-                    currentCaptchaId = data.captcha_id || "";
-                    currentCaptchaUrl = data.image_url || "";
-                    const fallbackDataUrl = data.image_data_url || "";
-                    if (currentCaptchaUrl) {
-                        loginCaptchaImg.src = `${currentCaptchaUrl}?t=${Date.now()}`;
-                    } else if (fallbackDataUrl) {
-                        loginCaptchaImg.src = fallbackDataUrl;
-                    } else {
-                        loginCaptchaImg.removeAttribute('src');
-                    }
-                    loginCaptchaCode.value = "";
-                } catch (e) {
-                    currentCaptchaId = "";
-                    currentCaptchaUrl = "";
-                    loginCaptchaImg.removeAttribute('src');
-                    loginError.textContent = '验证码加载失败，请点击“刷新验证码”或检查后端服务是否已重启';
-                    loginError.classList.remove('hidden');
-                }
-            }
+        // Upload
+        form: $('quote-form'), fileInput: $('file-upload'),
+        fileNameDisplay: $('file-name'),
+        resultContainer: $('result-container'), errorContainer: $('error-container'),
+        errorMsg: $('error-msg'), batchResultsBody: $('batch-results-body'),
 
-            function openLoginModal() {
-                loginError.classList.add('hidden');
-                loginError.textContent = '';
-                loginPassword.value = '';
-                loginCaptchaCode.value = '';
-                if (loginAcceptLegal) loginAcceptLegal.checked = false;
-                loginModal.classList.remove('hidden');
-                refreshLoginCaptcha();
-            }
+        // User center
+        userCenterModal: $('user-center-modal'), userCenterBackdrop: $('user-center-backdrop'),
+        userCenterCloseBtn: $('user-center-close-btn'),
+        userCenterSetDefaultsBtn: $('user-center-set-defaults-btn'),
+        userCenterSaveBtn: $('user-center-save-btn'), materialsTbody: $('materials-tbody'),
+        addMaterialBtn: $('add-material-btn'), userCenterMsg: $('user-center-msg'),
+        userCenterHint: $('user-center-hint'),
 
-            function closeLoginModal() {
-                loginModal.classList.add('hidden');
-            }
+        // Pricing inputs
+        cfgMachineHourlyRate: $('cfg-machine-hourly-rate'), cfgSetupFee: $('cfg-setup-fee'),
+        cfgMinJobFee: $('cfg-min-job-fee'), cfgMaterialWaste: $('cfg-material-waste'),
+        cfgSupportPercent: $('cfg-support-percent'), cfgPostPerPart: $('cfg-post-per-part'),
+        cfgTimeOverheadMin: $('cfg-time-overhead-min'), cfgTimeVolMinPerCm3: $('cfg-time-vol-min-per-cm3'),
+        cfgDifficultyCoefficient: $('cfg-difficulty-coefficient'), cfgDifficultyRatioLow: $('cfg-difficulty-ratio-low'),
+        cfgDifficultyRatioHigh: $('cfg-difficulty-ratio-high'), cfgSupportPricePerG: $('cfg-support-price-per-g'),
+        cfgUnitCostFormula: $('cfg-unit-cost-formula'), cfgTotalCostFormula: $('cfg-total-cost-formula'),
 
-            function renderAuthUI() {
-                if (currentUser) {
-                    openLoginBtn.classList.add('hidden');
-                    openMembershipBtn.classList.remove('hidden');
-                    userMenu.classList.remove('hidden');
-                    const isMember = !!currentUser.is_member;
-                    userMenuBtn.textContent = isMember ? `${currentUser.username}（会员）` : `${currentUser.username}`;
-                    if (currentUser.is_admin) {
-                        openAdminUsersBtn.classList.remove('hidden');
-                    } else {
-                        openAdminUsersBtn.classList.add('hidden');
-                    }
-                } else {
-                    openLoginBtn.classList.remove('hidden');
-                    openMembershipBtn.classList.add('hidden');
-                    userMenu.classList.add('hidden');
-                    userDropdown.classList.add('hidden');
-                    openAdminUsersBtn.classList.add('hidden');
-                }
-            }
+        // Slicer presets
+        slicerPresetFileInput: $('slicer-preset-file'), slicerPresetUploadBtn: $('slicer-preset-upload-btn'),
+        slicerPresetsRefreshBtn: $('slicer-presets-refresh-btn'), slicerPresetsMsg: $('slicer-presets-msg'),
+        slicerPresetsTbody: $('slicer-presets-tbody'), cfgSlicerPresetId: $('cfg-slicer-preset-id'),
+        genPresetName: $('gen-preset-name'), genBedWidth: $('gen-bed-width'), genBedDepth: $('gen-bed-depth'),
+        genBedHeight: $('gen-bed-height'), genNozzleSize: $('gen-nozzle-size'),
+        genInfill: $('gen-infill'), genWallCount: $('gen-wall-count'),
+        slicerPresetGenerateBtn: $('slicer-preset-generate-btn'),
 
-            function loadUserSession() {
-                try {
-                    authToken = localStorage.getItem(TOKEN_STORAGE_KEY) || "";
-                    const rawUser = localStorage.getItem(USER_STORAGE_KEY);
-                    if (!rawUser) {
-                        currentUser = null;
-                        loadSlicerPresetSelection();
-                        return;
-                    }
-                    const parsedUser = JSON.parse(rawUser);
-                    if (parsedUser && parsedUser.username) currentUser = parsedUser;
-                    loadSlicerPresetSelection();
-                } catch (e) {
-                    currentUser = null;
-                    authToken = "";
-                    loadSlicerPresetSelection();
-                }
-            }
+        // Orientation
+        layFaceBtn: $('lay-face-btn'), orientResetBtn: $('orient-reset-btn'),
+        orientCenterBtn: $('orient-center-btn'), orientTrainBtn: $('orient-train-btn'),
+        orientTrainStatus: $('orient-train-status'),
 
-            function saveUserSession() {
-                if (!currentUser || !authToken) return;
-                localStorage.setItem(TOKEN_STORAGE_KEY, authToken);
-                localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(currentUser));
-            }
+        // User center tabs + password
+        ucTabBtns: document.querySelectorAll('.uc-tab-btn'),
+        ucTabPanes: document.querySelectorAll('.uc-tab-pane'),
+        ucOldPassword: $('uc-old-password'), ucNewPassword: $('uc-new-password'),
+        ucConfirmPassword: $('uc-confirm-password'), ucPasswordMsg: $('uc-password-msg'),
+        ucChangePasswordBtn: $('uc-change-password-btn'),
 
-            function clearUserSession() {
-                localStorage.removeItem(TOKEN_STORAGE_KEY);
-                localStorage.removeItem(USER_STORAGE_KEY);
-            }
+        // Formula
+        formulaResetBtn: $('formula-reset-btn'), formulaValidateBtn: $('formula-validate-btn'),
+        formulaValidateMsg: $('formula-validate-msg'), formulaVarsToggleBtn: $('formula-vars-toggle-btn'),
+        formulaVarsPanel: $('formula-vars-panel'),
+    };
 
-            async function authFetch(url, options = {}) {
-                const headers = new Headers(options.headers || {});
-                if (authToken) {
-                    headers.set("Authorization", `Bearer ${authToken}`);
-                }
-                const response = await fetch(url, { ...options, headers });
-                if (response.status === 401) {
-                    currentUser = null;
-                    authToken = "";
-                    clearUserSession();
-                    renderAuthUI();
-                }
-                return response;
-            }
+    // ── Init all modules with their DOM refs ──
+    initAuth(dom);
+    initSettings(dom);
+    initPresets(dom);
+    initMembership(dom);
+    initQuote(dom);
+    initPreview(dom);
+    initOrientationUI(dom);
 
-            function getSlicerPresetStorageKey() {
-                const uid = currentUser && currentUser.id ? String(currentUser.id) : "guest";
-                return `${SLICER_PRESET_STORAGE_PREFIX}${uid}`;
-            }
+    // Break circular dep: quote.js needs openLoginModal from auth.js
+    setOpenLoginModalRef(openLoginModal);
 
-            function loadSlicerPresetSelection() {
-                try {
-                    const raw = localStorage.getItem(getSlicerPresetStorageKey());
-                    if (!raw) {
-                        quoteOptions.slicer_preset_id = null;
-                        return;
-                    }
-                    const parsed = Number.parseInt(raw, 10);
-                    quoteOptions.slicer_preset_id = Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
-                } catch (e) {
-                    quoteOptions.slicer_preset_id = null;
-                }
-            }
+    // ── Three.js setup ──
+    initViewer(dom.previewContainer, dom.previewPlaceholder);
 
-            function saveSlicerPresetSelection() {
-                try {
-                    const key = getSlicerPresetStorageKey();
-                    if (quoteOptions.slicer_preset_id !== null && quoteOptions.slicer_preset_id !== undefined) {
-                        localStorage.setItem(key, String(quoteOptions.slicer_preset_id));
-                    } else {
-                        localStorage.removeItem(key);
-                    }
-                } catch (e) {
-                }
-            }
+    // ── Quote history ──
+    initQuoteHistory();
 
-            function setSlicerPresetsMsg(text, ok) {
-                if (!slicerPresetsMsg) return;
-                slicerPresetsMsg.textContent = text || "";
-                slicerPresetsMsg.className = ok ? "text-xs text-green-600" : "text-xs text-red-600";
-                slicerPresetsMsg.classList.remove('hidden');
-                if (text) {
-                    setTimeout(() => {
-                        slicerPresetsMsg.classList.add('hidden');
-                        slicerPresetsMsg.textContent = "";
-                    }, 2500);
-                }
-            }
+    // ═══════════════════════════════════════════════
+    //  Event wiring
+    // ═══════════════════════════════════════════════
 
-            function renderSlicerPresetsUI() {
-                if (cfgSlicerPresetId) {
-                    const selected = quoteOptions.slicer_preset_id !== null && quoteOptions.slicer_preset_id !== undefined ? String(quoteOptions.slicer_preset_id) : "";
-                    cfgSlicerPresetId.innerHTML = [
-                        '<option value="">不使用预设</option>',
-                        ...(slicerPresets || []).map((p) => `<option value="${p.id}" ${String(p.id) === selected ? "selected" : ""}>${p.name} (#${p.id})</option>`)
-                    ].join('');
-                }
-                if (!slicerPresetsTbody) return;
-                const items = slicerPresets || [];
-                if (!items.length) {
-                    slicerPresetsTbody.innerHTML = '<tr><td colspan="5" class="px-2 py-3 text-gray-500">暂无预设</td></tr>';
-                    return;
-                }
-                slicerPresetsTbody.innerHTML = items.map((p) => `
-                    <tr>
-                        <td class="px-2 py-2 font-mono">${p.id}</td>
-                        <td class="px-2 py-2">${p.name || '-'}</td>
-                        <td class="px-2 py-2">${p.ext || '-'}</td>
-                        <td class="px-2 py-2">${p.created_at || '-'}</td>
-                        <td class="px-2 py-2 text-right space-x-1">
-                            <a href="/api/slicer/presets/${p.id}/download?token=${authToken}" class="text-blue-600 hover:text-blue-700 border border-blue-200 hover:border-blue-300 rounded px-2 py-0.5 inline-block text-xs" download>下载</a>
-                            ${p.is_default 
-                                ? `<button type="button" class="text-gray-400 border border-gray-200 rounded px-2 py-0.5 cursor-not-allowed text-xs" disabled>删除</button>` 
-                                : `<button type="button" data-slicer-delete="${p.id}" class="text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 rounded px-2 py-0.5 text-xs">删除</button>`
-                            }
-                        </td>
-                    </tr>
-                `).join('');
-                slicerPresetsTbody.querySelectorAll('[data-slicer-delete]').forEach((btn) => {
-                    btn.addEventListener('click', async () => {
-                        const id = Number.parseInt(btn.getAttribute('data-slicer-delete') || "", 10);
-                        if (!Number.isFinite(id)) return;
-                        await deleteSlicerPreset(id);
-                    });
-                });
-            }
+    // Auth - form events are wired by _wireLoginForm() in auth.js init
+    if (dom.openLoginBtn) dom.openLoginBtn.addEventListener('click', openLoginModal);
+    if (dom.userMenuBtn) dom.userMenuBtn.addEventListener('click', () => dom.userDropdown.classList.toggle('hidden'));
+    if (dom.openAdminUsersBtn) dom.openAdminUsersBtn.addEventListener('click', () => { dom.userDropdown.classList.add('hidden'); window.location.href = '/admin/users'; });
+    if (dom.openMembershipBtn) dom.openMembershipBtn.addEventListener('click', () => { dom.userDropdown.classList.add('hidden'); openMembershipModal(); });
+    if (dom.openUserCenterBtn) dom.openUserCenterBtn.addEventListener('click', () => {
+        dom.userDropdown.classList.add('hidden');
+        if (!currentUser) return;
+        renderUserCenterUI();
+        if (dom.userCenterSetDefaultsBtn) dom.userCenterSetDefaultsBtn.classList.toggle('hidden', !(currentUser && currentUser.is_admin));
+        if (dom.ucOldPassword) dom.ucOldPassword.value = '';
+        if (dom.ucNewPassword) dom.ucNewPassword.value = '';
+        if (dom.ucConfirmPassword) dom.ucConfirmPassword.value = '';
+        if (dom.ucPasswordMsg) { dom.ucPasswordMsg.textContent = ''; dom.ucPasswordMsg.className = 'text-xs hidden'; }
+        const defaultTab = document.querySelector('.uc-tab-btn[data-uc-tab="materials"]');
+        if (defaultTab) defaultTab.click();
+        dom.userCenterModal.classList.remove('hidden');
+        fetchSlicerPresets();
+    });
+    if (dom.logoutBtn) dom.logoutBtn.addEventListener('click', handleLogout);
+    document.addEventListener('click', (event) => {
+        if (dom.userMenu && !dom.userMenu.contains(event.target)) dom.userDropdown.classList.add('hidden');
+    });
 
-            // Pre-populate printer selectors before async load
-            function preloadPrinterSelectors() {
-                for (const selId of ["cfg-printer-model", "cfg-printer-model-main", "opt-printer"]) {
-                    const sel = document.getElementById(selId);
-                    if (!sel) continue;
-                    sel.innerHTML = "<option value=\"\">加载中...</option>";
-                }
-            }
-            preloadPrinterSelectors();
+    // Membership
+    if (dom.membershipCloseBtn) dom.membershipCloseBtn.addEventListener('click', closeMembershipModal);
+    if (dom.membershipBackdrop) dom.membershipBackdrop.addEventListener('click', closeMembershipModal);
+    if (dom.membershipRefreshBtn) dom.membershipRefreshBtn.addEventListener('click', refreshMembershipStatus);
+    if (dom.membershipOrdersBtn) dom.membershipOrdersBtn.addEventListener('click', toggleMembershipOrders);
 
-                        async function fetchPrinterModels() {
-                const resp = await authFetch("/api/slicer/printers");
-                if (!resp.ok) return;
-                const data = await resp.json();
-                const printers = data.items || [];
-                for (const selId of ["cfg-printer-model", "cfg-printer-model-main", "opt-printer"]) {
-                    const sel = document.getElementById(selId);
-                    if (!sel) continue;
-                    sel.innerHTML = "<option value=\"\">请选择打印机...</option>";
-                    printers.forEach(p => {
-                        const opt = document.createElement("option");
-                        opt.value = p.id;
-                        opt.textContent = p.name + " (\u2009"+p.bed_width+"x"+p.bed_depth+"x"+p.bed_height+" mm)";
-                        sel.appendChild(opt);
-                    });
-                }
-            }
+    // Slicer presets
+    if (dom.slicerPresetsRefreshBtn) dom.slicerPresetsRefreshBtn.addEventListener('click', fetchSlicerPresets);
+    if (dom.slicerPresetUploadBtn) dom.slicerPresetUploadBtn.addEventListener('click', uploadSlicerPreset);
+    if (dom.slicerPresetGenerateBtn) dom.slicerPresetGenerateBtn.addEventListener('click', generateSlicerPreset);
+    if (dom.cfgSlicerPresetId) {
+        dom.cfgSlicerPresetId.addEventListener('change', async () => {
+            const raw = String(dom.cfgSlicerPresetId.value || "").trim();
+            const parsed = raw ? Number.parseInt(raw, 10) : NaN;
+            quoteOptions.slicer_preset_id = Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+            saveSlicerPresetSelection();
+            renderSlicerPresetsUI();
+            if (selectedFilesMap.size > 0) await reQuoteAllSelectedFiles('切片预设已变更，重算报价');
+        });
+    }
 
-            async function fetchSlicerPresets() {
-                if (!authToken) return;
-                try {
-                    const resp = await authFetch('/api/slicer/presets');
-                    if (resp.status === 401) {
-                        if (userCenterModal) userCenterModal.classList.add('hidden');
-                        openLoginModal();
-                        return;
-                    }
-                    const data = await resp.json();
-                    if (!resp.ok) throw new Error((data && data.detail) ? String(data.detail) : '加载失败');
-                    slicerPresets = Array.isArray(data.items) ? data.items : [];
-                    if (quoteOptions.slicer_preset_id !== null && quoteOptions.slicer_preset_id !== undefined) {
-                        const exists = slicerPresets.some((p) => Number(p.id) === Number(quoteOptions.slicer_preset_id));
-                        if (!exists) {
-                            quoteOptions.slicer_preset_id = null;
-                            saveSlicerPresetSelection();
-                        }
-                    }
-                    renderSlicerPresetsUI();
-                } catch (e) {
-                    setSlicerPresetsMsg(e.message || '加载失败', false);
-                }
-            }
+    // ── Global: close color dropdowns on outside click ──
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.color-dd-wrapper')) {
+            document.querySelectorAll('.color-dd-list:not(.hidden)').forEach(l => l.classList.add('hidden'));
+        }
+    });
 
-            async function uploadSlicerPreset() {
-                if (!authToken) {
-                    openLoginModal();
-                    return;
-                }
-                const file = slicerPresetFileInput && slicerPresetFileInput.files && slicerPresetFileInput.files[0] ? slicerPresetFileInput.files[0] : null;
-                if (!file) {
-                    setSlicerPresetsMsg('请选择 .ini 文件', false);
-                    return;
-                }
-                const name = slicerPresetNameInput ? String(slicerPresetNameInput.value || "").trim() : "";
-                const formData = new FormData();
-                formData.append("file", file);
-                if (name) formData.append("name", name);
-                try {
-                    const resp = await authFetch('/api/slicer/presets', { method: 'POST', body: formData });
-                    if (resp.status === 401) {
-                        if (userCenterModal) userCenterModal.classList.add('hidden');
-                        openLoginModal();
-                        return;
-                    }
-                    const data = await resp.json();
-                    if (!resp.ok) throw new Error((data && data.detail) ? String(data.detail) : '上传失败');
-                    setSlicerPresetsMsg('上传成功', true);
-                    if (slicerPresetNameInput) slicerPresetNameInput.value = "";
-                    if (slicerPresetFileInput) slicerPresetFileInput.value = "";
-                    const preset = data && data.preset ? data.preset : null;
-                    await fetchSlicerPresets();
-                fetchPrinterModels();
-                    if (preset && preset.id) {
-                        quoteOptions.slicer_preset_id = Number(preset.id);
-                        saveSlicerPresetSelection();
-                        renderSlicerPresetsUI();
-                        if (selectedFilesMap.size > 0) {
-                            await reQuoteAllSelectedFiles('切片预设已更新，重算报价');
-                        }
-                    }
-                } catch (e) {
-                    setSlicerPresetsMsg(e.message || '上传失败', false);
-                }
-            }
-
-            async function generateSlicerPreset() {
-                if (!authToken) {
-                    openLoginModal();
-                    return;
-                }
-                const name = genPresetName ? String(genPresetName.value || "").trim() : "";
-                if (!name) {
-                    setSlicerPresetsMsg('请输入预设名称', false);
-                    return;
-                }
-                // Name conflict check
-                const existingNames = Array.from(document.querySelectorAll("#slicer-presets-tbody tr td:nth-child(2)")).map(td => td.textContent.trim());
-                if (existingNames.includes(name)) {
-                    setSlicerPresetsMsg('名称「' + name + '」已存在，请修改后保存', false);
-                    return;
-                }
-                // Load printer model dimensions
-                const pmSelect = document.getElementById("cfg-printer-model-main") || document.getElementById();
-                let bed_width = 256, bed_depth = 256, bed_height = 256;
-                if (pmSelect && pmSelect.value) {
-                    const opt = pmSelect.selectedOptions[0];
-                    const m = opt.textContent.match(/\((\d+)x(\d+)x(\d+)/);
-                    if (m) {
-                        bed_width = Number(m[1]);
-                        bed_depth = Number(m[2]);
-                        bed_height = Number(m[3]);
-                    } else {
-                        setSlicerPresetsMsg('请先选择打印机型号', false);
-                        return;
-                    }
-                } else {
-                    setSlicerPresetsMsg('请先选择打印机型号', false);
-                    return;
-                }
-                const nozzle_size = Number(genNozzleSize.value) || 0.4;
-            const infill = Number(genInfill.value) || 15;
-            const wall_count = Number(genWallCount.value) || 3;
-
-            const payload = {
-                name,
-                bed_width: bed_width,
-                bed_depth: bed_depth,
-                bed_height,
-                nozzle_size,
-                infill,
-                wall_count
-            };
-
-                try {
-                    const resp = await authFetch('/api/slicer/presets/generate', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                    if (resp.status === 401) {
-                        if (userCenterModal) userCenterModal.classList.add('hidden');
-                        openLoginModal();
-                        return;
-                    }
-                    const data = await resp.json();
-                    if (!resp.ok) throw new Error((data && data.detail) ? String(data.detail) : '生成失败');
-                    setSlicerPresetsMsg('生成成功', true);
-                    if (genPresetName) genPresetName.value = "";
-                    const preset = data && data.preset ? data.preset : null;
-                    await fetchSlicerPresets();
-                fetchPrinterModels();
-                    if (preset && preset.id) {
-                        quoteOptions.slicer_preset_id = Number(preset.id);
-                        saveSlicerPresetSelection();
-                        renderSlicerPresetsUI();
-                        if (selectedFilesMap.size > 0) {
-                            await reQuoteAllSelectedFiles('切片预设已生成，重算报价');
-                        }
-                    }
-                } catch (e) {
-                    setSlicerPresetsMsg(e.message || '生成失败', false);
-                }
-            }
-
-            async function deleteSlicerPreset(presetId) {
-                if (!authToken) return;
-                try {
-                    const resp = await authFetch(`/api/slicer/presets/${presetId}`, { method: 'DELETE' });
-                    if (resp.status === 401) {
-                        if (userCenterModal) userCenterModal.classList.add('hidden');
-                        openLoginModal();
-                        return;
-                    }
-                    let data = null;
-                    try {
-                        data = await resp.json();
-                    } catch (e) {
-                        data = null;
-                    }
-                    if (!resp.ok) throw new Error((data && data.detail) ? String(data.detail) : '删除失败');
-                    if (quoteOptions.slicer_preset_id !== null && quoteOptions.slicer_preset_id !== undefined && Number(quoteOptions.slicer_preset_id) === Number(presetId)) {
-                        quoteOptions.slicer_preset_id = null;
-                        saveSlicerPresetSelection();
-                    }
-                    setSlicerPresetsMsg('已删除', true);
-                    await fetchSlicerPresets();
-                fetchPrinterModels();
-                    if (selectedFilesMap.size > 0) {
-                        await reQuoteAllSelectedFiles('切片预设已删除，重算报价');
-                    }
-                } catch (e) {
-                    setSlicerPresetsMsg(e.message || '删除失败', false);
-                }
-            }
-
-            function showMembershipMsg(text, ok = false) {
-                membershipMsg.textContent = text;
-                membershipMsg.className = ok ? "text-xs text-green-600" : "text-xs text-red-600";
-                membershipMsg.classList.remove('hidden');
-            }
-
-            function clearMembershipMsg() {
-                membershipMsg.classList.add('hidden');
-                membershipMsg.textContent = '';
-            }
-
-            function openMembershipModal() {
-                if (!currentUser || !authToken) {
-                    openLoginModal();
-                    return;
-                }
-                clearMembershipMsg();
-                membershipOrders.classList.add('hidden');
-                membershipModal.classList.remove('hidden');
-                loadMembershipPlans();
-            }
-
-            function closeMembershipModal() {
-                membershipModal.classList.add('hidden');
-                clearMembershipMsg();
-            }
-
-            async function refreshMembershipStatus() {
-                if (!authToken) return;
-                try {
-                    const resp = await authFetch('/api/auth/me');
-                    if (!resp.ok) throw new Error('刷新失败');
-                    currentUser = await resp.json();
-                    saveUserSession();
-                    renderAuthUI();
-                    showMembershipMsg('会员状态已刷新', true);
-                } catch (e) {
-                    showMembershipMsg(e.message || '刷新失败', false);
-                }
-            }
-
-            async function loadMembershipPlans() {
-                membershipPlans.innerHTML = '<div class="text-xs text-gray-500">加载中...</div>';
-                try {
-                    const resp = await fetch('/api/billing/plans');
-                    const data = await resp.json();
-                    if (!resp.ok) throw new Error(data.detail || '加载失败');
-                    const items = data.items || [];
-                    if (!items.length) {
-                        membershipPlans.innerHTML = '<div class="text-xs text-gray-500">暂无可用套餐</div>';
-                        return;
-                    }
-                    membershipPlans.innerHTML = items.map((p) => `
-                        <div class="border border-gray-200 rounded-md p-3 bg-gray-50 flex flex-col gap-2">
-                            <div class="text-sm font-semibold text-gray-900">${p.name}</div>
-                            <div class="text-xs text-gray-600">¥ ${Number(p.price_cny || 0).toFixed(2)} / ${p.duration_days} 天</div>
-                            <button type="button" data-plan="${p.code}" class="mt-1 w-full py-2 px-3 rounded-md bg-indigo-600 text-white text-xs hover:bg-indigo-700">立即支付</button>
-                        </div>
-                    `).join('');
-                    membershipPlans.querySelectorAll('[data-plan]').forEach((btn) => {
-                        btn.addEventListener('click', () => {
-                            const code = btn.getAttribute('data-plan');
-                            startCheckout(code);
-                        });
-                    });
-                } catch (e) {
-                    membershipPlans.innerHTML = '<div class="text-xs text-red-600">加载失败</div>';
-                    showMembershipMsg(e.message || '加载失败', false);
-                }
-            }
-
-            async function startCheckout(planCode) {
-                if (!currentUser || !authToken) {
-                    openLoginModal();
-                    return;
-                }
-                clearMembershipMsg();
-                try {
-                    const resp = await authFetch('/api/billing/checkout', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ plan_code: planCode }),
-                    });
-                    const data = await resp.json();
-                    if (!resp.ok) throw new Error(data.detail || '创建订单失败');
-                    if (data.pay_url) {
-                        window.open(data.pay_url, '_blank', 'noopener');
-                        showMembershipMsg(`已打开支付页面：订单 ${data.order_no}。支付完成后点击“刷新会员状态”。`, true);
-                    } else {
-                        showMembershipMsg('当前未配置支付渠道', false);
-                    }
-                } catch (e) {
-                    showMembershipMsg(e.message || '创建订单失败', false);
-                }
-            }
-
-            async function toggleMembershipOrders() {
-                if (membershipOrders.classList.contains('hidden')) {
-                    membershipOrders.classList.remove('hidden');
-                    membershipOrdersTbody.innerHTML = '<tr><td colspan="5" class="px-2 py-3 text-gray-500">加载中...</td></tr>';
-                    try {
-                        const resp = await authFetch('/api/billing/orders?limit=20&offset=0');
-                        const data = await resp.json();
-                        if (!resp.ok) throw new Error(data.detail || '加载失败');
-                        const items = data.items || [];
-                        if (!items.length) {
-                            membershipOrdersTbody.innerHTML = '<tr><td colspan="5" class="px-2 py-3 text-gray-500">暂无数据</td></tr>';
-                            return;
-                        }
-                        membershipOrdersTbody.innerHTML = items.map((o) => `
-                            <tr>
-                                <td class="px-2 py-2 font-mono">${o.order_no}</td>
-                                <td class="px-2 py-2">${o.plan_code}</td>
-                                <td class="px-2 py-2">¥ ${Number(o.amount_cny || 0).toFixed(2)}</td>
-                                <td class="px-2 py-2">${o.status}</td>
-                                <td class="px-2 py-2">${o.created_at || '-'}</td>
-                            </tr>
-                        `).join('');
-                    } catch (e) {
-                        membershipOrdersTbody.innerHTML = '<tr><td colspan="5" class="px-2 py-3 text-red-600">加载失败</td></tr>';
-                        showMembershipMsg(e.message || '加载失败', false);
-                    }
-                } else {
-                    membershipOrders.classList.add('hidden');
-                }
-            }
-
-            function refreshOptionsSummary() {
-                const colorText = formatColorLabel(quoteOptions.color);
-                if (optionsSummary) {
-                    const pm = document.getElementById();
-                    const pmName = (pm && pm.selectedOptions[0]) ? pm.selectedOptions[0].text : "未选择";
-                    optionsSummary.textContent = `打印机：${pmName} | 材料 ${quoteOptions.material}，颜色 ${colorText}，数量 ${quoteOptions.quantity}`;
-                }
-            }
-
-function buildPrinterOptionsHtml(selectedId) {
-                const sel = document.getElementById() || document.getElementById("opt-printer");
-                if (!sel || sel.options.length <= 1) return '<option value="">选择打印机...</option>';
-                let html = '<option value="">选择打印机...</option>';
-                for (const opt of sel.options) {
-                    if (!opt.value) continue;
-                    html += '<option value="' + opt.value + '"' + (opt.value === selectedId ? ' selected' : '') + '>' + opt.text + '</option>';
-                }
-                return html;
-            }
-
-            function recalcSummaryFromCurrentResults() {
-                const successItems = currentResults.filter((i) => i.status === "success");
-                const failedItems = currentResults.filter((i) => i.status === "failed");
-                document.getElementById('sum-total-files').textContent = currentResults.length;
-                document.getElementById('sum-status').textContent = `${successItems.length} / ${failedItems.length}`;
-                document.getElementById('sum-total-cost').textContent = '¥ ' + successItems.reduce((s, i) => s + (i.cost_cny || 0), 0).toFixed(2);
-                document.getElementById('sum-total-time').textContent = formatTimeHMS(successItems.reduce((s, i) => s + (i.estimated_time_h || 0), 0));
-            }
-
-            async function quoteSingleFileWithOptions(file, options) {
-                const formData = new FormData();
-                formData.append("files", file);
-                const optPrinter = document.getElementById() || document.getElementById("opt-printer") || document.getElementById();
-                if (optPrinter && optPrinter.value) formData.append("printer_model", optPrinter.value);
-                formData.append("material", options.material);
-                formData.append("color", options.color);
-                formData.append("quantity", String(options.quantity));
-                if (quoteOptions.slicer_preset_id !== null && quoteOptions.slicer_preset_id !== undefined) {
-                    formData.append("slicer_preset_id", String(quoteOptions.slicer_preset_id));
-                }
-                const mainUseBambu = document.getElementById('main-use-bambu');
-                if (mainUseBambu) {
-                    formData.append("use_prusaslicer", mainUseBambu.checked ? "true" : "false");
-                }
-                const response = await authFetch('/api/quote', { method: 'POST', body: formData });
-                const data = await response.json();
-                if (!response.ok) {
-                    throw new Error(data.detail || data.error || '请求失败，请稍后重试');
-                }
-                return data.results && data.results.length > 0 ? data.results[0] : { filename: file.name, status: "failed", error: "空响应" };
-            }
-
-            // Three.js viewer setup (delegated to modules/viewer.js)
-            initViewer(previewContainer, previewPlaceholder);
-
-            function applyAxonometricRotation(meshObject) {
-                meshObject.rotation.x = -Math.PI / 4;
-                meshObject.rotation.z = Math.PI / 4;
-            }
-
-            function getRenderColorHex(colorKey) {
-                const key = normalizeColorToken(colorKey);
-                const palette = {
-                    White: 0xf3f4f6, Black: 0x111827, Gray: 0x9ca3af,
-                    Red: 0xef4444, Blue: 0x3b82f6, Green: 0x22c55e,
-                    Yellow: 0xeab308, Orange: 0xf97316, Purple: 0xa855f7,
-                    Pink: 0xec4899, Brown: 0x8b5e3c,
-                    白色: 0xf3f4f6, 黑色: 0x111827, 灰色: 0x9ca3af,
-                    红色: 0xef4444, 蓝色: 0x3b82f6, 绿色: 0x22c55e,
-                    黄色: 0xeab308, 橙色: 0xf97316, 紫色: 0xa855f7,
-                    粉色: 0xec4899, 棕色: 0x8b5e3c,
-                };
-                if (palette[key] !== undefined) return palette[key];
-                const hex6 = /^#([0-9a-fA-F]{6})$/;
-                if (hex6.test(key)) return Number.parseInt(key.slice(1), 16);
-                try {
-                    const parsed = new THREE.Color();
-                    parsed.setStyle(key);
-                    return parsed.getHex();
-                } catch (e) {}
-                const raw = String(key || 'custom');
-                let hash = 0;
-                for (let i = 0; i < raw.length; i++) {
-                    hash = ((hash << 5) - hash) + raw.charCodeAt(i);
-                    hash |= 0;
-                }
-                const hue = Math.abs(hash) % 360;
-                const fallback = new THREE.Color();
-                fallback.setHSL(hue / 360, 0.58, 0.56);
-                return fallback.getHex();
-            }
-
-            const stlLoader = new STLLoader();
-
-            async function buildStlThumbnail(file, colorKey = "Blue") {
-                const arrayBuffer = await file.arrayBuffer();
-                const geometry = stlLoader.parse(arrayBuffer);
-                geometry.computeVertexNormals();
-                geometry.center();
-
-                const width = 220;
-                const height = 140;
-                const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
-                renderer.setSize(width, height);
-                renderer.setPixelRatio(1);
-
-                const scene = new THREE.Scene();
-                scene.background = new THREE.Color(0xffffff);
-
-                const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 10000);
-                const mesh = new THREE.Mesh(
-                    geometry,
-                    new THREE.MeshStandardMaterial({ color: getRenderColorHex(colorKey), metalness: 0.15, roughness: 0.65 })
-                );
-                applyAxonometricRotation(mesh);
-                scene.add(mesh);
-                scene.add(new THREE.AmbientLight(0xffffff, 0.65));
-                const light = new THREE.DirectionalLight(0xffffff, 0.85);
-                light.position.set(40, 60, 90);
-                scene.add(light);
-
-                const box = new THREE.Box3().setFromObject(mesh);
-                const size = box.getSize(new THREE.Vector3());
-                const center = box.getCenter(new THREE.Vector3());
-                const maxDim = Math.max(size.x, size.y, size.z) || 1;
-                const fov = camera.fov * (Math.PI / 180);
-                let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
-                cameraZ *= 1.7;
-                camera.position.set(center.x, center.y, center.z + cameraZ);
-                camera.lookAt(center);
-                camera.updateProjectionMatrix();
-
-                renderer.render(scene, camera);
-                const dataUrl = renderer.domElement.toDataURL('image/png');
-
-                mesh.geometry.dispose();
-                mesh.material.dispose();
-                renderer.dispose();
-
-                return dataUrl;
-            }
-
-            async function ensureThumbnailForFile(file, colorKey) {
-                const ext = file.name.includes('.') ? file.name.split('.').pop().toLowerCase() : '';
-                if (ext !== 'stl') {
-                    thumbnailMap.set(file.name, buildPlaceholderThumbnail(ext));
-                    return;
-                }
-                try {
-                    const thumb = await buildStlThumbnail(file, colorKey);
-                    thumbnailMap.set(file.name, thumb);
-                } catch (e) {
-                    thumbnailMap.set(file.name, buildPlaceholderThumbnail(ext));
-                }
-            }
-
-            async function buildThumbnails(selectedFiles, colorByFilename = {}) {
-                for (const file of selectedFiles) {
-                    const selectedColor = colorByFilename[file.name] || quoteOptions.color;
-                    await ensureThumbnailForFile(file, selectedColor);
-                }
-            }
-
-            function openPreviewModal() {
-                previewModal.classList.remove('hidden');
-                const width = previewContainer.clientWidth || 1000;
-                const height = previewContainer.clientHeight || 700;
-                camera.aspect = width / height;
-                camera.updateProjectionMatrix();
-                renderer.setSize(width, height);
-            }
-
-            function closePreviewModal() {
-                previewModal.classList.add('hidden');
-            }
-
-            function openOptionsModal() {
-                updateDropdowns();
-                optMaterial.value = quoteOptions.material;
-                const rendered = renderColorOptionsForMaterial(optMaterial.value, quoteOptions.color);
-                optColor.innerHTML = rendered.html;
-                optColor.value = rendered.selected;
-                optQuantity.value = String(quoteOptions.quantity);
-                optionsModal.classList.remove('hidden');
-            }
-
-            function closeOptionsModal() {
-                optionsModal.classList.add('hidden');
-            }
-
-            function previewByFilename(filename, ext) {
-                openPreviewModal();
-                if (ext !== 'stl') {
-                    clearCurrentMesh();
-                    previewPlaceholder.textContent = '当前仅支持 STL 在线预览';
-                    previewPlaceholder.classList.remove('hidden');
-                    return;
-                }
-                const file = selectedFilesMap.get(filename);
-                if (!file) {
-                    clearCurrentMesh();
-                    previewPlaceholder.textContent = '未找到对应文件，请重新上传后再预览';
-                    previewPlaceholder.classList.remove('hidden');
-                    return;
-                }
-                previewPlaceholder.textContent = `加载预览中：${filename}`;
-                previewPlaceholder.classList.remove('hidden');
-                const rowData = currentResults.find((i) => i && i.filename === filename);
-                const colorForPreview = (rowData && rowData.color) ? rowData.color : quoteOptions.color;
-                renderSTL(file, colorForPreview);
-            }
-
-            previewCloseBtn.addEventListener('click', closePreviewModal);
-            previewBackdrop.addEventListener('click', closePreviewModal);
-            optionsCloseBtn.addEventListener('click', closeOptionsModal);
-            optionsBackdrop.addEventListener('click', closeOptionsModal);
-            optMaterial.addEventListener('change', () => {
-                const rendered = renderColorOptionsForMaterial(optMaterial.value, optColor.value);
-                optColor.innerHTML = rendered.html;
-                optColor.value = rendered.selected;
-            });
-            optionsSaveBtn.addEventListener('click', () => {
-                const quantity = Number.parseInt(optQuantity.value, 10);
-                if (!Number.isFinite(quantity) || quantity < 1) {
-                    errorMsg.textContent = '数量必须大于等于 1';
-                    errorContainer.classList.remove('hidden');
-                    return;
-                }
-                quoteOptions.material = optMaterial.value;
-                const rendered = renderColorOptionsForMaterial(quoteOptions.material, optColor.value);
-                quoteOptions.color = rendered.selected;
-                quoteOptions.quantity = quantity;
+    // ── Global: color dropdown toggle + item selection ──
+    document.addEventListener('click', (e) => {
+        // Toggle dropdown
+        const trigger = e.target.closest('.color-dd-trigger');
+        if (trigger) {
+            e.stopPropagation();
+            const wrapper = trigger.closest('.color-dd-wrapper');
+            if (!wrapper) return;
+            const list = wrapper.querySelector('.color-dd-list');
+            if (!list) return;
+            const wasHidden = list.classList.contains('hidden');
+            // Close all other dropdowns first
+            document.querySelectorAll('.color-dd-list:not(.hidden)').forEach(l => l.classList.add('hidden'));
+            if (wasHidden) list.classList.remove('hidden');
+            return;
+        }
+        // Select a color item
+        const item = e.target.closest('.color-dd-item');
+        if (item) {
+            e.stopPropagation();
+            const hex = item.getAttribute('data-color-hex');
+            if (!hex) return;
+            const wrapper = item.closest('.color-dd-wrapper');
+            if (!wrapper) return;
+            // Update hidden input
+            const valueInput = wrapper.querySelector('.row-color-value');
+            if (valueInput) valueInput.value = hex;
+            // Update trigger swatch
+            const swatch = wrapper.querySelector('.color-dd-swatch');
+            if (swatch) swatch.style.background = hex;
+            // Update trigger label (for full mode)
+            const label = wrapper.querySelector('.color-dd-label');
+            const nameSpan = item.querySelector('span:nth-child(2)');
+            if (label && nameSpan) label.textContent = nameSpan.textContent;
+            // Highlight selected item
+            wrapper.querySelectorAll('.color-dd-item').forEach(el => el.classList.remove('bg-indigo-50'));
+            item.classList.add('bg-indigo-50');
+            // Close dropdown
+            const list = wrapper.querySelector('.color-dd-list');
+            if (list) list.classList.add('hidden');
+            // Update quoteOptions if in options modal
+            const inModal = wrapper.closest('#options-modal');
+            if (inModal) {
+                quoteOptions.color = hex;
                 refreshOptionsSummary();
-                closeOptionsModal();
-            });
-            async function fetchUserSettings() {
-                if (!authToken) return;
-                try {
-                    const response = await authFetch('/api/user/settings');
-                    if (response.ok) {
-                        const data = await response.json();
-                        MATERIAL_OPTIONS = data.materials || MATERIAL_OPTIONS;
-                        COLOR_OPTIONS = data.colors || COLOR_OPTIONS;
-                        PRICING_CONFIG = data.pricing_config || PRICING_CONFIG;
-                    }
-                } catch (e) {
-                    console.error("Failed to fetch user settings", e);
-                }
-                updateDropdowns();
             }
-
-            function getMaterialByName(name) {
-                return MATERIAL_OPTIONS.find((m) => m && m.name === name) || null;
+            // For table rows: trigger re-quote
+            const row = wrapper.closest('tr[data-row-file]');
+            if (row) {
+                const rowEditEl = row.querySelector('.row-edit');
+                if (rowEditEl) rowEditEl.dispatchEvent(new Event('change', { bubbles: true }));
             }
+        }
+    });
 
-            function getColorsForMaterial(name) {
-                const material = getMaterialByName(name);
-                const colors = material && Array.isArray(material.colors) ? material.colors : [];
-                return colors.length ? colors : COLOR_OPTIONS;
-            }
+    // Options modal — color dropdown
+    if (dom.optMaterial) dom.optMaterial.addEventListener('change', () => {
+        const rendered = renderColorDropdown(dom.optMaterial.value, quoteOptions.color);
+        dom.optColor.innerHTML = rendered.html;
+    });
+    if (dom.optionsSaveBtn) dom.optionsSaveBtn.addEventListener('click', () => {
+        const quantity = Number.parseInt(dom.optQuantity?.value, 10);
+        if (!Number.isFinite(quantity) || quantity < 1) {
+            if (dom.errorMsg) { dom.errorMsg.textContent = '数量必须大于等于 1'; dom.errorContainer.classList.remove('hidden'); }
+            return;
+        }
+        quoteOptions.material = dom.optMaterial.value;
+        const wrapper = dom.optColor.querySelector('.color-dd-wrapper');
+        const hiddenInput = wrapper ? wrapper.querySelector('.row-color-value') : null;
+        if (hiddenInput) quoteOptions.color = hiddenInput.value;
+        quoteOptions.quantity = quantity;
+        refreshOptionsSummary();
+        dom.optionsModal.classList.add('hidden');
+    });
+    if (dom.optionsCloseBtn) dom.optionsCloseBtn.addEventListener('click', () => dom.optionsModal.classList.add('hidden'));
+    if (dom.optionsBackdrop) dom.optionsBackdrop.addEventListener('click', () => dom.optionsModal.classList.add('hidden'));
 
-            function renderColorOptionsForMaterial(name, selectedColor) {
-                const allowedColors = getColorsForMaterial(name);
-                const safeSelected = allowedColors.includes(selectedColor) ? selectedColor : (allowedColors[0] || "");
-                return {
-                    html: allowedColors.map(c => `<option value="${c}" ${c === safeSelected ? 'selected' : ''}>${formatColorLabel(c)}</option>`).join(''),
-                    selected: safeSelected,
-                };
-            }
+    // Open options modal
+    const openOptionsTrigger = document.querySelector('[data-open-options]');
+    if (openOptionsTrigger) {
+        openOptionsTrigger.addEventListener('click', () => {
+            updateDropdowns();
+            dom.optMaterial.value = quoteOptions.material;
+            const rendered = renderColorDropdown(dom.optMaterial.value, quoteOptions.color);
+            dom.optColor.innerHTML = rendered.html;
+            dom.optQuantity.value = String(quoteOptions.quantity);
+            dom.optionsModal.classList.remove('hidden');
+        });
+    }
 
-            function updateDropdowns() {
-                optMaterial.innerHTML = MATERIAL_OPTIONS.map(m => `<option value="${m.name}">${m.name} (¥${Number(m.price_per_kg || 0).toFixed(2)}/KG)</option>`).join('');
-                
-                // reset quote options if they don't exist
-                if (!MATERIAL_OPTIONS.find(m => m.name === quoteOptions.material) && MATERIAL_OPTIONS.length > 0) {
-                    quoteOptions.material = MATERIAL_OPTIONS[0].name;
-                }
-                const rendered = renderColorOptionsForMaterial(quoteOptions.material, quoteOptions.color);
-                optColor.innerHTML = rendered.html;
-                quoteOptions.color = rendered.selected;
+    // Preview modal
+    if (dom.previewCloseBtn) dom.previewCloseBtn.addEventListener('click', closePreviewModal);
+    if (dom.previewBackdrop) dom.previewBackdrop.addEventListener('click', closePreviewModal);
+    setupViewCube();
 
-                refreshOptionsSummary();
+    // Orientation
+    if (dom.orientCenterBtn) dom.orientCenterBtn.addEventListener('click', centerModel);
+    if (dom.orientResetBtn) dom.orientResetBtn.addEventListener('click', resetOrientationHandler);
+    if (dom.layFaceBtn) dom.layFaceBtn.addEventListener('click', toggleLayFace);
+    if (dom.orientTrainBtn) dom.orientTrainBtn.addEventListener('click', submitTraining);
 
-                const mainUseBambuCfg = document.getElementById('main-use-bambu');
-                if (mainUseBambuCfg && PRICING_CONFIG) {
-                    mainUseBambuCfg.checked = !!(Number(PRICING_CONFIG.use_prusaslicer) || 0) || PRICING_CONFIG.use_prusaslicer === true;
-                }
-            }
+    // User center
+    if (dom.userCenterCloseBtn) dom.userCenterCloseBtn.addEventListener('click', () => { dom.userCenterModal.classList.add('hidden'); dom.userCenterMsg.classList.add('hidden'); });
+    if (dom.userCenterBackdrop) dom.userCenterBackdrop.addEventListener('click', () => { dom.userCenterModal.classList.add('hidden'); dom.userCenterMsg.classList.add('hidden'); });
+    if (dom.userCenterSaveBtn) dom.userCenterSaveBtn.addEventListener('click', saveUserSettings);
+    if (dom.userCenterSetDefaultsBtn) dom.userCenterSetDefaultsBtn.addEventListener('click', setAsDefaults);
+    if (dom.ucChangePasswordBtn) dom.ucChangePasswordBtn.addEventListener('click', changePassword);
 
-            async function handleAuthSuccess(data) {
-                authToken = data.access_token || "";
-                currentUser = data.user || null;
-                if (!authToken || !currentUser) {
-                    throw new Error('登录响应无效，请重试');
-                }
-                try {
-                    const meResp = await authFetch('/api/auth/me');
-                    if (meResp.ok) {
-                        currentUser = await meResp.json();
-                    }
-                } catch (e) {}
-                saveUserSession();
-                loadSlicerPresetSelection();
-                renderAuthUI();
-                await fetchUserSettings();
-                loadQuoteHistory(authToken);
-                fetchPrinterModels();
-                closeLoginModal();
-                errorContainer.classList.add('hidden');
-                const filesToQuote = pendingQuoteFiles;
-                pendingQuoteFiles = null;
-                if (filesToQuote && filesToQuote.length) {
-                    const totalFiles = selectedFilesMap.size || filesToQuote.length;
-                    fileNameDisplay.textContent = `当前列表共 ${totalFiles} 个文件，正在为新增 ${filesToQuote.length} 个文件生成静态图与自动报价...`;
-                    try {
-                        await buildThumbnails(filesToQuote);
-                        await quoteSelectedFiles(filesToQuote);
-                        fileNameDisplay.textContent = `当前列表共 ${selectedFilesMap.size} 个文件，新增 ${filesToQuote.length} 个文件报价完成`;
-                    } catch (err) {
-                        errorMsg.textContent = err.message;
-                        errorContainer.classList.remove('hidden');
-                        fileNameDisplay.textContent = `当前列表共 ${selectedFilesMap.size} 个文件，新增 ${filesToQuote.length} 个文件自动报价失败`;
-                    }
-                }
-            }
-            openLoginBtn.addEventListener('click', openLoginModal);
-            loginCloseBtn.addEventListener('click', closeLoginModal);
-            loginBackdrop.addEventListener('click', closeLoginModal);
-            loginCaptchaRefreshBtn.addEventListener('click', refreshLoginCaptcha);
-            loginSubmitBtn.addEventListener('click', async () => {
-                const identifier = (loginUsername.value || '').trim();
-                const password = loginPassword.value || '';
-                const captchaCode = (loginCaptchaCode.value || '').trim();
-                const acceptLegal = !!(loginAcceptLegal && loginAcceptLegal.checked);
-                if (!identifier) {
-                    loginError.textContent = '请输入账号';
-                    loginError.classList.remove('hidden');
-                    return;
-                }
-                if (!(password.length >= 6 && /[A-Za-z]/.test(password) && /\d/.test(password))) {
-                    loginError.textContent = '密码至少 6 位且必须包含字母和数字';
-                    loginError.classList.remove('hidden');
-                    return;
-                }
-                if (!captchaCode) {
-                    loginError.textContent = '请输入验证码';
-                    loginError.classList.remove('hidden');
-                    return;
-                }
-                if (!acceptLegal) {
-                    loginError.textContent = '请先阅读并同意《用户协议》和《隐私政策》';
-                    loginError.classList.remove('hidden');
-                    return;
-                }
-                if (!currentCaptchaId) {
-                    loginError.textContent = '验证码已失效，请刷新后重试';
-                    loginError.classList.remove('hidden');
-                    await refreshLoginCaptcha();
-                    return;
-                }
-                loginError.classList.add('hidden');
-                try {
-                    const response = await fetch('/api/auth/login', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            identifier,
-                            password,
-                            captcha_id: currentCaptchaId,
-                            captcha_code: captchaCode,
-                            accept_terms: acceptLegal,
-                            accept_privacy: acceptLegal,
-                        })
-                    });
-                    const data = await response.json();
-                    if (!response.ok) {
-                        throw new Error(data.detail || '登录失败');
-                    }
-                    await handleAuthSuccess(data);
-                } catch (err) {
-                    loginError.textContent = err.message || '登录失败';
-                    loginError.classList.remove('hidden');
-                    await refreshLoginCaptcha();
-                }
-            });
-            registerSubmitBtn.addEventListener('click', () => {
-                window.location.href = '/register';
-            });
-            userMenuBtn.addEventListener('click', () => {
-                userDropdown.classList.toggle('hidden');
-            });
-            openAdminUsersBtn.addEventListener('click', () => {
-                userDropdown.classList.add('hidden');
-                window.location.href = '/admin/users';
-            });
-            openMembershipBtn.addEventListener('click', () => {
-                userDropdown.classList.add('hidden');
-                openMembershipModal();
-            });
-            openUserCenterBtn.addEventListener('click', () => {
-                userDropdown.classList.add('hidden');
-                if (!currentUser) return;
+    // User center tabs
+    dom.ucTabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tabId = btn.getAttribute('data-uc-tab');
+            dom.ucTabBtns.forEach(b => { b.classList.remove('text-indigo-700', 'bg-indigo-50', 'active'); b.classList.add('text-gray-600'); });
+            btn.classList.add('text-indigo-700', 'bg-indigo-50', 'active');
+            btn.classList.remove('text-gray-600');
+            dom.ucTabPanes.forEach(pane => { pane.classList.add('hidden'); pane.classList.remove('block'); });
+            const targetPane = document.getElementById(`uc-tab-${tabId}`);
+            if (targetPane) { targetPane.classList.remove('hidden'); targetPane.classList.add('block'); }
+            if (dom.userCenterSaveBtn) dom.userCenterSaveBtn.classList.toggle('hidden', tabId === 'security');
+            if (dom.userCenterHint) dom.userCenterHint.classList.toggle('invisible', tabId !== 'security');
+            if (tabId === 'security') dom.userCenterMsg.classList.add('hidden');
+        });
+    });
+
+    // Materials table
+    if (dom.materialsTbody) {
+        dom.materialsTbody.addEventListener('change', (e) => {
+            const target = e.target;
+            if (target.tagName !== 'INPUT') return;
+            const idx = target.getAttribute('data-idx');
+            const field = target.getAttribute('data-field');
+            if (field === 'name') MATERIAL_OPTIONS[idx].name = target.value;
+            else if (field === 'brand') MATERIAL_OPTIONS[idx].brand = target.value;
+            else if (field === 'density') MATERIAL_OPTIONS[idx].density = parseFloat(target.value) || 1.0;
+            else if (field === 'price_per_kg') MATERIAL_OPTIONS[idx].price_per_kg = parseFloat(target.value) || 0.0;
+        });
+        dom.materialsTbody.addEventListener('click', (e) => {
+            if (e.target.classList.contains('delete-material-btn')) {
+                const idx = e.target.getAttribute('data-idx');
+                MATERIAL_OPTIONS.splice(idx, 1);
                 renderUserCenterUI();
-                if (userCenterSetDefaultsBtn) {
-                    userCenterSetDefaultsBtn.classList.toggle('hidden', !(currentUser && currentUser.is_admin));
-                }
-                if (ucOldPassword) ucOldPassword.value = '';
-                if (ucNewPassword) ucNewPassword.value = '';
-                if (ucConfirmPassword) ucConfirmPassword.value = '';
-                if (ucPasswordMsg) {
-                    ucPasswordMsg.textContent = '';
-                    ucPasswordMsg.className = 'text-xs hidden';
-                }
-                const defaultUcTabBtn = document.querySelector('.uc-tab-btn[data-uc-tab="materials"]');
-                if (defaultUcTabBtn) defaultUcTabBtn.click();
-                userCenterModal.classList.remove('hidden');
-                fetchSlicerPresets();
-            });
-
-            membershipCloseBtn.addEventListener('click', closeMembershipModal);
-            membershipBackdrop.addEventListener('click', closeMembershipModal);
-            membershipRefreshBtn.addEventListener('click', refreshMembershipStatus);
-            membershipOrdersBtn.addEventListener('click', toggleMembershipOrders);
-            if (slicerPresetsRefreshBtn) slicerPresetsRefreshBtn.addEventListener('click', fetchSlicerPresets);
-            if (slicerPresetUploadBtn) slicerPresetUploadBtn.addEventListener('click', uploadSlicerPreset);
-            if (slicerPresetGenerateBtn) slicerPresetGenerateBtn.addEventListener('click', generateSlicerPreset);
-            if (cfgSlicerPresetId) {
-                cfgSlicerPresetId.addEventListener('change', async () => {
-                    const raw = String(cfgSlicerPresetId.value || "").trim();
-                    const parsed = raw ? Number.parseInt(raw, 10) : NaN;
-                    quoteOptions.slicer_preset_id = Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
-                    saveSlicerPresetSelection();
-                    renderSlicerPresetsUI();
-                    if (selectedFilesMap.size > 0) {
-                        await reQuoteAllSelectedFiles('切片预设已变更，重算报价');
-                    }
-                });
+            } else if (e.target.classList.contains('edit-colors-btn')) {
+                openColorEditor(parseInt(e.target.getAttribute('data-idx')));
             }
-            
-            userCenterCloseBtn.addEventListener('click', () => {
-                userCenterModal.classList.add('hidden');
-                userCenterMsg.classList.add('hidden');
-            });
-            
-            userCenterBackdrop.addEventListener('click', () => {
-                userCenterModal.classList.add('hidden');
-                userCenterMsg.classList.add('hidden');
-            });
+        });
+    }
+    if (dom.addMaterialBtn) dom.addMaterialBtn.addEventListener('click', () => {
+        MATERIAL_OPTIONS.push({ name: "NewMaterial", brand: "通用", density: 1.0, price_per_kg: 200.0, colors: [{ name: "白色", hex: "#ffffff" }] });
+        renderUserCenterUI();
+    });
 
-            // User Center Tabs
-            ucTabBtns.forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const tabId = btn.getAttribute('data-uc-tab');
-                    
-                    // Update active button state
-                    ucTabBtns.forEach(b => {
-                        b.classList.remove('text-indigo-700', 'bg-indigo-50', 'active');
-                        b.classList.add('text-gray-600');
-                    });
-                    btn.classList.add('text-indigo-700', 'bg-indigo-50', 'active');
-                    btn.classList.remove('text-gray-600');
-                    
-                    // Update tab pane visibility
-                    ucTabPanes.forEach(pane => {
-                        pane.classList.add('hidden');
-                        pane.classList.remove('block');
-                    });
-                    const targetPane = document.getElementById(`uc-tab-${tabId}`);
-                    if (targetPane) {
-                        targetPane.classList.remove('hidden');
-                        targetPane.classList.add('block');
-                    }
-                    if (userCenterSaveBtn) {
-                        userCenterSaveBtn.classList.toggle('hidden', tabId === 'security');
-                    }
-                    if (tabId === 'security') {
-                        userCenterMsg.classList.add('hidden');
-                    }
-                });
-            });
+    // Color editor
+    const colorEditorList = document.getElementById('color-editor-list');
+    if (colorEditorList) {
+        colorEditorList.addEventListener('click', (e) => {
+            const btn = e.target.closest('.remove-color-btn');
+            if (!btn) return;
+            removeColorFromMaterial(btn.getAttribute('data-color-hex'));
+        });
+    }
+    const colorEditorClose = document.getElementById('color-editor-close');
+    if (colorEditorClose) colorEditorClose.addEventListener('click', closeColorEditor);
+    const colorEditorAdd = document.getElementById('color-editor-add');
+    if (colorEditorAdd) colorEditorAdd.addEventListener('click', addColorToMaterial);
 
-            if (userCenterSetDefaultsBtn) {
-                userCenterSetDefaultsBtn.addEventListener('click', async () => {
-                    if (!authToken) return;
-                    if (!currentUser || !currentUser.is_admin) {
-                        alert('无管理员权限');
-                        return;
-                    }
-                    try {
-                        const formulaOk = await validateCurrentFormulas();
-                        if (!formulaOk) return;
-                        syncPricingFromInputs();
-                        const payload = {
-                            materials: MATERIAL_OPTIONS,
-                            pricing_config: PRICING_CONFIG
-                        };
-                        const saveRes = await authFetch('/api/user/settings', {
-                            method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload)
-                        });
-                        if (saveRes.status === 401) {
-                            userCenterModal.classList.add('hidden');
-                            openLoginModal();
-                            return;
-                        }
-                        if (!saveRes.ok) {
-                            let data = null;
-                            try {
-                                data = await saveRes.json();
-                            } catch (e) {
-                                data = null;
-                            }
-                            const msg = data && data.detail ? String(data.detail) : '保存失败';
-                            throw new Error(msg);
-                        }
-                        const resp = await authFetch('/api/admin/defaults/from-me', { method: 'POST' });
-                        let data = null;
-                        try {
-                            data = await resp.json();
-                        } catch (e) {
-                            data = null;
-                        }
-                        if (!resp.ok) {
-                            throw new Error((data && data.detail) ? String(data.detail) : '设为默认失败');
-                        }
-                        const prev = userCenterMsg.textContent || '保存成功';
-                        userCenterMsg.textContent = '已设为全局默认（新用户生效）';
-                        userCenterMsg.classList.remove('hidden');
-                        setTimeout(() => {
-                            userCenterMsg.textContent = prev;
-                            userCenterMsg.classList.add('hidden');
-                        }, 3000);
-                    } catch (e) {
-                        alert(e.message);
-                    }
-                });
-            }
+    // Formula
+    if (dom.formulaVarsToggleBtn) {
+        dom.formulaVarsToggleBtn.addEventListener('click', () => {
+            const hidden = dom.formulaVarsPanel.classList.contains('hidden');
+            dom.formulaVarsPanel.classList.toggle('hidden', !hidden);
+            dom.formulaVarsToggleBtn.textContent = hidden ? '收起变量字典' : '展开变量字典';
+        });
+    }
+    if (dom.formulaResetBtn) {
+        dom.formulaResetBtn.addEventListener('click', () => {
+            dom.cfgUnitCostFormula.value = '((effective_weight_g * (price_per_kg / 1000.0)) + (unit_time_h * machine_hourly_rate_cny) + post_process_fee_per_part_cny) * difficulty_multiplier + support_cost_per_part_cny';
+            dom.cfgTotalCostFormula.value = 'max((unit_cost_cny * quantity) + setup_fee_cny, min_job_fee_cny)';
+            syncPricingFromInputs();
+            if (dom.formulaValidateMsg) dom.formulaValidateMsg.classList.add('hidden');
+        });
+    }
+    if (dom.formulaValidateBtn) dom.formulaValidateBtn.addEventListener('click', validateCurrentFormulas);
 
-            function renderUserCenterUI() {
-                materialsTbody.innerHTML = MATERIAL_OPTIONS.map((m, idx) => `
-                    <tr>
-                        <td class="px-2 py-2"><input type="text" class="w-full border-gray-300 rounded-sm text-xs px-1 py-1" value="${m.name}" data-idx="${idx}" data-field="name"></td>
-                        <td class="px-2 py-2"><input type="number" step="0.01" class="w-full border-gray-300 rounded-sm text-xs px-1 py-1" value="${m.density}" data-idx="${idx}" data-field="density"></td>
-                        <td class="px-2 py-2"><input type="number" step="0.01" class="w-full border-gray-300 rounded-sm text-xs px-1 py-1" value="${m.price_per_kg}" data-idx="${idx}" data-field="price_per_kg"></td>
-                        <td class="px-2 py-2"><input type="text" class="w-full border border-gray-300 rounded-sm text-xs px-2 py-1" value="${(Array.isArray(m.colors) ? m.colors : []).map(formatColorLabel).join(',')}" data-idx="${idx}" data-field="colors" /></td>
-                        <td class="px-2 py-2 text-center"><button type="button" class="text-red-500 hover:text-red-700 delete-material-btn" data-idx="${idx}">删除</button></td>
-                    </tr>
-                `).join('');
+    // Pricing inputs auto-sync
+    [
+        dom.cfgMachineHourlyRate, dom.cfgSetupFee, dom.cfgMinJobFee, dom.cfgMaterialWaste,
+        dom.cfgSupportPercent, dom.cfgPostPerPart, dom.cfgTimeOverheadMin, dom.cfgTimeVolMinPerCm3,
+        dom.cfgDifficultyCoefficient, dom.cfgDifficultyRatioLow, dom.cfgDifficultyRatioHigh,
+        dom.cfgSupportPricePerG, dom.cfgUnitCostFormula, dom.cfgTotalCostFormula,
+    ].forEach((el) => el && el.addEventListener('change', syncPricingFromInputs));
 
-                cfgMachineHourlyRate.value = String(PRICING_CONFIG.machine_hourly_rate_cny ?? 15);
-                cfgSetupFee.value = String(PRICING_CONFIG.setup_fee_cny ?? 0);
-                cfgMinJobFee.value = String(PRICING_CONFIG.min_job_fee_cny ?? 0);
-                cfgMaterialWaste.value = String(PRICING_CONFIG.material_waste_percent ?? 5);
-                cfgSupportPercent.value = String(PRICING_CONFIG.support_percent_of_model ?? 0);
-                cfgPostPerPart.value = String(PRICING_CONFIG.post_process_fee_per_part_cny ?? 0);
-                cfgTimeOverheadMin.value = String(PRICING_CONFIG.time_overhead_min ?? 5);
-                cfgTimeVolMinPerCm3.value = String(PRICING_CONFIG.time_vol_min_per_cm3 ?? 0.8);
-                cfgDifficultyCoefficient.value = String(((Number(PRICING_CONFIG.difficulty_coefficient ?? 0.25) || 0) * 100).toFixed(2));
-                cfgDifficultyRatioLow.value = String(PRICING_CONFIG.difficulty_ratio_low ?? 0.8);
-                cfgDifficultyRatioHigh.value = String(PRICING_CONFIG.difficulty_ratio_high ?? 4.0);
-                cfgSupportPricePerG.value = String(PRICING_CONFIG.support_price_per_g ?? 0);
-                cfgUnitCostFormula.value = String(PRICING_CONFIG.unit_cost_formula ?? '((effective_weight_g * (price_per_kg / 1000.0)) + (unit_time_h * machine_hourly_rate_cny) + post_process_fee_per_part_cny) * difficulty_multiplier + support_cost_per_part_cny');
-                cfgTotalCostFormula.value = String(PRICING_CONFIG.total_cost_formula ?? 'max((unit_cost_cny * quantity) + setup_fee_cny, min_job_fee_cny)');
-                loadSlicerPresetSelection();
-                renderSlicerPresetsUI();
-            }
-
-            function syncPricingFromInputs() {
-                const diffCoeffPercent = Number(cfgDifficultyCoefficient.value) || 0;
-                PRICING_CONFIG = {
-                    ...PRICING_CONFIG,
-                    machine_hourly_rate_cny: Number(cfgMachineHourlyRate.value) || 0,
-                    setup_fee_cny: Number(cfgSetupFee.value) || 0,
-                    min_job_fee_cny: Number(cfgMinJobFee.value) || 0,
-                    material_waste_percent: Number(cfgMaterialWaste.value) || 0,
-                    support_percent_of_model: Number(cfgSupportPercent.value) || 0,
-                    post_process_fee_per_part_cny: Number(cfgPostPerPart.value) || 0,
-                    difficulty_coefficient: Math.max(0, diffCoeffPercent) / 100.0,
-                    difficulty_ratio_low: Number(cfgDifficultyRatioLow.value) || 0,
-                    difficulty_ratio_high: Number(cfgDifficultyRatioHigh.value) || 0,
-                    bambu_support_mode: 'diff',
-                    support_price_per_g: Number(cfgSupportPricePerG.value) || 0,
-                    time_overhead_min: Number(cfgTimeOverheadMin.value) || 0,
-                    time_vol_min_per_cm3: Number(cfgTimeVolMinPerCm3.value) || 0,
-                    unit_cost_formula: String(cfgUnitCostFormula.value || '').trim(),
-                    total_cost_formula: String(cfgTotalCostFormula.value || '').trim(),
-                };
-            }
-
-            materialsTbody.addEventListener('change', (e) => {
-                const target = e.target;
-                if (target.tagName === 'INPUT') {
-                    const idx = target.getAttribute('data-idx');
-                    const field = target.getAttribute('data-field');
-                    if (field === 'name') {
-                        MATERIAL_OPTIONS[idx][field] = target.value;
-                    } else if (field === 'density') {
-                        MATERIAL_OPTIONS[idx][field] = parseFloat(target.value) || 1.0;
-                    } else if (field === 'price_per_kg') {
-                        MATERIAL_OPTIONS[idx][field] = parseFloat(target.value) || 0.0;
-                    } else if (field === 'colors') {
-                        const raw = target.value || '';
-                        const colors = raw
-                            .split(',')
-                            .map(normalizeColorToken)
-                            .filter(Boolean);
-                        MATERIAL_OPTIONS[idx].colors = colors;
-                    }
-                }
-            });
-
-            materialsTbody.addEventListener('click', (e) => {
-                if (e.target.classList.contains('delete-material-btn')) {
-                    const idx = e.target.getAttribute('data-idx');
-                    MATERIAL_OPTIONS.splice(idx, 1);
-                    renderUserCenterUI();
-                }
-            });
-
-            addMaterialBtn.addEventListener('click', () => {
-                MATERIAL_OPTIONS.push({ name: "NewMaterial", density: 1.0, price_per_kg: 200.0, colors: ["White"] });
-                renderUserCenterUI();
-            });
-
-            formulaVarsToggleBtn.addEventListener('click', () => {
-                const isHidden = formulaVarsPanel.classList.contains('hidden');
-                if (isHidden) {
-                    formulaVarsPanel.classList.remove('hidden');
-                    formulaVarsToggleBtn.textContent = '收起变量字典';
-                } else {
-                    formulaVarsPanel.classList.add('hidden');
-                    formulaVarsToggleBtn.textContent = '展开变量字典';
-                }
-            });
-
-            formulaResetBtn.addEventListener('click', () => {
-                cfgUnitCostFormula.value = '((effective_weight_g * (price_per_kg / 1000.0)) + (unit_time_h * machine_hourly_rate_cny) + post_process_fee_per_part_cny) * difficulty_multiplier + support_cost_per_part_cny';
-                cfgTotalCostFormula.value = 'max((unit_cost_cny * quantity) + setup_fee_cny, min_job_fee_cny)';
-                syncPricingFromInputs();
-                formulaValidateMsg.classList.add('hidden');
-            });
-
-            async function validateCurrentFormulas() {
-                if (!authToken) return;
-                try {
-                    syncPricingFromInputs();
-                    const payload = {
-                        unit_cost_formula: PRICING_CONFIG.unit_cost_formula,
-                        total_cost_formula: PRICING_CONFIG.total_cost_formula,
-                    };
-                    const res = await authFetch('/api/formula/validate', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload),
-                    });
-                    if (res.status === 401) {
-                        formulaValidateMsg.textContent = '登录已失效，请重新登录';
-                        formulaValidateMsg.className = 'text-xs text-red-600';
-                        formulaValidateMsg.classList.remove('hidden');
-                        openLoginModal();
-                        return false;
-                    }
-                    if (res.status === 404) {
-                        formulaValidateMsg.textContent = '校验接口未生效，请重启后端服务';
-                        formulaValidateMsg.className = 'text-xs text-red-600';
-                        formulaValidateMsg.classList.remove('hidden');
-                        return false;
-                    }
-                    let data = null;
-                    try {
-                        data = await res.json();
-                    } catch (e) {
-                        data = null;
-                    }
-                    if (!res.ok || !data || !data.ok) {
-                        const serverDetail = data && data.detail ? String(data.detail) : '';
-                        const unitErr = data && data.unit && data.unit.error ? `单件公式：${data.unit.error}` : '';
-                        const totalErr = data && data.total && data.total.error ? `总价公式：${data.total.error}` : '';
-                        const msg = serverDetail || [unitErr, totalErr].filter(Boolean).join('；') || '公式校验失败';
-                        formulaValidateMsg.textContent = msg;
-                        formulaValidateMsg.className = 'text-xs text-red-600';
-                        formulaValidateMsg.classList.remove('hidden');
-                        return false;
-                    }
-                    formulaValidateMsg.textContent = '公式校验通过';
-                    formulaValidateMsg.className = 'text-xs text-green-600';
-                    formulaValidateMsg.classList.remove('hidden');
-                    setTimeout(() => formulaValidateMsg.classList.add('hidden'), 3000);
-                    return true;
-                } catch (e) {
-                    formulaValidateMsg.textContent = e.message || '公式校验失败';
-                    formulaValidateMsg.className = 'text-xs text-red-600';
-                    formulaValidateMsg.classList.remove('hidden');
-                    return false;
-                }
-            }
-
-            formulaValidateBtn.addEventListener('click', async () => {
-                await validateCurrentFormulas();
-            });
-
-            [
-                cfgMachineHourlyRate,
-                cfgSetupFee,
-                cfgMinJobFee,
-                cfgMaterialWaste,
-                cfgSupportPercent,
-                cfgPostPerPart,
-                cfgTimeOverheadMin,
-                cfgTimeVolMinPerCm3,
-                cfgDifficultyCoefficient,
-                cfgDifficultyRatioLow,
-                cfgDifficultyRatioHigh,
-                cfgSupportPricePerG,
-                cfgUnitCostFormula,
-                cfgTotalCostFormula,
-            ].forEach((el) => el.addEventListener('change', syncPricingFromInputs));
-
-            userCenterSaveBtn.addEventListener('click', async () => {
-                if (!authToken) return;
-                try {
-                    const formulaOk = await validateCurrentFormulas();
-                    if (!formulaOk) return;
-                    syncPricingFromInputs();
-                    const payload = {
-                        materials: MATERIAL_OPTIONS,
-                        pricing_config: PRICING_CONFIG
-                    };
-                    const res = await authFetch('/api/user/settings', {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                    if (res.status === 401) {
-                        userCenterModal.classList.add('hidden');
-                        openLoginModal();
-                        return;
-                    }
-                    if (!res.ok) {
-                        let data = null;
-                        try {
-                            data = await res.json();
-                        } catch (e) {
-                            data = null;
-                        }
-                        const msg = data && data.detail ? String(data.detail) : '保存失败';
-                        throw new Error(msg);
-                    }
-                    
-                    userCenterMsg.classList.remove('hidden');
-                    setTimeout(() => userCenterMsg.classList.add('hidden'), 3000);
-                    COLOR_OPTIONS = Array.from(new Set(MATERIAL_OPTIONS.flatMap((m) => Array.isArray(m.colors) ? m.colors : [])));
-                    updateDropdowns();
-                    normalizeResultsWithCurrentOptions();
-                    renderResultsTable();
-                    recalcSummaryFromCurrentResults();
-                    userCenterModal.classList.add('hidden');
-                    await reQuoteAllSelectedFiles('按新设置重算报价');
-                } catch (e) {
-                    alert(e.message);
-                }
-            });
-
-            if (ucChangePasswordBtn) {
-                ucChangePasswordBtn.addEventListener('click', async () => {
-                    const oldPwd = ucOldPassword.value;
-                    const newPwd = ucNewPassword.value;
-                    const confPwd = ucConfirmPassword.value;
-                    
-                    if (!oldPwd || !newPwd || !confPwd) {
-                        ucPasswordMsg.textContent = "所有密码字段必填";
-                        ucPasswordMsg.className = "text-xs text-red-600 block";
-                        return;
-                    }
-                    
-                    if (newPwd !== confPwd) {
-                        ucPasswordMsg.textContent = "两次输入的新密码不一致";
-                        ucPasswordMsg.className = "text-xs text-red-600 block";
-                        return;
-                    }
-                    
-                    if (newPwd.length < 6) {
-                        ucPasswordMsg.textContent = "新密码长度不能少于6位";
-                        ucPasswordMsg.className = "text-xs text-red-600 block";
-                        return;
-                    }
-                    
-                    try {
-                        const res = await authFetch('/api/users/change-password', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                old_password: oldPwd,
-                                new_password: newPwd
-                            })
-                        });
-                        
-                        if (res.status === 401) {
-                            userCenterModal.classList.add('hidden');
-                            openLoginModal();
-                            return;
-                        }
-                        
-                        let data = {};
-                        try { data = await res.json(); } catch(e){}
-                        
-                        if (!res.ok) {
-                            const msg = data && data.detail ? String(data.detail) : '修改失败';
-                            ucPasswordMsg.textContent = msg;
-                            ucPasswordMsg.className = "text-xs text-red-600 block";
-                            return;
-                        }
-                        
-                        ucPasswordMsg.textContent = "修改成功，请重新登录";
-                        ucPasswordMsg.className = "text-xs text-green-600 block";
-                        
-                        setTimeout(() => {
-                            userCenterModal.classList.add('hidden');
-                            currentUser = null;
-                            authToken = "";
-                            renderAuthUI();
-                            renderResultsTable();
-                            openLoginModal();
-                        }, 1500);
-                        
-                    } catch (e) {
-                        ucPasswordMsg.textContent = e.message;
-                        ucPasswordMsg.className = "text-xs text-red-600 block";
-                    }
-                });
-            }
-
-            logoutBtn.addEventListener('click', () => {
-                currentUser = null;
-                authToken = "";
-                quoteOptions.slicer_preset_id = null;
-                clearUserSession();
-                renderAuthUI();
-                userDropdown.classList.add('hidden');
-            });
-            document.addEventListener('click', (event) => {
-                if (!userMenu.contains(event.target)) {
-                    userDropdown.classList.add('hidden');
-                }
-            });
-            batchResultsBody.addEventListener('click', (event) => {
-                const deleteBtn = event.target.closest('[data-delete-file]');
-                if (deleteBtn) {
-                    const filename = deleteBtn.getAttribute('data-delete-file');
-                    selectedFilesMap.delete(filename);
-                    thumbnailMap.delete(filename);
-                    currentResults = currentResults.filter((i) => i && i.filename !== filename);
-                    renderResultsTable();
-                    recalcSummaryFromCurrentResults();
-                    if (selectedFilesMap.size === 0) {
-                        fileNameDisplay.textContent = '未选择文件（最多20个，单文件需小于100MB）';
-                        fileNameDisplay.classList.remove('text-indigo-600', 'font-medium');
-                    } else {
-                        fileNameDisplay.textContent = `当前列表共 ${selectedFilesMap.size} 个文件`;
-                        fileNameDisplay.classList.add('text-indigo-600', 'font-medium');
-                    }
-                    closePreviewModal();
-                    return;
-                }
-                const btn = event.target.closest('[data-preview-file]');
-                if (!btn) return;
-                const filename = btn.getAttribute('data-preview-file');
-                const ext = btn.getAttribute('data-preview-ext');
-                previewByFilename(filename, ext);
-            });
-            // Row edit debounce — prevent racing re-quotes
-            const _rowEditTimers = new Map();
-            const _rowEditSignals = new Map();
-
-            batchResultsBody.addEventListener('change', (event) => {
-                const target = event.target;
-                if (!target.classList.contains('row-edit')) return;
-                const row = target.closest('tr[data-row-file]');
-                if (!row) return;
-                const filename = row.getAttribute('data-row-file');
-
-                // Clear previous timer for this row
-                if (_rowEditTimers.has(filename)) {
-                    clearTimeout(_rowEditTimers.get(filename));
-                }
-                // Cancel in-flight request for this row
-                if (_rowEditSignals.has(filename)) {
-                    _rowEditSignals.get(filename).cancelled = true;
-                }
-
-                _rowEditTimers.set(filename, setTimeout(async () => {
-                    _rowEditTimers.delete(filename);
-                    const signal = { cancelled: false };
-                    _rowEditSignals.set(filename, signal);
-
-                    await _handleRowEdit(event, signal);
-
-                    if (_rowEditSignals.get(filename) === signal) {
-                        _rowEditSignals.delete(filename);
-                    }
-                }, 400));  // 400ms debounce
-            });
-
-            async function _handleRowEdit(event, signal) {
-                const target = event.target;
-                if (!authToken) {
-                    errorMsg.textContent = '请先登录后再修改报价参数';
-                    errorContainer.classList.remove('hidden');
-                    openLoginModal();
-                    return;
-                }
-                const row = target.closest('tr[data-row-file]');
-                if (!row) return;
-                const filename = row.getAttribute('data-row-file');
-                const file = selectedFilesMap.get(filename);
-                if (!file) return;
-
-                const materialSelect = row.querySelector('[data-field="material"]');
-                const colorSelect = row.querySelector('[data-field="color"]');
-                const material = materialSelect.value;
-                const rendered = renderColorOptionsForMaterial(material, colorSelect.value);
-                if (target === materialSelect) {
-                    colorSelect.innerHTML = rendered.html;
-                    colorSelect.value = rendered.selected;
-                }
-                const color = rendered.selected;
-                const quantity = Number.parseInt(row.querySelector('[data-field="quantity"]').value, 10);
-                if (!Number.isFinite(quantity) || quantity < 1) {
-                    errorMsg.textContent = '数量必须大于等于 1';
-                    errorContainer.classList.remove('hidden');
-                    return;
-                }
-                errorContainer.classList.add('hidden');
-                row.querySelector('[data-role="status-cell"]').textContent = '重算中...';
-                row.querySelector('[data-role="status-cell"]').className = 'px-2 py-1.5 text-amber-600';
-
-                try {
-                    await ensureThumbnailForFile(file, color);
-                    if (signal.cancelled) return;
-                    const updated = await quoteSingleFileWithOptions(file, { material, color, quantity });
-                    if (signal.cancelled) return;
-                    const idx = currentResults.findIndex((i) => i.filename === filename);
-                    if (idx >= 0) currentResults[idx] = updated;
-                    renderResultsTable();
-                    recalcSummaryFromCurrentResults();
-                } catch (err) {
-                    if (signal.cancelled) return;
-                    errorMsg.textContent = err.message;
-                    errorContainer.classList.remove('hidden');
-                    row.querySelector('[data-role="status-cell"]').textContent = '重算失败';
-                    row.querySelector('[data-role="status-cell"]').className = 'px-2 py-1.5 text-red-600';
-                }
-            }
-
-            function mergeResultsByFilename(incomingResults) {
-                const idxByFilename = new Map();
-                currentResults.forEach((item, idx) => {
-                    if (item && item.filename) idxByFilename.set(item.filename, idx);
-                });
-                (incomingResults || []).forEach((item) => {
-                    if (!item || !item.filename) return;
-                    const existingIdx = idxByFilename.get(item.filename);
-                    if (existingIdx === undefined) {
-                        idxByFilename.set(item.filename, currentResults.length);
-                        currentResults.push(item);
-                        return;
-                    }
-                    currentResults[existingIdx] = item;
-                });
-            }
-
-            function normalizeResultsWithCurrentOptions() {
-                const materialNames = new Set(MATERIAL_OPTIONS.map((m) => m && m.name).filter(Boolean));
-                currentResults = currentResults.map((item) => {
-                    if (!item || !item.filename) return item;
-                    const next = { ...item };
-                    const selectedMaterial = materialNames.has(next.material) ? next.material : quoteOptions.material;
-                    next.material = selectedMaterial;
-                    const allowedColors = getColorsForMaterial(selectedMaterial);
-                    const color = allowedColors.includes(next.color) ? next.color : (allowedColors[0] || quoteOptions.color);
-                    next.color = color;
-                    const q = Number.parseInt(next.quantity, 10);
-                    next.quantity = Number.isFinite(q) && q >= 1 ? q : (quoteOptions.quantity || 1);
-                    return next;
-                });
-            }
-
-            async function reQuoteAllSelectedFiles(reasonLabel) {
-                if (!authToken) return;
-                const files = Array.from(selectedFilesMap.values());
-                if (!files.length) return;
-                errorMsg.textContent = '';
-                errorContainer.classList.add('hidden');
-
-                // Don't pre-update results — they'll flash wrong numbers
-                // Just update the material/color in place without re-rendering
-                currentResults = currentResults.map((item) => {
-                    if (!item || !item.filename) return item;
-                    const next = { ...item };
-                    const materialNames = new Set(MATERIAL_OPTIONS.map((m) => m && m.name).filter(Boolean));
-                    next.material = materialNames.has(next.material) ? next.material : quoteOptions.material;
-                    const allowedColors = getColorsForMaterial(next.material);
-                    next.color = allowedColors.includes(next.color) ? next.color : (allowedColors[0] || quoteOptions.color);
-                    return next;
-                });
-
-                fileNameDisplay.classList.add('text-indigo-600', 'font-medium');
-                for (let i = 0; i < files.length; i += 1) {
-                    const file = files[i];
-                    const existing = currentResults.find((r) => r && r.filename === file.name) || null;
-                    const material = existing && existing.material ? existing.material : quoteOptions.material;
-                    const allowedColors = getColorsForMaterial(material);
-                    const color = existing && existing.color && allowedColors.includes(existing.color) ? existing.color : (allowedColors[0] || quoteOptions.color);
-                    const quantityRaw = existing && existing.quantity ? existing.quantity : quoteOptions.quantity;
-                    const quantity = Math.max(1, Number.parseInt(quantityRaw, 10) || 1);
-                    fileNameDisplay.textContent = `${reasonLabel}：${i + 1}/${files.length}（${file.name}）`;
-                    try {
-                        await ensureThumbnailForFile(file, color);
-                        const updated = await quoteSingleFileWithOptions(file, { material, color, quantity });
-                        mergeResultsByFilename([updated]);
-                    } catch (err) {
-                        mergeResultsByFilename([{ filename: file.name, status: 'failed', error: err.message || '重算失败', material, color, quantity }]);
-                    }
-                    renderResultsTable();
-                    recalcSummaryFromCurrentResults();
-                }
-                fileNameDisplay.textContent = `${reasonLabel}完成（共 ${files.length} 个文件）`;
-            }
-
-            async function quoteSelectedFiles(selectedFiles) {
-                const formData = new FormData();
-                selectedFiles.forEach((file) => formData.append("files", file));
-                const pmOpt = document.getElementById() || document.getElementById("opt-printer");
-                if (pmOpt && pmOpt.value) formData.append("printer_model", pmOpt.value);
-                formData.append("material", quoteOptions.material);
-                formData.append("color", quoteOptions.color);
-                formData.append("quantity", String(quoteOptions.quantity));
-                if (quoteOptions.slicer_preset_id !== null && quoteOptions.slicer_preset_id !== undefined) {
-                    formData.append("slicer_preset_id", String(quoteOptions.slicer_preset_id));
-                }
-                const mainUseBambu2 = document.getElementById('main-use-bambu');
-                if (mainUseBambu2) {
-                    formData.append("use_prusaslicer", mainUseBambu2.checked ? "true" : "false");
-                }
-
-                const response = await authFetch('/api/quote', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const data = await response.json();
-                if (!response.ok) {
-                    throw new Error(data.detail || data.error || '请求失败，请稍后重试');
-                }
-                mergeResultsByFilename(data.results || []);
+    // Results table events
+    if (dom.batchResultsBody) {
+        // Row editing
+        dom.batchResultsBody.addEventListener('change', handleRowEditChange);
+        // Delete / Preview buttons
+        dom.batchResultsBody.addEventListener('click', (event) => {
+            const deleteBtn = event.target.closest('[data-delete-file]');
+            if (deleteBtn) {
+                const filename = deleteBtn.getAttribute('data-delete-file');
+                selectedFilesMap.delete(filename);
+                thumbnailMap.delete(filename);
+                setCurrentResults(currentResults.filter((i) => i && i.filename !== filename));
                 renderResultsTable();
                 recalcSummaryFromCurrentResults();
-                // Reload history after successful quote
-                setTimeout(() => loadQuoteHistory(authToken), 500);
+                if (selectedFilesMap.size === 0) {
+                    dom.fileNameDisplay.textContent = '未选择文件（最多20个，单文件需小于100MB）';
+                    dom.fileNameDisplay.classList.remove('text-indigo-600', 'font-medium');
+                } else {
+                    dom.fileNameDisplay.textContent = `当前列表共 ${selectedFilesMap.size} 个文件`;
+                    dom.fileNameDisplay.classList.add('text-indigo-600', 'font-medium');
+                }
+                closePreviewModal();
+                return;
             }
-
-            function renderResultsTable() {
-                const tbody = document.getElementById('batch-results-body');
-                const mainUseBambuToggle = document.getElementById('main-use-bambu');
-                const showBambuStatus = !!(mainUseBambuToggle && mainUseBambuToggle.checked);
-                tbody.innerHTML = '';
-                if (!currentResults.length) {
-                    tbody.innerHTML = `
-                        <tr class="border-t border-gray-100">
-                            <td class="px-2 py-2 text-gray-500" colspan="12">暂无数据，请在表格底部上传并自动报价</td>
-                        </tr>
-                    `;
-                    return;
-                }
-                currentResults.forEach((item) => {
-                    const tr = document.createElement('tr');
-                    tr.className = 'border-t border-gray-100';
-                    tr.setAttribute('data-row-file', item.filename);
-                    const ext = item.filename && item.filename.includes('.')
-                        ? item.filename.split('.').pop().toLowerCase()
-                        : '-';
-                    if (item.status === 'success') {
-                        const breakdown = item && item.cost_breakdown && typeof item.cost_breakdown === 'object' ? item.cost_breakdown : null;
-                        const bambuUsed = !!(breakdown && breakdown.bambu_used);
-                        const bambuErrorRaw = breakdown && breakdown.bambu_error ? String(breakdown.bambu_error) : "";
-                        const bambuError = bambuErrorRaw ? escapeHtml(bambuErrorRaw) : "";
-                        const bambuExtraHtml = showBambuStatus
-                            ? (bambuUsed
-                                ? '<div class="text-[10px] text-indigo-600">PrusaSlicer</div>'
-                                : (bambuError ? `<div class="text-[10px] text-amber-700">PrusaSlicer失败：${bambuError}</div>` : ''))
-                            : '';
-                        const markupPercentRaw = Number(item.difficulty_markup_percent);
-                        let markupPercent = Number.isFinite(markupPercentRaw) ? markupPercentRaw : NaN;
-                        if (!Number.isFinite(markupPercent)) {
-                            const multiplierRaw = Number(item.difficulty_multiplier);
-                            if (Number.isFinite(multiplierRaw)) {
-                                markupPercent = (multiplierRaw - 1) * 100;
-                            }
-                        }
-                        if (!Number.isFinite(markupPercent)) {
-                            const vol = Number(item.volume_cm3);
-                            const area = Number(item.surface_area_cm2);
-                            const coeff = Number(PRICING_CONFIG.difficulty_coefficient);
-                            const low = Number(PRICING_CONFIG.difficulty_ratio_low);
-                            const high = Number(PRICING_CONFIG.difficulty_ratio_high);
-                            if (Number.isFinite(vol) && vol > 0 && Number.isFinite(area) && Number.isFinite(coeff) && Number.isFinite(low) && Number.isFinite(high) && high > low) {
-                                const ratio = area / vol;
-                                const score = Math.max(0, Math.min(1, (ratio - low) / (high - low)));
-                                const multiplier = 1 + Math.max(0, coeff) * score;
-                                markupPercent = Math.max(0, (multiplier - 1) * 100);
-                            } else {
-                                markupPercent = 0;
-                            }
-                        }
-                        const markupText = Number.isFinite(markupPercent) ? markupPercent.toFixed(2) : '0.00';
-                        const geometryText = `
-                            <div class="whitespace-nowrap">体积: ${item.volume_cm3} cm³</div>
-                            <div class="whitespace-nowrap">表面积: ${item.surface_area_cm2} cm²</div>
-                            <div class="whitespace-nowrap">难度加价: +${markupText}%</div>
-                            <div class="whitespace-nowrap">尺寸: ${item.dimensions}</div>
-                        `;
-                        const colorText = formatColorLabel(item.color) || '-';
-                        const thumbnail = thumbnailMap.get(item.filename) || buildPlaceholderThumbnail(ext);
-                        const materialOptionsHtml = MATERIAL_OPTIONS.map((m) => `<option value="${m.name}" ${m.name === item.material ? 'selected' : ''}>${m.name}</option>`).join('');
-                        const renderedRowColors = renderColorOptionsForMaterial(item.material, item.color);
-                        const colorOptionsHtml = renderedRowColors.html;
-                        tr.innerHTML = `
-                            <td class="px-2 py-1.5">${item.filename}</td>
-                            <td class="px-2 py-1.5">
-                                <button type="button" data-preview-file="${item.filename}" data-preview-ext="${ext}" class="block rounded border border-gray-200 overflow-hidden hover:border-indigo-300 transition-colors">
-                                    <img src="${thumbnail}" alt="静态图" class="w-32 h-20 object-cover bg-white" />
-                                </button>
-                            </td>
-                            <td class="px-2 py-1.5"><select data-field="material" class="row-edit text-[11px] border border-gray-300 rounded px-1 py-0.5">${materialOptionsHtml}</select></td>
-                            <td class="px-2 py-1.5"><select data-field="color" class="row-edit text-[11px] border border-gray-300 rounded px-1 py-0.5">${colorOptionsHtml}</select></td>
-                            <td class="px-2 py-1.5"><input data-field="quantity" type="number" min="1" value="${item.quantity}" class="row-edit w-14 text-[11px] border border-gray-300 rounded px-1 py-0.5" /></td>
-                            <td class="px-2 py-1.5 text-[10px] leading-tight">${geometryText}</td>
-                            <td class="px-2 py-1.5">${item.weight_g}</td>
-                            <td class="px-2 py-1.5">${formatTimeHMS(item.unit_time_h || (item.estimated_time_h / Math.max(1, item.quantity)))}</td>
-                            <td class="px-2 py-1.5">${formatTimeHMS(item.estimated_time_h)}</td>
-                            <td class="px-2 py-1.5">¥ ${item.unit_cost_cny}</td>
-                            <td class="px-2 py-1.5">¥ ${item.cost_cny}</td>
-                            <td data-role="status-cell" class="px-2 py-1.5 text-green-600">
-                                <div>成功</div>
-                                ${bambuExtraHtml}
-                            </td>
-                            <td class="px-2 py-1.5">
-                                <button type="button" data-delete-file="${item.filename}" class="text-[11px] text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 rounded px-2 py-0.5">删除</button>
-                            </td>
-                        `;
-                    } else {
-                        const thumbnail = thumbnailMap.get(item.filename) || buildPlaceholderThumbnail(ext);
-                        const selectedMaterial = item.material || quoteOptions.material;
-                        const selectedColor = item.color || quoteOptions.color;
-                        const materialOptionsHtml = MATERIAL_OPTIONS.map((m) => `<option value="${m.name}" ${m.name === selectedMaterial ? 'selected' : ''}>${m.name}</option>`).join('');
-                        const renderedRowColors = renderColorOptionsForMaterial(selectedMaterial, selectedColor);
-                        const colorOptionsHtml = renderedRowColors.html;
-                        const quantityValue = item.quantity || quoteOptions.quantity || 1;
-                        tr.innerHTML = `
-                            <td class="px-2 py-1.5">${item.filename}</td>
-                            <td class="px-2 py-1.5">
-                                <button type="button" data-preview-file="${item.filename}" data-preview-ext="${ext}" class="block rounded border border-gray-200 overflow-hidden hover:border-indigo-300 transition-colors">
-                                    <img src="${thumbnail}" alt="静态图" class="w-32 h-20 object-cover bg-white" />
-                                </button>
-                            </td>
-                            <td class="px-2 py-1.5"><select data-field="material" class="row-edit text-[11px] border border-gray-300 rounded px-1 py-0.5">${materialOptionsHtml}</select></td>
-                            <td class="px-2 py-1.5"><select data-field="color" class="row-edit text-[11px] border border-gray-300 rounded px-1 py-0.5">${colorOptionsHtml}</select></td>
-                            <td class="px-2 py-1.5"><input data-field="quantity" type="number" min="1" value="${quantityValue}" class="row-edit w-14 text-[11px] border border-gray-300 rounded px-1 py-0.5" /></td>
-                            <td class="px-2 py-1.5">-</td>
-                            <td class="px-2 py-1.5">-</td>
-                            <td class="px-2 py-1.5">-</td>
-                            <td class="px-2 py-1.5">-</td>
-                            <td class="px-2 py-1.5">-</td>
-                            <td data-role="status-cell" class="px-2 py-1.5 text-red-600">${item.error || '失败'}</td>
-                            <td class="px-2 py-1.5">
-                                <button type="button" data-delete-file="${item.filename}" class="text-[11px] text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 rounded px-2 py-0.5">删除</button>
-                            </td>
-                        `;
-                    }
-                    tbody.appendChild(tr);
-                });
+            const previewBtn = event.target.closest('[data-preview-file]');
+            if (previewBtn) {
+                previewByFilename(previewBtn.getAttribute('data-preview-file'), previewBtn.getAttribute('data-preview-ext'));
             }
-
-            // 监听文件选择并显示文件名
-            fileInput.addEventListener('change', async (e) => {
-                const newFiles = Array.from(e.target.files || []);
-                fileInput.value = '';
-                if (newFiles.length === 0) return;
-
-                const combined = new Map(selectedFilesMap);
-                newFiles.forEach((file) => combined.set(file.name, file));
-
-                if (combined.size > MAX_FILES) {
-                    errorMsg.textContent = `最多支持 ${MAX_FILES} 个文件（当前已选择 ${selectedFilesMap.size} 个，本次新增 ${newFiles.length} 个）`;
-                    errorContainer.classList.remove('hidden');
-                    return;
-                }
-
-                const invalidByType = newFiles.find((f) => {
-                    const name = f.name.toLowerCase();
-                    return !ALLOWED_EXTENSIONS.some((ext) => name.endsWith(ext));
-                });
-                if (invalidByType) {
-                    errorMsg.textContent = `不支持的格式：${invalidByType.name}。仅支持 ${ALLOWED_EXTENSIONS.join('/')}`;
-                    errorContainer.classList.remove('hidden');
-                    return;
-                }
-
-                const invalidBySize = newFiles.find((f) => f.size >= MAX_FILE_SIZE);
-                if (invalidBySize) {
-                    errorMsg.textContent = `文件过大：${invalidBySize.name}，单文件必须小于100MB`;
-                    errorContainer.classList.remove('hidden');
-                    return;
-                }
-
-                errorContainer.classList.add('hidden');
-                newFiles.forEach((file) => selectedFilesMap.set(file.name, file));
-                fileNameDisplay.classList.add('text-indigo-600', 'font-medium');
-
-                if (!authToken) {
-                    pendingQuoteFiles = newFiles;
-                    fileNameDisplay.textContent = `当前列表共 ${selectedFilesMap.size} 个文件，请登录后继续为新增 ${newFiles.length} 个文件自动报价`;
-                    errorMsg.textContent = '请先登录后再上传报价';
-                    errorContainer.classList.remove('hidden');
-                    openLoginModal();
-                    return;
-                }
-                fileNameDisplay.textContent = `当前列表共 ${selectedFilesMap.size} 个文件，正在为新增 ${newFiles.length} 个文件生成静态图与自动报价...`;
-
-                try {
-                    await buildThumbnails(newFiles);
-                    await quoteSelectedFiles(newFiles);
-                    fileNameDisplay.textContent = `当前列表共 ${selectedFilesMap.size} 个文件，新增 ${newFiles.length} 个文件报价完成`;
-                } catch (err) {
-                    errorMsg.textContent = err.message;
-                    errorContainer.classList.remove('hidden');
-                    fileNameDisplay.textContent = `当前列表共 ${selectedFilesMap.size} 个文件，新增 ${newFiles.length} 个文件自动报价失败`;
-                }
-            });
-
-            const mainUseBambuListener = document.getElementById('main-use-bambu');
-            if (mainUseBambuListener) {
-                mainUseBambuListener.addEventListener('change', async () => {
-                    if (!selectedFilesMap.size) return;
-                    if (!authToken) {
-                        pendingQuoteFiles = Array.from(selectedFilesMap.values());
-                        errorMsg.textContent = '请先登录后再进行切片估算';
-                        errorContainer.classList.remove('hidden');
-                        openLoginModal();
-                        return;
-                    }
-                    await reQuoteAllSelectedFiles(mainUseBambuListener.checked ? '启用PrusaSlicer切片估算' : '关闭PrusaSlicer切片估算');
-                });
-            }
-
-            // 预览区域自适应
-            window.addEventListener('resize', updateViewerSize);
-
-            // Load printers on page load (no auth required)
-            fetchPrinterModels();
-
-            async function initializeAuth() {
-                loadUserSession();
-                try {
-                    const params = new URLSearchParams(window.location.search || "");
-                    const shouldOpenLogin = params.get('login') === '1' || (params.get('login') || '').toLowerCase() === 'true';
-                    if (shouldOpenLogin && !authToken) {
-                        openLoginModal();
-                    }
-                    if (params.has('login')) {
-                        params.delete('login');
-                        const query = params.toString();
-                        const newUrl = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash || ''}`;
-                        window.history.replaceState({}, '', newUrl);
-                    }
-                } catch (e) {
-                }
-                if (!authToken) {
-                    renderAuthUI();
-                    updateDropdowns();
-                    return;
-                }
-                try {
-                    const response = await authFetch('/api/auth/me');
-                    if (!response.ok) {
-                        throw new Error('会话已失效');
-                    }
-                    const user = await response.json();
-                    currentUser = user;
-                    saveUserSession();
-                    loadSlicerPresetSelection();
-                    await fetchUserSettings();
-                } catch (e) {
-                    currentUser = null;
-                    authToken = "";
-                    clearUserSession();
-                    updateDropdowns();
-                }
-                renderAuthUI();
-            }
-
-            initializeAuth();
-            refreshOptionsSummary();
-
-            // 防刷新拦截
-            window.addEventListener('beforeunload', (event) => {
-                if (selectedFilesMap.size > 0) {
-                    event.preventDefault();
-                    // 现代浏览器通常忽略此字符串，但必须赋值才能触发原生弹窗
-                    event.returnValue = '您有未保存的文件，确定要离开吗？';
-                }
-            });
-
-            // 上传后自动报价，不再需要手动提交
-
-            // ── Drag & Drop upload ──
-            const dropZone = document.getElementById('drop-zone');
-            if (dropZone) {
-                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
-                    dropZone.addEventListener(evt, e => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                    });
-                });
-                dropZone.addEventListener('dragenter', () => dropZone.classList.add('border-indigo-400', 'bg-indigo-50'));
-                dropZone.addEventListener('dragleave', () => dropZone.classList.remove('border-indigo-400', 'bg-indigo-50'));
-                dropZone.addEventListener('dragover', () => dropZone.classList.add('border-indigo-400', 'bg-indigo-50'));
-                dropZone.addEventListener('drop', (e) => {
-                    dropZone.classList.remove('border-indigo-400', 'bg-indigo-50');
-                    const droppedFiles = Array.from(e.dataTransfer.files);
-                    const valid = droppedFiles.filter(f => {
-                        const ext = '.' + f.name.split('.').pop().toLowerCase();
-                        return ALLOWED_EXTENSIONS.includes(ext) && f.size < MAX_FILE_SIZE;
-                    });
-                    if (valid.length === 0) {
-                        errorMsg.textContent = '不支持的文件格式或文件过大（支持 .stl/.step/.stp/.obj/.3mf，最大100MB）';
-                        errorContainer.classList.remove('hidden');
-                        return;
-                    }
-                    if (valid.length + selectedFilesMap.size > MAX_FILES) {
-                        errorMsg.textContent = `单次最多上传 ${MAX_FILES} 个文件`;
-                        errorContainer.classList.remove('hidden');
-                        return;
-                    }
-                    // Update file input and trigger change
-                    const dt = new DataTransfer();
-                    valid.forEach(f => dt.items.add(f));
-                    fileInput.files = dt.files;
-                    fileInput.dispatchEvent(new Event('change'));
-                });
-            }
-
-            // ── Quote history (delegated to modules/history.js) ──
-            initQuoteHistory();
-
-            // Auto-load history after login
-            const origLogin = typeof doLogin === 'function' ? doLogin : null;
         });
+    }
+
+    // File upload
+    if (dom.fileInput) {
+        dom.fileInput.addEventListener('change', async (e) => {
+            const newFiles = Array.from(e.target.files || []);
+            dom.fileInput.value = '';
+            if (newFiles.length === 0) return;
+
+            const combined = new Map(selectedFilesMap);
+            newFiles.forEach((file) => combined.set(file.name, file));
+
+            if (combined.size > MAX_FILES) {
+                dom.errorMsg.textContent = `最多支持 ${MAX_FILES} 个文件（当前已选择 ${selectedFilesMap.size} 个，本次新增 ${newFiles.length} 个）`;
+                dom.errorContainer.classList.remove('hidden');
+                return;
+            }
+            const invalidByType = newFiles.find((f) => {
+                const name = f.name.toLowerCase();
+                return !ALLOWED_EXTENSIONS.some((ext) => name.endsWith(ext));
+            });
+            if (invalidByType) {
+                dom.errorMsg.textContent = `不支持的格式：${invalidByType.name}。仅支持 ${ALLOWED_EXTENSIONS.join('/')}`;
+                dom.errorContainer.classList.remove('hidden');
+                return;
+            }
+            const invalidBySize = newFiles.find((f) => f.size >= MAX_FILE_SIZE);
+            if (invalidBySize) {
+                dom.errorMsg.textContent = `文件过大：${invalidBySize.name}，单文件必须小于100MB`;
+                dom.errorContainer.classList.remove('hidden');
+                return;
+            }
+
+            dom.errorContainer.classList.add('hidden');
+            newFiles.forEach((file) => selectedFilesMap.set(file.name, file));
+            dom.fileNameDisplay.classList.add('text-indigo-600', 'font-medium');
+
+            if (!authToken) {
+                setPendingQuoteFiles(newFiles);
+                dom.fileNameDisplay.textContent = `当前列表共 ${selectedFilesMap.size} 个文件，请登录后继续为新增 ${newFiles.length} 个文件自动报价`;
+                dom.errorMsg.textContent = '请先登录后再上传报价';
+                dom.errorContainer.classList.remove('hidden');
+                openLoginModal();
+                return;
+            }
+            dom.fileNameDisplay.textContent = `当前列表共 ${selectedFilesMap.size} 个文件，正在为新增 ${newFiles.length} 个文件生成静态图与自动报价...`;
+            try {
+                await buildThumbnails(newFiles);
+                await quoteSelectedFiles(newFiles);
+                dom.fileNameDisplay.textContent = `当前列表共 ${selectedFilesMap.size} 个文件，新增 ${newFiles.length} 个文件报价完成`;
+            } catch (err) {
+                dom.errorMsg.textContent = err.message;
+                dom.errorContainer.classList.remove('hidden');
+                dom.fileNameDisplay.textContent = `当前列表共 ${selectedFilesMap.size} 个文件，新增 ${newFiles.length} 个文件自动报价失败`;
+            }
+        });
+    }
+
+    // PrusaSlicer 始终启用 — 不再需要复选框
+
+    // Load app version from API
+    async function loadAppVersion() {
+        const versionEl = document.getElementById('app-version');
+        if (!versionEl) return;
+        try {
+            const resp = await fetch('/api/version');
+            const data = await resp.json();
+            let text = `v${data.version || '?'}`;
+            if (data.deployed_at) {
+                const dt = data.deployed_at.replace('T', ' ').substring(0, 16);
+                text += ` · ${dt}`;
+            }
+            versionEl.textContent = text;
+            versionEl.title = `环境: ${data.env || 'unknown'}`;
+        } catch (e) {
+            versionEl.textContent = 'v?';
+        }
+    }
+
+    // Drag & drop
+    const dropZone = document.getElementById('drop-zone');
+    if (dropZone) {
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
+            dropZone.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); });
+        });
+        dropZone.addEventListener('dragenter', () => dropZone.classList.add('border-indigo-400', 'bg-indigo-50'));
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('border-indigo-400', 'bg-indigo-50'));
+        dropZone.addEventListener('dragover', () => dropZone.classList.add('border-indigo-400', 'bg-indigo-50'));
+        dropZone.addEventListener('drop', (e) => {
+            dropZone.classList.remove('border-indigo-400', 'bg-indigo-50');
+            const droppedFiles = Array.from(e.dataTransfer.files);
+            const valid = droppedFiles.filter(f => {
+                const ext = '.' + f.name.split('.').pop().toLowerCase();
+                return ALLOWED_EXTENSIONS.includes(ext) && f.size < MAX_FILE_SIZE;
+            });
+            if (valid.length === 0) {
+                dom.errorMsg.textContent = '不支持的文件格式或文件过大（支持 .stl/.step/.stp/.obj/.3mf，最大100MB）';
+                dom.errorContainer.classList.remove('hidden');
+                return;
+            }
+            if (valid.length + selectedFilesMap.size > MAX_FILES) {
+                dom.errorMsg.textContent = `单次最多上传 ${MAX_FILES} 个文件`;
+                dom.errorContainer.classList.remove('hidden');
+                return;
+            }
+            const dt = new DataTransfer();
+            valid.forEach(f => dt.items.add(f));
+            dom.fileInput.files = dt.files;
+            dom.fileInput.dispatchEvent(new Event('change'));
+        });
+    }
+
+    // ═══════════════════════════════════════════════
+    //  Startup
+    // ═══════════════════════════════════════════════
+    loadAppVersion();
+    preloadPrinterSelectors();
+    fetchPrinterModels();
+    window.addEventListener('resize', updateViewerSize);
+
+    // Before unload warning
+    window.addEventListener('beforeunload', (event) => {
+        if (selectedFilesMap.size > 0) {
+            event.preventDefault();
+            event.returnValue = '您有未保存的文件，确定要离开吗？';
+        }
+    });
+
+    refreshOptionsSummary();
+    initializeAuth();
+});

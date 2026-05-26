@@ -10,17 +10,17 @@
     <div class="max-w-lg mx-auto bg-white rounded-xl shadow-md overflow-hidden">
         <div class="p-5 sm:p-8 space-y-6">
             <div class="flex flex-col sm:flex-row items-start sm:justify-between gap-4">
-                <div>
+                <a href="/" class="hover:opacity-80">
                     <div class="uppercase tracking-wide text-sm text-indigo-500 font-semibold mb-1">3D Printing Parts Automated Quoting System</div>
                     <h2 class="text-2xl font-bold text-gray-900">用户注册</h2>
-                </div>
-                <a href="/?login=1" class="text-sm px-3 py-1.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 whitespace-nowrap shrink-0">返回登录</a>
+                </a>
+                <a href="/" class="text-sm px-3 py-1.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 whitespace-nowrap shrink-0">返回首页</a>
             </div>
 
             <div class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700">用户名</label>
-                    <input id="reg-username" type="text" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md text-sm" placeholder="字母/数字/._-，3-50位" />
+                    <input id="reg-username" type="text" autocomplete="off" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md text-sm" placeholder="字母/数字/._-，3-50位" />
                     <p id="reg-username-check" class="hidden text-xs mt-1"></p>
                 </div>
                 <div class="grid grid-cols-2 gap-2">
@@ -30,11 +30,11 @@
                 <div id="reg-email-section">
                     <label class="block text-sm font-medium text-gray-700">邮箱</label>
                     <div class="grid grid-cols-1 sm:grid-cols-[1fr,auto] gap-2">
-                        <input id="reg-email" type="email" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md text-sm" placeholder="name@example.com" />
+                        <input id="reg-email" type="email" autocomplete="email" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md text-sm" placeholder="name@example.com" />
                         <button id="send-email-code-btn" type="button" class="px-3 py-2 rounded-md border border-indigo-200 text-indigo-700 text-xs hover:bg-indigo-50 w-full sm:w-auto sm:mt-1">发送验证码</button>
                     </div>
                     <p id="reg-email-check" class="hidden text-xs mt-1"></p>
-                    <input id="reg-email-code" type="text" class="mt-2 block w-full py-2 px-3 border border-gray-300 rounded-md text-sm" placeholder="邮箱验证码（6位）" />
+                    <input id="reg-email-code" type="text" autocomplete="one-time-code" class="mt-2 block w-full py-2 px-3 border border-gray-300 rounded-md text-sm" placeholder="邮箱验证码（6位）" />
                 </div>
                 <div id="reg-phone-section" class="hidden">
                     <label class="block text-sm font-medium text-gray-700">手机号</label>
@@ -43,11 +43,11 @@
                         <button id="send-phone-code-btn" type="button" class="px-3 py-2 rounded-md border border-indigo-200 text-indigo-700 text-xs hover:bg-indigo-50 w-full sm:w-auto sm:mt-1">发送验证码</button>
                     </div>
                     <p id="reg-phone-check" class="hidden text-xs mt-1"></p>
-                    <input id="reg-phone-code" type="text" class="mt-2 block w-full py-2 px-3 border border-gray-300 rounded-md text-sm" placeholder="短信验证码（6位）" />
+                    <input id="reg-phone-code" type="text" autocomplete="one-time-code" class="mt-2 block w-full py-2 px-3 border border-gray-300 rounded-md text-sm" placeholder="短信验证码（6位）" />
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700">密码</label>
-                    <input id="reg-password" type="password" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md text-sm" placeholder="至少6位，字母+数字" />
+                    <input id="reg-password" type="password" autocomplete="new-password" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md text-sm" placeholder="至少8位，字母+数字" />
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-[1fr,auto] gap-2 items-end">
