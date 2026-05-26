@@ -131,7 +131,7 @@ export function syncPricingFromInputs() {
         difficulty_coefficient: Math.max(0, diffCoeffPercent) / 100.0,
         difficulty_ratio_low: Number(cfgDifficultyRatioLow?.value) || 0,
         difficulty_ratio_high: Number(cfgDifficultyRatioHigh?.value) || 0,
-        support_mode: 'diff',
+        support_mode: 'on',
         support_price_per_g: Number(cfgSupportPricePerG?.value) || 0,
         time_overhead_min: Number(cfgTimeOverheadMin?.value) || 0,
         time_vol_min_per_cm3: Number(cfgTimeVolMinPerCm3?.value) || 0,

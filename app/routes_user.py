@@ -42,7 +42,7 @@ class PricingConfig(BaseModel):
     difficulty_ratio_low: float = 0.8
     difficulty_ratio_high: float = 4.0
     use_prusaslicer: int = 0
-    prusaslicer_support_mode: str = "diff"
+    prusaslicer_support_mode: str = "on"
     support_price_per_g: float = 0.0
     time_overhead_min: float = 5.0
     time_vol_min_per_cm3: float = 0.8

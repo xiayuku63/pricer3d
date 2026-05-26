@@ -11,7 +11,7 @@ import logging
 from typing import List, Optional
 from fastapi import UploadFile, Request
 
-from parser.prusa_slicer import run_prusa_slice, prusa_support_diff_stats
+from parser.prusa_slicer import run_prusa_slice
 
 logger = logging.getLogger(__name__)
 
@@ -345,53 +345,30 @@ def calculate_cost(
             os.makedirs(outputs_job_dir, exist_ok=True)
 
             output_gcode = os.path.join(outputs_job_dir, f"{output_prefix}.gcode")
-            if support_mode == "diff":
-                st = prusa_support_diff_stats(
-                    actual_slice_path,
-                    layer_height=layer_height_mm,
-                    infill_percent=infill_percent,
-                    perimeters=perimeters or 3,
-                    output_dir=outputs_job_dir,
-                    output_prefix=output_prefix,
-                    printer_profile_path=_printer_profile,
-                )
-                support_weight_g_per_part = float(st.get("support_g") or 0.0)
-                if st.get("estimated_time_s") is not None:
-                    # Apply PrusaSlicer time correction factor
-                    _ps_corr = float(cfg.get("prusa_time_correction") or 1.0)
-                    if _ps_corr <= 0 or _ps_corr > 5:
-                        _ps_corr = 1.0
-                    slicer_time_s = max(1, int(st["estimated_time_s"] * _ps_corr))
-                if st.get("filament_g") is not None and float(st["filament_g"]) > 0:
-                    slicer_filament_g_per_part = float(st["filament_g"])
-                elif st.get("filament_cm3") is not None and float(st["filament_cm3"]) > 0:
-                    filament_cm3 = float(st["filament_cm3"])
-                    slicer_filament_g_per_part = filament_cm3 * spec["density"]
-                if not preset_used and st.get("preset_used"):
-                    preset_used = str(st["preset_used"])
-            else:
-                stats = run_prusa_slice(
-                    actual_slice_path, output_gcode,
-                    layer_height=layer_height_mm,
-                    infill_percent=infill_percent,
-                    perimeters=perimeters or 3,
-                    material_density=spec["density"],
-                    slicer_preset=slicer_preset,
-                    printer_profile_path=_printer_profile,
-                )
-                if stats.get("time_s", 0) > 0:
-                    correction = float(cfg.get("prusa_time_correction") or 1.0)
-                    if correction <= 0 or correction > 5:
-                        correction = 1.0
-                    slicer_time_s = max(1, int(stats["time_s"] * correction))
-                    logger.info(f"PrusaSlicer raw={stats['time_s']}s × corr={correction} = {slicer_time_s}s")
-                if stats.get("filament_g", 0) > 0:
-                    slicer_filament_g_per_part = stats["filament_g"]
-                elif stats.get("filament_cm3", 0) > 0:
-                    filament_cm3 = stats["filament_cm3"]
-                    slicer_filament_g_per_part = filament_cm3 * spec["density"]
-                if not preset_used and stats.get("preset_used"):
-                    preset_used = str(stats["preset_used"])
+            # Always single slice with supports — no diff mode (too slow, 2x slicing)
+            stats = run_prusa_slice(
+                actual_slice_path, output_gcode,
+                layer_height=layer_height_mm,
+                infill_percent=infill_percent,
+                perimeters=perimeters or 3,
+                material_density=spec["density"],
+                slicer_preset=slicer_preset,
+                enable_supports=True,
+                printer_profile_path=_printer_profile,
+            )
+            if stats.get("time_s", 0) > 0:
+                correction = float(cfg.get("prusa_time_correction") or 1.0)
+                if correction <= 0 or correction > 5:
+                    correction = 1.0
+                slicer_time_s = max(1, int(stats["time_s"] * correction))
+                logger.info(f"PrusaSlicer raw={stats['time_s']}s × corr={correction} = {slicer_time_s}s")
+            if stats.get("filament_g", 0) > 0:
+                slicer_filament_g_per_part = stats["filament_g"]
+            elif stats.get("filament_cm3", 0) > 0:
+                filament_cm3 = stats["filament_cm3"]
+                slicer_filament_g_per_part = filament_cm3 * spec["density"]
+            if not preset_used and stats.get("preset_used"):
+                preset_used = str(stats["preset_used"])
         except Exception as e:
             logger.error(f"PrusaSlicer failed for {model_path}: {e}")
             slicer_time_s = None

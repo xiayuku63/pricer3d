@@ -111,7 +111,7 @@ DEFAULT_PRICING_CONFIG = {
     "difficulty_ratio_high": 4.0,
     "use_prusaslicer": 1,
     "prusa_time_correction": 0.44,
-    "support_mode": "diff",
+    "support_mode": "on",
     "support_price_per_g": 0.0,
     "time_overhead_min": 5.0,
     "time_vol_min_per_cm3": 0.8,
