@@ -96,9 +96,8 @@ export function formatColorLabel(colorKey) {
     const obj = colorToObj(colorKey);
     if (!obj) return String(colorKey || '');
     const hex = obj.hex;
-    const name = (!hex || obj.name === hex) ? (obj.name || '自定义色') : obj.name;
-    if (!hex) return escapeHtml(name);
-    return `<span class="inline-flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded-sm border border-gray-300 inline-block" style="background:${hex}"></span>${escapeHtml(name)}</span>`;
+    if (!hex) return escapeHtml(obj.name || String(colorKey || ''));
+    return `<span class="inline-flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded-sm border border-gray-300 inline-block" style="background:${hex}"></span><span class="font-mono text-[11px]">${hex}</span></span>`;
 }
 
 export function normalizeColorToken(token) {
@@ -229,39 +228,22 @@ export function getColorsForMaterial(name) {
 export function isColorInAllowedColors(color, allowedColors) {
     if (!color || !allowedColors || !allowedColors.length) return false;
     const obj = colorToObj(color);
-    if (!obj) return false;
-    const targetName = obj.name;
-    const targetHex = (obj.hex || '').toLowerCase();
+    if (!obj || !obj.hex) return false;
+    const targetHex = obj.hex.toLowerCase();
     return allowedColors.some(c => {
         const a = colorToObj(c);
-        if (!a) return false;
-        // Match by name first, then by hex
-        if (a.name === targetName) return true;
-        if (targetHex && a.hex && a.hex.toLowerCase() === targetHex) return true;
-        return false;
+        return a && a.hex && a.hex.toLowerCase() === targetHex;
     });
 }
 
 export function pickAllowedColor(allowedColors, preferredColor, defaultColor) {
     if (allowedColors && allowedColors.length && isColorInAllowedColors(preferredColor, allowedColors)) {
-        // If preferred is already a hex string, return it as-is
-        const prefStr = typeof preferredColor === 'string' ? preferredColor.trim() : '';
-        if (prefStr && /^#[0-9a-fA-F]{6}$/.test(prefStr)) {
-            return prefStr;
-        }
-        // Name or object — look up the hex from allowedColors
-        const prefObj = colorToObj(preferredColor);
-        const targetName = prefObj?.name || prefStr;
-        if (targetName) {
-            const match = allowedColors.map(c => colorToObj(c)).find(c => c && c.hex && c.name === targetName);
-            if (match) return match.hex;
-        }
-        // Fall back: return name if we can't find hex
-        return prefStr || (prefObj?.name || String(preferredColor));
+        const obj = colorToObj(preferredColor);
+        if (obj && obj.hex) return obj.hex;
+        return String(preferredColor);
     }
     const first = allowedColors && allowedColors.length ? colorToObj(allowedColors[0]) : null;
     if (first && first.hex) return first.hex;
-    if (first && first.name) return first.name;
     return typeof defaultColor === 'string' ? defaultColor : '';
 }
 
@@ -270,56 +252,51 @@ export function renderColorDropdown(name, selectedColor, compact) {
     const normColors = allowedColors.map(c => colorToObj(c)).filter(Boolean);
     if (!normColors.length) return { html: '', selected: '' };
 
-    // Match by name first, then by hex
+    // Match by hex (color display is hex-only now)
     const selObj = colorToObj(selectedColor);
     let match = null;
-    if (selObj) {
-        match = normColors.find(c => c.name === selObj.name) ||
-                (selObj.hex ? normColors.find(c => c.hex === selObj.hex) : null);
+    if (selObj && selObj.hex) {
+        match = normColors.find(c => c.hex === selObj.hex);
     }
     const safe = match || normColors[0];
-    const safeLabel = (!safe.hex || safe.name === safe.hex) ? (safe.name || '自定义') : safe.name;
+    const safeHex = safe.hex || '#d1d5db';
 
     const listItems = normColors.map(c => {
-        const label = (!c.hex || c.name === c.hex) ? (c.name || '自定义') : c.name;
-        const hexBg = c.hex || '#d1d5db';  // fallback gray if no hex
+        const hex = c.hex || '#d1d5db';
         return '<button type="button" class="color-dd-item flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-gray-50 border-b border-gray-100 last:border-0 text-left'
-            + (c.name === safe.name ? ' bg-indigo-50' : '')
-            + '" data-color-hex="' + (c.hex || c.name) + '" data-color-name="' + escapeHtml(c.name) + '">'
-            + '<span class="w-5 h-5 rounded-sm border border-gray-300 flex-shrink-0" style="background:' + hexBg + '"></span>'
-            + '<span class="flex-1">' + escapeHtml(label) + '</span>'
-            + (c.hex && c.name !== c.hex ? '<span class="text-[10px] text-gray-400 font-mono">' + c.hex + '</span>' : '')
+            + (c.hex === safeHex ? ' bg-indigo-50' : '')
+            + '" data-color-hex="' + hex + '">'
+            + '<span class="w-5 h-5 rounded-sm border border-gray-300 flex-shrink-0" style="background:' + hex + '"></span>'
+            + '<span class="flex-1 font-mono text-xs">' + hex + '</span>'
             + '</button>';
     }).join('');
-
-    const swatchHex = safe.hex || '#d1d5db';
 
     if (compact) {
         const html = '<div class="color-dd-wrapper relative inline-block">'
             + '<button type="button" class="color-dd-trigger flex items-center gap-1 px-1.5 py-0.5 border border-gray-300 rounded text-[11px] bg-white hover:border-gray-400 min-w-[36px]">'
-            + '<span class="color-dd-swatch w-3.5 h-3.5 rounded-sm flex-shrink-0" style="background:' + swatchHex + '"></span>'
+            + '<span class="color-dd-swatch w-3.5 h-3.5 rounded-sm flex-shrink-0" style="background:' + safeHex + '"></span>'
             + '<svg class="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>'
             + '</button>'
-            + '<div class="color-dd-list hidden absolute z-30 left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto min-w-[160px]">'
+            + '<div class="color-dd-list hidden absolute z-30 left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto min-w-[140px]">'
             + listItems
             + '</div>'
-            + '<input type="hidden" class="row-color-value" value="' + (safe.hex || safe.name) + '">'
+            + '<input type="hidden" class="row-color-value" value="' + safeHex + '">'
             + '</div>';
-        return { html, selected: safe.hex || safe.name };
+        return { html, selected: safeHex };
     }
 
     const html = '<div class="color-dd-wrapper relative">'
         + '<button type="button" class="color-dd-trigger flex items-center gap-2 w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white hover:border-gray-400">'
-        + '<span class="color-dd-swatch w-5 h-5 rounded-sm border border-gray-300 flex-shrink-0" style="background:' + swatchHex + '"></span>'
-        + '<span class="color-dd-label flex-1 text-left">' + escapeHtml(safeLabel) + '</span>'
+        + '<span class="color-dd-swatch w-5 h-5 rounded-sm border border-gray-300 flex-shrink-0" style="background:' + safeHex + '"></span>'
+        + '<span class="color-dd-label flex-1 text-left font-mono text-xs">' + safeHex + '</span>'
         + '<svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>'
         + '</button>'
         + '<div class="color-dd-list hidden absolute z-30 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">'
         + listItems
         + '</div>'
-        + '<input type="hidden" class="row-color-value" value="' + (safe.hex || safe.name) + '">'
+        + '<input type="hidden" class="row-color-value" value="' + safeHex + '">'
         + '</div>';
-    return { html, selected: safe.hex || safe.name };
+    return { html, selected: safeHex };
 }
 
 // ── Mutators (used by settings) ──

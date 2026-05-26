@@ -155,8 +155,7 @@ export function openColorEditor(materialIdx) {
         list.innerHTML = colors.map(c => `
             <div class="flex items-center gap-2 p-1.5 bg-gray-50 rounded-md">
                 <span class="w-6 h-6 rounded-sm border border-gray-300 flex-shrink-0" style="background:${c.hex}"></span>
-                <span class="text-xs flex-1">${escapeHtml(c.name)}</span>
-                <span class="text-[10px] text-gray-400 font-mono color-hex-display">${c.hex}</span>
+                <span class="text-xs flex-1 font-mono">${c.hex}</span>
                 <button type="button" class="text-red-400 hover:text-red-600 text-xs remove-color-btn" data-color-hex="${c.hex}">×</button>
             </div>
         `).join('');
@@ -181,7 +180,7 @@ export function addColorToMaterial() {
     const m = MATERIAL_OPTIONS[_colorEditMaterialIdx];
     if (!m) return;
     const hex = document.getElementById('color-editor-picker')?.value;
-    const name = document.getElementById('color-editor-name')?.value.trim() || hex;
+    if (!hex) return;
     if (!m.colors || !Array.isArray(m.colors)) m.colors = [];
     const existing = materialColorsArray(m);
     if (existing.some(c => c.hex === hex)) {
@@ -189,8 +188,8 @@ export function addColorToMaterial() {
         if (toast) { toast.textContent = '该颜色已存在'; toast.classList.remove('hidden'); setTimeout(() => toast.classList.add('hidden'), 2000); }
         return;
     }
-    m.colors.push({ name, hex });
-    if (!COLOR_OPTIONS.some(c => c.hex === hex)) COLOR_OPTIONS.push({ name, hex });
+    m.colors.push({ name: hex, hex });
+    if (!COLOR_OPTIONS.some(c => c.hex === hex)) COLOR_OPTIONS.push({ name: hex, hex });
     refreshQuoteColorDropdowns();
     renderUserCenterUI();
     openColorEditor(_colorEditMaterialIdx);
