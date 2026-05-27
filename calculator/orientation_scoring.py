@@ -5,6 +5,8 @@ overhang ratio, support volume, print time, and bed adhesion.
 """
 
 import math
+import os
+import subprocess
 import logging
 import numpy as np
 import trimesh
@@ -236,7 +238,33 @@ def get_stable_faces(model_path: str) -> dict:
     2. Convex hull faces
     3. Fibonacci sphere sampling (fallback for organic shapes)
     """
-    mesh = trimesh.load(model_path, force="mesh")
+    _tmp = None
+    ext = os.path.splitext(model_path)[1].lower()
+    if ext in (".stp", ".step"):
+        import tempfile as _tempfile
+        fd, _tmp = _tempfile.mkstemp(suffix=".stl", prefix="p3d_stable_")
+        os.close(fd)
+        result = subprocess.run(
+            ["prusa-slicer", "--export-stl", "--output", _tmp, model_path],
+            capture_output=True, text=True, timeout=120,
+        )
+        if result.returncode != 0 or not os.path.exists(_tmp):
+            if _tmp and os.path.exists(_tmp):
+                os.unlink(_tmp)
+            return {"faces": []}
+        load_path = _tmp
+    else:
+        load_path = model_path
+
+    try:
+        mesh = trimesh.load(load_path, force="mesh")
+    finally:
+        if _tmp and os.path.exists(_tmp):
+            try:
+                os.unlink(_tmp)
+            except OSError:
+                pass
+
     if isinstance(mesh, trimesh.Scene):
         meshes = mesh.dump()
         mesh = trimesh.util.concatenate(meshes)

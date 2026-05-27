@@ -91,16 +91,45 @@ __all__ = [
 
 
 def _load_mesh(model_path: str) -> trimesh.Trimesh:
-    """Load and validate a 3D model file (STL/3MF)."""
-    mesh = trimesh.load(model_path, force="mesh")
-    if isinstance(mesh, trimesh.Scene):
-        meshes = mesh.dump()
-        mesh = trimesh.util.concatenate(meshes)
-    if not isinstance(mesh, trimesh.Trimesh) or mesh.vertices.shape[0] == 0:
-        raise ValueError("无法加载模型: {}".format(model_path))
-    if not hasattr(mesh, 'face_normals') or mesh.face_normals is None or len(mesh.face_normals) == 0:
-        mesh = trimesh.Trimesh(vertices=mesh.vertices, faces=mesh.faces, process=True, validate=True)
-    return mesh
+    """Load and validate a 3D model file (STL/3MF/STEP).
+
+    STEP files are auto-converted to STL via PrusaSlicer before loading.
+    """
+    _tmp = None
+    ext = os.path.splitext(model_path)[1].lower()
+    if ext in (".stp", ".step"):
+        import tempfile as _tempfile
+        import subprocess as _subprocess
+        fd, _tmp = _tempfile.mkstemp(suffix=".stl", prefix="p3d_orient_step_")
+        os.close(fd)
+        result = _subprocess.run(
+            ["prusa-slicer", "--export-stl", "--output", _tmp, model_path],
+            capture_output=True, text=True, timeout=120,
+        )
+        if result.returncode != 0 or not os.path.exists(_tmp):
+            if _tmp and os.path.exists(_tmp):
+                os.unlink(_tmp)
+            raise ValueError(f"STEP 文件转换失败: {os.path.basename(model_path)}")
+        load_path = _tmp
+    else:
+        load_path = model_path
+
+    try:
+        mesh = trimesh.load(load_path, force="mesh")
+        if isinstance(mesh, trimesh.Scene):
+            meshes = mesh.dump()
+            mesh = trimesh.util.concatenate(meshes)
+        if not isinstance(mesh, trimesh.Trimesh) or mesh.vertices.shape[0] == 0:
+            raise ValueError("无法加载模型: {}".format(model_path))
+        if not hasattr(mesh, 'face_normals') or mesh.face_normals is None or len(mesh.face_normals) == 0:
+            mesh = trimesh.Trimesh(vertices=mesh.vertices, faces=mesh.faces, process=True, validate=True)
+        return mesh
+    finally:
+        if _tmp and os.path.exists(_tmp):
+            try:
+                os.unlink(_tmp)
+            except OSError:
+                pass
 
 
 def analyze_orientation(
@@ -160,46 +189,72 @@ def apply_orientation_to_mesh(
     Returns:
         Path to the rotated STL file.
     """
-    mesh = trimesh.load(model_path, force="mesh")
-    if isinstance(mesh, trimesh.Scene):
-        meshes = mesh.dump()
-        mesh = trimesh.util.concatenate(meshes)
-
-    if not isinstance(mesh, trimesh.Trimesh):
-        raise ValueError("无法加载模型: {}".format(model_path))
-
-    R = np.asarray(rotation_matrix, dtype=np.float64)
-    if R.shape != (3, 3):
-        R = R[:3, :3]
-
-    vertices = np.asarray(mesh.vertices, dtype=np.float64)
-    rotated_verts = vertices @ R.T
-
-    if translation is not None:
-        T = np.asarray(translation, dtype=np.float64)[:3]
+    _tmp = None
+    ext = os.path.splitext(model_path)[1].lower()
+    if ext in (".stp", ".step"):
+        import tempfile as _tempfile
+        import subprocess as _subprocess
+        fd, _tmp = _tempfile.mkstemp(suffix=".stl", prefix="p3d_orient_apply_")
+        os.close(fd)
+        result = _subprocess.run(
+            ["prusa-slicer", "--export-stl", "--output", _tmp, model_path],
+            capture_output=True, text=True, timeout=120,
+        )
+        if result.returncode != 0 or not os.path.exists(_tmp):
+            if _tmp and os.path.exists(_tmp):
+                os.unlink(_tmp)
+            raise ValueError(f"STEP 文件转换失败: {os.path.basename(model_path)}")
+        load_path = _tmp
     else:
-        T = np.array([0.0, 0.0, -float(rotated_verts[:, 2].min())])
+        load_path = model_path
 
-    rotated_verts += T
+    try:
+        mesh = trimesh.load(load_path, force="mesh")
+        if isinstance(mesh, trimesh.Scene):
+            meshes = mesh.dump()
+            mesh = trimesh.util.concatenate(meshes)
 
-    rotated_mesh = trimesh.Trimesh(
-        vertices=rotated_verts,
-        faces=mesh.faces,
-        process=False,
-        validate=False,
-    )
+        if not isinstance(mesh, trimesh.Trimesh):
+            raise ValueError("无法加载模型: {}".format(model_path))
 
-    import tempfile
-    fd, out_path = tempfile.mkstemp(suffix=".stl", prefix="p3d_orient_")
-    os.close(fd)
-    rotated_mesh.export(out_path, file_type="stl")
-    logger.info(
-        "模型已旋转保存: %s → %s (旋转角度: %s)",
-        os.path.basename(model_path),
-        os.path.basename(out_path),
-        rotation_to_euler(R),
-    )
-    return out_path
+        R = np.asarray(rotation_matrix, dtype=np.float64)
+        if R.shape != (3, 3):
+            R = R[:3, :3]
+
+        vertices = np.asarray(mesh.vertices, dtype=np.float64)
+        rotated_verts = vertices @ R.T
+
+        if translation is not None:
+            T = np.asarray(translation, dtype=np.float64)[:3]
+        else:
+            T = np.array([0.0, 0.0, -float(rotated_verts[:, 2].min())])
+
+        rotated_verts += T
+
+        rotated_mesh = trimesh.Trimesh(
+            vertices=rotated_verts,
+            faces=mesh.faces,
+            process=False,
+            validate=False,
+        )
+
+        import tempfile
+        fd, out_path = tempfile.mkstemp(suffix=".stl", prefix="p3d_orient_")
+        os.close(fd)
+        rotated_mesh.export(out_path, file_type="stl")
+        logger.info(
+            "模型已旋转保存: %s → %s (旋转角度: %s)",
+            os.path.basename(model_path),
+            os.path.basename(out_path),
+            rotation_to_euler(R),
+        )
+        return out_path
+    finally:
+        if _tmp and os.path.exists(_tmp):
+            try:
+                os.unlink(_tmp)
+            except OSError:
+                pass
 
 
 def get_best_face_for_slicing(model_path: str) -> dict:

@@ -1,15 +1,22 @@
 """Geometry parsing for 3D model files.
 
 Supports STL/STEP/OBJ via trimesh, plus native 3MF XML parsing.
+STP/STEP files are converted to STL via PrusaSlicer before trimesh loading.
 """
 
 import re
 import zipfile
 import tempfile
 import os
+import subprocess
+import logging
 
 import numpy as np
 import trimesh
+
+logger = logging.getLogger(__name__)
+
+_STEP_EXTENSIONS = {".stp", ".step"}
 
 
 def _parse_3mf_xml_mesh(xml_data: bytes) -> "np.ndarray | None":
@@ -89,6 +96,39 @@ def _extract_geometry_from_3mf(path_3mf: str) -> "np.ndarray | None":
     return None
 
 
+def _convert_step_to_stl(step_path: str) -> "str | None":
+    """Convert a STEP (.stp/.step) file to STL via PrusaSlicer CLI.
+
+    PrusaSlicer 2.6+ supports STEP import natively and can export STL.
+    Returns path to the temporary STL file, or None on failure.
+    Caller is responsible for cleanup.
+    """
+    fd, tmp = tempfile.mkstemp(suffix=".stl", prefix="p3d_step_")
+    os.close(fd)
+    try:
+        result = subprocess.run(
+            ["prusa-slicer", "--export-stl", "--output", tmp, step_path],
+            capture_output=True, text=True, timeout=120,
+        )
+        if result.returncode != 0 or not os.path.exists(tmp) or os.path.getsize(tmp) == 0:
+            logger.warning("STEP→STL conversion failed: %s", result.stderr[:200])
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            return None
+        logger.info("STEP→STL converted: %s → %s (%d bytes)",
+                     os.path.basename(step_path), os.path.basename(tmp), os.path.getsize(tmp))
+        return tmp
+    except Exception as e:
+        logger.warning("STEP→STL conversion error: %s", e)
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        return None
+
+
 def calculate_geometry(model_path):
     """Calculate model geometry (volume, surface_area, dimensions)."""
     tmp_file = None
@@ -97,6 +137,11 @@ def calculate_geometry(model_path):
     try:
         if ext == ".3mf":
             tmp_file = _extract_geometry_from_3mf(model_path)
+            if tmp_file is None:
+                return 0, 0, {"x": 0, "y": 0, "z": 0}
+            model_path = tmp_file
+        elif ext in _STEP_EXTENSIONS:
+            tmp_file = _convert_step_to_stl(model_path)
             if tmp_file is None:
                 return 0, 0, {"x": 0, "y": 0, "z": 0}
             model_path = tmp_file
