@@ -540,37 +540,79 @@
                                     <div id="printer-bed-info" class="text-xs text-gray-400 mt-1"></div>
                                 </div>
 
-                                <div id="uc-tab-slicer" class="uc-tab-pane hidden space-y-6">
+                                <div id="uc-tab-slicer" class="uc-tab-pane hidden space-y-5">
                                     <h5 class="text-sm font-medium text-gray-700">切片配置</h5>
-                                    <p class="text-xs text-gray-500">调整影响打印时间和耗材的关键参数。修改后需保存为预设方可生效。</p>
+                                    <p class="text-xs text-gray-500">选择一个预设查看参数，修改后可直接保存或另存为新预设。</p>
 
-                                    <!-- Layer & Perimeters -->
+                                    <!-- ── Preset selector bar ── -->
+                                    <div class="border border-indigo-200 bg-indigo-50/50 rounded-md p-3">
+                                        <div class="flex items-end gap-3 flex-wrap">
+                                            <div class="min-w-[200px]">
+                                                <label class="block text-[11px] text-gray-500">当前预设</label>
+                                                <select id="gen-preset-select" class="mt-0.5 w-full border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
+                                                    <option value="">-- 新建 / 未选择 --</option>
+                                                </select>
+                                            </div>
+                                            <button id="gen-preset-save-btn" type="button" class="h-[30px] px-3 rounded-md bg-indigo-600 text-white text-xs hover:bg-indigo-700 whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed" disabled title="保存到当前预设">💾 保存</button>
+                                            <button id="gen-preset-saveas-btn" type="button" class="h-[30px] px-3 rounded-md bg-white border border-indigo-300 text-indigo-700 text-xs hover:bg-indigo-50 whitespace-nowrap">📋 另存为</button>
+                                            <div class="min-w-[180px]">
+                                                <label class="block text-[11px] text-gray-500">打印机型号 <span class="text-red-500">*</span></label>
+                                                <select id="gen-printer-model" class="mt-0.5 w-full border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
+                                                    <option value="">请选择打印机...</option>
+                                                </select>
+                                            </div>
+                                            <p id="slicer-presets-msg" class="text-xs hidden"></p>
+                                        </div>
+                                        <!-- Save-as name row (hidden by default) -->
+                                        <div id="gen-saveas-row" class="mt-2 hidden">
+                                            <label class="block text-[11px] text-gray-500">新预设名称 <span class="text-red-500">*</span></label>
+                                            <div class="flex items-center gap-2 mt-0.5">
+                                                <input id="gen-saveas-name" type="text" maxlength="60" class="w-56 border border-gray-300 rounded-sm text-xs px-2 py-1" placeholder="例如：A1 0.12mm精细" />
+                                                <button id="gen-saveas-confirm-btn" type="button" class="h-[28px] px-3 rounded-md bg-green-600 text-white text-xs hover:bg-green-700 whitespace-nowrap">确认另存</button>
+                                                <button id="gen-saveas-cancel-btn" type="button" class="h-[28px] px-3 rounded-md border border-gray-300 text-gray-600 text-xs hover:bg-gray-100 whitespace-nowrap">取消</button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- ── Parameters ── -->
                                     <div class="border border-gray-200 rounded-md p-3 space-y-2">
                                         <h6 class="text-xs font-medium text-gray-600 uppercase tracking-wide">层与外壳</h6>
                                         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                             <div>
                                                 <label class="text-[11px] text-gray-500">层高 (mm)</label>
-                                                <select id="gen-layer-height" class="mt-0.5 w-full border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
-                                                    <option value="0.08">0.08 精细</option><option value="0.10">0.10</option><option value="0.12">0.12</option><option value="0.16">0.16</option><option value="0.20" selected>0.20 标准</option><option value="0.28">0.28 快速</option><option value="0.32">0.32</option>
-                                                </select>
+                                                <div class="flex items-center gap-1 mt-0.5">
+                                                    <select id="gen-layer-height" data-preset-param="layer_height" class="flex-1 border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
+                                                        <option value="0.08">0.08 精细</option><option value="0.10">0.10</option><option value="0.12">0.12</option><option value="0.16">0.16</option><option value="0.20" selected>0.20 标准</option><option value="0.28">0.28 快速</option><option value="0.32">0.32</option>
+                                                    </select>
+                                                    <button type="button" class="preset-undo-btn hidden flex-shrink-0 w-5 h-5 text-[10px] text-amber-600 hover:text-amber-800 hover:bg-amber-50 rounded-full inline-flex items-center justify-center" title="撤销修改" data-undo-for="gen-layer-height">↺</button>
+                                                </div>
                                             </div>
                                             <div>
-                                                <label class="text-[11px] text-gray-500">外壳圈数</label>
-                                                <select id="gen-wall-count" class="mt-0.5 w-full border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
-                                                    <option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="8">8</option>
-                                                </select>
+                                                <label class="text-[11px] text-gray-500">墙层数</label>
+                                                <div class="flex items-center gap-1 mt-0.5">
+                                                    <select id="gen-wall-count" data-preset-param="perimeters" class="flex-1 border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
+                                                        <option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="8">8</option>
+                                                    </select>
+                                                    <button type="button" class="preset-undo-btn hidden flex-shrink-0 w-5 h-5 text-[10px] text-amber-600 hover:text-amber-800 hover:bg-amber-50 rounded-full inline-flex items-center justify-center" title="撤销修改" data-undo-for="gen-wall-count">↺</button>
+                                                </div>
                                             </div>
                                             <div>
                                                 <label class="text-[11px] text-gray-500">顶部实心层</label>
-                                                <select id="gen-top-shells" class="mt-0.5 w-full border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
-                                                    <option value="3">3</option><option value="4">4</option><option value="5" selected>5</option><option value="6">6</option><option value="8">8</option><option value="10">10</option>
-                                                </select>
+                                                <div class="flex items-center gap-1 mt-0.5">
+                                                    <select id="gen-top-shells" data-preset-param="top_shell_layers" class="flex-1 border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
+                                                        <option value="3">3</option><option value="4">4</option><option value="5" selected>5</option><option value="6">6</option><option value="8">8</option><option value="10">10</option>
+                                                    </select>
+                                                    <button type="button" class="preset-undo-btn hidden flex-shrink-0 w-5 h-5 text-[10px] text-amber-600 hover:text-amber-800 hover:bg-amber-50 rounded-full inline-flex items-center justify-center" title="撤销修改" data-undo-for="gen-top-shells">↺</button>
+                                                </div>
                                             </div>
                                             <div>
                                                 <label class="text-[11px] text-gray-500">底部实心层</label>
-                                                <select id="gen-bottom-shells" class="mt-0.5 w-full border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
-                                                    <option value="3">3</option><option value="4">4</option><option value="5" selected>5</option><option value="6">6</option><option value="8">8</option><option value="10">10</option>
-                                                </select>
+                                                <div class="flex items-center gap-1 mt-0.5">
+                                                    <select id="gen-bottom-shells" data-preset-param="bottom_shell_layers" class="flex-1 border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
+                                                        <option value="3">3</option><option value="4">4</option><option value="5" selected>5</option><option value="6">6</option><option value="8">8</option><option value="10">10</option>
+                                                    </select>
+                                                    <button type="button" class="preset-undo-btn hidden flex-shrink-0 w-5 h-5 text-[10px] text-amber-600 hover:text-amber-800 hover:bg-amber-50 rounded-full inline-flex items-center justify-center" title="撤销修改" data-undo-for="gen-bottom-shells">↺</button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -581,9 +623,12 @@
                                         <div class="grid grid-cols-2 gap-2 max-w-xs">
                                             <div>
                                                 <label class="text-[11px] text-gray-500">填充密度</label>
-                                                <select id="gen-infill" class="mt-0.5 w-full border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
-                                                    <option value="5">5%</option><option value="10">10%</option><option value="15">15%</option><option value="20" selected>20%</option><option value="25">25%</option><option value="30">30%</option><option value="40">40%</option><option value="50">50%</option><option value="60">60%</option><option value="80">80%</option><option value="100">100%</option>
-                                                </select>
+                                                <div class="flex items-center gap-1 mt-0.5">
+                                                    <select id="gen-infill" data-preset-param="fill_density" class="flex-1 border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
+                                                        <option value="5">5%</option><option value="10">10%</option><option value="15">15%</option><option value="20" selected>20%</option><option value="25">25%</option><option value="30">30%</option><option value="40">40%</option><option value="50">50%</option><option value="60">60%</option><option value="80">80%</option><option value="100">100%</option>
+                                                    </select>
+                                                    <button type="button" class="preset-undo-btn hidden flex-shrink-0 w-5 h-5 text-[10px] text-amber-600 hover:text-amber-800 hover:bg-amber-50 rounded-full inline-flex items-center justify-center" title="撤销修改" data-undo-for="gen-infill">↺</button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -594,35 +639,20 @@
                                         <div class="grid grid-cols-2 gap-2 max-w-xs">
                                             <div>
                                                 <label class="text-[11px] text-gray-500">底边宽度 (mm)</label>
-                                                <select id="gen-brim-width" class="mt-0.5 w-full border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
-                                                    <option value="0" selected>0 (关闭)</option><option value="3">3</option><option value="5">5</option><option value="8">8</option><option value="10">10</option><option value="15">15</option>
-                                                </select>
+                                                <div class="flex items-center gap-1 mt-0.5">
+                                                    <select id="gen-brim-width" data-preset-param="brim_width" class="flex-1 border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
+                                                        <option value="0" selected>0 (关闭)</option><option value="3">3</option><option value="5">5</option><option value="8">8</option><option value="10">10</option><option value="15">15</option>
+                                                    </select>
+                                                    <button type="button" class="preset-undo-btn hidden flex-shrink-0 w-5 h-5 text-[10px] text-amber-600 hover:text-amber-800 hover:bg-amber-50 rounded-full inline-flex items-center justify-center" title="撤销修改" data-undo-for="gen-brim-width">↺</button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <!-- Save as preset -->
-                                    <div class="border-t border-gray-200 pt-3">
-                                        <div class="flex items-end gap-3 flex-wrap">
-                                            <div class="min-w-[160px]">
-                                                <label class="block text-[11px] text-gray-500">预设名称 <span class="text-red-500">*</span></label>
-                                                <input id="gen-preset-name" type="text" maxlength="60" class="mt-0.5 w-full border border-gray-300 rounded-sm text-xs px-2 py-1" placeholder="例如：A1 0.2mm标准" />
-                                            </div>
-                                            <div>
-                                                <label class="block text-[11px] text-gray-500">打印机型号 <span class="text-red-500">*</span></label>
-                                                <select id="gen-printer-model" class="mt-0.5 w-full border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
-                                                    <option value="">请选择打印机...</option>
-                                                </select>
-                                            </div>
-                                            <button id="slicer-preset-generate-btn" type="button" class="h-[30px] px-3 rounded-md bg-green-600 text-white text-xs hover:bg-green-700 whitespace-nowrap">保存为预设</button>
-                                        </div>
-                                        <p id="slicer-presets-msg" class="text-xs mt-1 hidden"></p>
-                                    </div>
-
-                                    <!-- Saved presets -->
+                                    <!-- Saved presets list -->
                                     <div>
                                         <div class="flex justify-between items-center mb-1">
-                                            <label class="text-xs text-gray-600">已保存的预设</label>
+                                            <label class="text-xs text-gray-600">所有已保存预设</label>
                                             <button id="slicer-presets-refresh-btn" type="button" class="text-xs text-indigo-600 hover:text-indigo-800">刷新</button>
                                         </div>
                                         <div class="overflow-x-auto border border-gray-200 rounded-md">

@@ -52,6 +52,17 @@ export async function quoteSingleFileWithOptions(file, options) {
     if (quoteOptions.slicer_preset_id !== null && quoteOptions.slicer_preset_id !== undefined) {
         formData.append("slicer_preset_id", String(quoteOptions.slicer_preset_id));
     }
+    // 发送切片参数（从切片配置面板读取用户设置）
+    const lhEl = document.getElementById("gen-layer-height");
+    const wcEl = document.getElementById("gen-wall-count");
+    const ifEl = document.getElementById("gen-infill");
+    const tsEl = document.getElementById("gen-top-shells");
+    const bsEl = document.getElementById("gen-bottom-shells");
+    if (lhEl && lhEl.value) formData.append("layer_height", lhEl.value);
+    if (wcEl && wcEl.value) formData.append("wall_count", wcEl.value);
+    if (ifEl && ifEl.value) formData.append("infill", ifEl.value);
+    if (tsEl && tsEl.value) formData.append("top_shell_layers", tsEl.value);
+    if (bsEl && bsEl.value) formData.append("bottom_shell_layers", bsEl.value);
     formData.append("use_prusaslicer", "true");
     const response = await authFetch('/api/quote', { method: 'POST', body: formData });
     const data = await response.json();
@@ -70,6 +81,17 @@ export async function quoteSelectedFiles(selectedFiles) {
     if (quoteOptions.slicer_preset_id !== null && quoteOptions.slicer_preset_id !== undefined) {
         formData.append("slicer_preset_id", String(quoteOptions.slicer_preset_id));
     }
+    // 发送切片参数（从切片配置面板读取用户设置）
+    const lhEl2 = document.getElementById("gen-layer-height");
+    const wcEl2 = document.getElementById("gen-wall-count");
+    const ifEl2 = document.getElementById("gen-infill");
+    const tsEl2 = document.getElementById("gen-top-shells");
+    const bsEl2 = document.getElementById("gen-bottom-shells");
+    if (lhEl2 && lhEl2.value) formData.append("layer_height", lhEl2.value);
+    if (wcEl2 && wcEl2.value) formData.append("wall_count", wcEl2.value);
+    if (ifEl2 && ifEl2.value) formData.append("infill", ifEl2.value);
+    if (tsEl2 && tsEl2.value) formData.append("top_shell_layers", tsEl2.value);
+    if (bsEl2 && bsEl2.value) formData.append("bottom_shell_layers", bsEl2.value);
     formData.append("use_prusaslicer", "true");
     const response = await authFetch('/api/quote', { method: 'POST', body: formData });
     const data = await response.json();
@@ -262,58 +284,46 @@ export function renderResultsTable() {
 }
 
 // ── G-code 详情构建 ──
-const _TYPE_CN = {
-    'Custom': '自定义G-code', 'Skirt/Brim': '裙边/底边', 'Perimeter': '内墙',
-    'External perimeter': '外墙', 'Solid infill': '实心填充',
-    'Internal infill': '内部填充', 'Bridge infill': '桥接填充',
-    'Top solid infill': '顶部实心填充', 'Gap fill': '间隙填充',
-    'Overhang perimeter': '悬垂外墙', 'Support material': '支撑材料',
-    'Support material interface': '支撑接触面',
-};
-
 function _buildGcodeDetailHtml(gcode) {
-    const cn = (t) => _TYPE_CN[t] || t;
-    let html = '<td colspan="13" class="px-3 py-2"><div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px]">';
+    const cp = gcode.core_params || {};
+    let html = '<td colspan="13" class="px-3 py-2"><div class="grid grid-cols-3 md:grid-cols-5 gap-x-3 gap-y-1 text-[11px]">';
 
-    // 总层数
-    html += `<div><span class="text-gray-400">总层数</span> <span class="font-semibold">${gcode.layer_count}</span></div>`;
+    // 核心切片参数
+    const add = (label, value, unit) => {
+        if (value != null && value !== '') {
+            html += `<div><span class="text-gray-400">${label}</span> <span class="font-semibold">${value}${unit || ''}</span></div>`;
+        }
+    };
 
-    // 喷嘴
-    if (gcode.nozzle_diameter) {
-        html += `<div><span class="text-gray-400">喷嘴</span> <span class="font-semibold">${gcode.nozzle_diameter} mm</span></div>`;
+    add('层高', cp.layer_height, ' mm');
+    add('首层层高', cp.first_layer_height, ' mm');
+    add('喷嘴直径', cp.nozzle_diameter, ' mm');
+    add('墙层数', cp.perimeters, ' 圈');
+    add('填充率', cp.fill_density, '%');
+    add('顶部实心层', cp.top_shell_layers, ' 层');
+    add('底部实心层', cp.bottom_shell_layers, ' 层');
+    add('底边宽度', cp.brim_width, ' mm');
+    add('支撑', cp.support_material === '1' ? '是' : '否');
+    add('总层数', gcode.layer_count);
+
+    // 分隔线
+    html += '<div class="col-span-full border-t border-gray-200 my-1"></div>';
+
+    // 耗材 + 时间
+    if (gcode.filament_mm != null) {
+        add('耗材线长', (gcode.filament_mm / 1000).toFixed(2), ' m');
+    }
+    if (gcode.filament_g != null && gcode.filament_g > 0) {
+        add('耗材重量', gcode.filament_g.toFixed(2), ' g');
+    }
+    if (gcode.time_display) {
+        add('预估时间', gcode.time_display);
     }
 
     // 层高分布
     if (gcode.heights && gcode.heights.length) {
         const hParts = gcode.heights.map(h => `${h.height.toFixed(3)}mm×${h.count}`).join(', ');
-        html += `<div class="col-span-2"><span class="text-gray-400">层高分布</span> <span>${hParts}</span></div>`;
-    }
-
-    // 耗材
-    if (gcode.filament_mm != null) {
-        html += `<div><span class="text-gray-400">耗材线长</span> <span class="font-semibold">${(gcode.filament_mm / 1000).toFixed(2)} m</span></div>`;
-    }
-    if (gcode.filament_g != null && gcode.filament_g > 0) {
-        html += `<div><span class="text-gray-400">耗材重量</span> <span class="font-semibold">${gcode.filament_g.toFixed(2)} g</span></div>`;
-    }
-    if (gcode.time_display) {
-        html += `<div><span class="text-gray-400">预估时间</span> <span class="font-semibold">${gcode.time_display}</span></div>`;
-    }
-
-    // 特征类型统计
-    if (gcode.types && gcode.types.length) {
-        html += '<div class="col-span-2 md:col-span-4 mt-1"><span class="text-gray-400">特征类型: </span>';
-        const tParts = gcode.types.map(t => `${cn(t.type)}×${t.count}`);
-        html += tParts.join(' &nbsp;|&nbsp; ');
-        html += '</div>';
-    }
-
-    // 挤出宽度
-    if (gcode.widths && Object.keys(gcode.widths).length) {
-        html += '<div class="col-span-2 md:col-span-4"><span class="text-gray-400">挤出宽度: </span>';
-        const wParts = Object.entries(gcode.widths).map(([t, w]) => `${cn(t)} ${w}mm`);
-        html += wParts.join(' &nbsp;|&nbsp; ');
-        html += '</div>';
+        html += `<div class="col-span-full"><span class="text-gray-400">层高分布</span> <span>${hParts}</span></div>`;
     }
 
     html += '</div></td>';

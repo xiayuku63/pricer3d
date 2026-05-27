@@ -160,6 +160,8 @@ def generate_slice_config(
     material_density: float = 1.24,
     slicer_preset: Optional[dict] = None,
     printer_profile_path: Optional[str] = None,
+    top_shell_layers: Optional[int] = None,
+    bottom_shell_layers: Optional[int] = None,
 ) -> str:
     """
     Generate a combined PrusaSlicer INI config file for a quote request.
@@ -208,8 +210,8 @@ def generate_slice_config(
     ps["sparse_infill_density"] = f"{infill_percent}%"
     ps["perimeters"] = str(perimeters)
     ps["wall_loops"] = str(perimeters)
-    ps["top_shell_layers"] = str(max(3, min(perimeters + 2, 10)))
-    ps["bottom_shell_layers"] = str(max(3, min(perimeters + 2, 10)))
+    ps["top_shell_layers"] = str(top_shell_layers) if top_shell_layers is not None else str(max(3, min(perimeters + 2, 10)))
+    ps["bottom_shell_layers"] = str(bottom_shell_layers) if bottom_shell_layers is not None else str(max(3, min(perimeters + 2, 10)))
 
     # ── Apply filament density into the filament section ──
     for sec_name in sections:
@@ -244,6 +246,8 @@ def run_prusa_slice(
     slicer_preset: Optional[dict] = None,
     enable_supports: bool = False,
     printer_profile_path: Optional[str] = None,
+    top_shell_layers: Optional[int] = None,
+    bottom_shell_layers: Optional[int] = None,
 ) -> dict:
     """
     Run PrusaSlicer headless. Merges system/user/quote config into temp INI.
@@ -267,6 +271,8 @@ def run_prusa_slice(
         material_density=material_density,
         slicer_preset=slicer_preset,
         printer_profile_path=printer_profile_path,
+        top_shell_layers=top_shell_layers,
+        bottom_shell_layers=bottom_shell_layers,
     )
 
     preset_label = "系统默认 (A1)"
@@ -387,6 +393,7 @@ def generate_prusa_config(
     fd, path = tempfile.mkstemp(suffix=".ini", prefix="prusa_gen_")
     with os.fdopen(fd, "w") as f:
         f.write(f"""; Generated PrusaSlicer config — pricer3d
+[print:custom]
 layer_height = {layer_height}
 first_layer_height = {round(min(layer_height * 1.75, 0.35), 2)}
 fill_density = {infill_percent}%

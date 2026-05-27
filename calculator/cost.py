@@ -356,6 +356,8 @@ def calculate_cost(
                 slicer_preset=slicer_preset,
                 enable_supports=True,
                 printer_profile_path=_printer_profile,
+                top_shell_layers=top_shell_layers,
+                bottom_shell_layers=bottom_shell_layers,
             )
             if stats.get("time_s", 0) > 0:
                 correction = float(cfg.get("prusa_time_correction") or 1.0)
@@ -474,6 +476,7 @@ def calculate_cost(
 
     # ── G-code 分析（切片完成后自动解析）──
     gcode_summary = None
+    logger.info(f"Gcode analysis check: prusaslicer_used={prusaslicer_used}, output_gcode={output_gcode}, exists={os.path.exists(output_gcode) if output_gcode else 'N/A'}")
     if prusaslicer_used and output_gcode and os.path.exists(output_gcode):
         try:
             import importlib.util
@@ -482,40 +485,47 @@ def calculate_cost(
             _ga = importlib.util.module_from_spec(_ga_spec)
             _ga_spec.loader.exec_module(_ga)
             parsed = _ga.parse_gcode(output_gcode)
+            logger.info(f"Gcode analysis parsed: layers={parsed.get('layer_count')}, error={parsed.get('error', 'none')}")
             if "error" not in parsed:
-                heights = parsed.get("heights", {})
-                type_counts = parsed.get("type_counts", {})
+                settings = parsed.get("settings", {})
                 fil = parsed.get("filament", {})
                 t = parsed.get("time", {})
-                settings = parsed.get("settings", {})
 
-                # 层高分布 Top 3
+                # ── 核心切片参数（用户最关心的）──
+                def _gs(keys):
+                    for k in keys:
+                        v = settings.get(k)
+                        if v is not None:
+                            return v
+                    return None
+
+                core_params = {
+                    "layer_height": _gs(["layer_height"]),
+                    "first_layer_height": _gs(["first_layer_height"]),
+                    "nozzle_diameter": _gs(["nozzle_diameter"]),
+                    "perimeters": _gs(["perimeters", "wall_loops"]),
+                    "fill_density": _gs(["fill_density"]),
+                    "top_shell_layers": _gs(["top_shell_layers", "top_solid_layers"]),
+                    "bottom_shell_layers": _gs(["bottom_shell_layers", "bottom_solid_layers"]),
+                    "brim_width": _gs(["brim_width"]),
+                    "support_material": _gs(["support_material"]),
+                }
+
+                # 层高分布（Top 3）
+                heights = parsed.get("heights", {})
                 top_heights = sorted(heights.items(), key=lambda x: -x[1])[:3]
                 height_bars = [{"height": float(h), "count": c} for h, c in top_heights]
 
-                # 特征类型统计 Top 5
-                top_types = sorted(type_counts.items(), key=lambda x: -x[1])[:5]
-                type_list = [{"type": t, "count": c} for t, c in top_types]
-
-                # 挤出宽度摘要（按类型）
-                widths_by_type = parsed.get("widths_by_type", {})
-                width_summary = {}
-                for tp, wset in widths_by_type.items():
-                    ws = sorted(wset, key=float)
-                    if ws:
-                        width_summary[tp] = ws[0] if len(ws) == 1 else f"{ws[0]}~{ws[-1]}"
-
                 gcode_summary = {
                     "layer_count": parsed.get("layer_count", 0),
+                    "core_params": core_params,
                     "heights": height_bars,
-                    "types": type_list,
-                    "widths": width_summary,
                     "filament_mm": round(fil.get("filament_mm", 0), 2) if fil.get("filament_mm") else None,
                     "filament_cm3": round(fil.get("filament_cm3", 0), 2) if fil.get("filament_cm3") else None,
                     "filament_g": round(fil.get("filament_g", 0), 2) if fil.get("filament_g") else None,
                     "time_display": t.get("display"),
-                    "nozzle_diameter": settings.get("nozzle_diameter"),
                 }
+                logger.info(f"Gcode summary built: {json.dumps(gcode_summary, default=str)[:200]}")
         except Exception as e:
             logger.warning(f"G-code analysis skipped: {e}")
 
@@ -545,6 +555,8 @@ async def process_single_file(
     perimeters: Optional[int] = None,
     current_user: Optional[dict] = None,
     auto_orient: bool = False,
+    top_shell_layers: Optional[int] = None,
+    bottom_shell_layers: Optional[int] = None,
 ):
     from app.config import SUPPORTED_EXTENSIONS, MAX_FILE_SIZE_BYTES
     from app.utils import _sanitize_filename_component, _user_base_dir, _date_folder_utc

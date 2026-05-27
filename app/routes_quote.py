@@ -31,6 +31,8 @@ async def get_quote(
     layer_height: float = Form(0.2, ge=0.05, le=1.0),
     infill: int = Form(20, ge=0, le=100),
     wall_count: int = Form(3, ge=1, le=20),
+    top_shell_layers: Optional[int] = Form(default=None, ge=3, le=20),
+    bottom_shell_layers: Optional[int] = Form(default=None, ge=3, le=20),
     slicer_preset_id: Optional[int] = Form(default=None),
     quantity: int = Form(1, ge=1, le=5000),
     color: str = Form("White", min_length=1, max_length=40),
@@ -109,7 +111,7 @@ async def get_quote(
                         _process_single_file_sync,
                         file, material, layer_height, infill, quantity, color,
                         user_materials, pricing_config, slicer_preset, wall_count, current_user,
-                        auto_orient,
+                        auto_orient, top_shell_layers, bottom_shell_layers,
                     )
                 except Exception as e:
                     fname = file.filename or "unknown"
@@ -216,6 +218,8 @@ def _process_single_file_sync(
     perimeters: Optional[int] = None,
     current_user: Optional[dict] = None,
     auto_orient: bool = False,
+    top_shell_layers: Optional[int] = None,
+    bottom_shell_layers: Optional[int] = None,
 ):
     """Synchronous wrapper for process_single_file — runs in thread pool."""
     import asyncio as _asyncio
@@ -226,7 +230,7 @@ def _process_single_file_sync(
             process_single_file(
                 file, material, layer_height, infill, quantity, color,
                 user_materials, pricing_config, slicer_preset, perimeters, current_user,
-                auto_orient,
+                auto_orient, top_shell_layers, bottom_shell_layers,
             )
         )
     finally:
