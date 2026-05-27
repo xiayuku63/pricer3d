@@ -105,18 +105,26 @@ export async function fetchPrinterModels() {
         if (_printerModels.length > 0) genSel.value = _printerModels[0].id;
     }
 
-    // Auto-fill nozzle when printer changes in preset form
-    if (genSel && dom.genNozzleSize) {
-        genSel.onchange = () => {
-            const printer = _printerModels.find(p => p.id === genSel.value);
+    // Auto-fill nozzle + bed info when printer changes in printer tab
+    const cfgPrinter = document.getElementById("cfg-printer-model-main");
+    if (cfgPrinter && dom.cfgNozzleDiameter) {
+        const updateNozzleAndBed = () => {
+            const printer = _printerModels.find(p => p.id === cfgPrinter.value);
             if (printer) {
-                dom.genNozzleSize.value = String(printer.nozzle);
+                dom.cfgNozzleDiameter.value = String(printer.nozzle);
+                if (dom.printerBedInfo) {
+                    dom.printerBedInfo.textContent = '热床尺寸：' + printer.bed_width + ' × ' + printer.bed_depth + ' × ' + printer.bed_height + ' mm';
+                }
             }
         };
-        // Trigger initial nozzle fill
-        const printer = _printerModels.find(p => p.id === genSel.value);
+        cfgPrinter.onchange = updateNozzleAndBed;
+        // Trigger initial fill
+        const printer = _printerModels.find(p => p.id === cfgPrinter.value);
         if (printer) {
-            dom.genNozzleSize.value = String(printer.nozzle);
+            dom.cfgNozzleDiameter.value = String(printer.nozzle);
+            if (dom.printerBedInfo) {
+                dom.printerBedInfo.textContent = '热床尺寸：' + printer.bed_width + ' × ' + printer.bed_depth + ' × ' + printer.bed_height + ' mm';
+            }
         }
     }
 }
@@ -172,7 +180,7 @@ export async function uploadSlicerPreset() {
 }
 
 export async function generateSlicerPreset() {
-    const { genPresetName, genPrinterModel, genNozzleSize, genInfill, genWallCount } = dom;
+    const { genPresetName, genPrinterModel, genLayerHeight, genInfill, genWallCount, genTopShells, genBottomShells, genBrimWidth, cfgNozzleDiameter } = dom;
     if (!authToken) { openLoginModal(); return; }
     const name = genPresetName ? String(genPresetName.value || "").trim() : "";
     if (!name) { setMsg('请输入预设名称', false); return; }
@@ -188,10 +196,15 @@ export async function generateSlicerPreset() {
     const bed_width = printer.bed_width;
     const bed_depth = printer.bed_depth;
     const bed_height = printer.bed_height;
-    const nozzle_size = Number(genNozzleSize?.value) || printer.nozzle || 0.4;
-    const infill = Number(genInfill?.value) || 15;
+    // Nozzle: prefer printer tab's selection, fallback to printer default
+    const nozzle_size = Number(cfgNozzleDiameter?.value) || printer.nozzle || 0.4;
+    const layer_height = Number(genLayerHeight?.value) || 0.2;
+    const infill = Number(genInfill?.value) || 20;
     const wall_count = Number(genWallCount?.value) || 3;
-    const payload = { name, bed_width, bed_depth, bed_height, nozzle_size, infill, wall_count };
+    const top_shell_layers = Number(genTopShells?.value) || 5;
+    const bottom_shell_layers = Number(genBottomShells?.value) || 5;
+    const brim_width = Number(genBrimWidth?.value) || 0;
+    const payload = { name, bed_width, bed_depth, bed_height, nozzle_size, infill, wall_count, layer_height, top_shell_layers, bottom_shell_layers, brim_width };
     try {
         const resp = await authFetch('/api/slicer/presets/generate', {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)

@@ -35,6 +35,9 @@ class SlicerPresetGenerateRequest(BaseModel):
     infill: int = Field(20, description="默认填充(%)")
     wall_count: int = Field(3, description="默认墙层数")
     layer_height: Optional[float] = Field(default=None, ge=0.05, le=1.0, description="层高(mm)")
+    top_shell_layers: Optional[int] = Field(default=None, ge=3, le=20, description="顶部实心层数")
+    bottom_shell_layers: Optional[int] = Field(default=None, ge=3, le=20, description="底部实心层数")
+    brim_width: Optional[int] = Field(default=None, ge=0, le=20, description="底边宽度(mm)")
 
 
 async def api_list_slicer_presets(current_user=Depends(get_current_user)):
@@ -95,6 +98,9 @@ async def api_generate_slicer_preset(payload: SlicerPresetGenerateRequest, reque
         layer_height=payload.layer_height or 0.2,
         infill_percent=payload.infill,
         perimeters=payload.wall_count,
+        top_shell_layers=payload.top_shell_layers or 5,
+        bottom_shell_layers=payload.bottom_shell_layers or 5,
+        brim_width=payload.brim_width or 0,
     )
     with open(config_path, "r") as f:
         raw = f.read().encode("utf-8")

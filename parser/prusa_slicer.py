@@ -320,6 +320,7 @@ def generate_prusa_config(
     perimeters: int = 3,
     top_shell_layers: int = 5,
     bottom_shell_layers: int = 5,
+    brim_width: int = 0,
     material_density: float = 1.24,
 ) -> str:
     """
@@ -336,6 +337,7 @@ fill_density = {infill_percent}%
 perimeters = {perimeters}
 top_shell_layers = {top_shell_layers}
 bottom_shell_layers = {bottom_shell_layers}
+brim_width = {brim_width}
 nozzle_diameter = 0.4
 filament_diameter = 1.75
 filament_density = {material_density}

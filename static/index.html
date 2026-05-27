@@ -518,69 +518,121 @@
                                     </div>
                                 </div>
                                 <div id="uc-tab-printer" class="uc-tab-pane hidden space-y-4">
-                                    <h5 class="text-sm font-medium text-gray-700">打印机机型</h5>
-                                    <p class="text-xs text-gray-500">选择默认打印机，切片时将自动加载对应机型的 PrusaSlicer 配置。</p>
-                                    <div class="max-w-sm">
-                                        <label class="block text-xs text-gray-600">默认打印机型号</label>
-                                        <select id="cfg-printer-model-main" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md text-sm">
-                                            <option value="">选择打印机...</option>
-                                        </select>
+                                    <h5 class="text-sm font-medium text-gray-700">机型配置</h5>
+                                    <p class="text-xs text-gray-500">选择打印机型号和喷嘴直径，切片时将自动加载对应配置。</p>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md">
+                                        <div>
+                                            <label class="block text-xs text-gray-600">打印机型号</label>
+                                            <select id="cfg-printer-model-main" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md text-sm">
+                                                <option value="">选择打印机...</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs text-gray-600">喷嘴直径</label>
+                                            <select id="cfg-nozzle-diameter" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md text-sm">
+                                                <option value="0.2">0.2 mm</option>
+                                                <option value="0.4" selected>0.4 mm</option>
+                                                <option value="0.6">0.6 mm</option>
+                                                <option value="0.8">0.8 mm</option>
+                                            </select>
+                                        </div>
                                     </div>
+                                    <div id="printer-bed-info" class="text-xs text-gray-400 mt-1"></div>
                                 </div>
 
                                 <div id="uc-tab-slicer" class="uc-tab-pane hidden space-y-6">
-                                    <div class="flex justify-between items-center mb-2">
-                                        <h5 class="text-sm font-medium text-gray-700">切片预设</h5>
-                                        <div class="flex items-center gap-2">
-                                            <p id="slicer-presets-msg" class="text-xs hidden"></p>
+                                    <h5 class="text-sm font-medium text-gray-700">切片配置</h5>
+                                    <p class="text-xs text-gray-500">调整影响打印时间和耗材的关键参数。修改后需保存为预设方可生效。</p>
+
+                                    <!-- Layer & Perimeters -->
+                                    <div class="border border-gray-200 rounded-md p-3 space-y-2">
+                                        <h6 class="text-xs font-medium text-gray-600 uppercase tracking-wide">层与外壳</h6>
+                                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                            <div>
+                                                <label class="text-[11px] text-gray-500">层高 (mm)</label>
+                                                <select id="gen-layer-height" class="mt-0.5 w-full border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
+                                                    <option value="0.08">0.08 精细</option><option value="0.10">0.10</option><option value="0.12">0.12</option><option value="0.16">0.16</option><option value="0.20" selected>0.20 标准</option><option value="0.28">0.28 快速</option><option value="0.32">0.32</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="text-[11px] text-gray-500">外壳圈数</label>
+                                                <select id="gen-wall-count" class="mt-0.5 w-full border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
+                                                    <option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="8">8</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="text-[11px] text-gray-500">顶部实心层</label>
+                                                <select id="gen-top-shells" class="mt-0.5 w-full border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
+                                                    <option value="3">3</option><option value="4">4</option><option value="5" selected>5</option><option value="6">6</option><option value="8">8</option><option value="10">10</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="text-[11px] text-gray-500">底部实心层</label>
+                                                <select id="gen-bottom-shells" class="mt-0.5 w-full border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
+                                                    <option value="3">3</option><option value="4">4</option><option value="5" selected>5</option><option value="6">6</option><option value="8">8</option><option value="10">10</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Infill -->
+                                    <div class="border border-gray-200 rounded-md p-3">
+                                        <h6 class="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2">填充</h6>
+                                        <div class="grid grid-cols-2 gap-2 max-w-xs">
+                                            <div>
+                                                <label class="text-[11px] text-gray-500">填充密度</label>
+                                                <select id="gen-infill" class="mt-0.5 w-full border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
+                                                    <option value="5">5%</option><option value="10">10%</option><option value="15">15%</option><option value="20" selected>20%</option><option value="25">25%</option><option value="30">30%</option><option value="40">40%</option><option value="50">50%</option><option value="60">60%</option><option value="80">80%</option><option value="100">100%</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Adhesion -->
+                                    <div class="border border-gray-200 rounded-md p-3">
+                                        <h6 class="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2">附着</h6>
+                                        <div class="grid grid-cols-2 gap-2 max-w-xs">
+                                            <div>
+                                                <label class="text-[11px] text-gray-500">底边宽度 (mm)</label>
+                                                <select id="gen-brim-width" class="mt-0.5 w-full border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
+                                                    <option value="0" selected>0 (关闭)</option><option value="3">3</option><option value="5">5</option><option value="8">8</option><option value="10">10</option><option value="15">15</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Save as preset -->
+                                    <div class="border-t border-gray-200 pt-3">
+                                        <div class="flex items-end gap-3 flex-wrap">
+                                            <div class="min-w-[160px]">
+                                                <label class="block text-[11px] text-gray-500">预设名称 <span class="text-red-500">*</span></label>
+                                                <input id="gen-preset-name" type="text" maxlength="60" class="mt-0.5 w-full border border-gray-300 rounded-sm text-xs px-2 py-1" placeholder="例如：A1 0.2mm标准" />
+                                            </div>
+                                            <div>
+                                                <label class="block text-[11px] text-gray-500">打印机型号 <span class="text-red-500">*</span></label>
+                                                <select id="gen-printer-model" class="mt-0.5 w-full border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
+                                                    <option value="">请选择打印机...</option>
+                                                </select>
+                                            </div>
+                                            <button id="slicer-preset-generate-btn" type="button" class="h-[30px] px-3 rounded-md bg-green-600 text-white text-xs hover:bg-green-700 whitespace-nowrap">保存为预设</button>
+                                        </div>
+                                        <p id="slicer-presets-msg" class="text-xs mt-1 hidden"></p>
+                                    </div>
+
+                                    <!-- Saved presets -->
+                                    <div>
+                                        <div class="flex justify-between items-center mb-1">
+                                            <label class="text-xs text-gray-600">已保存的预设</label>
                                             <button id="slicer-presets-refresh-btn" type="button" class="text-xs text-indigo-600 hover:text-indigo-800">刷新</button>
                                         </div>
-                                    </div>
-                                    <p class="text-xs text-gray-500 mb-3">选择打印机和基础参数，系统生成 PrusaSlicer 配置用于切片估算。</p>
-                                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                                        <div>
-                                            <label class="block text-xs text-gray-600">预设名称 <span class="text-red-500">*</span></label>
-                                            <input id="gen-preset-name" type="text" maxlength="60" class="mt-1 w-full border border-gray-300 rounded-sm text-xs px-2 py-1" placeholder="例如：A1-0.4喷嘴-标准" />
-                                        </div>
-                                        
-                                        <div>
-                                            <label class="block text-xs text-gray-600">打印机型号 <span class="text-red-500">*</span></label>
-                                            <select id="gen-printer-model" class="mt-1 w-full border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
-                                                <option value="">请选择打印机...</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label class="block text-xs text-gray-600">喷嘴大小 (mm)</label>
-                                            <select id="gen-nozzle-size" class="mt-1 w-full border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
-                                                <option value="0.2">0.2</option><option value="0.4" selected>0.4</option><option value="0.6">0.6</option><option value="0.8">0.8</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label class="block text-xs text-gray-600">填充率 (%)</label>
-                                            <select id="gen-infill" class="mt-1 w-full border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
-                                                <option value="5">5%</option><option value="10">10%</option><option value="15" selected>15%</option><option value="20">20%</option><option value="25">25%</option><option value="30">30%</option><option value="40">40%</option><option value="50">50%</option><option value="60">60%</option><option value="80">80%</option><option value="100">100%</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label class="block text-xs text-gray-600">墙层数</label>
-                                            <select id="gen-wall-count" class="mt-1 w-full border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
-                                                <option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="8">8</option><option value="10">10</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="mt-3 text-right">
-                                        <button id="slicer-preset-generate-btn" type="button" class="h-[30px] px-3 rounded-md bg-green-600 text-white text-xs hover:bg-green-700">生成并保存预设</button>
-                                    </div>
-                                    <div class="mt-3">
-                                        <label class="block text-xs text-gray-600 mb-1">已保存的预设</label>
                                         <div class="overflow-x-auto border border-gray-200 rounded-md">
                                             <table class="min-w-full text-xs text-left">
                                                 <thead class="bg-gray-50 text-gray-600">
                                                     <tr>
                                                         <th class="px-2 py-2 w-20">ID</th>
                                                         <th class="px-2 py-2">名称</th>
-                                                        <th class="px-2 py-2 w-20">扩展</th>
-                                                        <th class="px-2 py-2 w-44">创建时间</th>
+                                                        <th class="px-2 py-2 w-16">格式</th>
+                                                        <th class="px-2 py-2 w-40">创建时间</th>
                                                         <th class="px-2 py-2 w-20 text-right">操作</th>
                                                     </tr>
                                                 </thead>
@@ -589,12 +641,12 @@
                                                 </tbody>
                                             </table>
                                         </div>
-                                    </div>
-                                    <div class="mt-3">
-                                        <label class="block text-xs text-gray-600">报价默认使用的预设</label>
-                                        <select id="cfg-slicer-preset-id" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md text-sm">
-                                            <option value="">不使用预设</option>
-                                        </select>
+                                        <div class="mt-2">
+                                            <label class="block text-xs text-gray-600">报价默认使用的预设</label>
+                                            <select id="cfg-slicer-preset-id" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md text-sm">
+                                                <option value="">不使用预设</option>
+                                            </select>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -774,6 +826,6 @@
     </div>
 
     <!-- 将表单处理逻辑拆分 -->
-    <script type="module" src="/static/js/main.js?v=20"></script>
+    <script type="module" src="/static/js/main.js?v=21"></script>
 </body>
 </html>

@@ -134,9 +134,11 @@ document.addEventListener('DOMContentLoaded', () => {
         slicerPresetsRefreshBtn: $('slicer-presets-refresh-btn'), slicerPresetsMsg: $('slicer-presets-msg'),
         slicerPresetsTbody: $('slicer-presets-tbody'), cfgSlicerPresetId: $('cfg-slicer-preset-id'),
         genPresetName: $('gen-preset-name'), genPrinterModel: $('gen-printer-model'),
-        genNozzleSize: $('gen-nozzle-size'),
-        genInfill: $('gen-infill'), genWallCount: $('gen-wall-count'),
+        genLayerHeight: $('gen-layer-height'), genInfill: $('gen-infill'),
+        genWallCount: $('gen-wall-count'), genTopShells: $('gen-top-shells'),
+        genBottomShells: $('gen-bottom-shells'), genBrimWidth: $('gen-brim-width'),
         slicerPresetGenerateBtn: $('slicer-preset-generate-btn'),
+        cfgNozzleDiameter: $('cfg-nozzle-diameter'), printerBedInfo: $('printer-bed-info'),
 
         // Orientation
         layFaceBtn: $('lay-face-btn'), orientResetBtn: $('orient-reset-btn'),
