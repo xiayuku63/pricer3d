@@ -99,8 +99,47 @@ def _load_system_ini() -> str:
         return f.read()
 
 
+def _parse_ini_sections(content: str) -> dict[str, dict[str, str]]:
+    """Parse INI content into {section_name: {key: value}} dict.
+
+    Preserves section headers — critical for PrusaSlicer which requires
+    settings under proper [print:*], [filament:*], [machine:*] sections.
+    """
+    sections: dict[str, dict[str, str]] = {}
+    current_section: str | None = None
+    for line in content.split("\n"):
+        stripped = line.strip()
+        if not stripped or stripped.startswith(";") or stripped.startswith("#"):
+            continue
+        if stripped.startswith("[") and stripped.endswith("]"):
+            current_section = stripped[1:-1]
+            sections.setdefault(current_section, {})
+            continue
+        if "=" in stripped and current_section is not None:
+            k, v = stripped.split("=", 1)
+            key = k.strip()
+            if key:
+                sections[current_section][key] = v.strip()
+    return sections
+
+
+def _write_ini_sections(sections: dict[str, dict[str, str]]) -> str:
+    """Serialize sections dict back to INI string with proper section headers."""
+    lines = []
+    for sec_name, settings in sections.items():
+        lines.append(f"[{sec_name}]")
+        for key in sorted(settings):
+            lines.append(f"{key} = {settings[key]}")
+        lines.append("")
+    return "\n".join(lines)
+
+
 def _parse_ini_settings(content: str) -> dict[str, str]:
-    """Parse INI content into flat key=value dict (ignoring section headers)."""
+    """Parse INI content into flat key=value dict (ignoring section headers).
+
+    Kept for backward compatibility with generate_prusa_config() which
+    generates flat key=value configs for preset storage.
+    """
     settings: dict[str, str] = {}
     for line in content.split("\n"):
         line = line.strip()
@@ -128,7 +167,7 @@ def generate_slice_config(
     Merges: printer profile (or system default) → user preset → quote parameters.
     Returns path to temporary INI file.
     """
-    # Load base config: printer profile > system default
+    # ── Load and parse base config with section awareness ──
     ini_content = ""
     if printer_profile_path and os.path.exists(printer_profile_path):
         with open(printer_profile_path, "r", encoding="utf-8") as f:
@@ -139,37 +178,54 @@ def generate_slice_config(
         except Exception:
             ini_content = ""
 
-    settings = _parse_ini_settings(ini_content)
+    sections = _parse_ini_sections(ini_content)
 
-    # Apply user preset overrides (if provided and is valid INI content)
+    # ── Apply user preset overrides (section-aware merge) ──
     if slicer_preset and isinstance(slicer_preset, dict) and slicer_preset.get("content"):
         raw = slicer_preset["content"]
         if isinstance(raw, str):
             raw = raw.encode("utf-8")
         first_byte = raw[:1] if raw else b""
         if first_byte not in (b"{", b"[") and b"=" in raw:
-            preset_settings = _parse_ini_settings(raw.decode("utf-8", errors="replace"))
-            settings.update(preset_settings)
+            preset_sections = _parse_ini_sections(raw.decode("utf-8", errors="replace"))
+            for sec_name, sec_settings in preset_sections.items():
+                sections.setdefault(sec_name, {}).update(sec_settings)
 
-    # Apply quote parameter overrides (these always win)
-    settings["layer_height"] = str(layer_height)
-    settings["first_layer_height"] = str(round(min(layer_height * 1.75, 0.35), 2))
-    settings["fill_density"] = f"{infill_percent}%"
-    settings["perimeters"] = str(perimeters)
-    settings["wall_loops"] = str(perimeters)
-    settings["top_shell_layers"] = str(max(3, min(perimeters + 2, 10)))
-    settings["bottom_shell_layers"] = str(max(3, min(perimeters + 2, 10)))
-    settings["filament_density"] = str(material_density)
+    # ── Apply quote parameter overrides into the print section ──
+    print_section = None
+    for sec_name in sections:
+        if sec_name.startswith("print:"):
+            print_section = sec_name
+            break
+    if print_section is None:
+        print_section = "print:custom"
+        sections[print_section] = {}
 
-    # Write temp config file
+    ps = sections[print_section]
+    ps["layer_height"] = str(layer_height)
+    ps["first_layer_height"] = str(round(min(layer_height * 1.75, 0.35), 2))
+    ps["fill_density"] = f"{infill_percent}%"
+    ps["sparse_infill_density"] = f"{infill_percent}%"
+    ps["perimeters"] = str(perimeters)
+    ps["wall_loops"] = str(perimeters)
+    ps["top_shell_layers"] = str(max(3, min(perimeters + 2, 10)))
+    ps["bottom_shell_layers"] = str(max(3, min(perimeters + 2, 10)))
+
+    # ── Apply filament density into the filament section ──
+    for sec_name in sections:
+        if sec_name.startswith("filament:"):
+            sections[sec_name]["filament_density"] = str(material_density)
+            break
+
+    # ── Write temp config with proper section headers ──
     fd, path = tempfile.mkstemp(suffix=".ini", prefix="prc3d_")
     with os.fdopen(fd, "w") as f:
         f.write("; Generated by pricer3d — combined slice config\n")
         f.write(f"; layer_height={layer_height} infill={infill_percent}% perimeters={perimeters} density={material_density}\n\n")
-        for key in sorted(settings):
-            f.write(f"{key} = {settings[key]}\n")
+        f.write(_write_ini_sections(sections))
 
-    logger.info(f"PrusaSlicer config: {len(settings)} settings → {path}")
+    total_settings = sum(len(s) for s in sections.values())
+    logger.info(f"PrusaSlicer config: {len(sections)} sections, {total_settings} settings → {path}")
     return path
 
 
