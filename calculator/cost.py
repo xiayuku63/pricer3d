@@ -339,7 +339,7 @@ def calculate_cost(
                         _printer_profile = os.path.join(os.path.dirname(os.path.dirname(__file__)), pm["profile"])
                         break
             base_name = os.path.splitext(os.path.basename(model_path))[0]
-            output_prefix = _sanitize_filename_component(base_name, fallback="model", max_len=60)
+            output_prefix = _sanitize_filename_component(base_name, fallback="model", max_len=40)
             user_folder = f"user_{current_user['id']}_{current_user['username']}" if current_user else "anonymous"
             outputs_job_dir = os.path.join(_user_base_dir(), user_folder, "outputs", _date_folder_utc(), output_prefix)
             os.makedirs(outputs_job_dir, exist_ok=True)
@@ -519,9 +519,9 @@ async def process_single_file(
     try:
         safe_original = os.path.basename(filename)
         original_stem = os.path.splitext(safe_original)[0]
-        safe_stem = _sanitize_filename_component(original_stem, fallback="model", max_len=80)
-        job_id = uuid.uuid4().hex
-        
+        safe_stem = _sanitize_filename_component(original_stem, fallback="model", max_len=40)
+        job_id = uuid.uuid4().hex[:8]
+
         user_folder = f"user_{current_user['id']}_{current_user['username']}" if current_user else "anonymous"
         uploads_day_dir = os.path.join(_user_base_dir(), user_folder, "uploads", _date_folder_utc(), f"{job_id}_{safe_stem}")
         os.makedirs(uploads_day_dir, exist_ok=True)
