@@ -176,6 +176,12 @@ export function renderResultsTable() {
                     : (prusaError ? `<div class="text-[10px] text-amber-700">PrusaSlicer失败：${prusaError}</div>` : ''))
                 : '';
 
+            // G-code 分析详情
+            const gcode = breakdown?.gcode_summary;
+            const gcodeToggleHtml = gcode
+                ? `<button type="button" data-toggle-gcode="${escapeHtml(item.filename)}" class="text-[10px] text-indigo-500 hover:text-indigo-700 underline ml-1">📊详情</button>`
+                : '';
+
             let markupPercent = Number(item.difficulty_markup_percent);
             if (!Number.isFinite(markupPercent)) {
                 const multiplierRaw = Number(item.difficulty_multiplier);
@@ -215,7 +221,7 @@ export function renderResultsTable() {
                 <td class="px-2 py-1.5">${formatTimeHMS(item.estimated_time_h)}</td>
                 <td class="px-2 py-1.5">¥ ${item.unit_cost_cny}</td>
                 <td class="px-2 py-1.5">¥ ${item.cost_cny}</td>
-                <td data-role="status-cell" class="px-2 py-1.5 text-green-600"><div>成功</div>${prusaExtraHtml}</td>
+                <td data-role="status-cell" class="px-2 py-1.5 text-green-600"><div>成功</div>${prusaExtraHtml}${gcodeToggleHtml}</td>
                 <td class="px-2 py-1.5 space-x-1"><button type="button" data-delete-file="${item.filename}" class="text-[11px] text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 rounded px-2 py-0.5">删除</button></td>
             `;
         } else {
@@ -241,8 +247,80 @@ export function renderResultsTable() {
             `;
         }
         tbody.appendChild(tr);
+
+        // ── G-code 详情展开行 ──
+        const gcodeData = item.status === 'success' && item.cost_breakdown?.gcode_summary;
+        if (gcodeData) {
+            const detailTr = document.createElement('tr');
+            detailTr.className = 'border-t border-gray-100 bg-gray-50';
+            detailTr.setAttribute('data-gcode-detail', item.filename);
+            detailTr.style.display = 'none';
+            detailTr.innerHTML = _buildGcodeDetailHtml(gcodeData);
+            tbody.appendChild(detailTr);
+        }
     });
 }
+
+// ── G-code 详情构建 ──
+const _TYPE_CN = {
+    'Custom': '自定义G-code', 'Skirt/Brim': '裙边/底边', 'Perimeter': '内墙',
+    'External perimeter': '外墙', 'Solid infill': '实心填充',
+    'Internal infill': '内部填充', 'Bridge infill': '桥接填充',
+    'Top solid infill': '顶部实心填充', 'Gap fill': '间隙填充',
+    'Overhang perimeter': '悬垂外墙', 'Support material': '支撑材料',
+    'Support material interface': '支撑接触面',
+};
+
+function _buildGcodeDetailHtml(gcode) {
+    const cn = (t) => _TYPE_CN[t] || t;
+    let html = '<td colspan="13" class="px-3 py-2"><div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px]">';
+
+    // 总层数
+    html += `<div><span class="text-gray-400">总层数</span> <span class="font-semibold">${gcode.layer_count}</span></div>`;
+
+    // 喷嘴
+    if (gcode.nozzle_diameter) {
+        html += `<div><span class="text-gray-400">喷嘴</span> <span class="font-semibold">${gcode.nozzle_diameter} mm</span></div>`;
+    }
+
+    // 层高分布
+    if (gcode.heights && gcode.heights.length) {
+        const hParts = gcode.heights.map(h => `${h.height.toFixed(3)}mm×${h.count}`).join(', ');
+        html += `<div class="col-span-2"><span class="text-gray-400">层高分布</span> <span>${hParts}</span></div>`;
+    }
+
+    // 耗材
+    if (gcode.filament_mm != null) {
+        html += `<div><span class="text-gray-400">耗材线长</span> <span class="font-semibold">${(gcode.filament_mm / 1000).toFixed(2)} m</span></div>`;
+    }
+    if (gcode.filament_g != null && gcode.filament_g > 0) {
+        html += `<div><span class="text-gray-400">耗材重量</span> <span class="font-semibold">${gcode.filament_g.toFixed(2)} g</span></div>`;
+    }
+    if (gcode.time_display) {
+        html += `<div><span class="text-gray-400">预估时间</span> <span class="font-semibold">${gcode.time_display}</span></div>`;
+    }
+
+    // 特征类型统计
+    if (gcode.types && gcode.types.length) {
+        html += '<div class="col-span-2 md:col-span-4 mt-1"><span class="text-gray-400">特征类型: </span>';
+        const tParts = gcode.types.map(t => `${cn(t.type)}×${t.count}`);
+        html += tParts.join(' &nbsp;|&nbsp; ');
+        html += '</div>';
+    }
+
+    // 挤出宽度
+    if (gcode.widths && Object.keys(gcode.widths).length) {
+        html += '<div class="col-span-2 md:col-span-4"><span class="text-gray-400">挤出宽度: </span>';
+        const wParts = Object.entries(gcode.widths).map(([t, w]) => `${cn(t)} ${w}mm`);
+        html += wParts.join(' &nbsp;|&nbsp; ');
+        html += '</div>';
+    }
+
+    html += '</div></td>';
+    return html;
+}
+
+// ── G-code 详情切换事件委托 ──
 
 // ── Batch edit bar ──
 export function refreshBatchMaterialDropdown() {

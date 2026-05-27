@@ -287,6 +287,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // ── Global: G-code 详情展开/收起 ──
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-toggle-gcode]');
+        if (!btn) return;
+        e.stopPropagation();
+        const filename = btn.getAttribute('data-toggle-gcode');
+        const detailRow = document.querySelector(`tr[data-gcode-detail="${CSS.escape(filename)}"]`);
+        if (!detailRow) return;
+        const hidden = detailRow.style.display === 'none';
+        detailRow.style.display = hidden ? '' : 'none';
+        btn.textContent = hidden ? '📊收起' : '📊详情';
+    });
+
     // Options modal — color dropdown
     if (dom.optMaterial) dom.optMaterial.addEventListener('change', () => {
         const rendered = renderColorDropdown(dom.optMaterial.value, quoteOptions.color);

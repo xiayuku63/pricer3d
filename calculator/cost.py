@@ -312,6 +312,7 @@ def calculate_cost(
     slicer_error_msg = None
     prusaslicer_used = False
     support_weight_g_per_part = 0.0
+    output_gcode = None  # for gcode analysis later
 
     # ---- PrusaSlicer (preferred: no display needed) ----
     if use_prusaslicer and model_path and os.path.exists(model_path):
@@ -471,12 +472,62 @@ def calculate_cost(
         **({k: v for k, v in orientation_info.items()} if orientation_info else {}),
     }
 
+    # ── G-code 分析（切片完成后自动解析）──
+    gcode_summary = None
+    if prusaslicer_used and output_gcode and os.path.exists(output_gcode):
+        try:
+            import importlib.util
+            _ga_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "tools", "gcode_analyzer.py")
+            _ga_spec = importlib.util.spec_from_file_location("gcode_analyzer", _ga_path)
+            _ga = importlib.util.module_from_spec(_ga_spec)
+            _ga_spec.loader.exec_module(_ga)
+            parsed = _ga.parse_gcode(output_gcode)
+            if "error" not in parsed:
+                heights = parsed.get("heights", {})
+                type_counts = parsed.get("type_counts", {})
+                fil = parsed.get("filament", {})
+                t = parsed.get("time", {})
+                settings = parsed.get("settings", {})
+
+                # 层高分布 Top 3
+                top_heights = sorted(heights.items(), key=lambda x: -x[1])[:3]
+                height_bars = [{"height": float(h), "count": c} for h, c in top_heights]
+
+                # 特征类型统计 Top 5
+                top_types = sorted(type_counts.items(), key=lambda x: -x[1])[:5]
+                type_list = [{"type": t, "count": c} for t, c in top_types]
+
+                # 挤出宽度摘要（按类型）
+                widths_by_type = parsed.get("widths_by_type", {})
+                width_summary = {}
+                for tp, wset in widths_by_type.items():
+                    ws = sorted(wset, key=float)
+                    if ws:
+                        width_summary[tp] = ws[0] if len(ws) == 1 else f"{ws[0]}~{ws[-1]}"
+
+                gcode_summary = {
+                    "layer_count": parsed.get("layer_count", 0),
+                    "heights": height_bars,
+                    "types": type_list,
+                    "widths": width_summary,
+                    "filament_mm": round(fil.get("filament_mm", 0), 2) if fil.get("filament_mm") else None,
+                    "filament_cm3": round(fil.get("filament_cm3", 0), 2) if fil.get("filament_cm3") else None,
+                    "filament_g": round(fil.get("filament_g", 0), 2) if fil.get("filament_g") else None,
+                    "time_display": t.get("display"),
+                    "nozzle_diameter": settings.get("nozzle_diameter"),
+                }
+        except Exception as e:
+            logger.warning(f"G-code analysis skipped: {e}")
+
     # Cleanup temp oriented model
     if _oriented_tmp_path and os.path.exists(_oriented_tmp_path):
         try:
             os.unlink(_oriented_tmp_path)
         except OSError:
             pass
+
+    if gcode_summary:
+        breakdown["gcode_summary"] = gcode_summary
 
     return round(unit_cost, 2), round(model_weight_g, 2), round(unit_time_h, 3), round(total, 2), round(effective_weight_g, 2), round(total_time_h, 3), breakdown
 
