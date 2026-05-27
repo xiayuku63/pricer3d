@@ -9,6 +9,7 @@ import { openLoginModal } from './auth.js';
 import { reQuoteAllSelectedFiles } from './quote.js';
 
 let dom = {};
+let _printerModels = [];  // cached printer list from API
 
 export function initPresets(d) { dom = d; }
 
@@ -62,7 +63,7 @@ export function renderSlicerPresetsUI() {
 }
 
 export function preloadPrinterSelectors() {
-    for (const selId of ["cfg-printer-model-main"]) {
+    for (const selId of ["cfg-printer-model-main", "gen-printer-model"]) {
         const sel = document.getElementById(selId);
         if (!sel) continue;
         sel.innerHTML = "";
@@ -73,20 +74,50 @@ export async function fetchPrinterModels() {
     const resp = await authFetch("/api/slicer/printers");
     if (!resp.ok) return;
     const data = await resp.json();
-    const printers = data.items || [];
+    _printerModels = data.items || [];
+
+    // Populate "打印机机型" tab selector (with bed dimensions)
     for (const selId of ["cfg-printer-model-main"]) {
         const sel = document.getElementById(selId);
         if (!sel) continue;
         let hasSelection = false;
         sel.innerHTML = "<option value=\"\">请选择打印机...</option>";
-        printers.forEach(p => {
+        _printerModels.forEach(p => {
             const opt = document.createElement("option");
             opt.value = p.id;
             opt.textContent = p.name + " (\u2009"+p.bed_width+"x"+p.bed_depth+"x"+p.bed_height+" mm)";
             if (sel.value) hasSelection = true;
             sel.appendChild(opt);
         });
-        if (!hasSelection && printers.length > 0) sel.value = printers[0].id;
+        if (!hasSelection && _printerModels.length > 0) sel.value = _printerModels[0].id;
+    }
+
+    // Populate preset form printer selector (name only, nozzle is in the name)
+    const genSel = document.getElementById("gen-printer-model");
+    if (genSel) {
+        genSel.innerHTML = "<option value=\"\">请选择打印机...</option>";
+        _printerModels.forEach(p => {
+            const opt = document.createElement("option");
+            opt.value = p.id;
+            opt.textContent = p.name;
+            genSel.appendChild(opt);
+        });
+        if (_printerModels.length > 0) genSel.value = _printerModels[0].id;
+    }
+
+    // Auto-fill nozzle when printer changes in preset form
+    if (genSel && dom.genNozzleSize) {
+        genSel.onchange = () => {
+            const printer = _printerModels.find(p => p.id === genSel.value);
+            if (printer) {
+                dom.genNozzleSize.value = String(printer.nozzle);
+            }
+        };
+        // Trigger initial nozzle fill
+        const printer = _printerModels.find(p => p.id === genSel.value);
+        if (printer) {
+            dom.genNozzleSize.value = String(printer.nozzle);
+        }
     }
 }
 
@@ -141,21 +172,23 @@ export async function uploadSlicerPreset() {
 }
 
 export async function generateSlicerPreset() {
-    const { genPresetName, genNozzleSize, genInfill, genWallCount } = dom;
+    const { genPresetName, genPrinterModel, genNozzleSize, genInfill, genWallCount } = dom;
     if (!authToken) { openLoginModal(); return; }
     const name = genPresetName ? String(genPresetName.value || "").trim() : "";
     if (!name) { setMsg('请输入预设名称', false); return; }
     const existingNames = Array.from(document.querySelectorAll("#slicer-presets-tbody tr td:nth-child(2)")).map(td => td.textContent.trim());
     if (existingNames.includes(name)) { setMsg('名称「' + name + '」已存在，请修改后保存', false); return; }
-    const pmSelect = document.getElementById("cfg-printer-model-main");
-    let bed_width = 256, bed_depth = 256, bed_height = 256;
-    if (pmSelect && pmSelect.value) {
-        const opt = pmSelect.selectedOptions[0];
-        const m = opt.textContent.match(/\((\d+)x(\d+)x(\d+)/);
-        if (m) { bed_width = Number(m[1]); bed_depth = Number(m[2]); bed_height = Number(m[3]); }
-        else { setMsg('请先选择打印机型号', false); return; }
-    } else { setMsg('请先选择打印机型号', false); return; }
-    const nozzle_size = Number(genNozzleSize?.value) || 0.4;
+
+    // Get printer from the preset form's own selector
+    const printerId = genPrinterModel?.value;
+    if (!printerId) { setMsg('请先选择打印机型号', false); return; }
+    const printer = _printerModels.find(p => p.id === printerId);
+    if (!printer) { setMsg('未找到打印机数据，请刷新后重试', false); return; }
+
+    const bed_width = printer.bed_width;
+    const bed_depth = printer.bed_depth;
+    const bed_height = printer.bed_height;
+    const nozzle_size = Number(genNozzleSize?.value) || printer.nozzle || 0.4;
     const infill = Number(genInfill?.value) || 15;
     const wall_count = Number(genWallCount?.value) || 3;
     const payload = { name, bed_width, bed_depth, bed_height, nozzle_size, infill, wall_count };

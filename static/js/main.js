@@ -133,8 +133,8 @@ document.addEventListener('DOMContentLoaded', () => {
         slicerPresetFileInput: $('slicer-preset-file'), slicerPresetUploadBtn: $('slicer-preset-upload-btn'),
         slicerPresetsRefreshBtn: $('slicer-presets-refresh-btn'), slicerPresetsMsg: $('slicer-presets-msg'),
         slicerPresetsTbody: $('slicer-presets-tbody'), cfgSlicerPresetId: $('cfg-slicer-preset-id'),
-        genPresetName: $('gen-preset-name'), genBedWidth: $('gen-bed-width'), genBedDepth: $('gen-bed-depth'),
-        genBedHeight: $('gen-bed-height'), genNozzleSize: $('gen-nozzle-size'),
+        genPresetName: $('gen-preset-name'), genPrinterModel: $('gen-printer-model'),
+        genNozzleSize: $('gen-nozzle-size'),
         genInfill: $('gen-infill'), genWallCount: $('gen-wall-count'),
         slicerPresetGenerateBtn: $('slicer-preset-generate-btn'),
 
