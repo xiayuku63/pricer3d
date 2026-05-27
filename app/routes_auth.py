@@ -5,6 +5,8 @@ import secrets
 import logging
 from typing import Optional, List
 
+logger = logging.getLogger(__name__)
+
 from fastapi import Request, Depends, HTTPException
 from fastapi.responses import JSONResponse, Response
 
@@ -107,18 +109,25 @@ async def send_verify_code(payload: VerifySendRequest, request: Request):
         raise HTTPException(status_code=429, detail="请求过于频繁，请稍后再试")
     code, row_id = create_verification_code(channel=channel, target=target)
     if channel == "email":
-        if IS_PRODUCTION and not is_smtp_configured():
-            delete_verification_code_row(row_id)
-            raise HTTPException(status_code=500, detail="邮件服务未配置，暂无法发送邮箱验证码")
-        try:
-            if is_smtp_configured():
-                send_email_verification_code(target, code)
-        except Exception as e:
+        if not is_smtp_configured():
             if IS_PRODUCTION:
                 delete_verification_code_row(row_id)
-                raise HTTPException(status_code=500, detail="邮箱验证码发送失败，请稍后重试")
+                raise HTTPException(status_code=500, detail="邮件服务未配置，暂无法发送邮箱验证码")
+            # dev: SMTP 未配置，返回 dev_code 供开发使用
+            resp = {"status": "sent", "channel": channel, "target": target, "expires_in": VERIFY_CODE_TTL_SECONDS, "email_warning": "SMTP 未配置，邮件不会真实发送"}
+            if SHOW_DEV_CODES:
+                resp["dev_code"] = code
+            return resp
+        try:
+            send_email_verification_code(target, code)
+        except Exception as e:
+            err_msg = str(e) or type(e).__name__
+            logger.warning(f"Email verification send failed to {mask_email(target)}: {err_msg}")
+            if IS_PRODUCTION:
+                delete_verification_code_row(row_id)
+                raise HTTPException(status_code=500, detail=f"邮箱验证码发送失败：{err_msg}")
             # dev: 继续返回 dev_code，不阻塞流程
-            resp = {"status": "sent", "channel": channel, "target": target, "expires_in": VERIFY_CODE_TTL_SECONDS, "email_warning": str(e)}
+            resp = {"status": "sent", "channel": channel, "target": target, "expires_in": VERIFY_CODE_TTL_SECONDS, "email_warning": err_msg}
             if SHOW_DEV_CODES:
                 resp["dev_code"] = code
             return resp
