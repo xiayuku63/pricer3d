@@ -204,14 +204,26 @@ def generate_slice_config(
         sections[print_section] = {}
 
     ps = sections[print_section]
-    ps["layer_height"] = str(layer_height)
-    ps["first_layer_height"] = str(round(min(layer_height * 1.75, 0.35), 2))
-    ps["fill_density"] = f"{infill_percent}%"
-    ps["sparse_infill_density"] = f"{infill_percent}%"
-    ps["perimeters"] = str(perimeters)
-    ps["wall_loops"] = str(perimeters)
-    ps["top_shell_layers"] = str(top_shell_layers) if top_shell_layers is not None else str(max(3, min(perimeters + 2, 10)))
-    ps["bottom_shell_layers"] = str(bottom_shell_layers) if bottom_shell_layers is not None else str(max(3, min(perimeters + 2, 10)))
+
+    # When a user preset is active, the preset defines slicing parameters —
+    # do NOT override them with quote form defaults. Only override when
+    # no preset is selected (or using system default).
+    _is_user_preset = (
+        slicer_preset is not None
+        and isinstance(slicer_preset, dict)
+        and slicer_preset.get("content")
+        and not slicer_preset.get("is_default")
+    )
+
+    if not _is_user_preset:
+        ps["layer_height"] = str(layer_height)
+        ps["first_layer_height"] = str(round(min(layer_height * 1.75, 0.35), 2))
+        ps["fill_density"] = f"{infill_percent}%"
+        ps["sparse_infill_density"] = f"{infill_percent}%"
+        ps["perimeters"] = str(perimeters)
+        ps["wall_loops"] = str(perimeters)
+        ps["top_shell_layers"] = str(top_shell_layers) if top_shell_layers is not None else str(max(3, min(perimeters + 2, 10)))
+        ps["bottom_shell_layers"] = str(bottom_shell_layers) if bottom_shell_layers is not None else str(max(3, min(perimeters + 2, 10)))
 
     # ── Apply filament density into the filament section ──
     for sec_name in sections:

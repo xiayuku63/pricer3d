@@ -76,7 +76,7 @@ def create_app() -> FastAPI:
     )
     from .routes_user import get_user_settings, update_user_settings, change_password
     from .routes_slicer import (
-        api_list_slicer_presets, api_generate_slicer_preset, api_upsert_slicer_preset,
+        api_list_slicer_presets, api_get_slicer_preset, api_generate_slicer_preset, api_upsert_slicer_preset,
         api_download_slicer_preset, api_delete_slicer_preset, api_list_printers,
     )
     from .routes_admin import (
@@ -117,6 +117,7 @@ def create_app() -> FastAPI:
 
     # slicer
     app.get("/api/slicer/presets")(api_list_slicer_presets)
+    app.get("/api/slicer/presets/{preset_id}")(api_get_slicer_preset)
     app.post("/api/slicer/presets/generate")(api_generate_slicer_preset)
     app.post("/api/slicer/presets")(api_upsert_slicer_preset)
     app.get("/api/slicer/presets/{preset_id}/download")(api_download_slicer_preset)

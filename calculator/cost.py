@@ -228,6 +228,8 @@ def calculate_cost(
     perimeters: Optional[int] = None,
     current_user: Optional[dict] = None,
     auto_orient: bool = False,
+    top_shell_layers: Optional[int] = None,
+    bottom_shell_layers: Optional[int] = None,
 ):
     from app.utils import normalize_materials, _sanitize_filename_component, _user_base_dir, _date_folder_utc
     from app.config import DEFAULT_MATERIALS
@@ -616,6 +618,8 @@ async def process_single_file(
             perimeters=perimeters,
             current_user=current_user,
             auto_orient=auto_orient,
+            top_shell_layers=top_shell_layers,
+            bottom_shell_layers=bottom_shell_layers,
         )
         total_weight = round(model_weight_g * quantity, 2)
         try:

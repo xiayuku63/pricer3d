@@ -40,6 +40,66 @@ class SlicerPresetGenerateRequest(BaseModel):
     brim_width: Optional[int] = Field(default=None, ge=0, le=20, description="底边宽度(mm)")
 
 
+async def api_get_slicer_preset(preset_id: int, current_user=Depends(get_current_user)):
+    """Return a single preset with parsed parameters for form editing."""
+    from .slicer_presets import get_slicer_preset_by_id, SYSTEM_SLICER_PRESET_ID
+    try:
+        if preset_id == SYSTEM_SLICER_PRESET_ID:
+            sys_preset = get_system_slicer_preset()
+            params = _parse_ini_params(sys_preset["content"].decode("utf-8", errors="replace"))
+            return {"preset": {**sys_preset, "content": None, "params": params}}
+
+        preset = get_slicer_preset_by_id(int(current_user["id"]), int(preset_id))
+        if not preset:
+            raise HTTPException(status_code=404, detail="预设不存在或无权限")
+
+        content_str = preset["content"].decode("utf-8", errors="replace") if preset.get("content") else ""
+        params = _parse_ini_params(content_str)
+        return {"preset": {**preset, "content": None, "params": params}}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"获取切片预设详情失败: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"INTERNAL_ERROR: 获取预设失败 ({str(e)})")
+
+
+def _parse_ini_params(content: str) -> dict:
+    """Parse PrusaSlicer INI content and extract key parameters for form editing."""
+    params: dict = {
+        "layer_height": 0.2,
+        "fill_density": 20,
+        "perimeters": 3,
+        "top_shell_layers": 5,
+        "bottom_shell_layers": 5,
+        "brim_width": 0,
+    }
+    for line in content.split("\n"):
+        line = line.strip()
+        if not line or line.startswith(";") or line.startswith("#") or line.startswith("["):
+            continue
+        if "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        key = k.strip()
+        val = v.strip().rstrip("%")
+        try:
+            if key == "layer_height":
+                params["layer_height"] = float(val)
+            elif key == "fill_density":
+                params["fill_density"] = int(float(val))
+            elif key == "perimeters":
+                params["perimeters"] = int(val)
+            elif key == "top_shell_layers":
+                params["top_shell_layers"] = int(val)
+            elif key == "bottom_shell_layers":
+                params["bottom_shell_layers"] = int(val)
+            elif key == "brim_width":
+                params["brim_width"] = int(float(val))
+        except (ValueError, TypeError):
+            pass
+    return params
+
+
 async def api_list_slicer_presets(current_user=Depends(get_current_user)):
     try:
         items = list_slicer_presets(int(current_user["id"]))

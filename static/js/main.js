@@ -44,6 +44,7 @@ import {
 import {
     initPresets, preloadPrinterSelectors, fetchPrinterModels, fetchSlicerPresets,
     renderSlicerPresetsUI, uploadSlicerPreset, generateSlicerPreset, deleteSlicerPreset,
+    loadPresetIntoForm, saveCurrentPreset, showSaveAsRow, hideSaveAsRow, saveAsNewPreset,
 } from './modules/presets.js';
 import {
     initMembership, openMembershipModal, closeMembershipModal,
@@ -133,6 +134,10 @@ document.addEventListener('DOMContentLoaded', () => {
         slicerPresetFileInput: $('slicer-preset-file'), slicerPresetUploadBtn: $('slicer-preset-upload-btn'),
         slicerPresetsRefreshBtn: $('slicer-presets-refresh-btn'), slicerPresetsMsg: $('slicer-presets-msg'),
         slicerPresetsTbody: $('slicer-presets-tbody'), cfgSlicerPresetId: $('cfg-slicer-preset-id'),
+        genPresetSelect: $('gen-preset-select'), genPresetSaveBtn: $('gen-preset-save-btn'),
+        genPresetSaveasBtn: $('gen-preset-saveas-btn'),
+        genSaveasRow: $('gen-saveas-row'), genSaveasName: $('gen-saveas-name'),
+        genSaveasConfirmBtn: $('gen-saveas-confirm-btn'), genSaveasCancelBtn: $('gen-saveas-cancel-btn'),
         genPresetName: $('gen-preset-name'), genPrinterModel: $('gen-printer-model'),
         genLayerHeight: $('gen-layer-height'), genInfill: $('gen-infill'),
         genWallCount: $('gen-wall-count'), genTopShells: $('gen-top-shells'),
@@ -223,6 +228,39 @@ document.addEventListener('DOMContentLoaded', () => {
             renderSlicerPresetsUI();
             if (selectedFilesMap.size > 0) await reQuoteAllSelectedFiles('切片预设已变更，重算报价');
         });
+    }
+
+    // ── Slicer preset form: select preset → load params ──
+    if (dom.genPresetSelect) {
+        dom.genPresetSelect.addEventListener('change', async () => {
+            const val = dom.genPresetSelect.value;
+            if (!val) {
+                // "-- 新建 / 未选择 --" → disable save
+                if (dom.genPresetSaveBtn) dom.genPresetSaveBtn.disabled = true;
+                return;
+            }
+            await loadPresetIntoForm(val);
+            // Enable save button when a preset is selected (and not system preset)
+            if (dom.genPresetSaveBtn) dom.genPresetSaveBtn.disabled = false;
+        });
+    }
+
+    // ── Slicer preset form: save button ──
+    if (dom.genPresetSaveBtn) {
+        dom.genPresetSaveBtn.addEventListener('click', saveCurrentPreset);
+    }
+
+    // ── Slicer preset form: save-as button ──
+    if (dom.genPresetSaveasBtn) {
+        dom.genPresetSaveasBtn.addEventListener('click', showSaveAsRow);
+    }
+
+    // ── Slicer preset form: save-as confirm / cancel ──
+    if (dom.genSaveasConfirmBtn) {
+        dom.genSaveasConfirmBtn.addEventListener('click', saveAsNewPreset);
+    }
+    if (dom.genSaveasCancelBtn) {
+        dom.genSaveasCancelBtn.addEventListener('click', hideSaveAsRow);
     }
 
     // ── Global: close color dropdowns on outside click ──
