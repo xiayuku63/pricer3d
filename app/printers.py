@@ -2,6 +2,13 @@
 
 PRINTER_MODELS = [
     {
+        "id": "bambu_a1",
+        "name": "Bambu Lab A1 - 0.4",
+        "bed_width": 256, "bed_depth": 256, "bed_height": 256,
+        "nozzle": 0.4, "icon": "🖨️",
+        "profile": "profiles/prusa/printers/bambu_a1.ini",
+    },
+    {
         "id": "voron_v2_250",
         "name": "Voron V2 (250mm) - 0.4",
         "bed_width": 250, "bed_depth": 250, "bed_height": 250,
@@ -14,12 +21,5 @@ PRINTER_MODELS = [
         "bed_width": 250, "bed_depth": 210, "bed_height": 220,
         "nozzle": 0.4, "icon": "🖨️",
         "profile": "profiles/prusa/printers/prusa_mk4.ini",
-    },
-    {
-        "id": "bambu_a1",
-        "name": "Bambu Lab A1 - 0.4",
-        "bed_width": 256, "bed_depth": 256, "bed_height": 256,
-        "nozzle": 0.4, "icon": "🖨️",
-        "profile": "profiles/prusa/printers/bambu_a1.ini",
     },
 ]
