@@ -296,12 +296,12 @@ function _buildGcodeDetailHtml(gcode) {
     };
 
     add('层高', cp.layer_height, ' mm');
-    add('首层层高', cp.first_layer_height, ' mm');
+    add('初始层高', cp.first_layer_height, ' mm');
     add('喷嘴直径', cp.nozzle_diameter, ' mm');
-    add('墙层数', cp.perimeters, ' 圈');
-    add('填充率', cp.fill_density, '%');
-    add('顶部实心层', cp.top_shell_layers, ' 层');
-    add('底部实心层', cp.bottom_shell_layers, ' 层');
+    add('外墙层数', cp.perimeters);
+    add('填充密度', cp.fill_density, '%');
+    add('顶部外壳层数', cp.top_shell_layers);
+    add('底部外壳层数', cp.bottom_shell_layers);
     add('底边宽度', cp.brim_width, ' mm');
     add('支撑', cp.support_material === '1' ? '是' : '否');
     add('总层数', gcode.layer_count);
