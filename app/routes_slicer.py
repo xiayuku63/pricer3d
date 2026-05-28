@@ -35,9 +35,6 @@ class SlicerPresetGenerateRequest(BaseModel):
     infill: int = Field(20, description="默认填充(%)")
     wall_count: int = Field(3, description="默认墙层数")
     layer_height: Optional[float] = Field(default=None, ge=0.05, le=1.0, description="层高(mm)")
-    top_shell_layers: Optional[int] = Field(default=None, ge=3, le=20, description="顶部实心层数")
-    bottom_shell_layers: Optional[int] = Field(default=None, ge=3, le=20, description="底部实心层数")
-    brim_width: Optional[int] = Field(default=None, ge=0, le=20, description="底边宽度(mm)")
 
 
 async def api_get_slicer_preset(preset_id: int, current_user=Depends(get_current_user)):
@@ -69,9 +66,6 @@ def _parse_ini_params(content: str) -> dict:
         "layer_height": 0.2,
         "fill_density": 20,
         "perimeters": 3,
-        "top_shell_layers": 5,
-        "bottom_shell_layers": 5,
-        "brim_width": 0,
     }
     for line in content.split("\n"):
         line = line.strip()
@@ -89,12 +83,6 @@ def _parse_ini_params(content: str) -> dict:
                 params["fill_density"] = int(float(val))
             elif key == "perimeters":
                 params["perimeters"] = int(val)
-            elif key == "top_shell_layers":
-                params["top_shell_layers"] = int(val)
-            elif key == "bottom_shell_layers":
-                params["bottom_shell_layers"] = int(val)
-            elif key == "brim_width":
-                params["brim_width"] = int(float(val))
         except (ValueError, TypeError):
             pass
     return params
@@ -158,9 +146,6 @@ async def api_generate_slicer_preset(payload: SlicerPresetGenerateRequest, reque
         layer_height=payload.layer_height or 0.2,
         infill_percent=payload.infill,
         perimeters=payload.wall_count,
-        top_shell_layers=payload.top_shell_layers or 5,
-        bottom_shell_layers=payload.bottom_shell_layers or 5,
-        brim_width=payload.brim_width or 0,
     )
     with open(config_path, "r") as f:
         raw = f.read().encode("utf-8")

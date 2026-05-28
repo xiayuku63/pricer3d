@@ -56,13 +56,9 @@ export async function quoteSingleFileWithOptions(file, options) {
     const lhEl = document.getElementById("gen-layer-height");
     const wcEl = document.getElementById("gen-wall-count");
     const ifEl = document.getElementById("gen-infill");
-    const tsEl = document.getElementById("gen-top-shells");
-    const bsEl = document.getElementById("gen-bottom-shells");
     if (lhEl && lhEl.value) formData.append("layer_height", lhEl.value);
     if (wcEl && wcEl.value) formData.append("wall_count", wcEl.value);
     if (ifEl && ifEl.value) formData.append("infill", ifEl.value);
-    if (tsEl && tsEl.value) formData.append("top_shell_layers", tsEl.value);
-    if (bsEl && bsEl.value) formData.append("bottom_shell_layers", bsEl.value);
     formData.append("use_prusaslicer", "true");
     const response = await authFetch('/api/quote', { method: 'POST', body: formData });
     const data = await response.json();
@@ -85,13 +81,9 @@ export async function quoteSelectedFiles(selectedFiles) {
     const lhEl2 = document.getElementById("gen-layer-height");
     const wcEl2 = document.getElementById("gen-wall-count");
     const ifEl2 = document.getElementById("gen-infill");
-    const tsEl2 = document.getElementById("gen-top-shells");
-    const bsEl2 = document.getElementById("gen-bottom-shells");
     if (lhEl2 && lhEl2.value) formData.append("layer_height", lhEl2.value);
     if (wcEl2 && wcEl2.value) formData.append("wall_count", wcEl2.value);
     if (ifEl2 && ifEl2.value) formData.append("infill", ifEl2.value);
-    if (tsEl2 && tsEl2.value) formData.append("top_shell_layers", tsEl2.value);
-    if (bsEl2 && bsEl2.value) formData.append("bottom_shell_layers", bsEl2.value);
     formData.append("use_prusaslicer", "true");
     const response = await authFetch('/api/quote', { method: 'POST', body: formData });
     const data = await response.json();
@@ -300,9 +292,6 @@ function _buildGcodeDetailHtml(gcode) {
     add('喷嘴直径', cp.nozzle_diameter, ' mm');
     add('外墙层数', cp.perimeters);
     add('填充密度', cp.fill_density, '%');
-    add('顶部外壳层数', cp.top_shell_layers);
-    add('底部外壳层数', cp.bottom_shell_layers);
-    add('底边宽度', cp.brim_width, ' mm');
     add('支撑', cp.support_material === '1' ? '是' : '否');
     add('总层数', gcode.layer_count);
 

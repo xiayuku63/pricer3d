@@ -28,7 +28,7 @@
 #   0.7.9 — 配置 Resend API key，邮箱验证正式可用（本地+生产）
 #   0.8.0 — 切片配置/机型配置 Tab 改造：PrusaSlicer 风格面板，新增层高/顶底实心层/底边宽度参数
 0.9.5
-deployed_at: 2026-05-28T22:15+08:00
+deployed_at: 2026-05-28T22:30+08:00
 
 # 0.9.5 — 修复自定义预设参数被表单默认值覆盖：选预设时不再用报价表单参数覆盖 preset 的 print section
 # 0.9.4 — Bambu A1 设为默认打印机；Bambu A1 移到 PRINTER_MODELS 第一位

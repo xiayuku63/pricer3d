@@ -501,12 +501,19 @@ def calculate_cost(
                             return v
                     return None
 
+                def _gs_strip(keys, suffix):
+                    """Get setting and strip trailing suffix (e.g. '%' from fill_density)."""
+                    val = _gs(keys)
+                    if val is not None and isinstance(val, str) and val.endswith(suffix):
+                        val = val[:-len(suffix)]
+                    return val
+
                 core_params = {
                     "layer_height": _gs(["layer_height"]),
                     "first_layer_height": _gs(["first_layer_height"]),
                     "nozzle_diameter": _gs(["nozzle_diameter"]),
                     "perimeters": _gs(["perimeters", "wall_loops"]),
-                    "fill_density": _gs(["fill_density"]),
+                    "fill_density": _gs_strip(["fill_density"], "%"),
                     "top_shell_layers": _gs(["top_shell_layers", "top_solid_layers"]),
                     "bottom_shell_layers": _gs(["bottom_shell_layers", "bottom_solid_layers"]),
                     "brim_width": _gs(["brim_width"]),
@@ -557,8 +564,6 @@ async def process_single_file(
     perimeters: Optional[int] = None,
     current_user: Optional[dict] = None,
     auto_orient: bool = False,
-    top_shell_layers: Optional[int] = None,
-    bottom_shell_layers: Optional[int] = None,
 ):
     from app.config import SUPPORTED_EXTENSIONS, MAX_FILE_SIZE_BYTES
     from app.utils import _sanitize_filename_component, _user_base_dir, _date_folder_utc
@@ -618,8 +623,6 @@ async def process_single_file(
             perimeters=perimeters,
             current_user=current_user,
             auto_orient=auto_orient,
-            top_shell_layers=top_shell_layers,
-            bottom_shell_layers=bottom_shell_layers,
         )
         total_weight = round(model_weight_g * quantity, 2)
         try:

@@ -188,7 +188,7 @@ export async function uploadSlicerPreset() {
 }
 
 export async function generateSlicerPreset() {
-    const { genPresetName, genPrinterModel, genLayerHeight, genInfill, genWallCount, genTopShells, genBottomShells, genBrimWidth, cfgNozzleDiameter } = dom;
+    const { genPresetName, genPrinterModel, genLayerHeight, genInfill, genWallCount, cfgNozzleDiameter } = dom;
     if (!authToken) { openLoginModal(); return; }
     const name = genPresetName ? String(genPresetName.value || "").trim() : "";
     if (!name) { setMsg('请输入预设名称', false); return; }
@@ -209,10 +209,7 @@ export async function generateSlicerPreset() {
     const layer_height = Number(genLayerHeight?.value) || 0.2;
     const infill = Number(genInfill?.value) || 20;
     const wall_count = Number(genWallCount?.value) || 3;
-    const top_shell_layers = Number(genTopShells?.value) || 5;
-    const bottom_shell_layers = Number(genBottomShells?.value) || 5;
-    const brim_width = Number(genBrimWidth?.value) || 0;
-    const payload = { name, bed_width, bed_depth, bed_height, nozzle_size, infill, wall_count, layer_height, top_shell_layers, bottom_shell_layers, brim_width };
+    const payload = { name, bed_width, bed_depth, bed_height, nozzle_size, infill, wall_count, layer_height };
     try {
         const resp = await authFetch('/api/slicer/presets/generate', {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
@@ -266,15 +263,12 @@ export async function loadPresetIntoForm(presetId) {
         if (!preset || !preset.params) throw new Error('预设数据无效');
 
         const p = preset.params;
-        const { genLayerHeight, genInfill, genWallCount, genTopShells, genBottomShells, genBrimWidth } = dom;
+        const { genLayerHeight, genInfill, genWallCount } = dom;
 
         // Map param values to the closest available option in each select
         _setSelectClosest(genLayerHeight, p.layer_height);
         _setSelectClosest(genInfill, p.fill_density);
         _setSelectClosest(genWallCount, p.perimeters);
-        _setSelectClosest(genTopShells, p.top_shell_layers);
-        _setSelectClosest(genBottomShells, p.bottom_shell_layers);
-        _setSelectClosest(genBrimWidth, p.brim_width);
 
         // Hide all undo buttons
         document.querySelectorAll('.preset-undo-btn').forEach(b => b.classList.add('hidden'));
@@ -298,7 +292,7 @@ function _setSelectClosest(sel, targetVal) {
 
 // ── Save current form values back to the selected preset ──
 export async function saveCurrentPreset() {
-    const { genPresetSelect, genPrinterModel, genLayerHeight, genInfill, genWallCount, genTopShells, genBottomShells, genBrimWidth, cfgNozzleDiameter } = dom;
+    const { genPresetSelect, genPrinterModel, genLayerHeight, genInfill, genWallCount, cfgNozzleDiameter } = dom;
     if (!authToken) { openLoginModal(); return; }
 
     const presetId = genPresetSelect?.value;
@@ -328,9 +322,6 @@ export async function saveCurrentPreset() {
         layer_height: Number(genLayerHeight?.value) || 0.2,
         infill: Number(genInfill?.value) || 20,
         wall_count: Number(genWallCount?.value) || 3,
-        top_shell_layers: Number(genTopShells?.value) || 5,
-        bottom_shell_layers: Number(genBottomShells?.value) || 5,
-        brim_width: Number(genBrimWidth?.value) || 0,
     };
 
     try {
@@ -363,7 +354,7 @@ export function hideSaveAsRow() {
 
 // ── Save as new preset ──
 export async function saveAsNewPreset() {
-    const { genSaveasName, genPrinterModel, genLayerHeight, genInfill, genWallCount, genTopShells, genBottomShells, genBrimWidth, cfgNozzleDiameter } = dom;
+    const { genSaveasName, genPrinterModel, genLayerHeight, genInfill, genWallCount, cfgNozzleDiameter } = dom;
     if (!authToken) { openLoginModal(); return; }
 
     const name = genSaveasName ? String(genSaveasName.value || "").trim() : "";
@@ -386,9 +377,6 @@ export async function saveAsNewPreset() {
         layer_height: Number(genLayerHeight?.value) || 0.2,
         infill: Number(genInfill?.value) || 20,
         wall_count: Number(genWallCount?.value) || 3,
-        top_shell_layers: Number(genTopShells?.value) || 5,
-        bottom_shell_layers: Number(genBottomShells?.value) || 5,
-        brim_width: Number(genBrimWidth?.value) || 0,
     };
 
     try {
