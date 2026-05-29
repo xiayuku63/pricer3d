@@ -59,12 +59,15 @@ class UserSettingsUpdate(BaseModel):
     materials: List[MaterialItem] = Field(..., min_length=1, max_length=100)
     colors: Optional[List[str]] = Field(default=None, max_length=100)
     pricing_config: Optional[PricingConfig] = None
+    default_printer_id: Optional[str] = None
+    default_nozzle: Optional[str] = None
+    default_slicer_preset_id: Optional[int] = None
 
 
 async def get_user_settings(current_user=Depends(get_current_user)):
     try:
         with get_db_conn() as conn:
-            row = conn.execute("SELECT materials, colors, pricing_config FROM users WHERE id = ?", (current_user["id"],)).fetchone()
+            row = conn.execute("SELECT materials, colors, pricing_config, default_printer_id, default_nozzle, default_slicer_preset_id FROM users WHERE id = ?", (current_user["id"],)).fetchone()
 
         if not row:
             raise HTTPException(status_code=404, detail="USER_NOT_FOUND: 用户不存在")
@@ -79,7 +82,10 @@ async def get_user_settings(current_user=Depends(get_current_user)):
             for c in m.get("colors", []):
                 if c not in derived_colors:
                     derived_colors.append(c)
-        return {"materials": materials, "colors": derived_colors, "pricing_config": pricing_config}
+        return {"materials": materials, "colors": derived_colors, "pricing_config": pricing_config,
+                "default_printer_id": row["default_printer_id"] or None,
+                "default_nozzle": row["default_nozzle"] or None,
+                "default_slicer_preset_id": int(row["default_slicer_preset_id"]) if row["default_slicer_preset_id"] is not None else None}
     except HTTPException:
         raise
     except Exception as e:
@@ -122,9 +128,11 @@ async def update_user_settings(payload: UserSettingsUpdate, request: Request, cu
         pricing_json = json.dumps(payload.pricing_config.model_dump())
     with get_db_conn() as conn:
         if pricing_json is None:
-            conn.execute("UPDATE users SET materials = ?, colors = ? WHERE id = ?", (materials_json, colors_json, current_user["id"]))
+            conn.execute("UPDATE users SET materials = ?, colors = ?, default_printer_id = ?, default_nozzle = ?, default_slicer_preset_id = ? WHERE id = ?",
+                         (materials_json, colors_json, payload.default_printer_id, payload.default_nozzle, payload.default_slicer_preset_id, current_user["id"]))
         else:
-            conn.execute("UPDATE users SET materials = ?, colors = ?, pricing_config = ? WHERE id = ?", (materials_json, colors_json, pricing_json, current_user["id"]))
+            conn.execute("UPDATE users SET materials = ?, colors = ?, pricing_config = ?, default_printer_id = ?, default_nozzle = ?, default_slicer_preset_id = ? WHERE id = ?",
+                         (materials_json, colors_json, pricing_json, payload.default_printer_id, payload.default_nozzle, payload.default_slicer_preset_id, current_user["id"]))
         conn.commit()
     write_audit_event(
         action="user.settings.update",

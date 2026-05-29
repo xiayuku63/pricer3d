@@ -69,11 +69,14 @@ import {
     initOrientationUI, syncOrientationFromMesh,
     centerModel, resetOrientationHandler, toggleLayFace, submitTraining,
 } from './modules/orientation-ui.js';
+import { initTheme } from './modules/theme.js';
 
 // ═══════════════════════════════════════════════
 //  App entry point
 // ═══════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
+    // Apply theme immediately (before any rendering)
+    initTheme();
     const MAX_FILES = 20;
     const MAX_FILE_SIZE = 100 * 1024 * 1024;
     const ALLOWED_EXTENSIONS = ['.stl', '.stp', '.step', '.obj', '.3mf'];

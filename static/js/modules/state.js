@@ -24,6 +24,14 @@ export const quoteOptions = {
     orientation: { x: 0, y: 0, z: 0 },
 };
 
+// ── User default printer / nozzle / preset (persisted to backend) ──
+export let defaultPrinterId = null;    // e.g. "bambu_a1"
+export let defaultNozzle = null;       // e.g. "0.4"
+export let defaultSlicerPresetId = null;  // e.g. 3
+export function setDefaultPrinterId(v) { defaultPrinterId = v; }
+export function setDefaultNozzle(v) { defaultNozzle = v; }
+export function setDefaultSlicerPresetId(v) { defaultSlicerPresetId = v; }
+
 // ── Collections ──
 export const selectedFilesMap = new Map();
 export const thumbnailMap = new Map();

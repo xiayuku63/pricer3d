@@ -15,11 +15,9 @@ from .utils import _sanitize_filename_component, _user_base_dir
 from .audit import write_audit_event
 from .slicer_presets import (
     list_slicer_presets,
-    get_system_slicer_preset,
     get_slicer_preset_by_id,
     upsert_slicer_preset,
     delete_slicer_preset,
-    SYSTEM_SLICER_PRESET_ID,
 )
 from .auth import get_user_by_id
 
@@ -39,13 +37,8 @@ class SlicerPresetGenerateRequest(BaseModel):
 
 async def api_get_slicer_preset(preset_id: int, current_user=Depends(get_current_user)):
     """Return a single preset with parsed parameters for form editing."""
-    from .slicer_presets import get_slicer_preset_by_id, SYSTEM_SLICER_PRESET_ID
+    from .slicer_presets import get_slicer_preset_by_id
     try:
-        if preset_id == SYSTEM_SLICER_PRESET_ID:
-            sys_preset = get_system_slicer_preset()
-            params = _parse_ini_params(sys_preset["content"].decode("utf-8", errors="replace"))
-            return {"preset": {**sys_preset, "content": None, "params": params}}
-
         preset = get_slicer_preset_by_id(int(current_user["id"]), int(preset_id))
         if not preset:
             raise HTTPException(status_code=404, detail="预设不存在或无权限")
@@ -96,16 +89,6 @@ async def api_list_slicer_presets(current_user=Depends(get_current_user)):
         user_configs_dir = os.path.join(_user_base_dir(), user_folder, "configs")
 
         valid_items = []
-
-        # 系统内置预设
-        sys_preset = get_system_slicer_preset()
-        valid_items.append({
-            "id": 0,
-            "name": sys_preset["name"],
-            "ext": sys_preset["ext"],
-            "created_at": "内置",
-            "is_default": True
-        })
 
         for item in items:
             safe_preset_name = _sanitize_filename_component(item["name"], fallback="preset", max_len=60)

@@ -14,7 +14,7 @@ from .config import DEFAULT_MATERIALS, DEFAULT_PRICING_CONFIG, MAX_FILES_PER_REQ
 from .database import get_db_conn
 from .deps import get_current_user, get_membership_effective
 from .audit import write_audit_event, get_idempotency_key_from_request, try_get_idempotent_response, save_idempotent_response
-from .slicer_presets import get_system_slicer_preset, get_slicer_preset_by_id, SYSTEM_SLICER_PRESET_ID
+from .slicer_presets import get_slicer_preset_by_id
 from calculator.cost import (
     validate_formula_expression,
     FORMULA_ALIAS_TO_CANONICAL,
@@ -92,8 +92,9 @@ async def get_quote(
         slicer_preset = None
         if slicer_preset_id is not None:
             sid = int(slicer_preset_id)
-            if sid == SYSTEM_SLICER_PRESET_ID:
-                slicer_preset = get_system_slicer_preset()
+            # id=0 (formerly system default) → treated as no preset
+            if sid <= 0:
+                slicer_preset = None
             else:
                 slicer_preset = get_slicer_preset_by_id(int(current_user["id"]), sid)
                 if slicer_preset is None:

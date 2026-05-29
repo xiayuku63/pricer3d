@@ -88,6 +88,9 @@ def init_db() -> None:
         _safe_add_column(conn, "users", "privacy_accepted_at", "TEXT")
         _safe_add_column(conn, "users", "terms_version", "TEXT")
         _safe_add_column(conn, "users", "privacy_version", "TEXT")
+        _safe_add_column(conn, "users", "default_printer_id", "TEXT")
+        _safe_add_column(conn, "users", "default_nozzle", "TEXT")
+        _safe_add_column(conn, "users", "default_slicer_preset_id", "INTEGER")
 
         conn.execute(
             """

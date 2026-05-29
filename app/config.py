@@ -78,8 +78,6 @@ SUPPORTED_EXTENSIONS = {".stl", ".stp", ".step", ".obj", ".3mf"}
 MAX_FILES_PER_REQUEST = 20
 MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024
 
-SYSTEM_SLICER_PRESET_ID = 0
-
 DEFAULT_COLORS = [
     {"name": "白色", "hex": "#ffffff"},
     {"name": "黑色", "hex": "#000000"},

@@ -86,6 +86,20 @@ export async function quoteSingleFileWithOptions(file, options) {
 }
 
 export async function quoteSelectedFiles(selectedFiles) {
+    // 上传前检查打印机/喷嘴/切片配置是否已设置
+    var printerEl = document.getElementById('batch-printer-model');
+    var nozzleEl = document.getElementById('batch-nozzle-diameter');
+    var presetEl = document.getElementById('batch-slicer-preset');
+    var missing = [];
+    if (!printerEl || !printerEl.value) missing.push('打印机');
+    if (!nozzleEl || !nozzleEl.value) missing.push('喷嘴直径');
+    if (!presetEl || !presetEl.value) missing.push('切片配置');
+    if (missing.length > 0) {
+        var warningMsg = '⚠️ 未设置：' + missing.join('、') + '。建议先设置后再报价。';
+        if (dom.errorMsg) { dom.errorMsg.textContent = warningMsg; }
+        if (dom.errorContainer) dom.errorContainer.classList.remove('hidden');
+    }
+
     const formData = new FormData();
     selectedFiles.forEach((file) => formData.append("files", file));
     const printerModel = _getActivePrinterModel();

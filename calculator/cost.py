@@ -654,6 +654,26 @@ async def process_single_file(
 
         dimensions_str = f"{dimensions['x']} × {dimensions['y']} × {dimensions['z']} mm"
 
+        # When a user preset was active, the form's layer_height/infill may differ from
+        # what PrusaSlicer actually used. Pull the real values from G-code analysis.
+        actual_layer_height = layer_height
+        actual_infill = infill
+        gcode_summary = (breakdown or {}).get("gcode_summary", {})
+        if gcode_summary and gcode_summary.get("core_params"):
+            cp = gcode_summary["core_params"]
+            try:
+                gh = cp.get("layer_height")
+                if gh is not None:
+                    actual_layer_height = float(gh)
+            except (ValueError, TypeError):
+                pass
+            try:
+                gf = cp.get("fill_density")
+                if gf is not None:
+                    actual_infill = int(float(gf))
+            except (ValueError, TypeError):
+                pass
+
         return {
             "filename": filename,
             "status": "success",
@@ -672,8 +692,8 @@ async def process_single_file(
             "quantity": quantity,
             "color": color,
             "material": material,
-            "layer_height": layer_height,
-            "infill": infill,
+            "layer_height": actual_layer_height,
+            "infill": actual_infill,
             "cost_breakdown": breakdown,
             "effective_weight_g": round(effective_weight_g * quantity, 2)
         }

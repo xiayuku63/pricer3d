@@ -9,6 +9,9 @@ import {
     renderColorDropdown, getColorsForMaterial,
     saveSlicerPresetSelection, loadSlicerPresetSelection,
     selectedFilesMap,
+    defaultPrinterId, setDefaultPrinterId,
+    defaultNozzle, setDefaultNozzle,
+    defaultSlicerPresetId, setDefaultSlicerPresetId,
 } from './state.js';
 import { openLoginModal } from './auth.js';
 import { renderSlicerPresetsUI, fetchSlicerPresets } from './presets.js';
@@ -28,6 +31,9 @@ export async function fetchUserSettings() {
             setMaterialOptions(data.materials || MATERIAL_OPTIONS);
             setColorOptions(data.colors || COLOR_OPTIONS);
             setPricingConfig(data.pricing_config || PRICING_CONFIG);
+            setDefaultPrinterId(data.default_printer_id || null);
+            setDefaultNozzle(data.default_nozzle || null);
+            setDefaultSlicerPresetId(data.default_slicer_preset_id || null);
         }
     } catch (e) { console.error("Failed to fetch user settings", e); }
     updateDropdowns();
@@ -249,7 +255,23 @@ export async function saveUserSettings() {
         const formulaOk = await validateCurrentFormulas();
         if (!formulaOk) return;
         syncPricingFromInputs();
-        const payload = { materials: MATERIAL_OPTIONS, pricing_config: PRICING_CONFIG };
+
+        // Capture user center printer / nozzle / preset as defaults
+        const cfgModel = document.getElementById("cfg-printer-model-main");
+        const cfgNozzle = document.getElementById("cfg-nozzle-diameter");
+        const genPreset = document.getElementById("gen-preset-select");
+        const printerId = (cfgModel && cfgModel.value) ? cfgModel.value : defaultPrinterId;
+        const nozzle = (cfgNozzle && cfgNozzle.value) ? cfgNozzle.value : defaultNozzle;
+        const presetId = (genPreset && genPreset.value) ? Number(genPreset.value) : null;
+        const effectivePresetId = presetId || defaultSlicerPresetId;
+
+        const payload = {
+            materials: MATERIAL_OPTIONS,
+            pricing_config: PRICING_CONFIG,
+            default_printer_id: printerId || null,
+            default_nozzle: nozzle || null,
+            default_slicer_preset_id: effectivePresetId || null,
+        };
         const res = await authFetch('/api/user/settings', {
             method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
         });
@@ -260,6 +282,10 @@ export async function saveUserSettings() {
             throw new Error((data && data.detail) ? String(data.detail) : '保存失败');
         }
         if (userCenterMsg) { userCenterMsg.classList.remove('hidden'); setTimeout(() => userCenterMsg.classList.add('hidden'), 3000); }
+        // Update local defaults so subsequent page loads see them
+        setDefaultPrinterId(printerId || null);
+        setDefaultNozzle(nozzle || null);
+        setDefaultSlicerPresetId(effectivePresetId || null);
         setColorOptions(Array.from(new Set(MATERIAL_OPTIONS.flatMap((m) => Array.isArray(m.colors) ? m.colors : []))));
         updateDropdowns();
         normalizeResultsWithCurrentOptions();

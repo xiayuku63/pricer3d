@@ -32,6 +32,7 @@
         let usernameTimer = null;
         let emailTimer = null;
         let phoneTimer = null;
+        let verifyCodeTimer = null;  // countdown timer for resend button
 
         function apiErrorMsg(data) {
             return data.message || data.detail || '操作失败';
@@ -208,9 +209,35 @@
                 } else {
                     showMsg('验证码已发送，请查收', 'ok');
                 }
+                // Start countdown on the send button
+                var seconds = (data.expires_in && data.expires_in > 0) ? data.expires_in : 600;
+                startVerifyCodeCountdown(channel, seconds);
             } catch (e) {
                 showMsg(e.message || '发送失败', 'error');
             }
+        }
+
+        function startVerifyCodeCountdown(channel, seconds) {
+            var btn = channel === 'email' ? sendEmailBtn : sendPhoneBtn;
+            var origText = btn.textContent;
+            if (verifyCodeTimer) clearInterval(verifyCodeTimer);
+            btn.disabled = true;
+
+            function tick() {
+                if (seconds <= 0) {
+                    clearInterval(verifyCodeTimer);
+                    verifyCodeTimer = null;
+                    btn.disabled = false;
+                    btn.textContent = origText;
+                    return;
+                }
+                var m = Math.floor(seconds / 60);
+                var s = seconds % 60;
+                btn.textContent = m > 0 ? m + '分' + s + '秒后重发' : s + '秒后重发';
+                seconds--;
+            }
+            tick();
+            verifyCodeTimer = setInterval(tick, 1000);
         }
 
         sendEmailBtn.addEventListener('click', () => {

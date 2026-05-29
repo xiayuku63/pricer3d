@@ -5,6 +5,34 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>注册 - 3D打印自动报价系统</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        [data-theme="dark"] body { background-color: #0f172a; }
+        [data-theme="dark"] .bg-white { background-color: #1e293b; }
+        [data-theme="dark"] .bg-gray-50 { background-color: #0f172a; }
+        [data-theme="dark"] .text-gray-900 { color: #f1f5f9; }
+        [data-theme="dark"] .text-gray-700 { color: #cbd5e1; }
+        [data-theme="dark"] .text-gray-600 { color: #94a3b8; }
+        [data-theme="dark"] .text-gray-500 { color: #64748b; }
+        [data-theme="dark"] .border-gray-300 { border-color: #475569; }
+        [data-theme="dark"] .border-gray-200 { border-color: #334155; }
+        [data-theme="dark"] input, [data-theme="dark"] select { background-color: #334155; color: #e2e8f0; border-color: #475569; }
+        [data-theme="dark"] input::placeholder { color: #64748b; }
+        [data-theme="dark"] .hover\:bg-gray-50:hover { background-color: #334155; }
+        [data-theme="dark"] .hover\:bg-indigo-50:hover { background-color: #312e81; }
+        [data-theme="dark"] .text-indigo-600 { color: #818cf8; }
+        [data-theme="dark"] .text-indigo-700 { color: #a5b4fc; }
+        [data-theme="dark"] .text-indigo-500 { color: #6366f1; }
+        [data-theme="dark"] .text-green-600 { color: #4ade80; }
+        [data-theme="dark"] .text-red-600 { color: #f87171; }
+        [data-theme="dark"] .border-indigo-200 { border-color: #4338ca; }
+        body, .bg-white, input, select { transition: background-color 0.3s, color 0.3s, border-color 0.3s; }
+    </style>
+    <script>
+        (() => {
+            const t = localStorage.getItem('pricer3d_theme_v1');
+            if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+        })();
+    </script>
 </head>
 <body class="bg-gray-50 min-h-screen p-4 lg:p-6">
     <div class="max-w-lg mx-auto bg-white rounded-xl shadow-md overflow-hidden">
@@ -77,6 +105,6 @@
         </div>
     </div>
 
-    <script type="module" src="/static/js/register.js"></script>
+    <script type="module" src="/static/js/register.js?v=1"></script>
 </body>
 </html>

@@ -21,6 +21,7 @@ let dom = {};
 // ── Separate captcha state for reset flow ──
 let _resetCaptchaId = '';
 let _resetCaptchaUrl = '';
+let _resetCodeTimer = null;  // countdown timer for resend button
 
 export function initAuth(d) {
     dom = d;
@@ -230,6 +231,29 @@ async function _refreshResetCaptcha() {
     }
 }
 
+// ── Reset code countdown ──
+function _startResetCodeCountdown(btn, seconds) {
+    var origText = btn.textContent;
+    if (_resetCodeTimer) clearInterval(_resetCodeTimer);
+    btn.disabled = true;
+
+    function tick() {
+        if (seconds <= 0) {
+            clearInterval(_resetCodeTimer);
+            _resetCodeTimer = null;
+            btn.disabled = false;
+            btn.textContent = origText;
+            return;
+        }
+        var m = Math.floor(seconds / 60);
+        var s = seconds % 60;
+        btn.textContent = m > 0 ? m + '分' + s + '秒后重发' : s + '秒后重发';
+        seconds--;
+    }
+    tick();
+    _resetCodeTimer = setInterval(tick, 1000);
+}
+
 // ── Modal ──
 let _loginSubmitting = false;
 
@@ -436,6 +460,9 @@ async function handleResetRequest() {
             showResetConfirmView(email);
             _showBannerSuccess('验证码已发送至您的邮箱，请查收');
         }
+        // Start countdown on the send button
+        var seconds = (data.expires_in && data.expires_in > 0) ? data.expires_in : 600;
+        _startResetCodeCountdown(submitBtn, seconds);
     } catch (err) {
         _showBannerError(err.message || '请求失败，请重试');
         _refreshResetCaptcha();
@@ -584,6 +611,8 @@ export async function initializeAuth() {
         saveUserSession();
         loadSlicerPresetSelection();
         await fetchUserSettings();
+        // Re-populate printer dropdowns with user's saved defaults
+        fetchPrinterModels();
     } catch (e) {
         setCurrentUser(null);
         setAuthToken("");

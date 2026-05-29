@@ -5,6 +5,7 @@ import {
     authFetch, saveSlicerPresetSelection, loadSlicerPresetSelection,
     selectedFilesMap, getActivePrinterCompoundId,
     setCachedPrinterModels,
+    defaultPrinterId, defaultNozzle, defaultSlicerPresetId,
 } from './state.js';
 import { openLoginModal } from './auth.js';
 import { reQuoteAllSelectedFiles } from './quote.js';
@@ -30,9 +31,12 @@ export function renderSlicerPresetsUI() {
     // Populate the "当前预设" dropdown in the slicer config form
     if (genPresetSelect) {
         const items = slicerPresets || [];
+        var genCurrentVal = (defaultSlicerPresetId !== null && defaultSlicerPresetId !== undefined
+            && items.some(function(p) { return p.id === defaultSlicerPresetId; }))
+            ? String(defaultSlicerPresetId) : "";
         genPresetSelect.innerHTML = [
             '<option value="">-- 新建 / 未选择 --</option>',
-            ...items.map((p) => `<option value="${p.id}">${p.name || '#' + p.id}</option>`)
+            ...items.map(function(p) { return '<option value="' + p.id + '"' + (String(p.id) === genCurrentVal ? ' selected' : '') + '>' + (p.name || '#' + p.id) + '</option>'; })
         ].join('');
     }
 
@@ -40,10 +44,19 @@ export function renderSlicerPresetsUI() {
     const batchPreset = document.getElementById('batch-slicer-preset');
     if (batchPreset) {
         const items = slicerPresets || [];
-        const currentVal = batchPreset.value;
+        // Use user's saved default preset; if none, default to first saved preset (combinations)
+        var batchCurrentVal;
+        if (defaultSlicerPresetId !== null && defaultSlicerPresetId !== undefined
+            && items.some(function(p) { return p.id === defaultSlicerPresetId; })) {
+            batchCurrentVal = String(defaultSlicerPresetId);
+        } else if (items.length > 0) {
+            batchCurrentVal = String(items[0].id);
+        } else {
+            batchCurrentVal = "";
+        }
         batchPreset.innerHTML = [
             '<option value="">不使用预设</option>',
-            ...items.map((p) => `<option value="${p.id}" ${String(p.id) === String(currentVal) ? 'selected' : ''}>${p.name || '#' + p.id}</option>`)
+            ...items.map(function(p) { return '<option value="' + p.id + '"' + (String(p.id) === String(batchCurrentVal) ? ' selected' : '') + '>' + (p.name || '#' + p.id) + '</option>'; })
         ].join('');
     }
     if (!slicerPresetsTbody) return;
@@ -132,8 +145,8 @@ export async function fetchPrinterModels() {
         const model = visibleModels.find(p => p.id === modelId);
         const nozzles = (model && model.nozzles) ? model.nozzles : [0.4];
         const currentVal = sel.value;
-        sel.innerHTML = nozzles.map(n =>
-            `<option value="${n}" ${String(n) === String(currentVal) ? 'selected' : ''}>${n}</option>`
+        sel.innerHTML = '<option value="">--</option>' + nozzles.map(n =>
+            '<option value="' + n + '" ' + (String(n) === String(currentVal) ? 'selected' : '') + '>' + n + '</option>'
         ).join('');
     }
 
@@ -141,31 +154,59 @@ export async function fetchPrinterModels() {
     for (const selId of ["cfg-printer-model-main"]) {
         const sel = document.getElementById(selId);
         if (!sel) continue;
-        let hasSelection = false;
         sel.innerHTML = "<option value=\"\">请选择打印机...</option>";
-        visibleModels.forEach(p => {
+        visibleModels.forEach(function(p) {
             const opt = document.createElement("option");
             opt.value = p.id;
             opt.textContent = p.name;
-            if (sel.value) hasSelection = true;
             sel.appendChild(opt);
         });
-        if (!hasSelection && visibleModels.length > 0) sel.value = visibleModels[0].id;
+        // Prefer user's saved default; let onchange handler fill nozzle + bed
+        var prefId = defaultPrinterId && visibleModels.some(function(p) { return p.id === defaultPrinterId; })
+            ? defaultPrinterId : (visibleModels.length > 0 ? visibleModels[0].id : "");
+        if (prefId) {
+            sel.value = prefId;
+            // Manually trigger nozzle/bed info for the selected model
+            var printer = visibleModels.find(function(p) { return p.id === prefId; });
+            if (printer) {
+                if (dom.cfgNozzleDiameter) {
+                    dom.cfgNozzleDiameter.value = defaultNozzle && printer.nozzles && printer.nozzles.includes(parseFloat(defaultNozzle))
+                        ? String(defaultNozzle) : String(printer.nozzle);
+                }
+                if (dom.printerBedInfo) {
+                    dom.printerBedInfo.textContent = '热床尺寸：' + printer.bed_width + ' × ' + printer.bed_depth + ' × ' + printer.bed_height + ' mm';
+                }
+            }
+        }
     }
 
     // ── Populate model-page batch printer selector ──
     const batchSel = document.getElementById("batch-printer-model");
     if (batchSel) {
         batchSel.innerHTML = "<option value=\"\">请选择打印机...</option>";
-        visibleModels.forEach(p => {
+        visibleModels.forEach(function(p) {
             const opt = document.createElement("option");
             opt.value = p.id;
             opt.textContent = p.name;
             batchSel.appendChild(opt);
         });
         if (visibleModels.length > 0) {
-            batchSel.value = visibleModels[0].id;
-            _populateNozzleDropdown("batch-nozzle-diameter", visibleModels[0].id);
+            // Prefer user's saved default, else fall back to first visible model
+            var preferredId = defaultPrinterId && visibleModels.some(function(p) { return p.id === defaultPrinterId; })
+                ? defaultPrinterId : visibleModels[0].id;
+            batchSel.value = preferredId;
+            _populateNozzleDropdown("batch-nozzle-diameter", preferredId);
+            // If user has a saved nozzle default, set it after populating
+            if (defaultNozzle) {
+                var batchNozzleEl = document.getElementById("batch-nozzle-diameter");
+                if (batchNozzleEl) {
+                    var nozzleOpts = Array.from(batchNozzleEl.options).map(function(o) { return o.value; });
+                    if (nozzleOpts.indexOf(String(defaultNozzle)) >= 0) {
+                        batchNozzleEl.value = String(defaultNozzle);
+                    }
+                }
+            }
+            _syncBatchPrinter();
         }
     }
 

@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3D打印自动报价系统 DEMO</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class' };
+    </script>
+    <!-- Dark theme injected by JS after Tailwind CDN loads -->
+    <style id="dark-theme" disabled></style>
     <script type="importmap">
         {
             "imports": {
@@ -72,6 +77,7 @@
                             <div class="flex items-center gap-1.5">
                                 <label class="text-[11px] text-gray-600">喷嘴</label>
                                 <select id="batch-nozzle-diameter" class="text-[11px] border border-gray-300 rounded px-2 py-1 bg-white w-[60px]">
+                                    <option value="">--</option>
                                     <option value="0.2">0.2</option><option value="0.4" selected>0.4</option><option value="0.6">0.6</option><option value="0.8">0.8</option>
                                 </select>
                             </div>
@@ -549,6 +555,7 @@
                                         <div>
                                             <label class="block text-xs text-gray-600">喷嘴直径</label>
                                             <select id="cfg-nozzle-diameter" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md text-sm">
+                                                <option value="">-- 请选择 --</option>
                                                 <option value="0.2">0.2 mm</option>
                                                 <option value="0.4" selected>0.4 mm</option>
                                                 <option value="0.6">0.6 mm</option>
@@ -894,6 +901,6 @@
     </div>
 
     <!-- 将表单处理逻辑拆分 -->
-    <script type="module" src="/static/js/main.js?v=22"></script>
+    <script type="module" src="/static/js/main.js?v=26"></script>
 </body>
 </html>
