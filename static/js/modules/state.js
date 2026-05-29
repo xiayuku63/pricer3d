@@ -337,5 +337,20 @@ export function getActivePrinterCompoundId() {
 
 // ── Printer model cache (for per-file dropdowns in results table) ──
 let _cachedPrinterModels = [];
-export function getCachedPrinterModels() { return _cachedPrinterModels; }
 export function setCachedPrinterModels(v) { _cachedPrinterModels = v || []; }
+export function getCachedPrinterModels() {
+    if (!_cachedPrinterModels.length) return [];
+    const hidden = getHiddenPrinters();
+    if (!hidden.length) return _cachedPrinterModels;
+    return _cachedPrinterModels.filter(function(p) { return !hidden.includes(p.id); });
+}
+
+// ── Hidden printers (user-disabled printer models) ──
+export const HIDDEN_PRINTERS_KEY = 'pricer3d_hidden_printers_v1';
+export function getHiddenPrinters() {
+    try { return JSON.parse(localStorage.getItem(HIDDEN_PRINTERS_KEY) || '[]'); }
+    catch (e) { return []; }
+}
+export function setHiddenPrinters(ids) {
+    localStorage.setItem(HIDDEN_PRINTERS_KEY, JSON.stringify(ids));
+}

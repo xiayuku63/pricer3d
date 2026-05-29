@@ -678,7 +678,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // ═══════════════════════════════════════════════
     loadAppVersion();
     preloadPrinterSelectors();
-    fetchPrinterModels();
     window.addEventListener('resize', updateViewerSize);
 
     // Before unload warning

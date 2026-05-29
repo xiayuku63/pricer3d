@@ -601,6 +601,7 @@ export async function initializeAuth() {
     if (!authToken) {
         renderAuthUI();
         updateDropdowns();
+        fetchPrinterModels();
     }
 
     try {
@@ -618,6 +619,7 @@ export async function initializeAuth() {
         setAuthToken("");
         clearUserSession();
         updateDropdowns();
+        fetchPrinterModels();
     }
     renderAuthUI();
 }

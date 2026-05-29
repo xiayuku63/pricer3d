@@ -6,6 +6,7 @@ import {
     selectedFilesMap, getActivePrinterCompoundId,
     setCachedPrinterModels,
     defaultPrinterId, defaultNozzle, defaultSlicerPresetId,
+    getHiddenPrinters, setHiddenPrinters, HIDDEN_PRINTERS_KEY,
 } from './state.js';
 import { openLoginModal } from './auth.js';
 import { reQuoteAllSelectedFiles } from './quote.js';
@@ -127,7 +128,7 @@ export async function fetchPrinterModels() {
     setCachedPrinterModels(_printerModels);
 
     // Filter out hidden printers
-    const hidden = _getHiddenPrinters();
+    const hidden = getHiddenPrinters();
     const visibleModels = hidden.length
         ? _printerModels.filter(p => !hidden.includes(p.id))
         : _printerModels;
@@ -618,22 +619,10 @@ export async function deletePrinterPreset(presetId) {
 }
 
 // ── Printer visibility management (localStorage) ──
-const HIDDEN_PRINTERS_KEY = 'pricer3d_hidden_printers_v1';
-
-function _getHiddenPrinters() {
-    try {
-        return JSON.parse(localStorage.getItem(HIDDEN_PRINTERS_KEY) || '[]');
-    } catch { return []; }
-}
-
-function _setHiddenPrinters(ids) {
-    localStorage.setItem(HIDDEN_PRINTERS_KEY, JSON.stringify(ids));
-}
-
 export function renderPrinterVisibilityList() {
     const container = document.getElementById('printer-visibility-list');
     if (!container || !_printerModels.length) return;
-    const hidden = _getHiddenPrinters();
+    const hidden = getHiddenPrinters();
     container.innerHTML = _printerModels.map(p => {
         const isHidden = hidden.includes(p.id);
         return `<label class="flex items-center gap-2 py-1 px-1 hover:bg-gray-50 rounded cursor-pointer text-xs">
@@ -644,14 +633,14 @@ export function renderPrinterVisibilityList() {
     container.querySelectorAll('.pp-vis-toggle').forEach(cb => {
         cb.addEventListener('change', () => {
             const id = cb.value;
-            const hidden = _getHiddenPrinters();
+            const hidden = getHiddenPrinters();
             if (cb.checked) {
                 const idx = hidden.indexOf(id);
                 if (idx >= 0) hidden.splice(idx, 1);
             } else {
                 if (!hidden.includes(id)) hidden.push(id);
             }
-            _setHiddenPrinters(hidden);
+            setHiddenPrinters(hidden);
             renderPrinterVisibilityList();
             fetchPrinterModels();
         });
@@ -659,7 +648,7 @@ export function renderPrinterVisibilityList() {
 }
 
 export function restoreDefaultPrinters() {
-    _setHiddenPrinters([]);
+    setHiddenPrinters([]);
     renderPrinterVisibilityList();
     fetchPrinterModels();
 }
