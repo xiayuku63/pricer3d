@@ -70,15 +70,14 @@ export async function quoteSingleFileWithOptions(file, options) {
     if (presetId !== null && presetId !== undefined) {
         formData.append("slicer_preset_id", String(presetId));
     }
-    // 发送切片参数（从切片配置面板读取用户设置）— only when no per-file preset
-    if (presetId === null || presetId === undefined) {
-        const lhEl = document.getElementById("gen-layer-height");
-        const wcEl = document.getElementById("gen-wall-count");
-        const ifEl = document.getElementById("gen-infill");
-        if (lhEl && lhEl.value) formData.append("layer_height", lhEl.value);
-        if (wcEl && wcEl.value) formData.append("wall_count", wcEl.value);
-        if (ifEl && ifEl.value) formData.append("infill", ifEl.value);
-    }
+    // 始终发送切片参数（用户面板设置），后端按优先级处理：
+    // 用户预设 → 预设内容优先；系统预设/无预设 → 表单参数覆盖
+    const lhEl = document.getElementById("gen-layer-height");
+    const wcEl = document.getElementById("gen-wall-count");
+    const ifEl = document.getElementById("gen-infill");
+    if (lhEl && lhEl.value) formData.append("layer_height", lhEl.value);
+    if (wcEl && wcEl.value) formData.append("wall_count", wcEl.value);
+    if (ifEl && ifEl.value) formData.append("infill", ifEl.value);
     formData.append("use_prusaslicer", "true");
     const response = await authFetch('/api/quote', { method: 'POST', body: formData });
     const data = await response.json();
