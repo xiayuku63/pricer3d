@@ -222,7 +222,10 @@ def generate_slice_config(
     sections = _parse_ini_sections(ini_content)
 
     # ── Apply user preset overrides ──
-    if slicer_preset and isinstance(slicer_preset, dict) and slicer_preset.get("content"):
+    # System preset (is_default=True) is NOT merged — quote params override it.
+    # Only user-created presets are merged; they take precedence over quote form params.
+    if slicer_preset and isinstance(slicer_preset, dict) and slicer_preset.get("content") \
+            and not slicer_preset.get("is_default"):
         raw = slicer_preset["content"]
         first_byte = raw[:1] if raw else b""
         if first_byte not in (b"{", b"[") and b"=" in raw:
