@@ -48,6 +48,24 @@ def init_db() -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_slicer_presets_user_id ON slicer_presets (user_id)")
         conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS printer_presets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                bed_width REAL NOT NULL DEFAULT 256,
+                bed_depth REAL NOT NULL DEFAULT 256,
+                bed_height REAL NOT NULL DEFAULT 256,
+                nozzle REAL NOT NULL DEFAULT 0.4,
+                nozzles TEXT NOT NULL DEFAULT '[0.4]',
+                profile_b64 TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                UNIQUE(user_id, name)
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_printer_presets_user_id ON printer_presets (user_id)")
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS app_defaults (
                 key TEXT PRIMARY KEY,
                 value_json TEXT NOT NULL,

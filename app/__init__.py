@@ -79,6 +79,10 @@ def create_app() -> FastAPI:
         api_list_slicer_presets, api_get_slicer_preset, api_generate_slicer_preset, api_upsert_slicer_preset,
         api_download_slicer_preset, api_delete_slicer_preset, api_list_printers,
     )
+    from .routes_printer import (
+        api_list_printer_presets, api_get_printer_preset, api_create_printer_preset,
+        api_delete_printer_preset, api_download_printer_profile,
+    )
     from .routes_admin import (
         admin_get_defaults, admin_set_defaults_from_me, admin_list_users,
         admin_update_user_membership, admin_list_audit, admin_metrics, admin_cleanup,
@@ -123,6 +127,13 @@ def create_app() -> FastAPI:
     app.get("/api/slicer/presets/{preset_id}/download")(api_download_slicer_preset)
     app.delete("/api/slicer/presets/{preset_id}")(api_delete_slicer_preset)
     app.get("/api/slicer/printers")(api_list_printers)
+
+    # printer presets
+    app.get("/api/printer/presets")(api_list_printer_presets)
+    app.get("/api/printer/presets/{preset_id}")(api_get_printer_preset)
+    app.post("/api/printer/presets")(api_create_printer_preset)
+    app.delete("/api/printer/presets/{preset_id}")(api_delete_printer_preset)
+    app.get("/api/printer/presets/{preset_id}/download")(api_download_printer_profile)
 
     # admin
     app.get("/api/admin/defaults")(admin_get_defaults)

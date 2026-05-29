@@ -7,6 +7,8 @@ import {
     authFetch, formatColorLabel, formatTimeHMS, escapeHtml,
     renderColorDropdown, getColorsForMaterial,
     colorToObj, isColorInAllowedColors, pickAllowedColor,
+    getActivePrinterCompoundId,
+    getCachedPrinterModels, slicerPresets,
 } from './state.js';
 import { buildPlaceholderThumbnail, ensureThumbnailForFile, buildThumbnails } from './preview.js';
 import { loadQuoteHistory } from './history.js';
@@ -41,24 +43,42 @@ export function recalcSummaryFromCurrentResults() {
 }
 
 // ── Quote API ──
+
+function _getActivePrinterModel() {
+    return getActivePrinterCompoundId();
+}
+
+function _getActiveSlicerPresetId() {
+    // Prefer the model-page batch selector; fall back to quoteOptions
+    const batch = document.getElementById('batch-slicer-preset');
+    if (batch && batch.value) return Number(batch.value);
+    return (quoteOptions.slicer_preset_id !== null && quoteOptions.slicer_preset_id !== undefined)
+        ? quoteOptions.slicer_preset_id : null;
+}
+
 export async function quoteSingleFileWithOptions(file, options) {
     const formData = new FormData();
     formData.append("files", file);
-    const optPrinter = document.getElementById("cfg-printer-model-main");
-    if (optPrinter && optPrinter.value) formData.append("printer_model", optPrinter.value);
+    // Use per-file printer if provided, else global
+    const printerModel = options._printer_model || _getActivePrinterModel();
+    if (printerModel) formData.append("printer_model", printerModel);
     formData.append("material", options.material);
     formData.append("color", options.color);
     formData.append("quantity", String(options.quantity));
-    if (quoteOptions.slicer_preset_id !== null && quoteOptions.slicer_preset_id !== undefined) {
-        formData.append("slicer_preset_id", String(quoteOptions.slicer_preset_id));
+    // Use per-file preset if provided, else global
+    const presetId = options._slicer_preset_id !== undefined ? options._slicer_preset_id : _getActiveSlicerPresetId();
+    if (presetId !== null && presetId !== undefined) {
+        formData.append("slicer_preset_id", String(presetId));
     }
-    // 发送切片参数（从切片配置面板读取用户设置）
-    const lhEl = document.getElementById("gen-layer-height");
-    const wcEl = document.getElementById("gen-wall-count");
-    const ifEl = document.getElementById("gen-infill");
-    if (lhEl && lhEl.value) formData.append("layer_height", lhEl.value);
-    if (wcEl && wcEl.value) formData.append("wall_count", wcEl.value);
-    if (ifEl && ifEl.value) formData.append("infill", ifEl.value);
+    // 发送切片参数（从切片配置面板读取用户设置）— only when no per-file preset
+    if (presetId === null || presetId === undefined) {
+        const lhEl = document.getElementById("gen-layer-height");
+        const wcEl = document.getElementById("gen-wall-count");
+        const ifEl = document.getElementById("gen-infill");
+        if (lhEl && lhEl.value) formData.append("layer_height", lhEl.value);
+        if (wcEl && wcEl.value) formData.append("wall_count", wcEl.value);
+        if (ifEl && ifEl.value) formData.append("infill", ifEl.value);
+    }
     formData.append("use_prusaslicer", "true");
     const response = await authFetch('/api/quote', { method: 'POST', body: formData });
     const data = await response.json();
@@ -69,13 +89,14 @@ export async function quoteSingleFileWithOptions(file, options) {
 export async function quoteSelectedFiles(selectedFiles) {
     const formData = new FormData();
     selectedFiles.forEach((file) => formData.append("files", file));
-    const pmOpt = document.getElementById("cfg-printer-model-main");
-    if (pmOpt && pmOpt.value) formData.append("printer_model", pmOpt.value);
+    const printerModel = _getActivePrinterModel();
+    if (printerModel) formData.append("printer_model", printerModel);
     formData.append("material", quoteOptions.material);
     formData.append("color", quoteOptions.color);
     formData.append("quantity", String(quoteOptions.quantity));
-    if (quoteOptions.slicer_preset_id !== null && quoteOptions.slicer_preset_id !== undefined) {
-        formData.append("slicer_preset_id", String(quoteOptions.slicer_preset_id));
+    const presetId = _getActiveSlicerPresetId();
+    if (presetId !== null && presetId !== undefined) {
+        formData.append("slicer_preset_id", String(presetId));
     }
     // 发送切片参数（从切片配置面板读取用户设置）
     const lhEl2 = document.getElementById("gen-layer-height");
@@ -102,7 +123,13 @@ export function mergeResultsByFilename(incomingResults) {
         if (!item || !item.filename) return;
         const existingIdx = idxByFilename.get(item.filename);
         if (existingIdx === undefined) { currentResults.push(item); return; }
-        currentResults[existingIdx] = item;
+        // Preserve per-file printer + preset from existing item
+        const existing = currentResults[existingIdx];
+        currentResults[existingIdx] = {
+            ...item,
+            _printer_model: existing._printer_model || item._printer_model,
+            _slicer_preset_id: existing._slicer_preset_id !== undefined ? existing._slicer_preset_id : item._slicer_preset_id,
+        };
     });
 }
 
@@ -148,10 +175,15 @@ export async function reQuoteAllSelectedFiles(reasonLabel) {
         const color = pickAllowedColor(allowedColors, existing && existing.color, quoteOptions.color);
         const quantityRaw = existing && existing.quantity ? existing.quantity : quoteOptions.quantity;
         const quantity = Math.max(1, Number.parseInt(quantityRaw, 10) || 1);
+        // Per-file printer + preset
+        const pm = (existing && existing._printer_model) ? existing._printer_model : '';
+        const sp = (existing && existing._slicer_preset_id !== undefined) ? existing._slicer_preset_id : null;
         if (fileNameDisplay) fileNameDisplay.textContent = `${reasonLabel}：${i + 1}/${files.length}（${file.name}）`;
         try {
             await ensureThumbnailForFile(file, color);
-            const updated = await quoteSingleFileWithOptions(file, { material, color, quantity });
+            const opts = { material, color, quantity, _printer_model: pm };
+            if (sp !== null) opts._slicer_preset_id = sp;
+            const updated = await quoteSingleFileWithOptions(file, opts);
             mergeResultsByFilename([updated]);
         } catch (err) {
             mergeResultsByFilename([{ filename: file.name, status: 'failed', error: err.message || '重算失败', material, color, quantity }]);
@@ -170,7 +202,7 @@ export function renderResultsTable() {
     const showPrusaStatus = true;
     tbody.innerHTML = '';
     if (!currentResults.length) {
-        tbody.innerHTML = '<tr class="border-t border-gray-100"><td class="px-2 py-2 text-gray-500" colspan="13">暂无数据，请在表格底部上传并自动报价</td></tr>';
+        tbody.innerHTML = '<tr class="border-t border-gray-100"><td class="px-2 py-2 text-gray-500" colspan="15">暂无数据，请在表格底部上传并自动报价</td></tr>';
         return;
     }
     currentResults.forEach((item) => {
@@ -223,9 +255,22 @@ export function renderResultsTable() {
 
             const materialOptionsHtml = MATERIAL_OPTIONS.map((m) => `<option value="${m.name}" ${m.name === item.material ? 'selected' : ''}>${m.name}</option>`).join('');
             const renderedRowColors = renderColorDropdown(item.material, item.color, true);
+
+            // Per-file printer + preset dropdowns
+            const printerModels = getCachedPrinterModels();
+            const pmOptions = printerModels.map(p =>
+                `<option value="${p.id}" ${p.id === (item._printer_model || '') ? 'selected' : ''}>${p.name}</option>`
+            ).join('');
+            const presets = slicerPresets || [];
+            const presetOptions = ['<option value="">不使用</option>',
+                ...presets.map(p => `<option value="${p.id}" ${String(p.id) === String(item._slicer_preset_id || '') ? 'selected' : ''}>${p.name || '#' + p.id}</option>`)
+            ].join('');
+
             tr.innerHTML = `
                 <td class="px-2 py-1.5">${item.filename}</td>
                 <td class="px-2 py-1.5">${previewButtonHtml}</td>
+                <td class="px-2 py-1.5"><select data-field="_printer_model" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5 max-w-[110px]">${pmOptions}</select></td>
+                <td class="px-2 py-1.5"><select data-field="_slicer_preset_id" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5 max-w-[100px]">${presetOptions}</select></td>
                 <td class="px-2 py-1.5"><select data-field="material" class="row-edit text-[11px] border border-gray-300 rounded px-1 py-0.5">${materialOptionsHtml}</select></td>
                 <td class="px-2 py-1.5" data-field="color">${renderedRowColors.html}</td>
                 <td class="px-2 py-1.5"><input data-field="quantity" type="number" min="1" value="${item.quantity}" class="row-edit w-14 text-[11px] border border-gray-300 rounded px-1 py-0.5" /></td>
@@ -249,9 +294,20 @@ export function renderResultsTable() {
             const materialOptionsHtml = MATERIAL_OPTIONS.map((m) => `<option value="${m.name}" ${m.name === selectedMaterial ? 'selected' : ''}>${m.name}</option>`).join('');
             const renderedRowColors = renderColorDropdown(selectedMaterial, selectedColor, true);
             const quantityValue = item.quantity || quoteOptions.quantity || 1;
+            // Per-file printer + preset
+            const printerModels = getCachedPrinterModels();
+            const pmOptions = printerModels.map(p =>
+                `<option value="${p.id}" ${p.id === (item._printer_model || '') ? 'selected' : ''}>${p.name}</option>`
+            ).join('');
+            const presets = slicerPresets || [];
+            const presetOptions = ['<option value="">不使用</option>',
+                ...presets.map(p => `<option value="${p.id}" ${String(p.id) === String(item._slicer_preset_id || '') ? 'selected' : ''}>${p.name || '#' + p.id}</option>`)
+            ].join('');
             tr.innerHTML = `
                 <td class="px-2 py-1.5">${item.filename}</td>
                 <td class="px-2 py-1.5">${previewButtonHtml}</td>
+                <td class="px-2 py-1.5"><select data-field="_printer_model" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5 max-w-[110px]">${pmOptions}</select></td>
+                <td class="px-2 py-1.5"><select data-field="_slicer_preset_id" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5 max-w-[100px]">${presetOptions}</select></td>
                 <td class="px-2 py-1.5"><select data-field="material" class="row-edit text-[11px] border border-gray-300 rounded px-1 py-0.5">${materialOptionsHtml}</select></td>
                 <td class="px-2 py-1.5" data-field="color">${renderedRowColors.html}</td>
                 <td class="px-2 py-1.5"><input data-field="quantity" type="number" min="1" value="${quantityValue}" class="row-edit w-14 text-[11px] border border-gray-300 rounded px-1 py-0.5" /></td>
@@ -278,7 +334,7 @@ export function renderResultsTable() {
 // ── G-code 详情构建 ──
 function _buildGcodeDetailHtml(gcode) {
     const cp = gcode.core_params || {};
-    let html = '<td colspan="13" class="px-3 py-2"><div class="grid grid-cols-3 md:grid-cols-5 gap-x-3 gap-y-1 text-[11px]">';
+    let html = '<td colspan="15" class="px-3 py-2"><div class="grid grid-cols-3 md:grid-cols-5 gap-x-3 gap-y-1 text-[11px]">';
 
     // 核心切片参数
     const add = (label, value, unit) => {
@@ -366,10 +422,12 @@ export async function batchApplyToAll() {
 
     if (errorContainer) errorContainer.classList.add('hidden');
 
-    // 1) 先更新模型数据
+    // 1) 先更新模型数据（包括 per-file printer + preset）
     setCurrentResults(currentResults.map(item => {
         if (!item || !item.filename) return item;
-        return { ...item, material, color, quantity };
+        return { ...item, material, color, quantity,
+            _printer_model: getActivePrinterCompoundId(),
+            _slicer_preset_id: quoteOptions.slicer_preset_id };
     }));
 
     // 2) 更新报价选项
@@ -441,20 +499,56 @@ async function _handleRowEdit(event, signal) {
         if (errorMsg) { errorMsg.textContent = '数量必须大于等于 1'; errorContainer.classList.remove('hidden'); }
         return;
     }
+    // Read per-file printer + preset
+    const pmSel = row.querySelector('[data-field="_printer_model"]');
+    const spSel = row.querySelector('[data-field="_slicer_preset_id"]');
+    const pm = pmSel ? pmSel.value : '';
+    const sp = spSel ? (spSel.value ? Number(spSel.value) : null) : null;
     if (errorContainer) errorContainer.classList.add('hidden');
     row.querySelector('[data-role="status-cell"]').textContent = '重算中...';
     row.querySelector('[data-role="status-cell"]').className = 'px-2 py-1.5 text-amber-600';
+
+    // Mark row as pending in currentResults so total price updates immediately
+    const idx = currentResults.findIndex((i) => i.filename === filename);
+    const prevItem = idx >= 0 ? { ...currentResults[idx] } : null;
+    if (idx >= 0) {
+        currentResults[idx] = { ...currentResults[idx], status: 'pending', cost_cny: 0 };
+    }
+    recalcSummaryFromCurrentResults();
+
     try {
         await ensureThumbnailForFile(file, color);
-        if (signal.cancelled) return;
-        const updated = await quoteSingleFileWithOptions(file, { material, color, quantity });
-        if (signal.cancelled) return;
-        const idx = currentResults.findIndex((i) => i.filename === filename);
-        if (idx >= 0) currentResults[idx] = updated;
+        if (signal.cancelled) {
+            if (prevItem && idx >= 0) currentResults[idx] = prevItem;
+            return;
+        }
+        // Only pass _slicer_preset_id when explicitly set (non-null); omit when null
+        // so quoteSingleFileWithOptions falls back to batch preset.
+        const opts = { material, color, quantity, _printer_model: pm };
+        if (sp !== null) opts._slicer_preset_id = sp;
+        const updated = await quoteSingleFileWithOptions(file, opts);
+        if (signal.cancelled) {
+            if (prevItem && idx >= 0) currentResults[idx] = prevItem;
+            return;
+        }
+        if (idx >= 0) {
+            currentResults[idx] = {
+                ...updated,
+                _printer_model: pm || prevItem._printer_model,
+            };
+            if (sp !== null) {
+                currentResults[idx]._slicer_preset_id = sp;
+            }
+        }
         renderResultsTable();
         recalcSummaryFromCurrentResults();
     } catch (err) {
         if (signal.cancelled) return;
+        if (prevItem && idx >= 0) {
+            currentResults[idx] = prevItem;
+        }
+        renderResultsTable();
+        recalcSummaryFromCurrentResults();
         if (errorMsg) { errorMsg.textContent = err.message; errorContainer.classList.remove('hidden'); }
         row.querySelector('[data-role="status-cell"]').textContent = '重算失败';
         row.querySelector('[data-role="status-cell"]').className = 'px-2 py-1.5 text-red-600';

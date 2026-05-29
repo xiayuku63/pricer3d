@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 class SlicerPresetGenerateRequest(BaseModel):
-    name: str = Field(..., min_length=1, max_length=60, description="预设名称")
+    name: Optional[str] = Field(default=None, max_length=60, description="预设名称（若不提供则自动生成为 层高-墙层数-填充密度%）")
     bed_width: float = Field(256.0, ge=50.0, le=1000.0, description="打印机X轴尺寸(mm)")
     bed_depth: float = Field(256.0, ge=50.0, le=1000.0, description="打印机Y轴尺寸(mm)")
     bed_height: float = Field(256.0, ge=50.0, le=1000.0, description="打印机Z轴尺寸(mm)")
@@ -138,7 +138,7 @@ async def api_generate_slicer_preset(payload: SlicerPresetGenerateRequest, reque
     if payload.wall_count not in valid_walls:
         raise HTTPException(status_code=400, detail="墙层数只允许推荐值 (如 2, 3, 4, 5, 6)")
 
-    preset_name = payload.name.strip()
+    preset_name = f"{payload.layer_height or 0.2:.2f}-{payload.wall_count}-{payload.infill}%"
 
     from parser.prusa_slicer import generate_prusa_config
 
@@ -266,7 +266,37 @@ async def api_delete_slicer_preset(preset_id: int, request: Request, current_use
     return {"status": "ok"}
 
 
-async def api_list_printers():
-    """Return available printer models."""
+async def api_list_printers(request: Request):
+    """Return available printer models (built-in + optional user presets)."""
     from .printers import PRINTER_MODELS
-    return {"items": PRINTER_MODELS}
+    items = list(PRINTER_MODELS)
+    # Merge user printer presets (when authenticated)
+    try:
+        from fastapi.security import OAuth2PasswordBearer
+        from jose import jwt as _jwt
+        from .config import JWT_SECRET_KEY, JWT_ALGORITHM
+        from .auth import get_user_by_id
+        o2 = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
+        token = await o2(request)
+        if token:
+            payload = _jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+            uid = int(payload.get("sub", "0"))
+            if uid > 0:
+                from .printer_presets import list_printer_presets
+                user_presets = list_printer_presets(uid)
+                for up in user_presets:
+                    items.append({
+                        "id": f"user_{up['id']}",
+                        "name": up["name"],
+                        "bed_width": up["bed_width"],
+                        "bed_depth": up["bed_depth"],
+                        "bed_height": up["bed_height"],
+                        "nozzle": up["nozzle"],
+                        "nozzles": up["nozzles"],
+                        "icon": "🖨️",
+                        "profile": None,
+                        "_user_preset_id": up["id"],
+                    })
+    except Exception:
+        pass
+    return {"items": items}

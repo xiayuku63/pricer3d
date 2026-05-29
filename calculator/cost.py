@@ -230,6 +230,7 @@ def calculate_cost(
     auto_orient: bool = False,
     top_shell_layers: Optional[int] = None,
     bottom_shell_layers: Optional[int] = None,
+    model_dimensions: Optional[dict] = None,
 ):
     from app.utils import normalize_materials, _sanitize_filename_component, _user_base_dir, _date_folder_utc
     from app.config import DEFAULT_MATERIALS
@@ -334,13 +335,29 @@ def calculate_cost(
 
             # Load printer profile for slicing
             _printer_profile = None
+            rp = None
             printer_id = cfg.get("printer_model", "") or ""
             if printer_id:
-                from app.printers import PRINTER_MODELS
-                for pm in PRINTER_MODELS:
-                    if pm["id"] == printer_id:
-                        _printer_profile = os.path.join(os.path.dirname(os.path.dirname(__file__)), pm["profile"])
-                        break
+                from app.printers import resolve_printer
+                rp = resolve_printer(printer_id)
+                if rp:
+                    _printer_profile = os.path.join(os.path.dirname(os.path.dirname(__file__)), rp["profile"])
+
+            # Pre-check: model height vs printer max_print_height
+            _printer_max_z = None
+            _printer_name = None
+            if rp:
+                _printer_max_z = float(rp.get("bed_height", 0))
+                _printer_name = str(rp.get("name", ""))
+            if not _printer_max_z or _printer_max_z <= 0:
+                _printer_max_z = 256.0  # system default
+                _printer_name = _printer_name or "系统默认"
+            if model_dimensions:
+                model_z = float(model_dimensions.get("z", 0))
+                if model_z > _printer_max_z > 0:
+                    slicer_error_msg = "模型尺寸超出打印机最大打印面积，请更换打印机或拆分模型"
+                    logger.warning(f"PrusaSlicer skipped: model_z={model_z:.1f} > printer_max_z={_printer_max_z:.0f} ({_printer_name})")
+                    raise RuntimeError(slicer_error_msg)
             base_name = os.path.splitext(os.path.basename(model_path))[0]
             output_prefix = _sanitize_filename_component(base_name, fallback="model", max_len=40)
             user_folder = f"user_{current_user['id']}_{current_user['username']}" if current_user else "anonymous"
@@ -623,6 +640,7 @@ async def process_single_file(
             perimeters=perimeters,
             current_user=current_user,
             auto_orient=auto_orient,
+            model_dimensions=dimensions,
         )
         total_weight = round(model_weight_g * quantity, 2)
         try:

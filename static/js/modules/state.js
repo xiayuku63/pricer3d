@@ -20,6 +20,7 @@ export const quoteOptions = {
     color: "",
     quantity: 1,
     slicer_preset_id: null,
+    printer_model: "",
     orientation: { x: 0, y: 0, z: 0 },
 };
 
@@ -308,3 +309,25 @@ export function setAuthToken(v) { authToken = v; }
 export function setCurrentResults(v) { currentResults = v; }
 export function setSlicerPresets(v) { slicerPresets = v; }
 export function setPendingQuoteFiles(v) { pendingQuoteFiles = v; }
+
+// ── Active printer compound ID (model + nozzle → e.g. "bambu_a1_04") ──
+export function getActivePrinterCompoundId() {
+    const batchModel = document.getElementById("batch-printer-model");
+    const batchNozzle = document.getElementById("batch-nozzle-diameter");
+    if (batchModel && batchModel.value && batchNozzle && batchNozzle.value) {
+        const n = String(Math.round(parseFloat(batchNozzle.value) * 10)).padStart(2, '0').slice(-2);
+        return `${batchModel.value}_${n}`;
+    }
+    const cfgModel = document.getElementById("cfg-printer-model-main");
+    const cfgNozzle = document.getElementById("cfg-nozzle-diameter");
+    if (cfgModel && cfgModel.value && cfgNozzle && cfgNozzle.value) {
+        const n = String(Math.round(parseFloat(cfgNozzle.value) * 10)).padStart(2, '0').slice(-2);
+        return `${cfgModel.value}_${n}`;
+    }
+    return "";
+}
+
+// ── Printer model cache (for per-file dropdowns in results table) ──
+let _cachedPrinterModels = [];
+export function getCachedPrinterModels() { return _cachedPrinterModels; }
+export function setCachedPrinterModels(v) { _cachedPrinterModels = v || []; }

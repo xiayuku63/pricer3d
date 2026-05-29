@@ -44,7 +44,10 @@ import {
 import {
     initPresets, preloadPrinterSelectors, fetchPrinterModels, fetchSlicerPresets,
     renderSlicerPresetsUI, uploadSlicerPreset, generateSlicerPreset, deleteSlicerPreset,
-    loadPresetIntoForm, saveCurrentPreset, showSaveAsRow, hideSaveAsRow, saveAsNewPreset,
+    loadPresetIntoForm, saveCurrentPreset, saveAsNewPreset,
+    downloadSelectedPreset, deleteSelectedPreset,
+    fetchPrinterPresets, savePrinterPreset, deletePrinterPreset,
+    renderPrinterVisibilityList, restoreDefaultPrinters,
 } from './modules/presets.js';
 import {
     initMembership, openMembershipModal, closeMembershipModal,
@@ -133,11 +136,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // Slicer presets
         slicerPresetFileInput: $('slicer-preset-file'), slicerPresetUploadBtn: $('slicer-preset-upload-btn'),
         slicerPresetsRefreshBtn: $('slicer-presets-refresh-btn'), slicerPresetsMsg: $('slicer-presets-msg'),
-        slicerPresetsTbody: $('slicer-presets-tbody'), cfgSlicerPresetId: $('cfg-slicer-preset-id'),
+        slicerPresetsTbody: $('slicer-presets-tbody'), slicerPresetsDownloadBtn: $('slicer-presets-download-btn'), slicerPresetsDeleteBtn: $('slicer-presets-delete-btn'),
         genPresetSelect: $('gen-preset-select'), genPresetSaveBtn: $('gen-preset-save-btn'),
         genPresetSaveasBtn: $('gen-preset-saveas-btn'),
-        genSaveasRow: $('gen-saveas-row'), genSaveasName: $('gen-saveas-name'),
-        genSaveasConfirmBtn: $('gen-saveas-confirm-btn'), genSaveasCancelBtn: $('gen-saveas-cancel-btn'),
+        genSaveasRow: $('gen-autoname-row'), genSaveasName: $('gen-autoname-preview'),
         genPresetName: $('gen-preset-name'), genPrinterModel: $('gen-printer-model'),
         genLayerHeight: $('gen-layer-height'), genInfill: $('gen-infill'),
         genWallCount: $('gen-wall-count'), genTopShells: $('gen-top-shells'),
@@ -203,6 +205,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (defaultTab) defaultTab.click();
         dom.userCenterModal.classList.remove('hidden');
         fetchSlicerPresets();
+        fetchPrinterPresets();
+        renderPrinterVisibilityList();
     });
     if (dom.logoutBtn) dom.logoutBtn.addEventListener('click', handleLogout);
     document.addEventListener('click', (event) => {
@@ -217,18 +221,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Slicer presets
     if (dom.slicerPresetsRefreshBtn) dom.slicerPresetsRefreshBtn.addEventListener('click', fetchSlicerPresets);
+    if (dom.slicerPresetsDownloadBtn) dom.slicerPresetsDownloadBtn.addEventListener('click', downloadSelectedPreset);
+    if (dom.slicerPresetsDeleteBtn) dom.slicerPresetsDeleteBtn.addEventListener('click', deleteSelectedPreset);
     if (dom.slicerPresetUploadBtn) dom.slicerPresetUploadBtn.addEventListener('click', uploadSlicerPreset);
     if (dom.slicerPresetGenerateBtn) dom.slicerPresetGenerateBtn.addEventListener('click', generateSlicerPreset);
-    if (dom.cfgSlicerPresetId) {
-        dom.cfgSlicerPresetId.addEventListener('change', async () => {
-            const raw = String(dom.cfgSlicerPresetId.value || "").trim();
-            const parsed = raw ? Number.parseInt(raw, 10) : NaN;
-            quoteOptions.slicer_preset_id = Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
-            saveSlicerPresetSelection();
-            renderSlicerPresetsUI();
-            if (selectedFilesMap.size > 0) await reQuoteAllSelectedFiles('切片预设已变更，重算报价');
-        });
-    }
 
     // ── Slicer preset form: select preset → load params ──
     if (dom.genPresetSelect) {
@@ -250,17 +246,9 @@ document.addEventListener('DOMContentLoaded', () => {
         dom.genPresetSaveBtn.addEventListener('click', saveCurrentPreset);
     }
 
-    // ── Slicer preset form: save-as button ──
+    // ── Slicer preset form: save-as button (direct save with auto-generated name)
     if (dom.genPresetSaveasBtn) {
-        dom.genPresetSaveasBtn.addEventListener('click', showSaveAsRow);
-    }
-
-    // ── Slicer preset form: save-as confirm / cancel ──
-    if (dom.genSaveasConfirmBtn) {
-        dom.genSaveasConfirmBtn.addEventListener('click', saveAsNewPreset);
-    }
-    if (dom.genSaveasCancelBtn) {
-        dom.genSaveasCancelBtn.addEventListener('click', hideSaveAsRow);
+        dom.genPresetSaveasBtn.addEventListener('click', saveAsNewPreset);
     }
 
     // ── Global: close color dropdowns on outside click ──
@@ -364,11 +352,50 @@ document.addEventListener('DOMContentLoaded', () => {
     const batchMaterial = document.getElementById('batch-material');
     const batchApplyBtn = document.getElementById('batch-apply-btn');
     const batchQuantity = document.getElementById('batch-quantity');
+    const batchPrinterModel = document.getElementById('batch-printer-model');
+    const batchSlicerPreset = document.getElementById('batch-slicer-preset');
+
     if (batchMaterial) batchMaterial.addEventListener('change', refreshBatchColorDropdown);
     if (batchApplyBtn) batchApplyBtn.addEventListener('click', batchApplyToAll);
     if (batchQuantity) {
         batchQuantity.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') { e.preventDefault(); batchApplyToAll(); }
+        });
+    }
+    // Batch nozzle change → re-quote (model+nozzle handled by presets.js)
+    const batchNozzle = document.getElementById('batch-nozzle-diameter');
+    if (batchNozzle) {
+        batchNozzle.addEventListener('change', async () => {
+            if (selectedFilesMap.size > 0) await reQuoteAllSelectedFiles('喷嘴已切换');
+        });
+    }
+    // Batch preset change → show params summary + update quoteOptions
+    if (batchSlicerPreset) {
+        batchSlicerPreset.addEventListener('change', async () => {
+            const val = batchSlicerPreset.value;
+            const paramsEl = document.getElementById('batch-preset-params');
+            if (!val) {
+                quoteOptions.slicer_preset_id = null;
+                saveSlicerPresetSelection();
+                if (paramsEl) { paramsEl.classList.add('hidden'); paramsEl.textContent = ''; }
+                if (selectedFilesMap.size > 0) await reQuoteAllSelectedFiles('切片预设已取消');
+                return;
+            }
+            quoteOptions.slicer_preset_id = Number(val);
+            saveSlicerPresetSelection();
+            // Show param summary
+            try {
+                const resp = await authFetch(`/api/slicer/presets/${val}`);
+                if (resp.ok) {
+                    const data = await resp.json();
+                    const p = data.preset?.params;
+                    if (p && paramsEl) {
+                        paramsEl.textContent = `层高:${p.layer_height || '-'} 墙:${p.perimeters || '-'} 填充:${p.fill_density || '-'}%`;
+                        paramsEl.classList.remove('hidden');
+                    }
+                }
+            } catch (e) { /* ignore */ }
+            if (selectedFilesMap.size > 0) await reQuoteAllSelectedFiles('切片预设已切换');
         });
     }
 
@@ -402,6 +429,22 @@ document.addEventListener('DOMContentLoaded', () => {
     if (dom.userCenterSaveBtn) dom.userCenterSaveBtn.addEventListener('click', saveUserSettings);
     if (dom.userCenterSetDefaultsBtn) dom.userCenterSetDefaultsBtn.addEventListener('click', setAsDefaults);
     if (dom.ucChangePasswordBtn) dom.ucChangePasswordBtn.addEventListener('click', changePassword);
+
+    // Printer preset management
+    const ppAddBtn = document.getElementById('printer-preset-add-btn');
+    const ppSaveBtn = document.getElementById('pp-save-btn');
+    const ppCancelBtn = document.getElementById('pp-cancel-btn');
+    if (ppAddBtn) ppAddBtn.addEventListener('click', () => {
+        document.getElementById('printer-preset-form')?.classList.remove('hidden');
+    });
+    if (ppCancelBtn) ppCancelBtn.addEventListener('click', () => {
+        document.getElementById('printer-preset-form')?.classList.add('hidden');
+    });
+    if (ppSaveBtn) ppSaveBtn.addEventListener('click', savePrinterPreset);
+
+    // Printer visibility
+    const ppRestoreBtn = document.getElementById('printer-restore-defaults-btn');
+    if (ppRestoreBtn) ppRestoreBtn.addEventListener('click', restoreDefaultPrinters);
 
     // User center tabs
     dom.ucTabBtns.forEach(btn => {
@@ -644,5 +687,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     refreshOptionsSummary();
-    initializeAuth();
+    initializeAuth().then(() => {
+        // Load presets for model-page selector after auth
+        if (authToken) fetchSlicerPresets();
+    });
 });

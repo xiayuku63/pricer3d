@@ -63,8 +63,25 @@
                         </dl>
 
                         <!-- 批量设置工具栏 -->
-                        <div id="batch-edit-bar" class="mt-4 flex items-center gap-3 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                        <div id="batch-edit-bar" class="mt-4 flex items-center gap-3 p-3 bg-indigo-50 border border-indigo-200 rounded-lg flex-wrap">
                             <span class="text-xs font-medium text-indigo-700 whitespace-nowrap">批量设置：</span>
+                            <div class="flex items-center gap-1.5">
+                                <label class="text-[11px] text-gray-600">打印机</label>
+                                <select id="batch-printer-model" class="text-[11px] border border-gray-300 rounded px-2 py-1 bg-white max-w-[155px]"></select>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <label class="text-[11px] text-gray-600">喷嘴</label>
+                                <select id="batch-nozzle-diameter" class="text-[11px] border border-gray-300 rounded px-2 py-1 bg-white w-[60px]">
+                                    <option value="0.2">0.2</option><option value="0.4" selected>0.4</option><option value="0.6">0.6</option><option value="0.8">0.8</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <label class="text-[11px] text-gray-600">预设</label>
+                                <select id="batch-slicer-preset" class="text-[11px] border border-gray-300 rounded px-2 py-1 bg-white max-w-[160px]">
+                                    <option value="">不使用预设</option>
+                                </select>
+                                <span id="batch-preset-params" class="text-[10px] text-gray-400 hidden"></span>
+                            </div>
                             <div class="flex items-center gap-1.5">
                                 <label class="text-[11px] text-gray-600">材料</label>
                                 <select id="batch-material" class="text-[11px] border border-gray-300 rounded px-2 py-1 bg-white"></select>
@@ -87,6 +104,8 @@
                                     <tr>
                                         <th class="px-2 py-1.5">文件名</th>
                                         <th class="px-2 py-1.5">预览</th>
+                                        <th class="px-2 py-1.5">打印机</th>
+                                        <th class="px-2 py-1.5">预设</th>
                                         <th class="px-2 py-1.5">材料</th>
                                         <th class="px-2 py-1.5">颜色</th>
                                         <th class="px-2 py-1.5">数量</th>
@@ -102,12 +121,12 @@
                                 </thead>
                                 <tbody id="batch-results-body" class="bg-white">
                                     <tr class="border-t border-gray-100">
-                                        <td class="px-2 py-2 text-gray-500" colspan="13">暂无数据，请在表格底部上传并自动报价</td>
+                                        <td class="px-2 py-2 text-gray-500" colspan="15">暂无数据，请在表格底部上传并自动报价</td>
                                     </tr>
                                 </tbody>
                                 <tfoot class="bg-white border-t border-gray-200">
                                     <tr>
-                                        <td class="px-2 py-3" colspan="13">
+                                        <td class="px-2 py-3" colspan="15">
                                             <form id="quote-form" class="space-y-3">
                                                 <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md bg-gray-50 hover:bg-gray-100 transition-colors" id="drop-zone">
                                                     <div class="space-y-1 text-center">
@@ -538,6 +557,65 @@
                                         </div>
                                     </div>
                                     <div id="printer-bed-info" class="text-xs text-gray-400 mt-1"></div>
+
+                                    <!-- ── Printer presets management ── -->
+                                    <div class="border-t border-gray-200 pt-4 mt-4">
+                                        <div class="flex justify-between items-center mb-2">
+                                            <h6 class="text-xs font-medium text-gray-700">我的打印机预设</h6>
+                                            <button id="printer-preset-add-btn" type="button" class="text-xs text-indigo-600 hover:text-indigo-800">+ 新增</button>
+                                        </div>
+                                        <!-- Add form (hidden by default) -->
+                                        <div id="printer-preset-form" class="hidden border border-gray-200 rounded-md p-3 mb-3 space-y-2">
+                                            <div class="grid grid-cols-2 gap-2">
+                                                <div>
+                                                    <label class="text-[11px] text-gray-500">名称 <span class="text-red-500">*</span></label>
+                                                    <input id="pp-name" type="text" maxlength="60" class="w-full border border-gray-300 rounded-sm text-xs px-2 py-1" placeholder="如：我的自定义打印机">
+                                                </div>
+                                                <div>
+                                                    <label class="text-[11px] text-gray-500">X轴 (mm)</label>
+                                                    <input id="pp-bed-x" type="number" value="256" min="50" max="1000" class="w-full border border-gray-300 rounded-sm text-xs px-2 py-1">
+                                                </div>
+                                                <div>
+                                                    <label class="text-[11px] text-gray-500">Y轴 (mm)</label>
+                                                    <input id="pp-bed-y" type="number" value="256" min="50" max="1000" class="w-full border border-gray-300 rounded-sm text-xs px-2 py-1">
+                                                </div>
+                                                <div>
+                                                    <label class="text-[11px] text-gray-500">Z轴 (mm)</label>
+                                                    <input id="pp-bed-z" type="number" value="256" min="50" max="1000" class="w-full border border-gray-300 rounded-sm text-xs px-2 py-1">
+                                                </div>
+                                            </div>
+                                            <div class="flex gap-2">
+                                                <button id="pp-save-btn" type="button" class="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded hover:bg-indigo-700">保存</button>
+                                                <button id="pp-cancel-btn" type="button" class="text-xs px-3 py-1.5 border border-gray-300 text-gray-600 rounded hover:bg-gray-50">取消</button>
+                                            </div>
+                                        </div>
+                                        <!-- Preset table -->
+                                        <div class="overflow-x-auto border border-gray-200 rounded-md">
+                                            <table class="min-w-full text-xs text-left">
+                                                <thead class="bg-gray-50 text-gray-600">
+                                                    <tr>
+                                                        <th class="px-2 py-1.5">名称</th>
+                                                        <th class="px-2 py-1.5">热床</th>
+                                                        <th class="px-2 py-1.5 w-10"></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="printer-presets-tbody" class="bg-white divide-y divide-gray-100">
+                                                    <tr><td colspan="3" class="px-2 py-3 text-gray-500">暂无预设</td></tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                    <!-- ── Printer visibility ── -->
+                                    <div class="border-t border-gray-200 pt-4 mt-4">
+                                        <div class="flex justify-between items-center mb-2">
+                                            <h6 class="text-xs font-medium text-gray-700">所有机型</h6>
+                                            <button id="printer-restore-defaults-btn" type="button" class="text-xs text-gray-500 hover:text-indigo-600">恢复默认</button>
+                                        </div>
+                                        <div id="printer-visibility-list" class="space-y-1 max-h-64 overflow-y-auto border border-gray-200 rounded-md p-2">
+                                            <span class="text-xs text-gray-400">加载中...</span>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div id="uc-tab-slicer" class="uc-tab-pane hidden space-y-5">
@@ -563,14 +641,10 @@
                                             </div>
                                             <p id="slicer-presets-msg" class="text-xs hidden"></p>
                                         </div>
-                                        <!-- Save-as name row (hidden by default) -->
-                                        <div id="gen-saveas-row" class="mt-2 hidden">
-                                            <label class="block text-[11px] text-gray-500">新预设名称 <span class="text-red-500">*</span></label>
-                                            <div class="flex items-center gap-2 mt-0.5">
-                                                <input id="gen-saveas-name" type="text" maxlength="60" class="w-56 border border-gray-300 rounded-sm text-xs px-2 py-1" placeholder="例如：A1 0.12mm精细" />
-                                                <button id="gen-saveas-confirm-btn" type="button" class="h-[28px] px-3 rounded-md bg-green-600 text-white text-xs hover:bg-green-700 whitespace-nowrap">确认另存</button>
-                                                <button id="gen-saveas-cancel-btn" type="button" class="h-[28px] px-3 rounded-md border border-gray-300 text-gray-600 text-xs hover:bg-gray-100 whitespace-nowrap">取消</button>
-                                            </div>
+                                        <!-- Auto-generated name preview -->
+                                        <div id="gen-autoname-row" class="mt-2 hidden">
+                                            <span class="text-[11px] text-gray-500">预设名称（自动生成）：</span>
+                                            <code id="gen-autoname-preview" class="text-xs text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded font-mono"></code>
                                         </div>
                                     </div>
 
@@ -619,29 +693,27 @@
                                     <div>
                                         <div class="flex justify-between items-center mb-1">
                                             <label class="text-xs text-gray-600">所有已保存预设</label>
-                                            <button id="slicer-presets-refresh-btn" type="button" class="text-xs text-indigo-600 hover:text-indigo-800">刷新</button>
+                                            <div class="flex items-center gap-2">
+                                                <button id="slicer-presets-download-btn" type="button" class="text-xs px-2 py-0.5 border border-blue-200 text-blue-600 rounded hover:bg-blue-50 disabled:opacity-30 disabled:cursor-not-allowed" disabled>下载</button>
+                                                <button id="slicer-presets-delete-btn" type="button" class="text-xs px-2 py-0.5 border border-red-200 text-red-600 rounded hover:bg-red-50 disabled:opacity-30 disabled:cursor-not-allowed" disabled>删除</button>
+                                                <button id="slicer-presets-refresh-btn" type="button" class="text-xs text-indigo-600 hover:text-indigo-800">刷新</button>
+                                            </div>
                                         </div>
                                         <div class="overflow-x-auto border border-gray-200 rounded-md">
                                             <table class="min-w-full text-xs text-left">
                                                 <thead class="bg-gray-50 text-gray-600">
                                                     <tr>
-                                                        <th class="px-2 py-2 w-20">ID</th>
+                                                        <th class="px-2 py-2 w-8"></th>
+                                                        <th class="px-2 py-2 w-16">ID</th>
                                                         <th class="px-2 py-2">名称</th>
                                                         <th class="px-2 py-2 w-16">格式</th>
                                                         <th class="px-2 py-2 w-40">创建时间</th>
-                                                        <th class="px-2 py-2 w-20 text-right">操作</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody id="slicer-presets-tbody" class="bg-white divide-y divide-gray-100">
                                                     <tr><td colspan="5" class="px-2 py-3 text-gray-500">暂无预设</td></tr>
                                                 </tbody>
                                             </table>
-                                        </div>
-                                        <div class="mt-2">
-                                            <label class="block text-xs text-gray-600">报价默认使用的预设</label>
-                                            <select id="cfg-slicer-preset-id" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md text-sm">
-                                                <option value="">不使用预设</option>
-                                            </select>
                                         </div>
                                     </div>
                                 </div>
