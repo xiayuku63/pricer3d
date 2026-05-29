@@ -239,10 +239,14 @@ export async function fetchPrinterModels() {
     // ── Auto-fill nozzle + bed info when printer changes in printer tab ──
     const cfgPrinter = document.getElementById("cfg-printer-model-main");
     if (cfgPrinter && dom.cfgNozzleDiameter) {
-        const updateNozzleAndBed = () => {
-            const printer = visibleModels.find(p => p.id === cfgPrinter.value);
+        var resolveNozzle = function(printer) {
+            return (defaultNozzle && printer.nozzles && printer.nozzles.includes(parseFloat(defaultNozzle)))
+                ? String(defaultNozzle) : String(printer.nozzle);
+        };
+        var updateNozzleAndBed = function() {
+            var printer = visibleModels.find(function(p) { return p.id === cfgPrinter.value; });
             if (printer) {
-                dom.cfgNozzleDiameter.value = String(printer.nozzle);
+                dom.cfgNozzleDiameter.value = resolveNozzle(printer);
                 if (dom.printerBedInfo) {
                     dom.printerBedInfo.textContent = '热床尺寸：' + printer.bed_width + ' × ' + printer.bed_depth + ' × ' + printer.bed_height + ' mm';
                 }
@@ -250,9 +254,9 @@ export async function fetchPrinterModels() {
         };
         cfgPrinter.onchange = updateNozzleAndBed;
         // Trigger initial fill
-        const printer = visibleModels.find(p => p.id === cfgPrinter.value);
+        var printer = visibleModels.find(function(p) { return p.id === cfgPrinter.value; });
         if (printer) {
-            dom.cfgNozzleDiameter.value = String(printer.nozzle);
+            dom.cfgNozzleDiameter.value = resolveNozzle(printer);
             if (dom.printerBedInfo) {
                 dom.printerBedInfo.textContent = '热床尺寸：' + printer.bed_width + ' × ' + printer.bed_depth + ' × ' + printer.bed_height + ' mm';
             }
