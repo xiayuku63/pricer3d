@@ -225,7 +225,7 @@ export function renderResultsTable() {
             // G-code 分析详情
             const gcode = breakdown?.gcode_summary;
             const gcodeToggleHtml = gcode
-                ? `<button type="button" data-toggle-gcode="${escapeHtml(item.filename)}" class="text-[10px] text-indigo-500 hover:text-indigo-700 underline ml-1">📊详情</button>`
+                ? `<button type="button" data-toggle-gcode="${escapeHtml(item.filename)}" class="text-[10px] text-indigo-500 hover:text-indigo-700 underline ml-1">📊收起</button>`
                 : '';
 
             let markupPercent = Number(item.difficulty_markup_percent);
@@ -324,7 +324,7 @@ export function renderResultsTable() {
             const detailTr = document.createElement('tr');
             detailTr.className = 'border-t border-gray-100 bg-gray-50';
             detailTr.setAttribute('data-gcode-detail', item.filename);
-            detailTr.style.display = 'none';
+            detailTr.style.display = '';
             detailTr.innerHTML = _buildGcodeDetailHtml(gcodeData);
             tbody.appendChild(detailTr);
         }
