@@ -14,7 +14,7 @@ import {
     defaultSlicerPresetId, setDefaultSlicerPresetId,
 } from './state.js';
 import { openLoginModal } from './auth.js';
-import { renderSlicerPresetsUI, fetchSlicerPresets } from './presets.js';
+import { renderSlicerPresetsUI, fetchSlicerPresets, fetchPrinterModels } from './presets.js';
 import { refreshOptionsSummary, normalizeResultsWithCurrentOptions, renderResultsTable, recalcSummaryFromCurrentResults, reQuoteAllSelectedFiles, refreshBatchMaterialDropdown } from './quote.js';
 
 let dom = {};
@@ -286,6 +286,9 @@ export async function saveUserSettings() {
         setDefaultPrinterId(printerId || null);
         setDefaultNozzle(nozzle || null);
         setDefaultSlicerPresetId(effectivePresetId || null);
+        // Sync batch toolbar with new defaults
+        fetchPrinterModels();
+        await fetchSlicerPresets();
         setColorOptions(Array.from(new Set(MATERIAL_OPTIONS.flatMap((m) => Array.isArray(m.colors) ? m.colors : []))));
         updateDropdowns();
         normalizeResultsWithCurrentOptions();
