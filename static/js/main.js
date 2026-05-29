@@ -207,6 +207,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const defaultTab = document.querySelector('.uc-tab-btn[data-uc-tab="materials"]');
         if (defaultTab) defaultTab.click();
         dom.userCenterModal.classList.remove('hidden');
+        fetchPrinterModels();
         fetchSlicerPresets();
         fetchPrinterPresets();
         renderPrinterVisibilityList();

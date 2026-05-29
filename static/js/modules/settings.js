@@ -287,7 +287,7 @@ export async function saveUserSettings() {
         setDefaultNozzle(nozzle || null);
         setDefaultSlicerPresetId(effectivePresetId || null);
         // Sync batch toolbar with new defaults
-        fetchPrinterModels();
+        await fetchPrinterModels();
         await fetchSlicerPresets();
         setColorOptions(Array.from(new Set(MATERIAL_OPTIONS.flatMap((m) => Array.isArray(m.colors) ? m.colors : []))));
         updateDropdowns();
