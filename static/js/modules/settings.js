@@ -35,6 +35,11 @@ export async function fetchUserSettings() {
             setDefaultPrinterId(data.default_printer_id || null);
             setDefaultNozzle(data.default_nozzle || null);
             setDefaultSlicerPresetId(data.default_slicer_preset_id || null);
+            // Sync default preset to quote options so auto-quote uses it
+            if (data.default_slicer_preset_id) {
+                quoteOptions.slicer_preset_id = data.default_slicer_preset_id;
+                saveSlicerPresetSelection();
+            }
         }
     } catch (e) { console.error("Failed to fetch user settings", e); }
     updateDropdowns();

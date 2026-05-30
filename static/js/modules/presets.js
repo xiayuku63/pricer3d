@@ -597,3 +597,66 @@ export async function deletePrinterPreset(presetId) {
         await fetchPrinterPresets();
     } catch (e) { setMsg(e.message || t('slicer.presetDeleteError'), false); }
 }
+
+// ── Save printer preset (custom user-defined printer) ──
+export async function savePrinterPreset() {
+    if (!authToken) { openLoginModal(); return; }
+    const nameEl = document.getElementById('pp-name');
+    const name = (nameEl?.value || '').trim();
+    if (!name) return;
+    const payload = {
+        name,
+        bed_width: Number(document.getElementById('pp-bed-x')?.value) || 256,
+        bed_depth: Number(document.getElementById('pp-bed-y')?.value) || 256,
+        bed_height: Number(document.getElementById('pp-bed-z')?.value) || 256,
+        nozzle: 0.4,
+        nozzles: [0.2, 0.4, 0.6, 0.8],
+    };
+    try {
+        const resp = await authFetch('/api/printer/presets', {
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
+        });
+        if (resp.status === 401) { openLoginModal(); return; }
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.detail || t('common.loadError'));
+        if (nameEl) nameEl.value = '';
+        document.getElementById('printer-preset-form')?.classList.add('hidden');
+        await fetchPrinterPresets();
+        await fetchPrinterModels();
+    } catch (e) { console.error(e); }
+}
+
+// ── Printer visibility management (localStorage) ──
+export function renderPrinterVisibilityList() {
+    const container = document.getElementById('printer-visibility-list');
+    if (!container || !_printerModels.length) return;
+    const hidden = getHiddenPrinters();
+    container.innerHTML = _printerModels.map(p => {
+        const isHidden = hidden.includes(p.id);
+        return `<label class="flex items-center gap-2 py-1 px-1 hover:bg-gray-50 rounded cursor-pointer text-xs">
+            <input type="checkbox" class="pp-vis-toggle w-3 h-3 rounded" value="${p.id}" ${isHidden ? '' : 'checked'}>
+            <span class="${isHidden ? 'text-gray-300 line-through' : 'text-gray-700'}">${p.name} <span class="text-gray-400">(${p.bed_width}×${p.bed_depth}×${p.bed_height})</span></span>
+        </label>`;
+    }).join('');
+    container.querySelectorAll('.pp-vis-toggle').forEach(cb => {
+        cb.addEventListener('change', () => {
+            const id = cb.value;
+            const hidden = getHiddenPrinters();
+            if (cb.checked) {
+                const idx = hidden.indexOf(id);
+                if (idx >= 0) hidden.splice(idx, 1);
+            } else {
+                if (!hidden.includes(id)) hidden.push(id);
+            }
+            setHiddenPrinters(hidden);
+            renderPrinterVisibilityList();
+            fetchPrinterModels();
+        });
+    });
+}
+
+export function restoreDefaultPrinters() {
+    setHiddenPrinters([]);
+    renderPrinterVisibilityList();
+    fetchPrinterModels();
+}
