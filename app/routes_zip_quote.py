@@ -300,6 +300,28 @@ async def zip_quote(
         from calculator.cost import process_single_file
         from .slicer_presets import get_slicer_preset_by_id
 
+        # Resolve printer name + nozzle from checklist -> compound_id
+        from app.printers import PRINTER_MODELS, resolve_printer
+        def _lookup_printer(printer_name, nozzle_str):
+            """Return compound_id (e.g. bambu_a1_04) or None if not found."""
+            if not printer_name or not str(printer_name).strip():
+                return None
+            name_lower = str(printer_name).strip().lower()
+            for pm in PRINTER_MODELS:
+                if pm.get("name", "").lower() == name_lower:
+                    pid = pm["id"]
+                    nz = None
+                    if nozzle_str and str(nozzle_str).strip():
+                        try:
+                            nz = float(str(nozzle_str).strip())
+                        except (ValueError, TypeError):
+                            pass
+                    resolved = resolve_printer(pid, nz)
+                    if resolved:
+                        return resolved.get("_compound_id") or pid
+                    return pid
+            return None
+
         # Process matched files with checklist params
         for m in match_result["matched"]:
             cl = m["checklist"]
@@ -325,6 +347,16 @@ async def zip_quote(
                 except (ValueError, TypeError):
                     inf = 20
 
+            # Resolve per-file printer from checklist
+            cl_printer = str(cl.get("printer_model", "")).strip()
+            cl_nozzle = str(cl.get("nozzle", "")).strip()
+            compound_id = _lookup_printer(cl_printer, cl_nozzle)
+
+            # Build per-file pricing_config with resolved printer
+            file_pricing = dict(pricing_config)
+            if compound_id:
+                file_pricing["printer_model"] = compound_id
+
             # Create a fake UploadFile for process_single_file
             fake_file = UploadFile(
                 filename=stl["filename"],
@@ -340,7 +372,7 @@ async def zip_quote(
                     quantity=quantity,
                     color=color,
                     user_materials=user_materials,
-                    pricing_config=pricing_config,
+                    pricing_config=file_pricing,
                     slicer_preset=None,
                     perimeters=wc,
                     current_user=current_user,
@@ -352,6 +384,8 @@ async def zip_quote(
                     "layer_height": lh,
                     "wall_count": wc,
                     "infill": inf,
+                    "printer_model": compound_id or cl_printer or "",
+                    "nozzle": cl_nozzle or "",
                 }
                 # Copy to non-underscore key for JSON serialization
                 if result.get("_saved_path"):
