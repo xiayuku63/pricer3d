@@ -82,7 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initI18n();
     const MAX_FILES = 20;
     const MAX_FILE_SIZE = 100 * 1024 * 1024;
-    const ALLOWED_EXTENSIONS = ['.stl', '.stp', '.step', '.obj', '.3mf'];
+    const ALLOWED_EXTENSIONS = ['.stl', '.stp', '.step', '.obj', '.3mf', '.zip'];
 
     // ── Collect ALL DOM refs ──
     const $ = (id) => document.getElementById(id);
@@ -610,6 +610,75 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             dom.errorContainer.classList.add('hidden');
+
+            // Check if any file is a ZIP — route to /api/quote/zip
+            const zipFiles = newFiles.filter(function(f) { return f.name.toLowerCase().endsWith('.zip'); });
+            const modelFiles = newFiles.filter(function(f) { return !f.name.toLowerCase().endsWith('.zip'); });
+
+            if (zipFiles.length > 0) {
+                // Only support single ZIP upload at a time (combined with model files is ok)
+                if (zipFiles.length > 1 && modelFiles.length === 0) {
+                    dom.errorMsg.textContent = '一次只能上传一个 ZIP 文件';
+                    dom.errorContainer.classList.remove('hidden');
+                    return;
+                }
+
+                if (!authToken) {
+                    setPendingQuoteFiles(newFiles);
+                    dom.fileNameDisplay.textContent = '当前列表共 ' + selectedFilesMap.size + ' 个文件，请登录后继续报价';
+                    dom.errorMsg.textContent = '请先登录后再上传报价';
+                    dom.errorContainer.classList.remove('hidden');
+                    openLoginModal();
+                    return;
+                }
+
+                dom.fileNameDisplay.textContent = '正在解析 ZIP 文件中的清单与模型...';
+                dom.fileNameDisplay.classList.add('text-indigo-600', 'font-medium');
+
+                try {
+                    // Upload ZIP to new endpoint
+                    var zipFormData = new FormData();
+                    zipFormData.append('file', zipFiles[0]);
+                    zipFormData.append('material', quoteOptions.material);
+                    zipFormData.append('color', quoteOptions.color);
+                    zipFormData.append('quantity', String(quoteOptions.quantity));
+
+                    var zipResp = await authFetch('/api/quote/zip', { method: 'POST', body: zipFormData });
+                    var zipData = await zipResp.json();
+                    if (!zipResp.ok) throw new Error(zipData.detail || 'ZIP 上传失败');
+
+                    // Process results
+                    mergeResultsByFilename(zipData.results || []);
+                    renderResultsTable();
+                    recalcSummaryFromCurrentResults();
+
+                    // Show match status message
+                    if (zipData.match_status) {
+                        var ms = zipData.match_status;
+                        var statusClass = ms.mode === 'all' ? 'text-green-700 bg-green-50 border-green-300'
+                            : ms.mode === 'partial' ? 'text-amber-700 bg-amber-50 border-amber-300'
+                            : 'text-red-700 bg-red-50 border-red-300';
+                        dom.fileNameDisplay.innerHTML = '<span class="inline-block px-2 py-0.5 rounded border text-xs ' + statusClass + '">' + escapeHtml(ms.message) + '</span>';
+                        dom.fileNameDisplay.classList.add('text-indigo-600', 'font-medium');
+                    } else {
+                        dom.fileNameDisplay.textContent = 'ZIP 报价完成，共 ' + (zipData.results || []).length + ' 个文件';
+                    }
+
+                    // Also process any non-ZIP model files from same selection
+                    if (modelFiles.length > 0) {
+                        modelFiles.forEach(function(f) { selectedFilesMap.set(f.name, f); });
+                        await buildThumbnails(modelFiles);
+                        await quoteSelectedFiles(modelFiles);
+                    }
+                } catch (err) {
+                    dom.errorMsg.textContent = err.message || 'ZIP 解析失败';
+                    dom.errorContainer.classList.remove('hidden');
+                    dom.fileNameDisplay.textContent = 'ZIP 文件处理失败';
+                }
+                return;
+            }
+
+            // Normal model file upload (existing flow)
             newFiles.forEach((file) => selectedFilesMap.set(file.name, file));
             dom.fileNameDisplay.classList.add('text-indigo-600', 'font-medium');
 

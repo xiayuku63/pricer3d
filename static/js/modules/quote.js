@@ -143,6 +143,8 @@ export function mergeResultsByFilename(incomingResults) {
             ...item,
             _printer_model: existing._printer_model || item._printer_model,
             _slicer_preset_id: existing._slicer_preset_id !== undefined ? existing._slicer_preset_id : item._slicer_preset_id,
+            _checklist_params: item._checklist_params !== undefined ? item._checklist_params : existing._checklist_params,
+            _checklist_source: item._checklist_source || existing._checklist_source,
         };
     });
 }
@@ -298,7 +300,7 @@ export function renderResultsTable() {
                 <td class="px-2 py-1.5">${recalculating ? '-' : formatTimeHMS(item.estimated_time_h)}</td>
                 <td class="px-2 py-1.5">${recalculating ? '-' : ('¥ ' + item.unit_cost_cny)}</td>
                 <td class="px-2 py-1.5">${recalculating ? '-' : ('¥ ' + item.cost_cny)}</td>
-                <td data-role="status-cell" class="px-2 py-1.5 ${recalculating ? 'text-amber-600' : 'text-green-600'}"><div>${recalculating ? t('quote.recalculating') : t('common.success')}</div>${recalculating ? '' : prusaExtraHtml}${recalculating ? '' : gcodeToggleHtml}</td>
+                <td data-role="status-cell" class="px-2 py-1.5 ${recalculating ? 'text-amber-600' : 'text-green-600'}"><div>${recalculating ? t('quote.recalculating') : t('common.success')}${item._checklist_params && item._checklist_source ? ' <span class=\"text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1 cursor-help\" title=\"层高:' + item._checklist_source.layer_height + 'mm 墙层数:' + item._checklist_source.wall_count + ' 填充:' + item._checklist_source.infill + '%\">\u{1F4CB}\u6E05\u5355</span>' : ''}</div>${recalculating ? '' : prusaExtraHtml}${recalculating ? '' : gcodeToggleHtml}</td>
                 <td class="px-2 py-1.5 space-x-1"><button type="button" data-delete-file="${item.filename}" class="text-[11px] text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 rounded px-2 py-0.5">${t('common.delete')}</button></td>
             `;
         } else {
@@ -331,7 +333,7 @@ export function renderResultsTable() {
                 <td class="px-2 py-1.5" data-field="color">${renderedRowColors.html}</td>
                 <td class="px-2 py-1.5"><input data-field="quantity" type="number" min="1" value="${quantityValue}" class="row-edit w-14 text-[11px] border border-gray-300 rounded px-1 py-0.5" /></td>
                 <td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td>
-                <td data-role="status-cell" class="px-2 py-1.5 text-red-600">${item.error || t('common.error')}</td>
+                <td data-role="status-cell" class="px-2 py-1.5 text-red-600">${item.error || t('common.error')}${item._checklist_params && item._checklist_source ? ' <span class=\"text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1 cursor-help\" title=\"层高:' + item._checklist_source.layer_height + 'mm 墙层数:' + item._checklist_source.wall_count + ' 填充:' + item._checklist_source.infill + '%\">\u{1F4CB}\u6E05\u5355</span>' : ''}</td>
                 <td class="px-2 py-1.5 space-x-1"><button type="button" data-delete-file="${item.filename}" class="text-[11px] text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 rounded px-2 py-0.5">${t('common.delete')}</button></td>
             `;
         }
