@@ -389,13 +389,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (e.key === 'Enter') { e.preventDefault(); batchApplyToAll(); }
         });
     }
-    // Batch nozzle change → re-quote (model+nozzle handled by presets.js)
-    const batchNozzle = document.getElementById('batch-nozzle-diameter');
-    if (batchNozzle) {
-        batchNozzle.addEventListener('change', async () => {
-            if (selectedFilesMap.size > 0) await reQuoteAllSelectedFiles('喷嘴已切换');
-        });
-    }
     // Batch preset change → show params summary + update quoteOptions
     if (batchSlicerPreset) {
         batchSlicerPreset.addEventListener('change', async () => {
@@ -405,7 +398,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 quoteOptions.slicer_preset_id = null;
                 saveSlicerPresetSelection();
                 if (paramsEl) { paramsEl.classList.add('hidden'); paramsEl.textContent = ''; }
-                if (selectedFilesMap.size > 0) await reQuoteAllSelectedFiles('切片预设已取消');
                 return;
             }
             quoteOptions.slicer_preset_id = Number(val);
@@ -422,7 +414,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             } catch (e) { /* ignore */ }
-            if (selectedFilesMap.size > 0) await reQuoteAllSelectedFiles('切片预设已切换');
         });
     }
 
