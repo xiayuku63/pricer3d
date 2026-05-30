@@ -89,6 +89,10 @@ STRINGS = {
     'common.retry': '重试',
     'common.refresh': '刷新',
     'common.preview': '预览',
+    'common.loadError': '加载失败',
+    'common.days': '天',
+    'common.unknownError': '未知错误',
+    'common.requestFailed': '请求失败',
 
     // ── Auth / 认证 ──
     'auth.login': '登录',
@@ -216,6 +220,25 @@ STRINGS = {
     'slicer.presetDeleteError': '预设删除失败',
     'slicer.presetsTable': '已保存预设',
     'slicer.paramSummary': '层高:{layer} 墙:{walls} 填充:{infill}%',
+    'slicer.noPresets': '暂无预设',
+    'slicer.selectIniFile': '请选择 .ini 文件',
+    'slicer.uploadSuccess': '上传成功',
+    'slicer.uploadError': '上传失败',
+    'slicer.genSuccess': '生成成功',
+    'slicer.genError': '生成失败',
+    'slicer.deleted': '已删除',
+    'slicer.saved': '保存成功',
+    'slicer.presetLoaded': '已加载预设: {name}',
+    'slicer.savedAs': '已另存为: {name}',
+    'slicer.selectPrinterFirst': '请先选择打印机型号',
+    'slicer.printerDataMissing': '未找到打印机数据，请刷新后重试',
+    'slicer.invalidPresetData': '预设数据无效',
+    'slicer.selectPresetToSave': '请先选择一个预设再保存',
+    'slicer.presetGone': '预设不存在，请刷新列表',
+    'slicer.systemPresetReadOnly': '系统预设不可覆盖，请使用「另存为」',
+    'slicer.recalcAfterUpdate': '切片预设已更新，重算报价',
+    'slicer.recalcAfterGen': '切片预设已生成，重算报价',
+    'slicer.recalcAfterDelete': '切片预设已删除，重算报价',
 
     // ── Printer / 打印机配置 ──
     'printer.title': '机型配置',
@@ -245,6 +268,8 @@ STRINGS = {
     'material.colorHex': '颜色色号',
     'material.colorName': '颜色名称',
     'material.defaultColors': '默认颜色',
+    'material.genericBrand': '通用',
+    'material.colorExists': '该颜色已存在',
 
     // ── Settings / 用户中心 ──
     'settings.title': '用户中心',
@@ -259,6 +284,21 @@ STRINGS = {
     'settings.slicerConfig': '切片配置',
     'settings.materialConfig': '材料配置',
     'settings.membership': '会员套餐',
+    'settings.editColorsFor': '编辑颜色 - {name}',
+    'settings.formulaEndpointDown': '校验接口未生效，请重启后端服务',
+    'settings.formulaUnit': '单件公式：{msg}',
+    'settings.formulaTotal': '总价公式：{msg}',
+    'settings.formulaValidationFailed': '公式校验失败',
+    'settings.formulaValidationPassed': '公式校验通过',
+    'settings.recalcAfterSave': '按新设置重算报价',
+    'settings.noAdminPermission': '无管理员权限',
+    'settings.setDefaultFailed': '设为默认失败',
+    'settings.setDefaultSuccess': '已设为全局默认（新用户生效）',
+    'settings.allPasswordFieldsRequired': '所有密码字段必填',
+    'settings.passwordsMismatch': '两次输入的新密码不一致',
+    'settings.passwordTooShort': '新密码长度不能少于6位',
+    'settings.changePasswordFailed': '修改失败',
+    'settings.changePasswordSuccess': '修改成功，请重新登录',
 
     // ── Membership / 会员 ──
     'membership.title': '会员套餐',
@@ -268,6 +308,11 @@ STRINGS = {
     'membership.refreshError': '刷新失败',
     'membership.loadError': '加载失败',
     'membership.refreshed': '会员状态已刷新',
+    'membership.noPlans': '暂无可用套餐',
+    'membership.payNow': '立即支付',
+    'membership.createOrderFailed': '创建订单失败',
+    'membership.noPaymentChannel': '当前未配置支付渠道',
+    'membership.orderCreated': '已打开支付页面：订单 {orderNo}。支付完成后点击"刷新会员状态"。',
 
     // ── History / 报价历史 ──
     'history.title': '报价历史',
@@ -275,18 +320,26 @@ STRINGS = {
     'history.files': '文件',
     'history.status': '状态',
     'history.success': '✓ 成功',
-    'history.noRecords': '暂无报价记录',
+    'history.failed': '✗ 失败',
+    'history.noRecords': '暂无报价历史记录',
+    'history.noRecordsSubtext': '上传模型完成报价后，记录将显示在这里',
 
     // ── Preview / 预览 ──
     'preview.fileNotFound': '文件未找到',
     'preview.loading': '加载中 {name} ({pct}%)',
+    'preview.loadingFile': '加载中 {filename} ({size}KB)...',
     'preview.title': '3D 预览',
 
     // ── Orientation / 朝向 ──
     'orientation.autoOrient': '🎯 智能摆放 (Lay on Face)',
-    'orientation.exit': '退出摆放模式',
+    'orientation.exit': '🔙 退出摆放模式',
     'orientation.noFace': '无可用摆放面',
     'orientation.analyzeError': '分析失败',
+    'orientation.requestFailedLogin': '请求失败，请登录后重试',
+    'orientation.requestFailed': '请求失败',
+    'orientation.submitting': '提交中...',
+    'orientation.marked': '已标记',
+    'orientation.markFailed': '标记失败: {msg}',
 
     // ── Theme ──
     'theme.toggle': '切换深色/浅色主题',
@@ -322,6 +375,10 @@ STRINGS = {
     'common.retry': 'Retry',
     'common.refresh': 'Refresh',
     'common.preview': 'Preview',
+    'common.loadError': 'Load failed',
+    'common.days': ' days',
+    'common.unknownError': 'Unknown error',
+    'common.requestFailed': 'Request failed',
 
     // ── Auth ──
     'auth.login': 'Login',
@@ -449,6 +506,25 @@ STRINGS = {
     'slicer.presetDeleteError': 'Failed to delete preset',
     'slicer.presetsTable': 'Saved Presets',
     'slicer.paramSummary': 'Layer:{layer} Walls:{walls} Infill:{infill}%',
+    'slicer.noPresets': 'No presets',
+    'slicer.selectIniFile': 'Select .ini file',
+    'slicer.uploadSuccess': 'Uploaded',
+    'slicer.uploadError': 'Upload failed',
+    'slicer.genSuccess': 'Generated',
+    'slicer.genError': 'Generation failed',
+    'slicer.deleted': 'Deleted',
+    'slicer.saved': 'Saved',
+    'slicer.presetLoaded': 'Loaded: {name}',
+    'slicer.savedAs': 'Saved as: {name}',
+    'slicer.selectPrinterFirst': 'Select a printer model first',
+    'slicer.printerDataMissing': 'Printer data not found, refresh and retry',
+    'slicer.invalidPresetData': 'Invalid preset data',
+    'slicer.selectPresetToSave': 'Select a preset to save',
+    'slicer.presetGone': 'Preset not found, refresh',
+    'slicer.systemPresetReadOnly': 'System preset is read-only, use Save As',
+    'slicer.recalcAfterUpdate': 'Preset updated, recalculating',
+    'slicer.recalcAfterGen': 'Preset generated, recalculating',
+    'slicer.recalcAfterDelete': 'Preset deleted, recalculating',
 
     // ── Printer ──
     'printer.title': 'Printer Config',
@@ -478,6 +554,8 @@ STRINGS = {
     'material.colorHex': 'Hex',
     'material.colorName': 'Color Name',
     'material.defaultColors': 'Default Colors',
+    'material.genericBrand': 'Generic',
+    'material.colorExists': 'Color already exists',
 
     // ── Settings ──
     'settings.title': 'Settings',
@@ -492,6 +570,21 @@ STRINGS = {
     'settings.slicerConfig': 'Slicer Config',
     'settings.materialConfig': 'Materials',
     'settings.membership': 'Membership',
+    'settings.editColorsFor': 'Edit Colors - {name}',
+    'settings.formulaEndpointDown': 'Validation endpoint unavailable, restart server',
+    'settings.formulaUnit': 'Unit formula: {msg}',
+    'settings.formulaTotal': 'Total formula: {msg}',
+    'settings.formulaValidationFailed': 'Formula validation failed',
+    'settings.formulaValidationPassed': 'Formula validation passed',
+    'settings.recalcAfterSave': 'Recalculating with new settings',
+    'settings.noAdminPermission': 'No admin permission',
+    'settings.setDefaultFailed': 'Failed to set as default',
+    'settings.setDefaultSuccess': 'Set as global default (applies to new users)',
+    'settings.allPasswordFieldsRequired': 'All password fields are required',
+    'settings.passwordsMismatch': 'New passwords do not match',
+    'settings.passwordTooShort': 'Password must be at least 6 characters',
+    'settings.changePasswordFailed': 'Change failed',
+    'settings.changePasswordSuccess': 'Password changed, please login again',
 
     // ── Membership ──
     'membership.title': 'Membership',
@@ -501,6 +594,11 @@ STRINGS = {
     'membership.refreshError': 'Refresh failed',
     'membership.loadError': 'Failed to load',
     'membership.refreshed': 'Membership status refreshed',
+    'membership.noPlans': 'No plans available',
+    'membership.payNow': 'Pay Now',
+    'membership.createOrderFailed': 'Failed to create order',
+    'membership.noPaymentChannel': 'Payment not configured',
+    'membership.orderCreated': 'Payment page opened: Order {orderNo}. Click "Refresh Status" after payment.',
 
     // ── History ──
     'history.title': 'Quote History',
@@ -508,18 +606,26 @@ STRINGS = {
     'history.files': 'Files',
     'history.status': 'Status',
     'history.success': '✓ Success',
+    'history.failed': '✗ Failed',
     'history.noRecords': 'No quote history',
+    'history.noRecordsSubtext': 'Records will appear here after quoting models',
 
     // ── Preview ──
     'preview.fileNotFound': 'File not found',
     'preview.loading': 'Loading {name} ({pct}%)',
+    'preview.loadingFile': 'Loading {filename} ({size}KB)...',
     'preview.title': '3D Preview',
 
     // ── Orientation ──
     'orientation.autoOrient': '🎯 Auto Orient (Lay on Face)',
-    'orientation.exit': 'Exit Lay Mode',
+    'orientation.exit': '🔙 Exit Lay Mode',
     'orientation.noFace': 'No surface available',
     'orientation.analyzeError': 'Analysis failed',
+    'orientation.requestFailedLogin': 'Request failed, please login and retry',
+    'orientation.requestFailed': 'Request failed',
+    'orientation.submitting': 'Submitting...',
+    'orientation.marked': 'Marked',
+    'orientation.markFailed': 'Mark failed: {msg}',
 
     // ── Theme ──
     'theme.toggle': 'Toggle dark/light theme',

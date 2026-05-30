@@ -11,6 +11,7 @@ import {
     authToken, authFetch, quoteOptions,
     selectedFilesMap, currentPreviewFilename,
 } from './state.js';
+import { t } from './i18n.js';
 import { openLoginModal } from './auth.js';
 
 let dom = {};
@@ -51,7 +52,7 @@ export function resetOrientationHandler() {
     clearClusters();
     window.__onLayFaceClick = null;
     const { layFaceBtn } = dom;
-    if (layFaceBtn) layFaceBtn.textContent = '🎯 智能摆放 (Lay on Face)';
+    if (layFaceBtn) layFaceBtn.textContent = t('orientation.autoOrient');
     quoteOptions.orientation = { x: 0, y: 0, z: 0 };
     // resetOrientation is from viewer.js
     const viewerModule = import('./viewer.js');
@@ -65,10 +66,10 @@ export async function toggleLayFace() {
     const file = selectedFilesMap.get(currentPreviewFilename);
     if (!file) return;
 
-    if (layFaceBtn && layFaceBtn.textContent.includes('退出')) {
+    if (layFaceBtn && layFaceBtn.textContent.includes(t('orientation.exit').replace('🔙 ', ''))) {
         clearClusters();
         window.__onLayFaceClick = null;
-        layFaceBtn.textContent = '🎯 智能摆放 (Lay on Face)';
+        layFaceBtn.textContent = t('orientation.autoOrient');
         return;
     }
 
@@ -79,10 +80,10 @@ export async function toggleLayFace() {
         const resp = await authFetch('/api/orientation/coplanar', { method: 'POST', body: formData });
         if (!resp || resp.status === 401) { openLoginModal(); return; }
         const data = await resp.json();
-        if (!resp.ok) throw new Error(data.detail || '分析失败');
+        if (!resp.ok) throw new Error(data.detail || t('orientation.analyzeError'));
         const clusters = data.clusters || [];
         if (clusters.length === 0) {
-            if (layFaceBtn) { layFaceBtn.textContent = '无可用摆放面'; setTimeout(() => { layFaceBtn.textContent = '🎯 智能摆放 (Lay on Face)'; }, 2000); }
+            if (layFaceBtn) { layFaceBtn.textContent = t('orientation.noFace'); setTimeout(() => { layFaceBtn.textContent = t('orientation.autoOrient'); }, 2000); }
             return;
         }
 
@@ -95,7 +96,7 @@ export async function toggleLayFace() {
             syncOrientationFromMesh();
             clearClusters();
             window.__onLayFaceClick = null;
-            if (layFaceBtn) layFaceBtn.textContent = '🎯 智能摆放 (Lay on Face)';
+            if (layFaceBtn) layFaceBtn.textContent = t('orientation.autoOrient');
             return true;
         };
 
@@ -107,15 +108,15 @@ export async function toggleLayFace() {
                     syncOrientationFromMesh();
                     clearClusters();
                     window.__onLayFaceClick = null;
-                    if (layFaceBtn) layFaceBtn.textContent = '🎯 智能摆放 (Lay on Face)';
+                    if (layFaceBtn) layFaceBtn.textContent = t('orientation.autoOrient');
                 }
             },
             setClusterHover
         );
-        if (layFaceBtn) layFaceBtn.textContent = '🔙 退出摆放模式';
+        if (layFaceBtn) layFaceBtn.textContent = t('orientation.exit');
     } catch (e) {
         console.error('Lay on Face error:', e);
-        if (layFaceBtn) { layFaceBtn.textContent = e.message || '请求失败，请登录后重试'; setTimeout(() => { layFaceBtn.textContent = '🎯 智能摆放 (Lay on Face)'; }, 3000); }
+        if (layFaceBtn) { layFaceBtn.textContent = e.message || t('orientation.requestFailedLogin'); setTimeout(() => { layFaceBtn.textContent = t('orientation.autoOrient'); }, 3000); }
     }
 }
 
@@ -134,7 +135,7 @@ export async function submitTraining() {
     formData.append('z', String(euler.z || 0));
 
     if (orientTrainBtn) orientTrainBtn.disabled = true;
-    if (orientTrainStatus) { orientTrainStatus.textContent = '提交中...'; orientTrainStatus.classList.remove('hidden'); }
+    if (orientTrainStatus) { orientTrainStatus.textContent = t('orientation.submitting'); orientTrainStatus.classList.remove('hidden'); }
     try {
         const resp = await authFetch('/api/orientation/train', { method: 'POST', body: formData });
         if (resp.status === 401) {
@@ -145,10 +146,10 @@ export async function submitTraining() {
             return;
         }
         const data = await resp.json();
-        if (!resp.ok) throw new Error(data.detail || '请求失败');
-        if (orientTrainStatus) { orientTrainStatus.textContent = '已标记'; orientTrainStatus.className = 'text-xs text-green-600'; }
+        if (!resp.ok) throw new Error(data.detail || t('orientation.requestFailed'));
+        if (orientTrainStatus) { orientTrainStatus.textContent = t('orientation.marked'); orientTrainStatus.className = 'text-xs text-green-600'; }
     } catch (e) {
-        if (orientTrainStatus) { orientTrainStatus.textContent = '标记失败: ' + (e.message || '未知错误'); orientTrainStatus.className = 'text-xs text-red-600'; }
+        if (orientTrainStatus) { orientTrainStatus.textContent = t('orientation.markFailed', { msg: (e.message || t('common.unknownError')) }); orientTrainStatus.className = 'text-xs text-red-600'; }
     } finally {
         if (orientTrainBtn) orientTrainBtn.disabled = false;
         setTimeout(() => {

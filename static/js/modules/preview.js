@@ -14,6 +14,7 @@ import {
     setupFaceClickHandler, highlightFaces, resetHighlight, fitCameraToMesh,
 } from './viewer.js';
 import { clearClusters } from './layface.js';
+import { t } from './i18n.js';
 
 let dom = {};
 
@@ -176,7 +177,7 @@ export function closePreviewModal() {
     setupFaceClickHandler(null);
     clearClusters();
     window.__onLayFaceClick = null;
-    if (layFaceBtn) layFaceBtn.textContent = '🎯 智能摆放 (Lay on Face)';
+    if (layFaceBtn) layFaceBtn.textContent = t('orientation.autoOrient');
     if (previewModal) previewModal.classList.add('hidden');
     if (viewCube) viewCube.classList.add('hidden');
 }
@@ -189,10 +190,10 @@ export function previewByFilename(filename, ext) {
     const file = selectedFilesMap.get(filename);
     if (!file) {
         clearCurrentMesh();
-        if (previewPlaceholder) { previewPlaceholder.textContent = '文件未找到'; previewPlaceholder.classList.remove('hidden'); }
+        if (previewPlaceholder) { previewPlaceholder.textContent = t('preview.fileNotFound'); previewPlaceholder.classList.remove('hidden'); }
         return;
     }
-    if (previewPlaceholder) { previewPlaceholder.textContent = `加载中 ${filename} (${(file.size/1024).toFixed(0)}KB)...`; previewPlaceholder.classList.remove('hidden'); }
+    if (previewPlaceholder) { previewPlaceholder.textContent = t('preview.loadingFile', { filename: filename, size: (file.size/1024).toFixed(0) }); previewPlaceholder.classList.remove('hidden'); }
     const rowData = currentResults.find((i) => i && i.filename === filename);
     const colorForPreview = (rowData && rowData.color) ? rowData.color : quoteOptions.color;
     renderSTL(file, colorForPreview);

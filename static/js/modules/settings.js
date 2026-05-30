@@ -13,6 +13,7 @@ import {
     defaultNozzle, setDefaultNozzle,
     defaultSlicerPresetId, setDefaultSlicerPresetId,
 } from './state.js';
+import { t } from './i18n.js';
 import { openLoginModal } from './auth.js';
 import { renderSlicerPresetsUI, fetchSlicerPresets, fetchPrinterModels } from './presets.js';
 import { refreshOptionsSummary, normalizeResultsWithCurrentOptions, renderResultsTable, recalcSummaryFromCurrentResults, reQuoteAllSelectedFiles, refreshBatchMaterialDropdown } from './quote.js';
@@ -64,8 +65,8 @@ export function refreshQuoteColorDropdowns() {
 
 export function buildPrinterOptionsHtml(selectedId) {
     const sel = document.getElementById("cfg-printer-model-main");
-    if (!sel || sel.options.length <= 1) return '<option value="">选择打印机...</option>';
-    let html = '<option value="">选择打印机...</option>';
+    if (!sel || sel.options.length <= 1) return '<option value="">' + t('printer.selectPrinter') + '</option>';
+    let html = '<option value="">' + t('printer.selectPrinter') + '</option>';
     for (const opt of sel.options) {
         if (!opt.value) continue;
         html += '<option value="' + opt.value + '"' + (opt.value === selectedId ? ' selected' : '') + '>' + opt.text + '</option>';
@@ -87,16 +88,16 @@ export function renderUserCenterUI() {
         materialsTbody.innerHTML = MATERIAL_OPTIONS.map((m, idx) => `
             <tr>
                 <td class="px-2 py-2"><input type="text" class="w-full border-gray-400 rounded-sm text-xs px-1 py-1" value="${escapeHtml(m.name)}" data-idx="${idx}" data-field="name"></td>
-                <td class="px-2 py-2"><input type="text" class="w-full border-gray-400 rounded-sm text-xs px-1 py-1" value="${escapeHtml(m.brand || '通用')}" data-idx="${idx}" data-field="brand"></td>
+                <td class="px-2 py-2"><input type="text" class="w-full border-gray-400 rounded-sm text-xs px-1 py-1" value="${escapeHtml(m.brand || t('material.genericBrand'))}" data-idx="${idx}" data-field="brand"></td>
                 <td class="px-2 py-2"><input type="number" step="0.01" class="w-full border-gray-400 rounded-sm text-xs px-1 py-1" value="${m.density}" data-idx="${idx}" data-field="density"></td>
                 <td class="px-2 py-2"><input type="number" step="0.01" class="w-full border-gray-400 rounded-sm text-xs px-1 py-1" value="${m.price_per_kg}" data-idx="${idx}" data-field="price_per_kg"></td>
                 <td class="px-2 py-2">
                     <div class="flex flex-wrap items-center gap-1">
                         ${materialColorsArray(m).map(c => `<span class="w-4 h-4 rounded-sm border border-gray-400 inline-block cursor-pointer" style="background:${c.hex}" title="${escapeHtml(c.name)}" data-color-idx="${idx}" data-color-hex="${c.hex}"></span>`).join('')}
-                        <button type="button" class="text-xs text-indigo-600 hover:text-indigo-800 edit-colors-btn" data-idx="${idx}">编辑</button>
+                        <button type="button" class="text-xs text-indigo-600 hover:text-indigo-800 edit-colors-btn" data-idx="${idx}">${t('common.edit')}</button>
                     </div>
                 </td>
-                <td class="px-2 py-2 text-center"><button type="button" class="text-red-500 hover:text-red-700 delete-material-btn" data-idx="${idx}">删除</button></td>
+                <td class="px-2 py-2 text-center"><button type="button" class="text-red-500 hover:text-red-700 delete-material-btn" data-idx="${idx}">${t('common.delete')}</button></td>
             </tr>
         `).join('');
     }
@@ -155,7 +156,7 @@ export function openColorEditor(materialIdx) {
     if (!m) return;
     const colors = materialColorsArray(m);
     const title = document.getElementById('color-editor-title');
-    if (title) title.textContent = `编辑颜色 - ${m.name}`;
+    if (title) title.textContent = t('settings.editColorsFor', { name: m.name });
     const list = document.getElementById('color-editor-list');
     if (list) {
         list.innerHTML = colors.map(c => `
@@ -191,7 +192,7 @@ export function addColorToMaterial() {
     const existing = materialColorsArray(m);
     if (existing.some(c => c.hex === hex)) {
         const toast = document.getElementById('color-editor-toast');
-        if (toast) { toast.textContent = '该颜色已存在'; toast.classList.remove('hidden'); setTimeout(() => toast.classList.add('hidden'), 2000); }
+        if (toast) { toast.textContent = t('material.colorExists'); toast.classList.remove('hidden'); setTimeout(() => toast.classList.add('hidden'), 2000); }
         return;
     }
     m.colors.push({ name: hex, hex });
@@ -223,26 +224,26 @@ export async function validateCurrentFormulas() {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
         });
         if (res.status === 401) {
-            if (formulaValidateMsg) { formulaValidateMsg.textContent = '登录已失效，请重新登录'; formulaValidateMsg.className = 'text-xs text-red-600'; formulaValidateMsg.classList.remove('hidden'); }
+            if (formulaValidateMsg) { formulaValidateMsg.textContent = t('auth.sessionExpired'); formulaValidateMsg.className = 'text-xs text-red-600'; formulaValidateMsg.classList.remove('hidden'); }
             openLoginModal(); return false;
         }
         if (res.status === 404) {
-            if (formulaValidateMsg) { formulaValidateMsg.textContent = '校验接口未生效，请重启后端服务'; formulaValidateMsg.className = 'text-xs text-red-600'; formulaValidateMsg.classList.remove('hidden'); }
+            if (formulaValidateMsg) { formulaValidateMsg.textContent = t('settings.formulaEndpointDown'); formulaValidateMsg.className = 'text-xs text-red-600'; formulaValidateMsg.classList.remove('hidden'); }
             return false;
         }
         let data = null;
         try { data = await res.json(); } catch (e) {}
         if (!res.ok || !data || !data.ok) {
-            const unitErr = data?.unit?.error ? `单件公式：${data.unit.error}` : '';
-            const totalErr = data?.total?.error ? `总价公式：${data.total.error}` : '';
-            const msg = [unitErr, totalErr].filter(Boolean).join('；') || '公式校验失败';
+            const unitErr = data?.unit?.error ? t('settings.formulaUnit', { msg: data.unit.error }) : '';
+            const totalErr = data?.total?.error ? t('settings.formulaTotal', { msg: data.total.error }) : '';
+            const msg = [unitErr, totalErr].filter(Boolean).join('；') || t('settings.formulaValidationFailed');
             if (formulaValidateMsg) { formulaValidateMsg.textContent = msg; formulaValidateMsg.className = 'text-xs text-red-600'; formulaValidateMsg.classList.remove('hidden'); }
             return false;
         }
-        if (formulaValidateMsg) { formulaValidateMsg.textContent = '公式校验通过'; formulaValidateMsg.className = 'text-xs text-green-600'; formulaValidateMsg.classList.remove('hidden'); setTimeout(() => formulaValidateMsg.classList.add('hidden'), 3000); }
+        if (formulaValidateMsg) { formulaValidateMsg.textContent = t('settings.formulaValidationPassed'); formulaValidateMsg.className = 'text-xs text-green-600'; formulaValidateMsg.classList.remove('hidden'); setTimeout(() => formulaValidateMsg.classList.add('hidden'), 3000); }
         return true;
     } catch (e) {
-        if (formulaValidateMsg) { formulaValidateMsg.textContent = e.message || '公式校验失败'; formulaValidateMsg.className = 'text-xs text-red-600'; formulaValidateMsg.classList.remove('hidden'); }
+        if (formulaValidateMsg) { formulaValidateMsg.textContent = e.message || t('settings.formulaValidationFailed'); formulaValidateMsg.className = 'text-xs text-red-600'; formulaValidateMsg.classList.remove('hidden'); }
         return false;
     }
 }
@@ -279,7 +280,7 @@ export async function saveUserSettings() {
         if (!res.ok) {
             let data = null;
             try { data = await res.json(); } catch (e) {}
-            throw new Error((data && data.detail) ? String(data.detail) : '保存失败');
+            throw new Error((data && data.detail) ? String(data.detail) : t('settings.saveError'));
         }
         if (userCenterMsg) { userCenterMsg.classList.remove('hidden'); setTimeout(() => userCenterMsg.classList.add('hidden'), 3000); }
         // Update local defaults so subsequent page loads see them
@@ -295,14 +296,14 @@ export async function saveUserSettings() {
         renderResultsTable();
         recalcSummaryFromCurrentResults();
         if (userCenterModal) userCenterModal.classList.add('hidden');
-        await reQuoteAllSelectedFiles('按新设置重算报价');
+        await reQuoteAllSelectedFiles(t('settings.recalcAfterSave'));
     } catch (e) { alert(e.message); }
 }
 
 // ── Set as defaults (admin) ──
 export async function setAsDefaults() {
     const { userCenterMsg } = dom;
-    if (!authToken || !currentUser?.is_admin) { alert('无管理员权限'); return; }
+    if (!authToken || !currentUser?.is_admin) { alert(t('settings.noAdminPermission')); return; }
     try {
         const formulaOk = await validateCurrentFormulas();
         if (!formulaOk) return;
@@ -315,15 +316,15 @@ export async function setAsDefaults() {
         if (!saveRes.ok) {
             let data = null;
             try { data = await saveRes.json(); } catch (e) {}
-            throw new Error((data && data.detail) ? String(data.detail) : '保存失败');
+            throw new Error((data && data.detail) ? String(data.detail) : t('settings.saveError'));
         }
         const resp = await authFetch('/api/admin/defaults/from-me', { method: 'POST' });
         if (!resp.ok && currentUser?.is_admin) {
             let data = null;
             try { data = await resp.json(); } catch (e) {}
-            throw new Error((data && data.message) ? String(data.message) : '设为默认失败');
+            throw new Error((data && data.message) ? String(data.message) : t('settings.setDefaultFailed'));
         }
-        if (userCenterMsg) { userCenterMsg.textContent = '已设为全局默认（新用户生效）'; userCenterMsg.classList.remove('hidden'); setTimeout(() => { userCenterMsg.classList.add('hidden'); }, 3000); }
+        if (userCenterMsg) { userCenterMsg.textContent = t('settings.setDefaultSuccess'); userCenterMsg.classList.remove('hidden'); setTimeout(() => { userCenterMsg.classList.add('hidden'); }, 3000); }
     } catch (e) { alert(e.message); }
 }
 
@@ -333,9 +334,9 @@ export async function changePassword() {
     const oldPwd = ucOldPassword?.value;
     const newPwd = ucNewPassword?.value;
     const confPwd = ucConfirmPassword?.value;
-    if (!oldPwd || !newPwd || !confPwd) { showPwdMsg("所有密码字段必填", false); return; }
-    if (newPwd !== confPwd) { showPwdMsg("两次输入的新密码不一致", false); return; }
-    if (newPwd.length < 6) { showPwdMsg("新密码长度不能少于6位", false); return; }
+    if (!oldPwd || !newPwd || !confPwd) { showPwdMsg(t('settings.allPasswordFieldsRequired'), false); return; }
+    if (newPwd !== confPwd) { showPwdMsg(t('settings.passwordsMismatch'), false); return; }
+    if (newPwd.length < 6) { showPwdMsg(t('settings.passwordTooShort'), false); return; }
     try {
         const res = await authFetch('/api/users/change-password', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -344,8 +345,8 @@ export async function changePassword() {
         if (res.status === 401) { if (userCenterModal) userCenterModal.classList.add('hidden'); openLoginModal(); return; }
         let data = {};
         try { data = await res.json(); } catch(e){}
-        if (!res.ok) { showPwdMsg((data && data.detail) ? String(data.detail) : '修改失败', false); return; }
-        showPwdMsg("修改成功，请重新登录", true);
+        if (!res.ok) { showPwdMsg((data && data.detail) ? String(data.detail) : t('settings.changePasswordFailed'), false); return; }
+        showPwdMsg(t('settings.changePasswordSuccess'), true);
         setTimeout(async () => {
             if (userCenterModal) userCenterModal.classList.add('hidden');
             setCurrentUser(null);
