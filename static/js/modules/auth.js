@@ -14,6 +14,7 @@ import { loadQuoteHistory } from './history.js';
 import { buildThumbnails, closePreviewModal } from './preview.js';
 import { quoteSelectedFiles } from './quote.js';
 import { clearClusters } from './layface.js';
+import { t, lang } from './i18n.js';
 
 // ── DOM refs (queried on init) ──
 let dom = {};
@@ -155,11 +156,11 @@ function _switchToView(viewId, title, subtitle) {
 }
 
 export function showLoginView() {
-    _switchToView('login-view', '登录 Pricer3D', '3D 打印自动报价系统');
+    _switchToView('login-view', t('auth.loginTitle'), t('auth.subtitle'));
 }
 
 export function showResetRequestView() {
-    _switchToView('reset-request-view', '重置密码', '3D 打印自动报价系统');
+    _switchToView('reset-request-view', t('auth.resetPassword'), t('auth.subtitle'));
     const emailEl = document.getElementById('reset-email');
     if (emailEl) emailEl.value = '';
     const captchaEl = document.getElementById('reset-request-captcha');
@@ -171,7 +172,7 @@ export function showResetRequestView() {
 }
 
 export function showResetConfirmView(email) {
-    _switchToView('reset-confirm-view', '设置新密码', '3D 打印自动报价系统');
+    _switchToView('reset-confirm-view', t('auth.setNewPassword'), t('auth.subtitle'));
     const display = document.getElementById('reset-confirm-email-display');
     if (display) display.textContent = email;
     const codeEl = document.getElementById('reset-code');
@@ -189,7 +190,7 @@ export async function refreshLoginCaptcha() {
     try {
         const res = await fetch('/api/auth/captcha', { method: 'GET' });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || '验证码获取失败');
+        if (!res.ok) throw new Error(data.detail || t('auth.codeSendError'));
         setCaptchaId(data.captcha_id || "");
         setCaptchaUrl(data.image_url || "");
         const fallbackDataUrl = data.image_data_url || "";
@@ -203,7 +204,7 @@ export async function refreshLoginCaptcha() {
     } catch (e) {
         setCaptchaId(""); setCaptchaUrl("");
         if (loginCaptchaImg) loginCaptchaImg.removeAttribute('src');
-        _showBannerError('验证码加载失败，请点击验证码图片重试');
+        _showBannerError(t('auth.captchaLoadError'));
     }
 }
 
@@ -213,7 +214,7 @@ async function _refreshResetCaptcha() {
     try {
         const res = await fetch('/api/auth/captcha', { method: 'GET' });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || '验证码获取失败');
+        if (!res.ok) throw new Error(data.detail || t('auth.codeSendError'));
         _resetCaptchaId = data.captcha_id || "";
         _resetCaptchaUrl = data.image_url || "";
         const fallbackDataUrl = data.image_data_url || "";
@@ -227,7 +228,7 @@ async function _refreshResetCaptcha() {
     } catch (e) {
         _resetCaptchaId = ""; _resetCaptchaUrl = "";
         if (img) img.removeAttribute('src');
-        _showBannerError('验证码加载失败，请点击刷新');
+        _showBannerError(t('auth.captchaLoadError'));
     }
 }
 
@@ -247,7 +248,7 @@ function _startResetCodeCountdown(btn, seconds) {
         }
         var m = Math.floor(seconds / 60);
         var s = seconds % 60;
-        btn.textContent = m > 0 ? m + '分' + s + '秒后重发' : s + '秒后重发';
+        btn.textContent = m > 0 ? t('auth.resendInMin', {minutes: m, seconds: s}) : t('auth.resendIn', {seconds: s});
         seconds--;
     }
     tick();
@@ -268,7 +269,7 @@ export function openLoginModal() {
     _clearFieldError('login-password-err');
     _clearFieldError('login-captcha-err');
     const btn = document.getElementById('login-submit-btn');
-    if (btn) { btn.disabled = false; btn.textContent = '登 录'; }
+    if (btn) { btn.disabled = false; btn.textContent = t('auth.login'); }
     showLoginView();
     _hideBannerSuccess();
     if (loginModal) loginModal.classList.remove('hidden');
@@ -294,7 +295,7 @@ export function renderAuthUI() {
         if (userMenu) userMenu.classList.remove('hidden');
         if (userMenuBtn) {
             const isMember = !!currentUser.is_member;
-            userMenuBtn.textContent = isMember ? `${currentUser.username}（会员）` : `${currentUser.username}`;
+            userMenuBtn.textContent = isMember ? currentUser.username + '（' + t('auth.memberBadge') + '）' : currentUser.username;
         }
         if (openAdminUsersBtn) {
             openAdminUsersBtn.classList.toggle('hidden', !currentUser.is_admin);
@@ -315,32 +316,32 @@ function validateLoginForm() {
 
     const identifier = (loginUsername?.value || '').trim();
     if (!identifier) {
-        _showFieldError('login-username-err', '请输入账号');
+        _showFieldError('login-username-err', t('auth.enterUsername'));
         valid = false;
     }
 
     const password = loginPassword?.value || '';
     if (!password) {
-        _showFieldError('login-password-err', '请输入密码');
+        _showFieldError('login-password-err', t('auth.enterPassword'));
         valid = false;
     } else if (password.length < 6) {
-        _showFieldError('login-password-err', '密码至少 6 位');
+        _showFieldError('login-password-err', t('auth.passwordMinLength'));
         valid = false;
     }
 
     const captchaCode = (loginCaptchaCode?.value || '').trim();
     if (!captchaCode) {
-        _showFieldError('login-captcha-err', '请输入验证码');
+        _showFieldError('login-captcha-err', t('auth.enterCaptcha'));
         valid = false;
     }
 
     if (!(loginAcceptLegal && loginAcceptLegal.checked)) {
-        _showBannerError('请先阅读并同意《用户协议》和《隐私政策》');
+        _showBannerError(t('auth.agreeTermsRequired'));
         valid = false;
     }
 
     if (!currentCaptchaId) {
-        _showFieldError('login-captcha-err', '验证码已失效，已自动刷新');
+        _showFieldError('login-captcha-err', t('auth.captchaExpired'));
         refreshLoginCaptcha();
         valid = false;
     }
@@ -380,7 +381,7 @@ export async function handleLoginSubmit() {
     _loginSubmitting = true;
     if (loginSubmitBtn) {
         loginSubmitBtn.disabled = true;
-        loginSubmitBtn.textContent = '登录中...';
+        loginSubmitBtn.textContent = t('common.loading');
     }
 
     try {
@@ -395,7 +396,7 @@ export async function handleLoginSubmit() {
             })
         });
         const data = await response.json();
-        if (!response.ok) throw new Error(data.detail || '登录失败');
+        if (!response.ok) throw new Error(data.detail || t('auth.loginFailed'));
         await handleAuthSuccess(data);
         // Tell browser password manager to save credentials
         try {
@@ -409,13 +410,13 @@ export async function handleLoginSubmit() {
             }
         } catch (_) { /* password manager not available */ }
     } catch (err) {
-        _showBannerError(err.message || '登录失败，请重试');
+        _showBannerError(err.message || t('auth.loginFailed'));
         await refreshLoginCaptcha();
     } finally {
         _loginSubmitting = false;
         if (loginSubmitBtn) {
             loginSubmitBtn.disabled = false;
-            loginSubmitBtn.textContent = '登 录';
+            loginSubmitBtn.textContent = t('auth.login');
         }
     }
 }
@@ -433,13 +434,13 @@ async function handleResetRequest() {
     const captcha = (captchaEl?.value || '').trim();
 
     let valid = true;
-    if (!email) { _showFieldError('reset-email-err', '请输入邮箱'); valid = false; }
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { _showFieldError('reset-email-err', '邮箱格式不正确'); valid = false; }
-    if (!captcha) { _showFieldError('reset-request-captcha-err', '请输入验证码'); valid = false; }
-    if (!_resetCaptchaId) { _showFieldError('reset-request-captcha-err', '验证码已失效，已自动刷新'); _refreshResetCaptcha(); valid = false; }
+    if (!email) { _showFieldError('reset-email-err', t('auth.enterEmail')); valid = false; }
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { _showFieldError('reset-email-err', t('auth.invalidEmail')); valid = false; }
+    if (!captcha) { _showFieldError('reset-request-captcha-err', t('auth.enterCaptcha')); valid = false; }
+    if (!_resetCaptchaId) { _showFieldError('reset-request-captcha-err', t('auth.captchaExpired')); _refreshResetCaptcha(); valid = false; }
     if (!valid) return;
 
-    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = '发送中...'; }
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = t('common.loading'); }
 
     try {
         const response = await fetch('/api/auth/password/reset/request', {
@@ -450,24 +451,24 @@ async function handleResetRequest() {
             })
         });
         const data = await response.json();
-        if (!response.ok) throw new Error(data.detail || '请求失败');
+        if (!response.ok) throw new Error(data.detail || t('auth.requestFailed'));
 
         // Check for dev code (when email sending isn't configured)
         if (data.dev_code) {
             showResetConfirmView(email);
-            _showBannerSuccess(`验证码：${data.dev_code}（开发模式，邮件未发送）`);
+            _showBannerSuccess(t('auth.devCodeNotice', {code: data.dev_code}));
         } else {
             showResetConfirmView(email);
-            _showBannerSuccess('验证码已发送至您的邮箱，请查收');
+            _showBannerSuccess(t('auth.codeSent'));
         }
         // Start countdown on the send button
         var seconds = (data.expires_in && data.expires_in > 0) ? data.expires_in : 600;
         _startResetCodeCountdown(submitBtn, seconds);
     } catch (err) {
-        _showBannerError(err.message || '请求失败，请重试');
+        _showBannerError(err.message || t('auth.requestFailed'));
         _refreshResetCaptcha();
     } finally {
-        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '发送验证码'; }
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = t('auth.sendCode'); }
     }
 }
 
@@ -484,17 +485,17 @@ async function handleResetConfirm() {
     const newPassword = pwEl?.value || '';
 
     let valid = true;
-    if (!code) { _showFieldError('reset-code-err', '请输入验证码'); valid = false; }
-    if (!newPassword) { _showFieldError('reset-new-password-err', '请输入新密码'); valid = false; }
+    if (!code) { _showFieldError('reset-code-err', t('auth.enterCaptcha')); valid = false; }
+    if (!newPassword) { _showFieldError('reset-new-password-err', t('auth.enterNewPassword')); valid = false; }
     else if (newPassword.length < 6 || !/[A-Za-z]/.test(newPassword) || !/\d/.test(newPassword)) {
-        _showFieldError('reset-new-password-err', '密码至少 6 位且包含字母和数字');
+        _showFieldError('reset-new-password-err', t('auth.passwordRequirements'));
         valid = false;
     }
     if (!valid) return;
 
     const email = document.getElementById('reset-confirm-email-display')?.textContent || '';
 
-    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = '重置中...'; }
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = t('common.loading'); }
 
     try {
         const response = await fetch('/api/auth/password/reset/confirm', {
@@ -503,16 +504,16 @@ async function handleResetConfirm() {
             body: JSON.stringify({ email, code, new_password: newPassword })
         });
         const data = await response.json();
-        if (!response.ok) throw new Error(data.detail || '重置失败');
+        if (!response.ok) throw new Error(data.detail || t('auth.resetFailed'));
 
         showLoginView();
-        _showBannerSuccess('密码重置成功，请使用新密码登录');
+        _showBannerSuccess(t('auth.resetSuccess'));
         const pwInput = document.getElementById('login-password');
         if (pwInput) { pwInput.value = ''; pwInput.focus(); }
     } catch (err) {
-        _showBannerError(err.message || '重置失败，请重试');
+        _showBannerError(err.message || t('auth.resetFailed'));
     } finally {
-        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '确认重置密码'; }
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = t('auth.confirmResetPassword'); }
     }
 }
 
@@ -520,7 +521,7 @@ async function handleResetConfirm() {
 export async function handleAuthSuccess(data) {
     setAuthToken(data.access_token || "");
     setCurrentUser(data.user || null);
-    if (!authToken || !currentUser) throw new Error('登录响应无效，请重试');
+    if (!authToken || !currentUser) throw new Error(t('auth.loginResponseInvalid'));
 
     try {
         const meResp = await authFetch('/api/auth/me');
@@ -545,14 +546,14 @@ export async function handleAuthSuccess(data) {
 
     if (filesToQuote && filesToQuote.length) {
         const totalFiles = selectedFilesMap.size || filesToQuote.length;
-        if (fileNameDisplay) fileNameDisplay.textContent = `当前列表共 ${totalFiles} 个文件，正在为新增 ${filesToQuote.length} 个文件生成静态图与自动报价...`;
+        if (fileNameDisplay) fileNameDisplay.textContent = t('auth.postLoginProgress', {total: totalFiles, new: filesToQuote.length});
         try {
             await buildThumbnails(filesToQuote);
             await quoteSelectedFiles(filesToQuote);
-            if (fileNameDisplay) fileNameDisplay.textContent = `当前列表共 ${selectedFilesMap.size} 个文件，新增 ${filesToQuote.length} 个文件报价完成`;
+            if (fileNameDisplay) fileNameDisplay.textContent = t('auth.postLoginDone', {total: selectedFilesMap.size, new: filesToQuote.length});
         } catch (err) {
             if (dom.errorMsg) { dom.errorMsg.textContent = err.message; dom.errorContainer.classList.remove('hidden'); }
-            if (fileNameDisplay) fileNameDisplay.textContent = `当前列表共 ${selectedFilesMap.size} 个文件，新增 ${filesToQuote.length} 个文件自动报价失败`;
+            if (fileNameDisplay) fileNameDisplay.textContent = t('auth.postLoginFail', {total: selectedFilesMap.size, new: filesToQuote.length});
         }
     }
 }
@@ -571,11 +572,11 @@ export function handleLogout() {
 
     if (dom.fileInput) dom.fileInput.value = '';
     if (fileNameDisplay) {
-        fileNameDisplay.textContent = '未选择文件（最多20个，单文件需小于100MB）';
+        fileNameDisplay.textContent = t('auth.noFileSelected');
         fileNameDisplay.classList.remove('text-indigo-600', 'font-medium');
     }
     clearClusters();
-    if (layFaceBtn) layFaceBtn.textContent = '🎯 智能摆放 (Lay on Face)';
+    if (layFaceBtn) layFaceBtn.textContent = t('orientation.autoOrient');
     if (resultContainer) resultContainer.classList.add('hidden');
     if (errorContainer) errorContainer.classList.add('hidden');
     renderAuthUI();
@@ -606,7 +607,7 @@ export async function initializeAuth() {
 
     try {
         const response = await authFetch('/api/auth/me');
-        if (!response.ok) throw new Error('会话已失效');
+        if (!response.ok) throw new Error(t('auth.sessionExpired'));
         const user = await response.json();
         setCurrentUser(user);
         saveUserSession();

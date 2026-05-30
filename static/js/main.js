@@ -70,6 +70,7 @@ import {
     centerModel, resetOrientationHandler, toggleLayFace, submitTraining,
 } from './modules/orientation-ui.js';
 import { initTheme } from './modules/theme.js';
+import { t, lang, toggleLang, langFlag, langLabel, initI18n } from './modules/i18n.js';
 
 // ═══════════════════════════════════════════════
 //  App entry point
@@ -77,6 +78,8 @@ import { initTheme } from './modules/theme.js';
 document.addEventListener('DOMContentLoaded', () => {
     // Apply theme immediately (before any rendering)
     initTheme();
+    // Init i18n (language switcher)
+    initI18n();
     const MAX_FILES = 20;
     const MAX_FILE_SIZE = 100 * 1024 * 1024;
     const ALLOWED_EXTENSIONS = ['.stl', '.stp', '.step', '.obj', '.3mf'];
@@ -192,6 +195,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Auth - form events are wired by _wireLoginForm() in auth.js init
     if (dom.openLoginBtn) dom.openLoginBtn.addEventListener('click', openLoginModal);
+
+    // Language switcher
+    const langSwitchBtn = document.getElementById('lang-switch-btn');
+    if (langSwitchBtn) {
+        const updateLangBtn = () => {
+            langSwitchBtn.textContent = `${langFlag(lang)} ${langLabel(lang)}`;
+        };
+        updateLangBtn();
+        langSwitchBtn.addEventListener('click', () => {
+            toggleLang();
+            updateLangBtn();
+        });
+    }
+    // Listen for i18n-change event to update data-i18n elements dynamically
+    window.addEventListener('i18n-change', () => {
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            const key = el.getAttribute('data-i18n');
+            if (key) el.textContent = t(key);
+        });
+    });
     if (dom.userMenuBtn) dom.userMenuBtn.addEventListener('click', () => dom.userDropdown.classList.toggle('hidden'));
     if (dom.openAdminUsersBtn) dom.openAdminUsersBtn.addEventListener('click', () => { dom.userDropdown.classList.add('hidden'); window.location.href = '/admin/users'; });
     if (dom.openMembershipBtn) dom.openMembershipBtn.addEventListener('click', () => { dom.userDropdown.classList.add('hidden'); openMembershipModal(); });

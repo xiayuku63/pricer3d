@@ -29,6 +29,7 @@
                     <span id="app-version" class="ml-2 px-2 py-0.5 text-xs font-mono rounded-full bg-gray-100 text-gray-500 align-middle">v0.7.6</span>
                 </div>
                 <div id="auth-area" class="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:justify-end">
+                    <button id="lang-switch-btn" type="button" class="w-full sm:w-auto text-sm px-3 py-1.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50">🇨🇳 中文</button>
                     <button id="open-login-btn" type="button" class="w-full sm:w-auto text-sm px-3 py-1.5 border border-indigo-200 text-indigo-700 rounded-md hover:bg-indigo-50">登录</button>
                     <button id="open-membership-btn" type="button" class="hidden w-full sm:w-auto text-sm px-3 py-1.5 border border-amber-300 text-amber-700 rounded-md hover:bg-amber-50 font-medium bg-amber-50/50">会员服务</button>
                     <div id="user-menu" class="hidden relative">
@@ -45,62 +46,62 @@
             <div class="space-y-6">
             <!-- 结果展示区 -->
             <div id="result-container" class="w-full">
-                <h3 class="text-lg leading-6 font-medium text-gray-900 mb-2">报价结果</h3>
+                <h3 class="text-lg leading-6 font-medium text-gray-900 mb-2" data-i18n="quote.quoteResults">报价结果</h3>
                 <div class="bg-gray-50 overflow-hidden shadow rounded-lg border border-gray-200">
                     <div class="px-4 py-5 sm:p-6">
                         <dl class="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-4">
                             <div>
-                                <dt class="text-sm font-medium text-gray-500">文件总数</dt>
+                                <dt class="text-sm font-medium text-gray-500" data-i18n="quote.totalFiles">文件总数</dt>
                                 <dd class="mt-1 text-sm text-gray-900" id="sum-total-files">-</dd>
                             </div>
                             <div>
-                                <dt class="text-sm font-medium text-gray-500">成功 / 失败</dt>
+                                <dt class="text-sm font-medium text-gray-500" data-i18n="quote.successFail">成功 / 失败</dt>
                                 <dd class="mt-1 text-sm text-gray-900" id="sum-status">-</dd>
                             </div>
                             <div>
-                                <dt class="text-sm font-medium text-gray-500">总费用 (CNY)</dt>
+                                <dt class="text-sm font-medium text-gray-500" data-i18n="quote.totalCostCNY">总费用 (CNY)</dt>
                                 <dd class="mt-1 text-2xl font-semibold text-indigo-600" id="sum-total-cost">-</dd>
                             </div>
                             <div>
-                                <dt class="text-sm font-medium text-gray-500">总时间</dt>
+                                <dt class="text-sm font-medium text-gray-500" data-i18n="quote.totalTime">总时间</dt>
                                 <dd class="mt-1 text-sm text-gray-900" id="sum-total-time">-</dd>
                             </div>
                         </dl>
 
                         <!-- 批量设置工具栏 -->
                         <div id="batch-edit-bar" class="mt-4 flex items-center gap-3 p-3 bg-indigo-50 border border-indigo-200 rounded-lg flex-wrap">
-                            <span class="text-xs font-medium text-indigo-700 whitespace-nowrap">批量设置：</span>
+                            <span class="text-xs font-medium text-indigo-700 whitespace-nowrap" data-i18n="quote.batchSettings">批量设置：</span>
                             <div class="flex items-center gap-1.5">
-                                <label class="text-[11px] text-gray-600">打印机</label>
+                                <label class="text-[11px] text-gray-600" data-i18n="quote.printerModel">打印机</label>
                                 <select id="batch-printer-model" class="text-[11px] border border-gray-300 rounded px-2 py-1 bg-white max-w-[155px]"></select>
                             </div>
                             <div class="flex items-center gap-1.5">
-                                <label class="text-[11px] text-gray-600">喷嘴</label>
+                                <label class="text-[11px] text-gray-600" data-i18n="quote.nozzleDiameter">喷嘴</label>
                                 <select id="batch-nozzle-diameter" class="text-[11px] border border-gray-300 rounded px-2 py-1 bg-white w-[60px]">
                                     <option value="">--</option>
                                     <option value="0.2">0.2</option><option value="0.4" selected>0.4</option><option value="0.6">0.6</option><option value="0.8">0.8</option>
                                 </select>
                             </div>
                             <div class="flex items-center gap-1.5">
-                                <label class="text-[11px] text-gray-600">预设</label>
+                                <label class="text-[11px] text-gray-600" data-i18n="quote.preset">预设</label>
                                 <select id="batch-slicer-preset" class="text-[11px] border border-gray-300 rounded px-2 py-1 bg-white max-w-[160px]">
                                     <option value="">不使用预设</option>
                                 </select>
                                 <span id="batch-preset-params" class="text-[10px] text-gray-400 hidden"></span>
                             </div>
                             <div class="flex items-center gap-1.5">
-                                <label class="text-[11px] text-gray-600">材料</label>
+                                <label class="text-[11px] text-gray-600" data-i18n="quote.material">材料</label>
                                 <select id="batch-material" class="text-[11px] border border-gray-300 rounded px-2 py-1 bg-white"></select>
                             </div>
                             <div class="flex items-center gap-1.5" id="batch-color-cell">
-                                <label class="text-[11px] text-gray-600">颜色</label>
+                                <label class="text-[11px] text-gray-600" data-i18n="quote.color">颜色</label>
                                 <div id="batch-color-dropdown"></div>
                             </div>
                             <div class="flex items-center gap-1.5">
-                                <label class="text-[11px] text-gray-600">数量</label>
+                                <label class="text-[11px] text-gray-600" data-i18n="quote.quantity">数量</label>
                                 <input id="batch-quantity" type="number" min="1" value="1" class="w-16 text-[11px] border border-gray-300 rounded px-2 py-1" />
                             </div>
-                            <button id="batch-apply-btn" type="button" class="text-[11px] px-3 py-1.5 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors whitespace-nowrap">应用到全部</button>
+                            <button id="batch-apply-btn" type="button" class="text-[11px] px-3 py-1.5 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors whitespace-nowrap" data-i18n="quote.applyToAll">应用到全部</button>
                             <span id="batch-msg" class="text-[11px] text-indigo-600 hidden"></span>
                         </div>
 
@@ -108,26 +109,26 @@
                             <table class="min-w-full text-[11px] text-left border border-gray-200 rounded-md overflow-hidden whitespace-nowrap">
                                 <thead class="bg-gray-100 text-gray-700">
                                     <tr>
-                                        <th class="px-2 py-1.5">文件名</th>
-                                        <th class="px-2 py-1.5">预览</th>
-                                        <th class="px-2 py-1.5">打印机</th>
-                                        <th class="px-2 py-1.5">预设</th>
-                                        <th class="px-2 py-1.5">材料</th>
-                                        <th class="px-2 py-1.5">颜色</th>
-                                        <th class="px-2 py-1.5">数量</th>
-                                        <th class="px-2 py-1.5">几何信息</th>
-                                        <th class="px-2 py-1.5">重量(g)</th>
-                                        <th class="px-2 py-1.5">单件时间</th>
-                                        <th class="px-2 py-1.5">总时间</th>
-                                        <th class="px-2 py-1.5">单价</th>
-                                        <th class="px-2 py-1.5">总价</th>
-                                        <th class="px-2 py-1.5">状态/错误</th>
-                                        <th class="px-2 py-1.5">操作</th>
+                                        <th class="px-2 py-1.5" data-i18n="quote.filename">文件名</th>
+                                        <th class="px-2 py-1.5" data-i18n="common.preview">预览</th>
+                                        <th class="px-2 py-1.5" data-i18n="quote.printerModel">打印机</th>
+                                        <th class="px-2 py-1.5" data-i18n="quote.preset">预设</th>
+                                        <th class="px-2 py-1.5" data-i18n="quote.material">材料</th>
+                                        <th class="px-2 py-1.5" data-i18n="quote.color">颜色</th>
+                                        <th class="px-2 py-1.5" data-i18n="quote.quantity">数量</th>
+                                        <th class="px-2 py-1.5" data-i18n="quote.geometry">几何信息</th>
+                                        <th class="px-2 py-1.5" data-i18n="quote.weight">重量(g)</th>
+                                        <th class="px-2 py-1.5" data-i18n="quote.unitTime">单件时间</th>
+                                        <th class="px-2 py-1.5" data-i18n="quote.totalTime">总时间</th>
+                                        <th class="px-2 py-1.5" data-i18n="quote.unitPrice">单价</th>
+                                        <th class="px-2 py-1.5" data-i18n="quote.totalPrice">总价</th>
+                                        <th class="px-2 py-1.5" data-i18n="quote.status">状态/错误</th>
+                                        <th class="px-2 py-1.5" data-i18n="quote.actions">操作</th>
                                     </tr>
                                 </thead>
                                 <tbody id="batch-results-body" class="bg-white">
                                     <tr class="border-t border-gray-100">
-                                        <td class="px-2 py-2 text-gray-500" colspan="15">暂无数据，请在表格底部上传并自动报价</td>
+                                        <td class="px-2 py-2 text-gray-500" colspan="15" data-i18n="quote.noDataUpload">暂无数据，请在表格底部上传并自动报价</td>
                                     </tr>
                                 </tbody>
                                 <tfoot class="bg-white border-t border-gray-200">
@@ -141,12 +142,12 @@
                                                         </svg>
                                                         <div class="flex text-sm text-gray-600 justify-center">
                                                             <label for="file-upload" class="relative cursor-pointer rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500">
-                                                                <span>选择文件</span>
+                                                                <span data-i18n="quote.selectFile">选择文件</span>
                                                                 <input id="file-upload" name="files" type="file" class="sr-only" accept=".stl,.stp,.step,.obj,.3mf" multiple required>
                                                             </label>
                                                         </div>
-                                                        <p id="file-name" class="text-xs text-gray-500 mt-2">未选择文件（最多20个，单文件需小于100MB）</p>
-                                                        <div class="text-sm font-medium text-gray-700 mt-2">上传 3D 模型（stl/stp/step/obj/3mf，最多20个，单文件&lt;100MB）</div>
+                                                        <p id="file-name" class="text-xs text-gray-500 mt-2" data-i18n="quote.noFileSelected">未选择文件（最多20个，单文件需小于100MB）</p>
+                                                        <div class="text-sm font-medium text-gray-700 mt-2" data-i18n="quote.uploadModels">上传 3D 模型（stl/stp/step/obj/3mf，最多20个，单文件&lt;100MB）</div>
                                                     </div>
                                                 </div>
 

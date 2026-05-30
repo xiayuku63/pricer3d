@@ -12,6 +12,7 @@ import {
 } from './state.js';
 import { buildPlaceholderThumbnail, ensureThumbnailForFile, buildThumbnails } from './preview.js';
 import { loadQuoteHistory } from './history.js';
+import { t, lang } from './i18n.js';
 
 let dom = {};
 let _openLoginModal = null;  // lazy-init to break circular dep with auth.js
@@ -25,8 +26,8 @@ export function refreshOptionsSummary() {
     if (!optionsSummary) return;
     const colorText = formatColorLabel(quoteOptions.color);
     const pm = document.getElementById("cfg-printer-model-main");
-    const pmName = (pm && pm.selectedOptions[0]) ? pm.selectedOptions[0].text : "未选择";
-    optionsSummary.innerHTML = `打印机：${pmName} | 材料 ${quoteOptions.material}，颜色 ${colorText}，数量 ${quoteOptions.quantity}`;
+    const pmName = (pm && pm.selectedOptions[0]) ? pm.selectedOptions[0].text : t('quote.printerNotSet');
+    optionsSummary.innerHTML = t('quote.printerModel') + '：' + pmName + ' | ' + t('quote.material') + ' ' + quoteOptions.material + '，' + t('quote.color') + ' ' + colorText + '，' + t('quote.quantity') + ' ' + quoteOptions.quantity;
 }
 
 export function recalcSummaryFromCurrentResults() {
@@ -81,7 +82,7 @@ export async function quoteSingleFileWithOptions(file, options) {
     formData.append("use_prusaslicer", "true");
     const response = await authFetch('/api/quote', { method: 'POST', body: formData });
     const data = await response.json();
-    if (!response.ok) throw new Error(data.detail || data.error || '请求失败，请稍后重试');
+    if (!response.ok) throw new Error(data.detail || data.error || t('quote.requestFailed'));
     return data.results && data.results.length > 0 ? data.results[0] : { filename: file.name, status: "failed", error: "空响应" };
 }
 
@@ -91,11 +92,11 @@ export async function quoteSelectedFiles(selectedFiles) {
     var nozzleEl = document.getElementById('batch-nozzle-diameter');
     var presetEl = document.getElementById('batch-slicer-preset');
     var missing = [];
-    if (!printerEl || !printerEl.value) missing.push('打印机');
-    if (!nozzleEl || !nozzleEl.value) missing.push('喷嘴直径');
-    if (!presetEl || !presetEl.value) missing.push('切片配置');
+    if (!printerEl || !printerEl.value) missing.push(t('quote.printerModel'));
+    if (!nozzleEl || !nozzleEl.value) missing.push(t('quote.nozzleDiameter'));
+    if (!presetEl || !presetEl.value) missing.push(t('quote.preset'));
     if (missing.length > 0) {
-        var warningMsg = '⚠️ 未设置：' + missing.join('、') + '。建议先设置后再报价。';
+        var warningMsg = t('quote.missingConfig', {items: missing.join('、')});
         if (dom.errorMsg) { dom.errorMsg.textContent = warningMsg; }
         if (dom.errorContainer) dom.errorContainer.classList.remove('hidden');
     }
@@ -121,7 +122,7 @@ export async function quoteSelectedFiles(selectedFiles) {
     formData.append("use_prusaslicer", "true");
     const response = await authFetch('/api/quote', { method: 'POST', body: formData });
     const data = await response.json();
-    if (!response.ok) throw new Error(data.detail || data.error || '请求失败，请稍后重试');
+    if (!response.ok) throw new Error(data.detail || data.error || t('quote.requestFailed'));
     mergeResultsByFilename(data.results || []);
     renderResultsTable();
     recalcSummaryFromCurrentResults();
@@ -215,7 +216,7 @@ export function renderResultsTable() {
     const showPrusaStatus = true;
     tbody.innerHTML = '';
     if (!currentResults.length) {
-        tbody.innerHTML = '<tr class="border-t border-gray-100"><td class="px-2 py-2 text-gray-500" colspan="15">暂无数据，请在表格底部上传并自动报价</td></tr>';
+        tbody.innerHTML = '<tr class="border-t border-gray-100"><td class="px-2 py-2 text-gray-500" colspan="15">' + t('common.noData') + '</td></tr>';
         return;
     }
     currentResults.forEach((item) => {
@@ -231,14 +232,14 @@ export function renderResultsTable() {
             const prusaError = prusaErrorRaw ? escapeHtml(prusaErrorRaw) : "";
             const prusaExtraHtml = showPrusaStatus
                 ? (prusaUsed
-                    ? '<div class="text-[10px] text-indigo-600">PrusaSlicer</div>'
+                    ? '<div class="text-[10px] text-indigo-600">' + t('quote.prusaEnabled') + '</div>'
                     : (prusaError ? `<div class="text-[10px] text-amber-700">PrusaSlicer失败：${prusaError}</div>` : ''))
                 : '';
 
             // G-code 分析详情
             const gcode = breakdown?.gcode_summary;
             const gcodeToggleHtml = gcode
-                ? `<button type="button" data-toggle-gcode="${escapeHtml(item.filename)}" class="text-[10px] text-indigo-500 hover:text-indigo-700 underline ml-1">📊收起</button>`
+                ? '<button type="button" data-toggle-gcode="' + escapeHtml(item.filename) + '" class="text-[10px] text-indigo-500 hover:text-indigo-700 underline ml-1">' + t('quote.gcodeCollapse') + '</button>'
                 : '';
 
             let markupPercent = Number(item.difficulty_markup_percent);
@@ -275,7 +276,7 @@ export function renderResultsTable() {
                 `<option value="${p.id}" ${p.id === (item._printer_model || '') ? 'selected' : ''}>${p.name}</option>`
             ).join('');
             const presets = slicerPresets || [];
-            const presetOptions = ['<option value="">不使用</option>',
+            const presetOptions = ['<option value="">' + t('quote.presetNone') + '</option>',
                 ...presets.map(p => `<option value="${p.id}" ${String(p.id) === String(item._slicer_preset_id || '') ? 'selected' : ''}>${p.name || '#' + p.id}</option>`)
             ].join('');
 
@@ -293,8 +294,8 @@ export function renderResultsTable() {
                 <td class="px-2 py-1.5">${formatTimeHMS(item.estimated_time_h)}</td>
                 <td class="px-2 py-1.5">¥ ${item.unit_cost_cny}</td>
                 <td class="px-2 py-1.5">¥ ${item.cost_cny}</td>
-                <td data-role="status-cell" class="px-2 py-1.5 text-green-600"><div>成功</div>${prusaExtraHtml}${gcodeToggleHtml}</td>
-                <td class="px-2 py-1.5 space-x-1"><button type="button" data-delete-file="${item.filename}" class="text-[11px] text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 rounded px-2 py-0.5">删除</button></td>
+                <td data-role="status-cell" class="px-2 py-1.5 text-green-600"><div>${t('common.success')}</div>${prusaExtraHtml}${gcodeToggleHtml}</td>
+                <td class="px-2 py-1.5 space-x-1"><button type="button" data-delete-file="${item.filename}" class="text-[11px] text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 rounded px-2 py-0.5">${t('common.delete')}</button></td>
             `;
         } else {
             const thumbnail = thumbnailMap.get(item.filename) || buildPlaceholderThumbnail(ext);
@@ -313,7 +314,7 @@ export function renderResultsTable() {
                 `<option value="${p.id}" ${p.id === (item._printer_model || '') ? 'selected' : ''}>${p.name}</option>`
             ).join('');
             const presets = slicerPresets || [];
-            const presetOptions = ['<option value="">不使用</option>',
+            const presetOptions = ['<option value="">' + t('quote.presetNone') + '</option>',
                 ...presets.map(p => `<option value="${p.id}" ${String(p.id) === String(item._slicer_preset_id || '') ? 'selected' : ''}>${p.name || '#' + p.id}</option>`)
             ].join('');
             tr.innerHTML = `
@@ -325,8 +326,8 @@ export function renderResultsTable() {
                 <td class="px-2 py-1.5" data-field="color">${renderedRowColors.html}</td>
                 <td class="px-2 py-1.5"><input data-field="quantity" type="number" min="1" value="${quantityValue}" class="row-edit w-14 text-[11px] border border-gray-300 rounded px-1 py-0.5" /></td>
                 <td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td>
-                <td data-role="status-cell" class="px-2 py-1.5 text-red-600">${item.error || '失败'}</td>
-                <td class="px-2 py-1.5 space-x-1"><button type="button" data-delete-file="${item.filename}" class="text-[11px] text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 rounded px-2 py-0.5">删除</button></td>
+                <td data-role="status-cell" class="px-2 py-1.5 text-red-600">${item.error || t('common.error')}</td>
+                <td class="px-2 py-1.5 space-x-1"><button type="button" data-delete-file="${item.filename}" class="text-[11px] text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 rounded px-2 py-0.5">${t('common.delete')}</button></td>
             `;
         }
         tbody.appendChild(tr);
@@ -424,7 +425,7 @@ export async function batchApplyToAll() {
     const quantity = Number.parseInt(quantityInput.value, 10);
 
     if (!Number.isFinite(quantity) || quantity < 1) {
-        if (errorMsg) { errorMsg.textContent = '数量必须大于等于 1'; errorContainer.classList.remove('hidden'); }
+        if (errorMsg) { errorMsg.textContent = t('quote.countMustBePositive'); errorContainer.classList.remove('hidden'); }
         return;
     }
 
@@ -509,7 +510,7 @@ async function _handleRowEdit(event, signal) {
     const color = newColorValueInput ? newColorValueInput.value : rendered.selected;
     const quantity = Number.parseInt(row.querySelector('[data-field="quantity"]').value, 10);
     if (!Number.isFinite(quantity) || quantity < 1) {
-        if (errorMsg) { errorMsg.textContent = '数量必须大于等于 1'; errorContainer.classList.remove('hidden'); }
+        if (errorMsg) { errorMsg.textContent = t('quote.countMustBePositive'); errorContainer.classList.remove('hidden'); }
         return;
     }
     // Read per-file printer + preset
