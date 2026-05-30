@@ -623,7 +623,8 @@ async def process_single_file(
             return {
                 "filename": filename,
                 "status": "failed",
-                "error": "无法读取或计算模型体积，可能文件已损坏 (Failed to calculate volume)"
+                "error": "无法读取或计算模型体积，可能文件已损坏 (Failed to calculate volume)",
+                "_saved_path": model_saved_path,
             }
 
         unit_cost, model_weight_g, unit_print_time_h, total_cost, effective_weight_g, total_print_time_h, breakdown = calculate_cost(
@@ -696,6 +697,7 @@ async def process_single_file(
             "infill": actual_infill,
             "_slicer_preset_id": slicer_preset.get("id") if slicer_preset else None,
             "_printer_model": pricing_config.get("printer_model") if pricing_config else None,
+            "_saved_path": model_saved_path,
             "cost_breakdown": breakdown,
             "effective_weight_g": round(effective_weight_g * quantity, 2)
         }

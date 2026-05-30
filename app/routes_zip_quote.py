@@ -353,6 +353,9 @@ async def zip_quote(
                     "wall_count": wc,
                     "infill": inf,
                 }
+                # Copy to non-underscore key for JSON serialization
+                if result.get("_saved_path"):
+                    result["checklist_file_path"] = result["_saved_path"]
             except Exception as e:
                 result = {
                     "filename": stl["filename"],
@@ -387,6 +390,8 @@ async def zip_quote(
                     auto_orient=False,
                 )
                 result["_checklist_params"] = False
+                if result.get("_saved_path"):
+                    result["checklist_file_path"] = result["_saved_path"]
             except Exception as e:
                 result = {
                     "filename": stl["filename"],
@@ -400,6 +405,8 @@ async def zip_quote(
             results.append(result)
 
         # Build response
+        _has_saved = any(r.get("_saved_path") for r in results)
+        logger.info(f"ZIP results has _saved_path: {_has_saved}")
         success_items = [r for r in results if r.get("status") == "success"]
         failed_items = [r for r in results if r.get("status") == "failed"]
 
@@ -446,3 +453,29 @@ async def zip_quote(
     except Exception as e:
         logger.error(f"ZIP quote failed: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"INTERNAL_ERROR: ZIP 报价失败 ({str(e)})")
+
+
+async def download_zip_model(
+    file_path: str,
+    current_user=Depends(get_current_user),
+):
+    """
+    Download a model file that was saved during ZIP processing.
+    Used by frontend to rebuild File objects for preview/re-quote.
+    """
+    from fastapi.responses import FileResponse
+    import os as _os
+
+    # Security: only allow paths under the user's upload directory
+    from app.utils import _user_base_dir
+    user_folder = f"user_{current_user['id']}_{current_user['username']}"
+    allowed_prefix = _os.path.join(_user_base_dir(), user_folder, "uploads")
+
+    abs_path = _os.path.abspath(file_path)
+    if not abs_path.startswith(allowed_prefix):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if not _os.path.isfile(abs_path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    return FileResponse(abs_path, filename=_os.path.basename(abs_path))

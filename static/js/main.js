@@ -652,6 +652,31 @@ document.addEventListener('DOMContentLoaded', () => {
                     renderResultsTable();
                     recalcSummaryFromCurrentResults();
 
+                    // Rebuild selectedFilesMap + thumbnails for ZIP-uploaded models
+                    // These files aren't in selectedFilesMap since they came from the ZIP,
+                    // so previews and batch re-quote won't work. Fetch each file from backend.
+                    var zipModelFiles = [];
+                    for (var ri = 0; ri < (zipData.results || []).length; ri++) {
+                        var r = zipData.results[ri];
+                        if (r.checklist_file_path) {
+                            try {
+                                var fileResp = await authFetch('/api/quote/zip/file?file_path=' + encodeURIComponent(r.checklist_file_path));
+                                if (fileResp.ok) {
+                                    var blob = await fileResp.blob();
+                                    var modelFile = new File([blob], r.filename, { type: 'application/octet-stream' });
+                                    selectedFilesMap.set(r.filename, modelFile);
+                                    zipModelFiles.push(modelFile);
+                                }
+                            } catch (fe) {
+                                console.warn('Failed to fetch model file for preview:', r.filename, fe);
+                            }
+                        }
+                    }
+                    if (zipModelFiles.length > 0) {
+                        await buildThumbnails(zipModelFiles);
+                        renderResultsTable();
+                    }
+
                     // Show match status message
                     if (zipData.match_status) {
                         var ms = zipData.match_status;
