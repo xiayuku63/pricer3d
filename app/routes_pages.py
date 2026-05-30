@@ -15,8 +15,23 @@ _START_TIME = time.time()
 
 
 async def index():
-    with open("static/index.html", "r", encoding="utf-8") as f:
-        return f.read()
+    """Assemble index.html from partials."""
+    partials_dir = "static/partials"
+    order = [
+        "head", "page-shell", "login-modal", "membership-modal",
+        "options-modal", "user-center-modal", "quote-history-modal",
+        "preview-modal", "orient-modal", "color-editor-modal",
+        "scripts", "closing",
+    ]
+    parts = []
+    for name in order:
+        fpath = f"{partials_dir}/{name}.html"
+        try:
+            with open(fpath, "r", encoding="utf-8") as f:
+                parts.append(f.read())
+        except FileNotFoundError:
+            pass
+    return "".join(parts)
 
 
 async def register_page():

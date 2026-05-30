@@ -1,0 +1,32 @@
+   348|            <!-- 报价参数弹窗 -->
+   349|            <div id="options-modal" class="hidden fixed inset-0 z-50">
+   350|                <div id="options-backdrop" class="absolute inset-0 bg-black/50"></div>
+   351|                <div class="relative z-10 h-full w-full flex items-center justify-center p-4">
+   352|                    <div class="w-full max-w-md bg-white rounded-lg shadow-xl overflow-hidden">
+   353|                        <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+   354|                            <h4 class="text-sm font-semibold text-gray-800">修改报价参数</h4>
+   355|                            <button id="options-close-btn" type="button" class="text-gray-500 hover:text-gray-700">关闭</button>
+   356|                        </div>
+   357|                        <div class="p-4 space-y-4">
+   358|                            <div>
+   359|                                <label class="block text-sm font-medium text-gray-700">材料</label>
+   360|                                <select id="opt-material" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md text-sm">
+   361|                                    <!-- 动态生成 -->
+   362|                                </select>
+   363|                            </div>
+   364|                            <div>
+   365|                                <label class="block text-sm font-medium text-gray-700">颜色</label>
+   366|                                <div id="opt-color" class="mt-1 flex flex-wrap gap-1.5"></div>
+   367|                            </div>
+   368|                            <div>
+   369|                                <label class="block text-sm font-medium text-gray-700">数量</label>
+   370|                                <input id="opt-quantity" type="number" min="1" value="1" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md text-sm" />
+   371|                            </div>
+   372|                            <div class="pt-2">
+   373|                                <button id="options-save-btn" type="button" class="w-full py-2 px-3 rounded-md bg-indigo-600 text-white text-sm hover:bg-indigo-700">保存参数</button>
+   374|                            </div>
+   375|                        </div>
+   376|                    </div>
+   377|                </div>
+   378|            </div>
+   379|

@@ -1,0 +1,155 @@
+    22|<body class="bg-gray-50 min-h-screen p-4 lg:p-6">
+    23|    <div class="max-w-[1600px] mx-auto bg-white rounded-xl shadow-md overflow-hidden">
+    24|        <div class="p-5 sm:p-8">
+    25|            <div class="flex flex-col sm:flex-row items-start sm:justify-between gap-4 mb-6">
+    26|                <div>
+    27|                    <div class="uppercase tracking-wide text-sm text-indigo-500 font-semibold mb-1">3D Printing Parts Automated Quoting System</div>
+    28|                    <h2 class="text-2xl font-bold text-gray-900 inline">3D打印件自动报价系统</h2>
+    29|                    <span id="app-version" class="ml-2 px-2 py-0.5 text-xs font-mono rounded-full bg-gray-100 text-gray-500 align-middle">v0.7.6</span>
+    30|                </div>
+    31|                <div id="auth-area" class="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:justify-end">
+    32|                    <button id="lang-switch-btn" type="button" class="w-full sm:w-auto text-sm px-3 py-1.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50">🇨🇳 中文</button>
+    33|                    <button id="open-login-btn" type="button" class="w-full sm:w-auto text-sm px-3 py-1.5 border border-indigo-200 text-indigo-700 rounded-md hover:bg-indigo-50">登录</button>
+    34|                    <button id="open-membership-btn" type="button" class="hidden w-full sm:w-auto text-sm px-3 py-1.5 border border-amber-300 text-amber-700 rounded-md hover:bg-amber-50 font-medium bg-amber-50/50">会员服务</button>
+    35|                    <div id="user-menu" class="hidden relative">
+    36|                        <button id="user-menu-btn" type="button" class="w-full sm:w-auto text-sm px-3 py-1.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"></button>
+    37|                        <div id="user-dropdown" class="hidden absolute right-0 mt-2 w-40 rounded-md border border-gray-200 bg-white shadow-lg z-20">
+    38|                            <button id="open-admin-users-btn" type="button" class="hidden w-full text-left text-xs px-3 py-2 hover:bg-gray-50">用户管理</button>
+    39|                            <button id="open-user-center-btn" type="button" class="w-full text-left text-xs px-3 py-2 hover:bg-gray-50">用户中心</button>
+    40|                            <button id="open-quote-history-btn" type="button" class="w-full text-left text-xs px-3 py-2 hover:bg-gray-50">报价历史</button>
+    41|                            <button id="logout-btn" type="button" class="w-full text-left text-xs px-3 py-2 text-red-600 hover:bg-red-50">退出登录</button>
+    42|                        </div>
+    43|                    </div>
+    44|                </div>
+    45|            </div>
+    46|            <div class="space-y-6">
+    47|            <!-- 结果展示区 -->
+    48|            <div id="result-container" class="w-full">
+    49|                <h3 class="text-lg leading-6 font-medium text-gray-900 mb-2" data-i18n="quote.quoteResults">报价结果</h3>
+    50|                <div class="bg-gray-50 overflow-hidden shadow rounded-lg border border-gray-200">
+    51|                    <div class="px-4 py-5 sm:p-6">
+    52|                        <dl class="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-4">
+    53|                            <div>
+    54|                                <dt class="text-sm font-medium text-gray-500" data-i18n="quote.totalFiles">文件总数</dt>
+    55|                                <dd class="mt-1 text-sm text-gray-900" id="sum-total-files">-</dd>
+    56|                            </div>
+    57|                            <div>
+    58|                                <dt class="text-sm font-medium text-gray-500" data-i18n="quote.successFail">成功 / 失败</dt>
+    59|                                <dd class="mt-1 text-sm text-gray-900" id="sum-status">-</dd>
+    60|                            </div>
+    61|                            <div>
+    62|                                <dt class="text-sm font-medium text-gray-500" data-i18n="quote.totalCostCNY">总费用 (CNY)</dt>
+    63|                                <dd class="mt-1 text-2xl font-semibold text-indigo-600" id="sum-total-cost">-</dd>
+    64|                            </div>
+    65|                            <div>
+    66|                                <dt class="text-sm font-medium text-gray-500" data-i18n="quote.totalTime">总时间</dt>
+    67|                                <dd class="mt-1 text-sm text-gray-900" id="sum-total-time">-</dd>
+    68|                            </div>
+    69|                        </dl>
+    70|
+    71|                        <!-- 批量设置工具栏 -->
+    72|                        <div id="batch-edit-bar" class="mt-4 flex items-center gap-3 p-3 bg-indigo-50 border border-indigo-200 rounded-lg flex-wrap">
+    73|                            <span class="text-xs font-medium text-indigo-700 whitespace-nowrap" data-i18n="quote.batchSettings">批量设置：</span>
+    74|                            <div class="flex items-center gap-1.5">
+    75|                                <label class="text-[11px] text-gray-600" data-i18n="quote.printerModel">打印机</label>
+    76|                                <select id="batch-printer-model" class="text-[11px] border border-gray-300 rounded px-2 py-1 bg-white max-w-[155px]"></select>
+    77|                            </div>
+    78|                            <div class="flex items-center gap-1.5">
+    79|                                <label class="text-[11px] text-gray-600" data-i18n="quote.nozzleDiameter">喷嘴</label>
+    80|                                <select id="batch-nozzle-diameter" class="text-[11px] border border-gray-300 rounded px-2 py-1 bg-white w-[60px]">
+    81|                                    <option value="">--</option>
+    82|                                    <option value="0.2">0.2</option><option value="0.4" selected>0.4</option><option value="0.6">0.6</option><option value="0.8">0.8</option>
+    83|                                </select>
+    84|                            </div>
+    85|                            <div class="flex items-center gap-1.5">
+    86|                                <label class="text-[11px] text-gray-600" data-i18n="quote.preset">预设</label>
+    87|                                <select id="batch-slicer-preset" class="text-[11px] border border-gray-300 rounded px-2 py-1 bg-white max-w-[160px]">
+    88|                                    <option value="">不使用预设</option>
+    89|                                </select>
+    90|                                <span id="batch-preset-params" class="text-[10px] text-gray-400 hidden"></span>
+    91|                            </div>
+    92|                            <div class="flex items-center gap-1.5">
+    93|                                <label class="text-[11px] text-gray-600" data-i18n="quote.material">材料</label>
+    94|                                <select id="batch-material" class="text-[11px] border border-gray-300 rounded px-2 py-1 bg-white"></select>
+    95|                            </div>
+    96|                            <div class="flex items-center gap-1.5" id="batch-color-cell">
+    97|                                <label class="text-[11px] text-gray-600" data-i18n="quote.color">颜色</label>
+    98|                                <div id="batch-color-dropdown"></div>
+    99|                            </div>
+   100|                            <div class="flex items-center gap-1.5">
+   101|                                <label class="text-[11px] text-gray-600" data-i18n="quote.quantity">数量</label>
+   102|                                <input id="batch-quantity" type="number" min="1" value="1" class="w-16 text-[11px] border border-gray-300 rounded px-2 py-1" />
+   103|                            </div>
+   104|                            <button id="batch-apply-btn" type="button" class="text-[11px] px-3 py-1.5 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors whitespace-nowrap" data-i18n="quote.applyToAll">应用到全部</button>
+   105|                            <span id="batch-msg" class="text-[11px] text-indigo-600 hidden"></span>
+   106|                        </div>
+   107|
+   108|                        <div class="mt-4 overflow-x-auto">
+   109|                            <table class="min-w-full text-[11px] text-left border border-gray-200 rounded-md overflow-hidden whitespace-nowrap">
+   110|                                <thead class="bg-gray-100 text-gray-700">
+   111|                                    <tr>
+   112|                                        <th class="px-2 py-1.5" data-i18n="quote.filename">文件名</th>
+   113|                                        <th class="px-2 py-1.5" data-i18n="common.preview">预览</th>
+   114|                                        <th class="px-2 py-1.5" data-i18n="quote.printerModel">打印机</th>
+   115|                                        <th class="px-2 py-1.5" data-i18n="quote.preset">预设</th>
+   116|                                        <th class="px-2 py-1.5" data-i18n="quote.material">材料</th>
+   117|                                        <th class="px-2 py-1.5" data-i18n="quote.color">颜色</th>
+   118|                                        <th class="px-2 py-1.5" data-i18n="quote.quantity">数量</th>
+   119|                                        <th class="px-2 py-1.5" data-i18n="quote.geometry">几何信息</th>
+   120|                                        <th class="px-2 py-1.5" data-i18n="quote.weight">重量(g)</th>
+   121|                                        <th class="px-2 py-1.5" data-i18n="quote.unitTime">单件时间</th>
+   122|                                        <th class="px-2 py-1.5" data-i18n="quote.totalTime">总时间</th>
+   123|                                        <th class="px-2 py-1.5" data-i18n="quote.unitPrice">单价</th>
+   124|                                        <th class="px-2 py-1.5" data-i18n="quote.totalPrice">总价</th>
+   125|                                        <th class="px-2 py-1.5" data-i18n="quote.status">状态/错误</th>
+   126|                                        <th class="px-2 py-1.5" data-i18n="quote.actions">操作</th>
+   127|                                    </tr>
+   128|                                </thead>
+   129|                                <tbody id="batch-results-body" class="bg-white">
+   130|                                    <tr class="border-t border-gray-100">
+   131|                                        <td class="px-2 py-2 text-gray-500" colspan="15" data-i18n="quote.noDataUpload">暂无数据，请在表格底部上传并自动报价</td>
+   132|                                    </tr>
+   133|                                </tbody>
+   134|                                <tfoot class="bg-white border-t border-gray-200">
+   135|                                    <tr>
+   136|                                        <td class="px-2 py-3" colspan="15">
+   137|                                            <form id="quote-form" class="space-y-3">
+   138|                                                <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md bg-gray-50 hover:bg-gray-100 transition-colors" id="drop-zone">
+   139|                                                    <div class="space-y-1 text-center">
+   140|                                                        <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+   141|                                                            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+   142|                                                        </svg>
+   143|                                                        <div class="flex text-sm text-gray-600 justify-center">
+   144|                                                            <label for="file-upload" class="relative cursor-pointer rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500">
+   145|                                                                <span data-i18n="quote.selectFile">选择文件</span>
+   146|                                                                <input id="file-upload" name="files" type="file" class="sr-only" accept=".stl,.stp,.step,.obj,.3mf,.zip" multiple required>
+   147|                                                            </label>
+   148|                                                        </div>
+   149|                                                        <p id="file-name" class="text-xs text-gray-500 mt-2" data-i18n="quote.noFileSelected">未选择文件（最多20个，单文件需小于100MB）</p>
+   150|                                                        <div class="text-sm font-medium text-gray-700 mt-2" data-i18n="quote.uploadModels">上传 3D 模型（stl/stp/step/obj/3mf，最多20个，单文件&lt;100MB）</div>
+   151|                                                    </div>
+   152|                                                </div>
+   153|
+   154|                                                <div class="mt-4 flex flex-col items-center justify-center gap-3">
+   155|                                                    <p class="text-xs text-indigo-600 mt-2 bg-indigo-50 px-3 py-1 rounded-full flex items-center gap-1">
+   156|                                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+   157|                                                        PrusaSlicer 切片精确估算已启用
+   158|                                                    </p>
+   159|                                                </div>
+   160|                                            </form>
+   161|                                        </td>
+   162|                                    </tr>
+   163|                                </tfoot>
+   164|                            </table>
+   165|                        </div>
+   166|                    </div>
+   167|                </div>
+   168|            </div>
+   169|            </div>
+   170|            
+   171|            <!-- 错误提示 -->
+   172|            <div id="error-container" class="mt-4 hidden p-4 bg-red-50 border-l-4 border-red-400 rounded-md">
+   173|                <p class="text-sm text-red-700 font-medium" id="error-msg"></p>
+   174|            </div>
+   175|
+   176|            <!-- 登录弹窗 — GitHub 风格（多视图：登录 / 忘记密码 / 重置确认） -->

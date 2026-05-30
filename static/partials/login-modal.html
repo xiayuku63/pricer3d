@@ -1,0 +1,133 @@
+   177|            <div id="login-modal" class="hidden fixed inset-0 z-50">
+   178|                <div id="login-backdrop" class="absolute inset-0 bg-[#0d1117]/70 backdrop-blur-sm"></div>
+   179|                <div class="relative z-10 h-full w-full flex items-center justify-center p-4">
+   180|                    <div class="w-full max-w-[340px] bg-white rounded-xl shadow-2xl overflow-hidden">
+   181|                        <!-- Header -->
+   182|                        <div class="pt-8 pb-4 text-center">
+   183|                            <div class="mx-auto w-12 h-12 rounded-full bg-indigo-600 flex items-center justify-center mb-3">
+   184|                                <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+   185|                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+   186|                                </svg>
+   187|                            </div>
+   188|                            <h2 id="login-view-title" class="text-xl font-semibold text-gray-900">登录 Pricer3D</h2>
+   189|                            <p id="login-view-subtitle" class="text-sm text-gray-500 mt-1">3D 打印自动报价系统</p>
+   190|                        </div>
+   191|
+   192|                        <!-- Success banner -->
+   193|                        <div id="login-success" class="hidden mx-6 mb-3 px-3 py-2 bg-green-50 border border-green-200 rounded-md text-xs text-green-700"></div>
+   194|
+   195|                        <!-- Error banner -->
+   196|                        <div id="login-error" class="hidden mx-6 mb-3 px-3 py-2 bg-red-50 border border-red-200 rounded-md text-xs text-red-700"></div>
+   197|
+   198|                        <!-- ═══ VIEW: Login ═══ -->
+   199|                        <form id="login-view" class="px-6 pb-6 space-y-3.5" method="POST" action="#">
+   200|                            <div>
+   201|                                <label for="login-username" class="block text-xs font-medium text-gray-700 mb-1">用户名 / 邮箱 / 手机号</label>
+   202|                                <input id="login-username" type="text" name="username" autocomplete="username"
+   203|                                    class="block w-full px-3 py-[7px] text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-shadow placeholder:text-gray-400"
+   204|                                    placeholder="请输入账号" />
+   205|                                <p id="login-username-err" class="hidden text-[11px] text-red-500 mt-0.5"></p>
+   206|                            </div>
+   207|                            <div>
+   208|                                <div class="flex justify-between items-baseline mb-1">
+   209|                                    <label for="login-password" class="text-xs font-medium text-gray-700">密码</label>
+   210|                                    <button type="button" id="forgot-password-link" class="text-[11px] text-indigo-600 hover:text-indigo-800 hover:underline bg-transparent border-0 cursor-pointer">忘记密码？</button>
+   211|                                </div>
+   212|                                <input id="login-password" type="password" name="password" autocomplete="current-password"
+   213|                                    class="block w-full px-3 py-[7px] text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-shadow placeholder:text-gray-400"
+   214|                                    placeholder="请输入密码" />
+   215|                                <p id="login-password-err" class="hidden text-[11px] text-red-500 mt-0.5"></p>
+   216|                            </div>
+   217|                            <div>
+   218|                                <label for="login-captcha-code" class="block text-xs font-medium text-gray-700 mb-1">验证码</label>
+   219|                                <div class="flex gap-2">
+   220|                                    <input id="login-captcha-code" type="text" maxlength="4" autocomplete="off" autocapitalize="off" spellcheck="false"
+   221|                                        class="flex-1 px-3 py-[7px] text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-shadow placeholder:text-gray-400"
+   222|                                        placeholder="4 位验证码" />
+   223|                                    <img id="login-captcha-img" alt="验证码" title="点击刷新"
+   224|                                        class="h-[38px] w-[100px] border border-gray-200 rounded-md bg-gray-50 cursor-pointer hover:border-gray-300 object-contain" />
+   225|                                </div>
+   226|                                <p id="login-captcha-err" class="hidden text-[11px] text-red-500 mt-0.5"></p>
+   227|                            </div>
+   228|                            <label class="flex items-start gap-2 cursor-pointer">
+   229|                                <input id="login-remember-me" type="checkbox" class="mt-0.5 w-3.5 h-3.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked />
+   230|                                <span class="text-[11px] text-gray-500 leading-relaxed">保持登录状态 30 天</span>
+   231|                            </label>
+   232|                            <label class="flex items-start gap-2 cursor-pointer">
+   233|                                <input id="login-accept-legal" type="checkbox" class="mt-0.5 w-3.5 h-3.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+   234|                                <span class="text-[11px] text-gray-500 leading-relaxed">
+   235|                                    我已阅读并同意
+   236|                                    <a href="/legal/terms" target="_blank" rel="noopener" class="text-indigo-600 hover:underline">《用户协议》</a>
+   237|                                    和
+   238|                                    <a href="/legal/privacy" target="_blank" rel="noopener" class="text-indigo-600 hover:underline">《隐私政策》</a>
+   239|                                </span>
+   240|                            </label>
+   241|                            <button id="login-submit-btn" type="submit"
+   242|                                class="w-full py-[7px] rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+   243|                                登 录
+   244|                            </button>
+   245|                            <p class="text-center text-xs text-gray-500 pt-2">
+   246|                                还没有账号？
+   247|                                <a href="/register" class="text-indigo-600 hover:text-indigo-800 hover:underline font-medium">立即注册</a>
+   248|                            </p>
+   249|                        </form>
+   250|
+   251|                        <!-- ═══ VIEW: Forgot Password – Step 1 (email + captcha) ═══ -->
+   252|                        <div id="reset-request-view" class="hidden px-6 pb-6 space-y-3.5">
+   253|                            <p class="text-xs text-gray-500">请输入注册邮箱，我们将发送验证码。</p>
+   254|                            <div>
+   255|                                <label for="reset-email" class="block text-xs font-medium text-gray-700 mb-1">注册邮箱</label>
+   256|                                <input id="reset-email" type="email" autocomplete="email"
+   257|                                    class="block w-full px-3 py-[7px] text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-shadow placeholder:text-gray-400"
+   258|                                    placeholder="请输入注册时使用的邮箱" />
+   259|                                <p id="reset-email-err" class="hidden text-[11px] text-red-500 mt-0.5"></p>
+   260|                            </div>
+   261|                            <div>
+   262|                                <label for="reset-request-captcha" class="block text-xs font-medium text-gray-700 mb-1">验证码</label>
+   263|                                <div class="flex gap-2">
+   264|                                    <input id="reset-request-captcha" type="text" maxlength="4" autocomplete="off" autocapitalize="off" spellcheck="false"
+   265|                                        class="flex-1 px-3 py-[7px] text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-shadow placeholder:text-gray-400"
+   266|                                        placeholder="4 位验证码" />
+   267|                                    <img id="reset-request-captcha-img" alt="验证码" title="点击刷新"
+   268|                                        class="h-[38px] w-[100px] border border-gray-200 rounded-md bg-gray-50 cursor-pointer hover:border-gray-300 object-contain" />
+   269|                                </div>
+   270|                                <p id="reset-request-captcha-err" class="hidden text-[11px] text-red-500 mt-0.5"></p>
+   271|                            </div>
+   272|                            <button id="reset-request-submit-btn" type="button"
+   273|                                class="w-full py-[7px] rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+   274|                                发送验证码
+   275|                            </button>
+   276|                            <p class="text-center text-xs text-gray-500 pt-2">
+   277|                                <button type="button" id="reset-back-to-login" class="text-indigo-600 hover:text-indigo-800 hover:underline bg-transparent border-0 cursor-pointer font-medium">← 返回登录</button>
+   278|                            </p>
+   279|                        </div>
+   280|
+   281|                        <!-- ═══ VIEW: Forgot Password – Step 2 (code + new password) ═══ -->
+   282|                        <div id="reset-confirm-view" class="hidden px-6 pb-6 space-y-3.5">
+   283|                            <p class="text-xs text-gray-500">验证码已发送至 <strong id="reset-confirm-email-display" class="text-gray-700"></strong></p>
+   284|                            <div>
+   285|                                <label for="reset-code" class="block text-xs font-medium text-gray-700 mb-1">验证码</label>
+   286|                                <input id="reset-code" type="text" maxlength="10" autocomplete="off" autocapitalize="off" spellcheck="false"
+   287|                                    class="block w-full px-3 py-[7px] text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-shadow placeholder:text-gray-400"
+   288|                                    placeholder="请输入邮件中的验证码" />
+   289|                                <p id="reset-code-err" class="hidden text-[11px] text-red-500 mt-0.5"></p>
+   290|                            </div>
+   291|                            <div>
+   292|                                <label for="reset-new-password" class="block text-xs font-medium text-gray-700 mb-1">新密码</label>
+   293|                                <input id="reset-new-password" type="password" autocomplete="new-password"
+   294|                                    class="block w-full px-3 py-[7px] text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-shadow placeholder:text-gray-400"
+   295|                                    placeholder="至少 6 位，包含字母和数字" />
+   296|                                <p id="reset-new-password-err" class="hidden text-[11px] text-red-500 mt-0.5"></p>
+   297|                            </div>
+   298|                            <button id="reset-confirm-submit-btn" type="button"
+   299|                                class="w-full py-[7px] rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+   300|                                确认重置密码
+   301|                            </button>
+   302|                            <p class="text-center text-xs text-gray-500 pt-2">
+   303|                                <button type="button" id="reset-confirm-back" class="text-indigo-600 hover:text-indigo-800 hover:underline bg-transparent border-0 cursor-pointer font-medium">← 返回登录</button>
+   304|                            </p>
+   305|                        </div>
+   306|                    </div>
+   307|                </div>
+   308|            </div>
+   309|
