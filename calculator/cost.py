@@ -694,6 +694,8 @@ async def process_single_file(
             "material": material,
             "layer_height": actual_layer_height,
             "infill": actual_infill,
+            "_slicer_preset_id": slicer_preset.get("id") if slicer_preset else None,
+            "_printer_model": pricing_config.get("printer_model") if pricing_config else None,
             "cost_breakdown": breakdown,
             "effective_weight_g": round(effective_weight_g * quantity, 2)
         }

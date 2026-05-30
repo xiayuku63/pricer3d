@@ -31,7 +31,7 @@ export function refreshOptionsSummary() {
 }
 
 export function recalcSummaryFromCurrentResults() {
-    const successItems = currentResults.filter((i) => i.status === "success");
+    const successItems = currentResults.filter((i) => i.status === "success" && !i._recalculating);
     const failedItems = currentResults.filter((i) => i.status === "failed");
     const sumFiles = document.getElementById('sum-total-files');
     const sumStatus = document.getElementById('sum-status');
@@ -177,8 +177,11 @@ export async function reQuoteAllSelectedFiles(reasonLabel) {
         next.material = materialNames.has(next.material) ? next.material : quoteOptions.material;
         const allowedColors = getColorsForMaterial(next.material);
         next.color = pickAllowedColor(allowedColors, next.color, quoteOptions.color);
+        next._recalculating = true;
         return next;
     }));
+    renderResultsTable();
+    recalcSummaryFromCurrentResults();
 
     if (fileNameDisplay) fileNameDisplay.classList.add('text-indigo-600', 'font-medium');
     for (let i = 0; i < files.length; i += 1) {
@@ -262,6 +265,7 @@ export function renderResultsTable() {
 
             const geometryText = `<div class="whitespace-nowrap">体积: ${item.volume_cm3} cm³</div><div class="whitespace-nowrap">表面积: ${item.surface_area_cm2} cm²</div><div class="whitespace-nowrap">难度加价: +${markupText}%</div><div class="whitespace-nowrap">尺寸: ${item.dimensions}</div>`;
             const thumbnail = thumbnailMap.get(item.filename) || buildPlaceholderThumbnail(ext);
+            const recalculating = !!item._recalculating;
             const isRealThumbnail = thumbnail && thumbnail.startsWith('data:image/png');
             const previewButtonHtml = isRealThumbnail
                 ? `<button type="button" data-preview-file="${item.filename}" data-preview-ext="${ext}" class="block rounded border border-gray-200 overflow-hidden hover:border-indigo-300 transition-colors"><img src="${thumbnail}" alt="静态图" class="w-32 h-20 object-cover bg-white" /></button>`
@@ -290,15 +294,16 @@ export function renderResultsTable() {
                 <td class="px-2 py-1.5"><input data-field="quantity" type="number" min="1" value="${item.quantity}" class="row-edit w-14 text-[11px] border border-gray-300 rounded px-1 py-0.5" /></td>
                 <td class="px-2 py-1.5 text-[10px] leading-tight">${geometryText}</td>
                 <td class="px-2 py-1.5">${item.weight_g}</td>
-                <td class="px-2 py-1.5">${formatTimeHMS(item.unit_time_h || (item.estimated_time_h / Math.max(1, item.quantity)))}</td>
-                <td class="px-2 py-1.5">${formatTimeHMS(item.estimated_time_h)}</td>
-                <td class="px-2 py-1.5">¥ ${item.unit_cost_cny}</td>
-                <td class="px-2 py-1.5">¥ ${item.cost_cny}</td>
-                <td data-role="status-cell" class="px-2 py-1.5 text-green-600"><div>${t('common.success')}</div>${prusaExtraHtml}${gcodeToggleHtml}</td>
+                <td class="px-2 py-1.5">${recalculating ? '-' : formatTimeHMS(item.unit_time_h || (item.estimated_time_h / Math.max(1, item.quantity)))}</td>
+                <td class="px-2 py-1.5">${recalculating ? '-' : formatTimeHMS(item.estimated_time_h)}</td>
+                <td class="px-2 py-1.5">${recalculating ? '-' : ('¥ ' + item.unit_cost_cny)}</td>
+                <td class="px-2 py-1.5">${recalculating ? '-' : ('¥ ' + item.cost_cny)}</td>
+                <td data-role="status-cell" class="px-2 py-1.5 ${recalculating ? 'text-amber-600' : 'text-green-600'}"><div>${recalculating ? t('quote.recalculating') : t('common.success')}</div>${recalculating ? '' : prusaExtraHtml}${recalculating ? '' : gcodeToggleHtml}</td>
                 <td class="px-2 py-1.5 space-x-1"><button type="button" data-delete-file="${item.filename}" class="text-[11px] text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 rounded px-2 py-0.5">${t('common.delete')}</button></td>
             `;
         } else {
             const thumbnail = thumbnailMap.get(item.filename) || buildPlaceholderThumbnail(ext);
+            const recalculating = !!item._recalculating;
             const isRealThumbnail = thumbnail && thumbnail.startsWith('data:image/png');
             const previewButtonHtml = isRealThumbnail
                 ? `<button type="button" data-preview-file="${item.filename}" data-preview-ext="${ext}" class="block rounded border border-gray-200 overflow-hidden hover:border-indigo-300 transition-colors"><img src="${thumbnail}" alt="静态图" class="w-32 h-20 object-cover bg-white" /></button>`
@@ -333,7 +338,7 @@ export function renderResultsTable() {
         tbody.appendChild(tr);
 
         // ── G-code 详情展开行 ──
-        const gcodeData = item.status === 'success' && item.cost_breakdown?.gcode_summary;
+        const gcodeData = !item._recalculating && item.status === 'success' && item.cost_breakdown?.gcode_summary;
         if (gcodeData) {
             const detailTr = document.createElement('tr');
             detailTr.className = 'border-t border-gray-100 bg-gray-50';
@@ -441,7 +446,8 @@ export async function batchApplyToAll() {
         if (!item || !item.filename) return item;
         return { ...item, material, color, quantity,
             _printer_model: getActivePrinterCompoundId(),
-            _slicer_preset_id: quoteOptions.slicer_preset_id };
+            _slicer_preset_id: quoteOptions.slicer_preset_id,
+            _recalculating: true };
     }));
 
     // 2) 更新报价选项

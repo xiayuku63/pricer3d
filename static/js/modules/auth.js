@@ -587,6 +587,29 @@ export function handleLogout() {
 // ── Init ──
 export async function initializeAuth() {
     loadUserSession();
+
+    // Debug mode: ?debug in URL -> auto-login as admin, no registration needed
+    try {
+        var dbgParams = new URLSearchParams(window.location.search || "");
+        if (dbgParams.has('debug') && !authToken) {
+            var dbgResp = await fetch('/api/auth/admin-login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: '{}',
+            });
+            if (dbgResp.ok) {
+                var dbgData = await dbgResp.json();
+                setAuthToken(dbgData.access_token || '');
+                setCurrentUser(dbgData.user || null);
+                saveUserSession();
+                dbgParams.delete('debug');
+                var dbgQuery = dbgParams.toString();
+                var dbgNewUrl = window.location.pathname + (dbgQuery ? '?' + dbgQuery : '') + (window.location.hash || '');
+                window.history.replaceState({}, '', dbgNewUrl);
+            }
+        }
+    } catch (e) { /* debug login failed, continue as guest */ }
+
     try {
         const params = new URLSearchParams(window.location.search || "");
         const shouldOpenLogin = params.get('login') === '1' || (params.get('login') || '').toLowerCase() === 'true';

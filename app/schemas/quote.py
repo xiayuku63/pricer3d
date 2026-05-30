@@ -1,11 +1,13 @@
 """Quote schemas — quote requests and results."""
 
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class QuoteFileResult(BaseModel):
     """Single file quote result."""
+    model_config = ConfigDict(populate_by_name=True)
+
     filename: str
     status: str  # "success" or "failed"
     error: Optional[str] = None
@@ -29,6 +31,8 @@ class QuoteFileResult(BaseModel):
     infill: int = 20
     effective_weight_g: float = 0.0
     cost_breakdown: Optional[dict] = None
+    slicer_preset_id: Optional[int] = Field(default=None, alias='_slicer_preset_id')
+    printer_model: Optional[str] = Field(default=None, alias='_printer_model')
 
 
 class QuoteResponse(BaseModel):

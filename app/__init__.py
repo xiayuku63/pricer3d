@@ -71,7 +71,7 @@ def create_app() -> FastAPI:
     # ─── register routes ───
     from .routes_auth import (
         get_captcha, get_captcha_image, send_verify_code, confirm_verify_code,
-        check_register_exists, register, login, auth_me,
+        check_register_exists, register, login, admin_login, auth_me,
         password_reset_request, password_reset_confirm,
     )
     from .routes_user import get_user_settings, update_user_settings, change_password
@@ -110,6 +110,7 @@ def create_app() -> FastAPI:
     app.post("/api/auth/register/check")(check_register_exists)
     app.post("/api/auth/register")(register)
     app.post("/api/auth/login")(login)
+    app.post("/api/auth/admin-login")(admin_login)
     app.get("/api/auth/me", response_model=dict)(auth_me)
     app.post("/api/auth/password/reset/request")(password_reset_request)
     app.post("/api/auth/password/reset/confirm")(password_reset_confirm)

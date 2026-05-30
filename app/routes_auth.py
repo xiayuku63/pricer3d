@@ -16,6 +16,8 @@ from .schemas.auth import (
     PasswordResetRequest, PasswordResetConfirmRequest,
 )
 
+from datetime import datetime, timezone
+
 from .config import (
     CAPTCHA_LENGTH,
     CAPTCHA_TTL_SECONDS,
@@ -25,10 +27,13 @@ from .config import (
     PRIVACY_VERSION,
     IS_PRODUCTION,
     SHOW_DEV_CODES,
+    DEFAULT_MATERIALS,
+    DEFAULT_COLORS,
+    DEFAULT_PRICING_CONFIG,
 )
 from .models import RegisterRequest, LoginRequest, VerifySendRequest, VerifyConfirmRequest, RegisterCheckRequest
 from pydantic import BaseModel, Field
-from .database import get_db_conn
+from .database import get_db_conn, get_app_defaults
 from .utils import (
     normalize_email,
     normalize_phone,
@@ -308,6 +313,64 @@ async def login(payload: LoginRequest, request: Request):
     # remember_me: 720h (30d); default: 24h
     expire_hours = 720 if payload.remember_me else 24
     access_token = create_access_token(user_id=user["id"], username=user["username"], expire_hours=expire_hours)
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {
+            "id": user["id"],
+            "username": user["username"],
+            "created_at": user["created_at"],
+        },
+    }
+
+
+# ---------- Admin Login (no captcha, no legal, dev only) ----------
+
+async def admin_login(request: Request):
+    """Admin quick login — no captcha, no legal acceptance. Auto-creates admin user."""
+    import json
+    from .auth import get_password_hash, verify_password
+
+    admin_username = "admin"
+    admin_password = "admin"
+
+    user = get_user_by_username(admin_username)
+    if not user:
+        # Auto-create admin user
+        password_hash = get_password_hash(admin_password)
+        created_at = datetime.now(timezone.utc).isoformat()
+        defaults = get_app_defaults()
+        materials_json = json.dumps(defaults.get("materials") or DEFAULT_MATERIALS)
+        colors_json = json.dumps(defaults.get("colors") or DEFAULT_COLORS)
+        pricing_json = json.dumps(defaults.get("pricing_config") or DEFAULT_PRICING_CONFIG)
+        accepted_at = datetime.now(timezone.utc).isoformat()
+        with get_db_conn() as conn:
+            conn.execute(
+                """INSERT INTO users (username, password_hash, created_at, materials, colors, pricing_config,
+                   email, phone, email_verified, phone_verified, membership_level, membership_expires_at,
+                   terms_accepted_at, privacy_accepted_at, terms_version, privacy_version)
+                   VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, 0, 0, 'free', NULL, ?, ?, 'v1', 'v1')""",
+                (admin_username, password_hash, created_at, materials_json, colors_json, pricing_json,
+                 accepted_at, accepted_at),
+            )
+            conn.commit()
+        user = get_user_by_username(admin_username)
+        if not user:
+            raise HTTPException(status_code=500, detail="ADMIN_CREATION_FAILED")
+
+    # Verify password
+    if not verify_password(admin_password, user["password_hash"]):
+        raise HTTPException(status_code=401, detail="管理员密码错误")
+
+    record_legal_acceptance(int(user["id"]))
+    write_audit_event(
+        action="auth.admin_login",
+        request=request,
+        user=user,
+        detail={"identifier": admin_username},
+    )
+    # 30-day token
+    access_token = create_access_token(user_id=user["id"], username=user["username"], expire_hours=720)
     return {
         "access_token": access_token,
         "token_type": "bearer",
