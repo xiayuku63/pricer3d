@@ -76,6 +76,7 @@ import { t, lang, toggleLang, langFlag, langLabel, initI18n } from './modules/i1
 //  App entry point
 // ═══════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('=== DOMContentLoaded FIRED ===');
     // Apply theme immediately (before any rendering)
     initTheme();
     // Init i18n (language switcher)
@@ -184,7 +185,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setOpenLoginModalRef(openLoginModal);
 
     // ── Three.js setup ──
-    initViewer(dom.previewContainer, dom.previewPlaceholder);
+    try { initViewer(dom.previewContainer, dom.previewPlaceholder); } catch(e) { console.error('initViewer failed (non-fatal):', e); }
 
     // ── Quote history ──
     initQuoteHistory();
