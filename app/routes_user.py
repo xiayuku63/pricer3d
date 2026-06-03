@@ -38,9 +38,6 @@ class PricingConfig(BaseModel):
     material_waste_percent: float = 5.0
     support_percent_of_model: float = 0.0
     post_process_fee_per_part_cny: float = 0.0
-    difficulty_coefficient: float = 0.25
-    difficulty_ratio_low: float = 0.8
-    difficulty_ratio_high: float = 4.0
     use_prusaslicer: int = 0
     prusaslicer_support_mode: str = "on"
     support_price_per_g: float = 0.0

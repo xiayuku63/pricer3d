@@ -27,6 +27,7 @@ import {
     saveSlicerPresetSelection, formatColorLabel, formatTimeHMS, escapeHtml,
     renderColorDropdown, getColorsForMaterial, colorToObj,
     authFetch,
+    getActivePrinterCompoundId,
 } from './modules/state.js';
 
 import {
@@ -135,8 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
         cfgMinJobFee: $('cfg-min-job-fee'), cfgMaterialWaste: $('cfg-material-waste'),
         cfgSupportPercent: $('cfg-support-percent'), cfgPostPerPart: $('cfg-post-per-part'),
         cfgTimeOverheadMin: $('cfg-time-overhead-min'), cfgTimeVolMinPerCm3: $('cfg-time-vol-min-per-cm3'),
-        cfgDifficultyCoefficient: $('cfg-difficulty-coefficient'), cfgDifficultyRatioLow: $('cfg-difficulty-ratio-low'),
-        cfgDifficultyRatioHigh: $('cfg-difficulty-ratio-high'), cfgSupportPricePerG: $('cfg-support-price-per-g'),
+        cfgSupportPricePerG: $('cfg-support-price-per-g'),
         cfgUnitCostFormula: $('cfg-unit-cost-formula'), cfgTotalCostFormula: $('cfg-total-cost-formula'),
 
         // Slicer presets
@@ -531,7 +531,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (dom.formulaResetBtn) {
         dom.formulaResetBtn.addEventListener('click', () => {
-            dom.cfgUnitCostFormula.value = '((effective_weight_g * (price_per_kg / 1000.0)) + (unit_time_h * machine_hourly_rate_cny) + post_process_fee_per_part_cny) * difficulty_multiplier + support_cost_per_part_cny';
+            dom.cfgUnitCostFormula.value = '((effective_weight_g * (price_per_kg / 1000.0)) + (unit_time_h * machine_hourly_rate_cny) + post_process_fee_per_part_cny) + support_cost_per_part_cny';
             dom.cfgTotalCostFormula.value = 'max((unit_cost_cny * quantity) + setup_fee_cny, min_job_fee_cny)';
             syncPricingFromInputs();
             if (dom.formulaValidateMsg) dom.formulaValidateMsg.classList.add('hidden');
@@ -642,6 +642,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     zipFormData.append('material', quoteOptions.material);
                     zipFormData.append('color', quoteOptions.color);
                     zipFormData.append('quantity', String(quoteOptions.quantity));
+
+                    // Send printer and slicer preset from batch toolbar for checklist-less models
+                    var zipPrinterModel = getActivePrinterCompoundId();
+                    if (zipPrinterModel) zipFormData.append('printer_model', zipPrinterModel);
+                    var zipPresetEl = document.getElementById('batch-slicer-preset');
+                    var zipPresetId = (zipPresetEl && zipPresetEl.value) ? Number(zipPresetEl.value) : null;
+                    if (zipPresetId) zipFormData.append('slicer_preset_id', String(zipPresetId));
 
                     var zipResp = await authFetch('/api/quote/zip', { method: 'POST', body: zipFormData });
                     var zipData = await zipResp.json();

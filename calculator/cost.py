@@ -113,11 +113,6 @@ FORMULA_ALIAS_TO_CANONICAL = {
     "最低起步价": "min_job_fee_cny",
     "单件成本": "unit_cost_cny",
     "小计": "subtotal_cny",
-    "难度系数": "difficulty_coefficient",
-    "表面积体积比": "surface_area_to_volume_ratio",
-    "难度得分": "difficulty_score",
-    "难度倍率": "difficulty_multiplier",
-    "难度加价百分比": "difficulty_markup_percent",
     "支撑重量_g": "support_weight_g",
     "支撑单价_元每g": "support_price_per_g",
     "支撑费_元每件": "support_cost_per_part_cny",
@@ -131,11 +126,6 @@ FORMULA_CANONICAL_VARS = {
     "unit_time_h",
     "machine_hourly_rate_cny",
     "post_process_fee_per_part_cny",
-    "difficulty_coefficient",
-    "surface_area_to_volume_ratio",
-    "difficulty_score",
-    "difficulty_multiplier",
-    "difficulty_markup_percent",
     "support_weight_g",
     "support_price_per_g",
     "support_cost_per_part_cny",
@@ -148,8 +138,6 @@ FORMULA_CANONICAL_VARS = {
     "machine_cost_cny",
     "volume_mm3",
     "surface_area_mm2",
-    "volume_cm3",
-    "surface_area_cm2",
     "unit_cost_cny",
     "subtotal_cny",
 }
@@ -253,25 +241,7 @@ def calculate_cost(
     min_job_fee = float(cfg.get("min_job_fee_cny") or 0.0)
 
     base_unit_cost = material_cost + machine_cost + post_per_part
-
-    volume_cm3 = float(volume_mm3) / 1000.0
-    surface_area_cm2 = float(surface_area_mm2) / 100.0
-    surface_area_to_volume_ratio = 0.0
-    if volume_cm3 > 0:
-        surface_area_to_volume_ratio = surface_area_cm2 / max(volume_cm3, 1e-9)
-    ratio_low = float(cfg.get("difficulty_ratio_low") or 0.0)
-    ratio_high = float(cfg.get("difficulty_ratio_high") or 0.0)
-    difficulty_score = 0.0
-    if ratio_high > ratio_low:
-        difficulty_score = (surface_area_to_volume_ratio - ratio_low) / (ratio_high - ratio_low)
-    difficulty_score = max(0.0, min(1.0, float(difficulty_score)))
-    difficulty_coefficient = float(cfg.get("difficulty_coefficient") or 0.0)
-    if difficulty_coefficient < 0:
-        difficulty_coefficient = 0.0
-    if difficulty_coefficient > 3:
-        difficulty_coefficient = 3.0
-    difficulty_multiplier = 1.0 + (difficulty_coefficient * difficulty_score)
-    difficulty_markup_percent = max(0.0, (difficulty_multiplier - 1.0) * 100.0)
+    difficulty_multiplier = 1.0
 
     # ── 自动朝向优化 (Lay on Face) ──
     orientation_info: dict = {}
@@ -425,11 +395,6 @@ def calculate_cost(
         "unit_time_h": float(unit_time_h),
         "machine_hourly_rate_cny": float(machine_hourly_rate),
         "post_process_fee_per_part_cny": float(post_per_part),
-        "difficulty_coefficient": float(difficulty_coefficient),
-        "surface_area_to_volume_ratio": float(surface_area_to_volume_ratio),
-        "difficulty_score": float(difficulty_score),
-        "difficulty_multiplier": float(difficulty_multiplier),
-        "difficulty_markup_percent": float(difficulty_markup_percent),
         "support_weight_g": float(support_weight_g_per_part),
         "support_price_per_g": float(support_price_per_g),
         "support_cost_per_part_cny": float(support_cost_per_part_cny),
@@ -442,8 +407,6 @@ def calculate_cost(
         "machine_cost_cny": float(machine_cost),
         "volume_mm3": float(volume_mm3),
         "surface_area_mm2": float(surface_area_mm2),
-        "volume_cm3": float(volume_cm3),
-        "surface_area_cm2": float(surface_area_cm2),
     }
 
     unit_formula = str(cfg.get("unit_cost_formula") or DEFAULT_UNIT_COST_FORMULA).strip()
@@ -451,9 +414,8 @@ def calculate_cost(
 
     unit_cost = safe_eval_formula(unit_formula, variables)
     if unit_cost is None or unit_cost < 0:
-        unit_cost = (base_unit_cost * float(difficulty_multiplier)) + float(support_cost_per_part_cny)
+        unit_cost = base_unit_cost + float(support_cost_per_part_cny)
 
-    unit_cost_before_difficulty = float(base_unit_cost)
 
     subtotal = (unit_cost * quantity) + setup_fee
     variables["unit_cost_cny"] = float(unit_cost)
@@ -469,12 +431,6 @@ def calculate_cost(
         "material_cost_cny": round(material_cost, 2),
         "machine_cost_cny": round(machine_cost, 2),
         "post_process_cost_per_part_cny": round(post_per_part, 2),
-        "difficulty_surface_area_to_volume_ratio": round(surface_area_to_volume_ratio, 6),
-        "difficulty_score": round(difficulty_score, 4),
-        "difficulty_coefficient": round(difficulty_coefficient, 4),
-        "difficulty_multiplier": round(difficulty_multiplier, 6),
-        "difficulty_markup_percent": round(max(0.0, (difficulty_multiplier - 1.0) * 100.0), 2),
-        "unit_cost_before_difficulty_cny": round(unit_cost_before_difficulty, 2),
         "support_weight_g_per_part": round(support_weight_g_per_part, 3),
         "support_price_per_g": round(support_price_per_g, 4),
         "support_cost_per_part_cny": round(support_cost_per_part_cny, 2),
@@ -680,10 +636,6 @@ async def process_single_file(
             "status": "success",
             "volume_cm3": round(volume / 1000, 2),
             "surface_area_cm2": round(surface_area / 100, 2),
-            "surface_area_to_volume_ratio": round(float((breakdown or {}).get("difficulty_surface_area_to_volume_ratio") or 0.0), 6),
-            "difficulty_score": round(float((breakdown or {}).get("difficulty_score") or 0.0), 4),
-            "difficulty_multiplier": round(float((breakdown or {}).get("difficulty_multiplier") or 1.0), 6),
-            "difficulty_markup_percent": round(float((breakdown or {}).get("difficulty_markup_percent") or 0.0), 2),
             "dimensions": dimensions_str,
             "weight_g": total_weight,
             "estimated_time_h": total_print_time_h,

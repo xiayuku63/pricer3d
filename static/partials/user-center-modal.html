@@ -90,11 +90,7 @@
                                                 <tr><td class="px-2 py-1.5">单件打印时间（小时）</td><td class="px-2 py-1.5">单件时间_h</td><td class="px-2 py-1.5">unit_time_h</td></tr>
                                                 <tr><td class="px-2 py-1.5">机台费（元/小时）</td><td class="px-2 py-1.5">机台费_元每小时</td><td class="px-2 py-1.5">machine_hourly_rate_cny</td></tr>
                                                 <tr><td class="px-2 py-1.5">后处理费（元/件）</td><td class="px-2 py-1.5">后处理费_元每件</td><td class="px-2 py-1.5">post_process_fee_per_part_cny</td></tr>
-                                                <tr><td class="px-2 py-1.5">难度系数（最高加价比例）</td><td class="px-2 py-1.5">难度系数</td><td class="px-2 py-1.5">difficulty_coefficient</td></tr>
                                                 <tr><td class="px-2 py-1.5">表面积/体积比</td><td class="px-2 py-1.5">表面积体积比</td><td class="px-2 py-1.5">surface_area_to_volume_ratio</td></tr>
-                                                <tr><td class="px-2 py-1.5">难度得分（0-1）</td><td class="px-2 py-1.5">难度得分</td><td class="px-2 py-1.5">difficulty_score</td></tr>
-                                                <tr><td class="px-2 py-1.5">难度倍率（>=1）</td><td class="px-2 py-1.5">难度倍率</td><td class="px-2 py-1.5">difficulty_multiplier</td></tr>
-                                                <tr><td class="px-2 py-1.5">难度加价百分比</td><td class="px-2 py-1.5">难度加价百分比</td><td class="px-2 py-1.5">difficulty_markup_percent</td></tr>
                                                 <tr><td class="px-2 py-1.5">支撑重量（克/件）</td><td class="px-2 py-1.5">支撑重量_g</td><td class="px-2 py-1.5">support_weight_g</td></tr>
                                                 <tr><td class="px-2 py-1.5">支撑单价（元/克）</td><td class="px-2 py-1.5">支撑单价_元每g</td><td class="px-2 py-1.5">support_price_per_g</td></tr>
                                                 <tr><td class="px-2 py-1.5">支撑费（元/件）</td><td class="px-2 py-1.5">支撑费_元每件</td><td class="px-2 py-1.5">support_cost_per_part_cny</td></tr>
@@ -144,18 +140,6 @@
                                     <div>
                                         <label class="block text-xs text-gray-600">体积耗时 (分钟/cm³)</label>
                                         <input id="cfg-time-vol-min-per-cm3" type="number" step="0.01" class="mt-1 w-full border border-gray-300 rounded-sm text-xs px-2 py-1" />
-                                    </div>
-                                    <div>
-                                        <label class="block text-xs text-gray-600">难度系数（最高加价比例，%）</label>
-                                        <input id="cfg-difficulty-coefficient" type="number" step="0.1" class="mt-1 w-full border border-gray-300 rounded-sm text-xs px-2 py-1" />
-                                    </div>
-                                    <div>
-                                        <label class="block text-xs text-gray-600">难度阈值低（表面积/体积）</label>
-                                        <input id="cfg-difficulty-ratio-low" type="number" step="0.01" class="mt-1 w-full border border-gray-300 rounded-sm text-xs px-2 py-1" />
-                                    </div>
-                                    <div>
-                                        <label class="block text-xs text-gray-600">难度阈值高（表面积/体积）</label>
-                                        <input id="cfg-difficulty-ratio-high" type="number" step="0.01" class="mt-1 w-full border border-gray-300 rounded-sm text-xs px-2 py-1" />
                                     </div>
                                     <div>
                                         <label class="block text-xs text-gray-600">支撑单价（元/克）</label>

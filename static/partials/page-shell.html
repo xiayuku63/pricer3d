@@ -5,7 +5,7 @@
                 <div>
                     <div class="uppercase tracking-wide text-sm text-indigo-500 font-semibold mb-1">3D Printing Parts Automated Quoting System</div>
                     <h2 class="text-2xl font-bold text-gray-900 inline">3D打印件自动报价系统</h2>
-                    <span id="app-version" class="ml-2 px-2 py-0.5 text-xs font-mono rounded-full bg-gray-100 text-gray-500 align-middle">v0.7.6</span>
+                    <span id="app-version" class="ml-2 px-2 py-0.5 text-xs font-mono rounded-full bg-gray-100 text-gray-500 align-middle">v0.13.0</span>
                 </div>
                 <div id="auth-area" class="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:justify-end">
                     <button id="lang-switch-btn" type="button" class="w-full sm:w-auto text-sm px-3 py-1.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50">🇨🇳 中文</button>
@@ -96,23 +96,21 @@
                                         <th class="px-2 py-1.5" data-i18n="quote.color">颜色</th>
                                         <th class="px-2 py-1.5" data-i18n="quote.quantity">数量</th>
                                         <th class="px-2 py-1.5" data-i18n="quote.geometry">几何信息</th>
-                                        <th class="px-2 py-1.5" data-i18n="quote.weight">重量(g)</th>
-                                        <th class="px-2 py-1.5" data-i18n="quote.unitTime">单件时间</th>
-                                        <th class="px-2 py-1.5" data-i18n="quote.totalTime">总时间</th>
-                                        <th class="px-2 py-1.5" data-i18n="quote.unitPrice">单价</th>
-                                        <th class="px-2 py-1.5" data-i18n="quote.totalPrice">总价</th>
+                                        <th class="px-2 py-1.5" data-i18n="quote.weight">重量（单件/总）</th>
+                                        <th class="px-2 py-1.5" data-i18n="quote.time">时间（单件/总）</th>
+                                        <th class="px-2 py-1.5" data-i18n="quote.price">价格（单价/总价）</th>
                                         <th class="px-2 py-1.5" data-i18n="quote.status">状态/错误</th>
                                         <th class="px-2 py-1.5" data-i18n="quote.actions">操作</th>
                                     </tr>
                                 </thead>
                                 <tbody id="batch-results-body" class="bg-white">
                                     <tr class="border-t border-gray-100">
-                                        <td class="px-2 py-2 text-gray-500" colspan="15" data-i18n="quote.noDataUpload">暂无数据，请在表格底部上传并自动报价</td>
+                                        <td class="px-2 py-2 text-gray-500" colspan="12" data-i18n="quote.noDataUpload">暂无数据，请在表格底部上传并自动报价</td>
                                     </tr>
                                 </tbody>
                                 <tfoot class="bg-white border-t border-gray-200">
                                     <tr>
-                                        <td class="px-2 py-3" colspan="15">
+                                        <td class="px-2 py-3" colspan="12">
                                             <form id="quote-form" class="space-y-3">
                                                 <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md bg-gray-50 hover:bg-gray-100 transition-colors" id="drop-zone">
                                                     <div class="space-y-1 text-center">

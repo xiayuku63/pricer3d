@@ -535,7 +535,7 @@ export async function handleAuthSuccess(data) {
     renderAuthUI();
     await fetchUserSettings();
     loadQuoteHistory(authToken);
-    fetchPrinterModels();
+    await fetchPrinterModels();
     closeLoginModal();
 
     const { errorContainer, fileNameDisplay } = dom;
@@ -625,7 +625,7 @@ export async function initializeAuth() {
     if (!authToken) {
         renderAuthUI();
         updateDropdowns();
-        fetchPrinterModels();
+        await fetchPrinterModels();
     }
 
     try {
@@ -637,13 +637,13 @@ export async function initializeAuth() {
         loadSlicerPresetSelection();
         await fetchUserSettings();
         // Re-populate printer dropdowns with user's saved defaults
-        fetchPrinterModels();
+        await fetchPrinterModels();
     } catch (e) {
         setCurrentUser(null);
         setAuthToken("");
         clearUserSession();
         updateDropdowns();
-        fetchPrinterModels();
+        await fetchPrinterModels();
     }
     renderAuthUI();
 }

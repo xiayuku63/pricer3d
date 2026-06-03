@@ -13,10 +13,6 @@ class QuoteFileResult(BaseModel):
     error: Optional[str] = None
     volume_cm3: float = 0.0
     surface_area_cm2: float = 0.0
-    surface_area_to_volume_ratio: float = 0.0
-    difficulty_score: float = 0.0
-    difficulty_multiplier: float = 1.0
-    difficulty_markup_percent: float = 0.0
     dimensions: str = ""
     weight_g: float = 0.0
     estimated_time_h: float = 0.0

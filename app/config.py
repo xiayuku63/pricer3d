@@ -95,20 +95,17 @@ DEFAULT_MATERIALS = [
     {"name": "ABS", "brand": "通用", "density": 1.04, "price_per_kg": 250.0, "colors": DEFAULT_COLORS},
     {"name": "Resin", "brand": "通用", "density": 1.11, "price_per_kg": 800.0, "colors": DEFAULT_COLORS},
 ]
-DEFAULT_UNIT_COST_FORMULA = "((effective_weight_g * (price_per_kg / 1000.0)) + (unit_time_h * machine_hourly_rate_cny) + post_process_fee_per_part_cny) * difficulty_multiplier + support_cost_per_part_cny"
+DEFAULT_UNIT_COST_FORMULA = "((effective_weight_g * (price_per_kg / 1000.0)) + (unit_time_h * machine_hourly_rate_cny) + post_process_fee_per_part_cny) + support_cost_per_part_cny"
 DEFAULT_TOTAL_COST_FORMULA = "max((unit_cost_cny * quantity) + setup_fee_cny, min_job_fee_cny)"
 DEFAULT_PRICING_CONFIG = {
     "machine_hourly_rate_cny": 15.0,
     "setup_fee_cny": 0.0,
     "min_job_fee_cny": 0.0,
     "material_waste_percent": 5.0,
-    "support_percent_of_model": 0.0,
+    "support_percent_of_model": 3.0,
     "post_process_fee_per_part_cny": 0.0,
-    "difficulty_coefficient": 0.25,
-    "difficulty_ratio_low": 0.8,
-    "difficulty_ratio_high": 4.0,
-    "use_prusaslicer": 1,
     "prusa_time_correction": 0.44,
+    "use_prusaslicer": 1,
     "support_mode": "on",
     "support_price_per_g": 0.0,
     "time_overhead_min": 5.0,

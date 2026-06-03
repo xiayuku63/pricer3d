@@ -70,9 +70,6 @@ export let PRICING_CONFIG = {
     material_waste_percent: 5.0,
     support_percent_of_model: 0.0,
     post_process_fee_per_part_cny: 0.0,
-    difficulty_coefficient: 0.25,
-    difficulty_ratio_low: 0.8,
-    difficulty_ratio_high: 4.0,
     use_prusaslicer: 1,
     support_mode: 'on',
     support_price_per_g: 0.0,
@@ -83,7 +80,7 @@ export let PRICING_CONFIG = {
     time_layer_height_exponent: 1.0,
     time_ref_infill_percent: 20.0,
     time_infill_coefficient: 1.0,
-    unit_cost_formula: '((effective_weight_g * (price_per_kg / 1000.0)) + (unit_time_h * machine_hourly_rate_cny) + post_process_fee_per_part_cny) * difficulty_multiplier + support_cost_per_part_cny',
+    unit_cost_formula: '((effective_weight_g * (price_per_kg / 1000.0)) + (unit_time_h * machine_hourly_rate_cny) + post_process_fee_per_part_cny) + support_cost_per_part_cny',
     total_cost_formula: 'max((unit_cost_cny * quantity) + setup_fee_cny, min_job_fee_cny)',
 };
 

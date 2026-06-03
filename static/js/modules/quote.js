@@ -221,7 +221,7 @@ export function renderResultsTable() {
     const showPrusaStatus = true;
     tbody.innerHTML = '';
     if (!currentResults.length) {
-        tbody.innerHTML = '<tr class="border-t border-gray-100"><td class="px-2 py-2 text-gray-500" colspan="15">' + t('common.noData') + '</td></tr>';
+        tbody.innerHTML = '<tr class="border-t border-gray-100"><td class="px-2 py-2 text-gray-500" colspan="12">' + t('common.noData') + '</td></tr>';
         return;
     }
     currentResults.forEach((item) => {
@@ -247,25 +247,9 @@ export function renderResultsTable() {
                 ? '<button type="button" data-toggle-gcode="' + escapeHtml(item.filename) + '" class="text-[10px] text-indigo-500 hover:text-indigo-700 underline ml-1">' + t('quote.gcodeCollapse') + '</button>'
                 : '';
 
-            let markupPercent = Number(item.difficulty_markup_percent);
-            if (!Number.isFinite(markupPercent)) {
-                const multiplierRaw = Number(item.difficulty_multiplier);
-                if (Number.isFinite(multiplierRaw)) markupPercent = (multiplierRaw - 1) * 100;
-            }
-            if (!Number.isFinite(markupPercent)) {
-                const vol = Number(item.volume_cm3), area = Number(item.surface_area_cm2);
-                const coeff = Number(PRICING_CONFIG.difficulty_coefficient);
-                const low = Number(PRICING_CONFIG.difficulty_ratio_low);
-                const high = Number(PRICING_CONFIG.difficulty_ratio_high);
-                if (Number.isFinite(vol) && vol > 0 && Number.isFinite(area) && Number.isFinite(coeff) && Number.isFinite(low) && Number.isFinite(high) && high > low) {
-                    const ratio = area / vol;
-                    const score = Math.max(0, Math.min(1, (ratio - low) / (high - low)));
-                    markupPercent = Math.max(0, (1 + Math.max(0, coeff) * score - 1) * 100);
-                } else { markupPercent = 0; }
-            }
-            const markupText = Number.isFinite(markupPercent) ? markupPercent.toFixed(2) : '0.00';
+            const markupText = '0.00';
 
-            const geometryText = `<div class="whitespace-nowrap">体积: ${item.volume_cm3} cm³</div><div class="whitespace-nowrap">表面积: ${item.surface_area_cm2} cm²</div><div class="whitespace-nowrap">难度加价: +${markupText}%</div><div class="whitespace-nowrap">尺寸: ${item.dimensions}</div>`;
+            const geometryText = `<div class="whitespace-nowrap">体积: ${item.volume_cm3} cm³</div><div class="whitespace-nowrap">表面积: ${item.surface_area_cm2} cm²</div><div class="whitespace-nowrap">尺寸: ${item.dimensions}</div>`;
             const thumbnail = thumbnailMap.get(item.filename) || buildPlaceholderThumbnail(ext);
             const recalculating = !!item._recalculating;
             const isRealThumbnail = thumbnail && thumbnail.startsWith('data:image/png');
@@ -278,8 +262,9 @@ export function renderResultsTable() {
 
             // Per-file printer + preset dropdowns
             const printerModels = getCachedPrinterModels();
+            const selectedPrinterId = (item._printer_model || '').replace(/_\d{2}$/, '');
             const pmOptions = printerModels.map(p =>
-                `<option value="${p.id}" ${p.id === (item._printer_model || '') ? 'selected' : ''}>${p.name}</option>`
+                `<option value="${p.id}" ${p.id === selectedPrinterId ? 'selected' : ''}>${p.name}</option>`
             ).join('');
             const presets = slicerPresets || [];
             const presetOptions = ['<option value="">' + t('quote.presetNone') + '</option>',
@@ -295,12 +280,19 @@ export function renderResultsTable() {
                 <td class="px-2 py-1.5" data-field="color">${renderedRowColors.html}</td>
                 <td class="px-2 py-1.5"><input data-field="quantity" type="number" min="1" value="${item.quantity}" class="row-edit w-14 text-[11px] border border-gray-300 rounded px-1 py-0.5" /></td>
                 <td class="px-2 py-1.5 text-[10px] leading-tight">${geometryText}</td>
-                <td class="px-2 py-1.5">${item.weight_g}</td>
-                <td class="px-2 py-1.5">${recalculating ? '-' : formatTimeHMS(item.unit_time_h || (item.estimated_time_h / Math.max(1, item.quantity)))}</td>
-                <td class="px-2 py-1.5">${recalculating ? '-' : formatTimeHMS(item.estimated_time_h)}</td>
-                <td class="px-2 py-1.5">${recalculating ? '-' : ('¥ ' + item.unit_cost_cny)}</td>
-                <td class="px-2 py-1.5">${recalculating ? '-' : ('¥ ' + item.cost_cny)}</td>
-                <td data-role="status-cell" class="px-2 py-1.5 ${recalculating ? 'text-amber-600' : 'text-green-600'}"><div>${recalculating ? t('quote.recalculating') : t('common.success')}${item._checklist_params && item._checklist_source ? ' <span class=\"text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1 cursor-help\" title=\"(item._checklist_source.printer_model ? '打印机:' + item._checklist_source.printer_model + ' ' : '') + (item._checklist_source.nozzle ? '喷嘴:' + item._checklist_source.nozzle + 'mm | ' : '') + '层高:' + item._checklist_source.layer_height + 'mm 墙层数:' + item._checklist_source.wall_count + ' 填充:' + item._checklist_source.infill + '%\">\u{1F4CB}\u6E05\u5355</span>' : ''}</div>${recalculating ? '' : prusaExtraHtml}${recalculating ? '' : gcodeToggleHtml}</td>
+                <td class="px-2 py-1.5">
+                    <div class="text-[10px] leading-tight">${recalculating ? '-' : (item.weight_g / Math.max(1, item.quantity)).toFixed(1)}g</div>
+                    <div class="text-xs leading-tight font-medium">${recalculating ? '-' : item.weight_g + 'g'}</div>
+                </td>
+                <td class="px-2 py-1.5\\">
+                    <div class="text-[10px] leading-tight">${recalculating ? '-' : formatTimeHMS(item.unit_time_h || (item.estimated_time_h / Math.max(1, item.quantity)))}</div>
+                    <div class="text-xs leading-tight font-medium">${recalculating ? '-' : formatTimeHMS(item.estimated_time_h)}</div>
+                </td>
+                <td class="px-2 py-1.5">
+                    <div class="text-[10px] leading-tight">${recalculating ? '-' : ('¥ ' + Number(item.unit_cost_cny || 0).toFixed(2))}</div>
+                    <div class="text-xs leading-tight font-medium">${recalculating ? '-' : ('¥ ' + Number(item.cost_cny || 0).toFixed(2))}</div>
+                </td>
+                <td data-role="status-cell" class="px-2 py-1.5 ${recalculating ? 'text-amber-600' : 'text-green-600'}"><div>${recalculating ? t('quote.recalculating') : t('common.success')}${item._checklist_params && item._checklist_source ? ` <span class="text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1 cursor-help" title="(item._checklist_source.printer_model ? '打印机:' + item._checklist_source.printer_model + ' ' : '') + (item._checklist_source.nozzle ? '喷嘴:' + item._checklist_source.nozzle + 'mm | ' : '') + '层高:' + item._checklist_source.layer_height + 'mm 墙层数:' + item._checklist_source.wall_count + ' 填充:' + item._checklist_source.infill + '%">\u{1F4CB}\u6E05\u5355</span>` : ''}</div>${recalculating ? '' : prusaExtraHtml}${recalculating ? '' : gcodeToggleHtml}</td>
                 <td class="px-2 py-1.5 space-x-1"><button type="button" data-delete-file="${item.filename}" class="text-[11px] text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 rounded px-2 py-0.5">${t('common.delete')}</button></td>
             `;
         } else {
@@ -317,8 +309,9 @@ export function renderResultsTable() {
             const quantityValue = item.quantity || quoteOptions.quantity || 1;
             // Per-file printer + preset
             const printerModels = getCachedPrinterModels();
+            const selectedPrinterId = (item._printer_model || '').replace(/_\d{2}$/, '');
             const pmOptions = printerModels.map(p =>
-                `<option value="${p.id}" ${p.id === (item._printer_model || '') ? 'selected' : ''}>${p.name}</option>`
+                `<option value="${p.id}" ${p.id === selectedPrinterId ? 'selected' : ''}>${p.name}</option>`
             ).join('');
             const presets = slicerPresets || [];
             const presetOptions = ['<option value="">' + t('quote.presetNone') + '</option>',
@@ -332,8 +325,8 @@ export function renderResultsTable() {
                 <td class="px-2 py-1.5"><select data-field="material" class="row-edit text-[11px] border border-gray-300 rounded px-1 py-0.5">${materialOptionsHtml}</select></td>
                 <td class="px-2 py-1.5" data-field="color">${renderedRowColors.html}</td>
                 <td class="px-2 py-1.5"><input data-field="quantity" type="number" min="1" value="${quantityValue}" class="row-edit w-14 text-[11px] border border-gray-300 rounded px-1 py-0.5" /></td>
-                <td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td>
-                <td data-role="status-cell" class="px-2 py-1.5 text-red-600">${item.error || t('common.error')}${item._checklist_params && item._checklist_source ? ' <span class=\"text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1 cursor-help\" title=\"(item._checklist_source.printer_model ? '打印机:' + item._checklist_source.printer_model + ' ' : '') + (item._checklist_source.nozzle ? '喷嘴:' + item._checklist_source.nozzle + 'mm | ' : '') + '层高:' + item._checklist_source.layer_height + 'mm 墙层数:' + item._checklist_source.wall_count + ' 填充:' + item._checklist_source.infill + '%\">\u{1F4CB}\u6E05\u5355</span>' : ''}</td>
+                <td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td>
+                <td data-role="status-cell" class="px-2 py-1.5 text-red-600">${item.error || t('common.error')}${item._checklist_params && item._checklist_source ? ` <span class="text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1 cursor-help" title="(item._checklist_source.printer_model ? '打印机:' + item._checklist_source.printer_model + ' ' : '') + (item._checklist_source.nozzle ? '喷嘴:' + item._checklist_source.nozzle + 'mm | ' : '') + '层高:' + item._checklist_source.layer_height + 'mm 墙层数:' + item._checklist_source.wall_count + ' 填充:' + item._checklist_source.infill + '%">\u{1F4CB}\u6E05\u5355</span>` : ''}</td>
                 <td class="px-2 py-1.5 space-x-1"><button type="button" data-delete-file="${item.filename}" class="text-[11px] text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 rounded px-2 py-0.5">${t('common.delete')}</button></td>
             `;
         }
@@ -355,7 +348,7 @@ export function renderResultsTable() {
 // ── G-code 详情构建 ──
 function _buildGcodeDetailHtml(gcode) {
     const cp = gcode.core_params || {};
-    let html = '<td colspan="15" class="px-3 py-2"><div class="grid grid-cols-3 md:grid-cols-5 gap-x-3 gap-y-1 text-[11px]">';
+    let html = '<td colspan="12" class="px-3 py-2"><div class="grid grid-cols-3 md:grid-cols-5 gap-x-3 gap-y-1 text-[11px]">';
 
     // 核心切片参数
     const add = (label, value, unit) => {

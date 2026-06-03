@@ -114,11 +114,8 @@ export function renderUserCenterUI() {
     if (cfgPostPerPart) cfgPostPerPart.value = String(PRICING_CONFIG.post_process_fee_per_part_cny ?? 0);
     if (cfgTimeOverheadMin) cfgTimeOverheadMin.value = String(PRICING_CONFIG.time_overhead_min ?? 5);
     if (cfgTimeVolMinPerCm3) cfgTimeVolMinPerCm3.value = String(PRICING_CONFIG.time_vol_min_per_cm3 ?? 0.8);
-    if (cfgDifficultyCoefficient) cfgDifficultyCoefficient.value = String(((Number(PRICING_CONFIG.difficulty_coefficient ?? 0.25) || 0) * 100).toFixed(2));
-    if (cfgDifficultyRatioLow) cfgDifficultyRatioLow.value = String(PRICING_CONFIG.difficulty_ratio_low ?? 0.8);
-    if (cfgDifficultyRatioHigh) cfgDifficultyRatioHigh.value = String(PRICING_CONFIG.difficulty_ratio_high ?? 4.0);
     if (cfgSupportPricePerG) cfgSupportPricePerG.value = String(PRICING_CONFIG.support_price_per_g ?? 0);
-    if (cfgUnitCostFormula) cfgUnitCostFormula.value = String(PRICING_CONFIG.unit_cost_formula ?? '((effective_weight_g * (price_per_kg / 1000.0)) + (unit_time_h * machine_hourly_rate_cny) + post_process_fee_per_part_cny) * difficulty_multiplier + support_cost_per_part_cny');
+    if (cfgUnitCostFormula) cfgUnitCostFormula.value = String(PRICING_CONFIG.unit_cost_formula ?? '((effective_weight_g * (price_per_kg / 1000.0)) + (unit_time_h * machine_hourly_rate_cny) + post_process_fee_per_part_cny) + support_cost_per_part_cny');
     if (cfgTotalCostFormula) cfgTotalCostFormula.value = String(PRICING_CONFIG.total_cost_formula ?? 'max((unit_cost_cny * quantity) + setup_fee_cny, min_job_fee_cny)');
 
     loadSlicerPresetSelection();
@@ -129,9 +126,7 @@ export function renderUserCenterUI() {
 export function syncPricingFromInputs() {
     const { cfgMachineHourlyRate, cfgSetupFee, cfgMinJobFee, cfgMaterialWaste,
         cfgSupportPercent, cfgPostPerPart, cfgTimeOverheadMin, cfgTimeVolMinPerCm3,
-        cfgDifficultyCoefficient, cfgDifficultyRatioLow, cfgDifficultyRatioHigh,
         cfgSupportPricePerG, cfgUnitCostFormula, cfgTotalCostFormula } = dom;
-    const diffCoeffPercent = Number(cfgDifficultyCoefficient?.value) || 0;
     setPricingConfig({
         ...PRICING_CONFIG,
         machine_hourly_rate_cny: Number(cfgMachineHourlyRate?.value) || 0,
@@ -140,9 +135,6 @@ export function syncPricingFromInputs() {
         material_waste_percent: Number(cfgMaterialWaste?.value) || 0,
         support_percent_of_model: Number(cfgSupportPercent?.value) || 0,
         post_process_fee_per_part_cny: Number(cfgPostPerPart?.value) || 0,
-        difficulty_coefficient: Math.max(0, diffCoeffPercent) / 100.0,
-        difficulty_ratio_low: Number(cfgDifficultyRatioLow?.value) || 0,
-        difficulty_ratio_high: Number(cfgDifficultyRatioHigh?.value) || 0,
         support_mode: 'on',
         support_price_per_g: Number(cfgSupportPricePerG?.value) || 0,
         time_overhead_min: Number(cfgTimeOverheadMin?.value) || 0,

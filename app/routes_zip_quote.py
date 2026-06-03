@@ -187,6 +187,8 @@ async def zip_quote(
     material: str = Form("PLA"),
     color: str = Form("White"),
     quantity: int = Form(1),
+    printer_model: Optional[str] = Form(default=None),
+    slicer_preset_id: Optional[int] = Form(default=None),
     current_user=Depends(get_current_user),
 ):
     """
@@ -271,14 +273,17 @@ async def zip_quote(
                 "match_mode": "none",
             }
 
-        # Get user materials + pricing
+        # Get user materials + pricing + defaults
         with get_db_conn() as conn:
             row = conn.execute(
-                "SELECT materials, pricing_config FROM users WHERE id = ?",
+                "SELECT materials, pricing_config, default_printer_id, default_nozzle, default_slicer_preset_id FROM users WHERE id = ?",
                 (current_user["id"],),
             ).fetchone()
         user_materials = json.loads(row["materials"]) if row and row["materials"] else DEFAULT_MATERIALS
         pricing_config = json.loads(row["pricing_config"]) if row and row["pricing_config"] else DEFAULT_PRICING_CONFIG
+        default_printer_id = row["default_printer_id"] if row else None
+        default_nozzle = row["default_nozzle"] if row else None
+        default_slicer_preset_id = int(row["default_slicer_preset_id"]) if row and row["default_slicer_preset_id"] is not None else None
 
         # Build match status message
         total_stl = len(stl_files)
@@ -402,12 +407,34 @@ async def zip_quote(
 
             results.append(result)
 
-        # Process stl_only with defaults
+        # Process stl_only with user defaults
+        # Resolve printer: request param > DB default
+        _default_compound_id = None
+        _default_preset = None
+        if printer_model:
+            from app.printers import resolve_printer as _rp2
+            _resolved = _rp2(printer_model)
+            if _resolved:
+                _default_compound_id = _resolved.get("_compound_id") or printer_model
+        elif default_printer_id:
+            nz = float(default_nozzle) if default_nozzle else None
+            resolved = resolve_printer(default_printer_id, nz)
+            if resolved:
+                _default_compound_id = resolved.get("_compound_id") or default_printer_id
+        # Resolve preset: request param > DB default
+        _effective_preset_id = slicer_preset_id if slicer_preset_id is not None else default_slicer_preset_id
+        if _effective_preset_id:
+            _default_preset = get_slicer_preset_by_id(int(current_user["id"]), _effective_preset_id)
+
         for stl in match_result["stl_only"]:
             fake_file = UploadFile(
                 filename=stl["filename"],
                 file=io.BytesIO(stl["file_bytes"]),
             )
+            # Build per-file pricing_config with user's default printer
+            file_pricing = dict(pricing_config)
+            if _default_compound_id:
+                file_pricing["printer_model"] = _default_compound_id
             try:
                 result = await process_single_file(
                     fake_file,
@@ -417,8 +444,8 @@ async def zip_quote(
                     quantity=quantity,
                     color=color,
                     user_materials=user_materials,
-                    pricing_config=pricing_config,
-                    slicer_preset=None,
+                    pricing_config=file_pricing,
+                    slicer_preset=_default_preset,
                     perimeters=3,
                     current_user=current_user,
                     auto_orient=False,
