@@ -31,12 +31,6 @@ async def lifespan(app: FastAPI):
     init_orm()
     _uploads_base_dir()
     _outputs_base_dir()
-    # Performance monitoring for key API endpoints
-    from .performance_monitor import MONITORED_ENDPOINTS
-    pricer_logger.info(
-        "event=performance_monitor_active endpoints=%s",
-        ",".join(MONITORED_ENDPOINTS.keys()),
-    )
     # Restore rate limit state from DB
     try:
         from .middleware import rate_limiter
@@ -94,18 +88,19 @@ def create_app() -> FastAPI:
     )
     from .routes_admin import (
         admin_get_defaults, admin_set_defaults_from_me, admin_list_users,
-        admin_update_user_membership, admin_list_audit, admin_metrics, admin_errors, admin_cleanup,
+        admin_update_user_membership, admin_list_audit, admin_metrics, admin_cleanup,
         admin_backup_create, admin_backup_list, admin_backup_cleanup,
     )
     from .routes_billing import (
         billing_plans, billing_checkout, billing_orders, billing_mock_complete, billing_webhook,
     )
-    from .routes_quote import get_quote, validate_formula, quote_history, delete_quote_history, clear_quote_history, export_quote_history, compare_quote_history
+    from .routes_quote import get_quote, validate_formula, quote_history, delete_quote_history, export_quote_history
     from .routes_zip_quote import zip_quote, download_zip_model
     from .routes_orientation import optimize_orientation, list_stable_faces, list_coplanar_clusters, train_sample
     from .routes_pages import (
-        index, register_page, faq_page, legal_terms, legal_privacy, admin_users_page,
-        pay_mock, healthz, readyz, version, health_api, health_ready_api,
+        index, register_page, legal_terms, legal_privacy, admin_users_page,
+        pay_mock, healthz, readyz, version,
+        printer_params_page, materials_page, quote_page,
     )
     from .schemas.auth import TokenResponse, CaptchaResponse
     from .schemas.quote import QuoteResponse, FormulaValidateRequest, QuoteHistoryItem
@@ -156,7 +151,6 @@ def create_app() -> FastAPI:
     app.post("/api/admin/users/{user_id}/membership")(admin_update_user_membership)
     app.get("/api/admin/audit")(admin_list_audit)
     app.get("/api/admin/metrics")(admin_metrics)
-    app.get("/api/admin/errors")(admin_errors)
     app.post("/api/admin/maintenance/cleanup")(admin_cleanup)
     app.post("/api/admin/maintenance/backup")(admin_backup_create)
     app.get("/api/admin/maintenance/backup")(admin_backup_list)
@@ -173,9 +167,7 @@ def create_app() -> FastAPI:
     app.post("/api/quote", response_model=QuoteResponse)(get_quote)
     app.get("/api/quote/history", response_model=PaginatedData[QuoteHistoryItem])(quote_history)
     app.delete("/api/quote/history/{id}")(delete_quote_history)
-    app.delete("/api/quote/history")(clear_quote_history)
     app.get("/api/quote/export")(export_quote_history)
-    app.get("/api/quote/compare")(compare_quote_history)
     app.post("/api/formula/validate", response_model=dict)(validate_formula)
 
     # zip quote
@@ -185,6 +177,14 @@ def create_app() -> FastAPI:
     # preview
     from .routes_preview import router as preview_router
     app.include_router(preview_router)
+
+    # printer params
+    from .routes_printer_params import router as printer_params_router
+    app.include_router(printer_params_router)
+
+    # materials
+    from .routes_materials import router as materials_router
+    app.include_router(materials_router)
 
     # todo
     from .todo_api import router as todo_router
@@ -213,7 +213,6 @@ def create_app() -> FastAPI:
     # pages
     app.get("/", response_class=HTMLResponse)(index)
     app.get("/register", response_class=HTMLResponse)(register_page)
-    app.get("/faq", response_class=HTMLResponse)(faq_page)
     app.get("/legal/terms", response_class=HTMLResponse)(legal_terms)
     app.get("/legal/privacy", response_class=HTMLResponse)(legal_privacy)
     app.get("/admin/users", response_class=HTMLResponse)(admin_users_page)
@@ -223,7 +222,10 @@ def create_app() -> FastAPI:
     app.get("/healthz")(healthz)
     app.get("/readyz")(readyz)
     app.get("/api/version")(version)
-    app.get("/api/health")(health_api)
-    app.get("/api/health/ready")(health_ready_api)
+
+    # new management pages
+    app.get("/printer-params", response_class=HTMLResponse)(printer_params_page)
+    app.get("/materials", response_class=HTMLResponse)(materials_page)
+    app.get("/quote", response_class=HTMLResponse)(quote_page)
 
     return app

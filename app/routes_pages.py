@@ -38,12 +38,6 @@ async def register_page():
         return f.read()
 
 
-async def faq_page():
-    """Serve the FAQ page."""
-    with open("static/faq.html", "r", encoding="utf-8") as f:
-        return f.read()
-
-
 def legal_terms():
     return f"""
 <!DOCTYPE html>
@@ -434,167 +428,28 @@ def version():
     return result
 
 
-def _get_version_info() -> dict:
-    """Helper: read version from VERSION file."""
-    version_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "VERSION")
-    result = {"version": "unknown", "deployed_at": None}
-    try:
-        with open(version_file, "r") as f:
-            for line in f:
-                line = line.strip()
-                if line.startswith("deployed_at:"):
-                    result["deployed_at"] = line.split(":", 1)[1].strip()
-                elif line and not line.startswith("#"):
-                    if result["version"] == "unknown":
-                        result["version"] = line
-    except Exception:
-        pass
-    return result
+def printer_params_page():
+    """打印机参数管理页面"""
+    from fastapi.responses import HTMLResponse
+    import os
+    html_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "html", "printer_params.html")
+    with open(html_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(f.read())
 
 
-def _check_database() -> dict:
-    """Check database connectivity by executing a simple query."""
-    import time as _time
-    try:
-        from .db import get_db_session
-        from .models_orm import User
-        start = _time.monotonic()
-        with get_db_session() as db:
-            count = db.query(User).count()
-        latency_ms = round((_time.monotonic() - start) * 1000, 1)
-        return {"status": "ok", "user_count": count, "latency_ms": latency_ms}
-    except Exception as e:
-        return {"status": "error", "detail": str(e)}
+def materials_page():
+    """材料管理页面"""
+    from fastapi.responses import HTMLResponse
+    import os
+    html_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "html", "materials.html")
+    with open(html_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(f.read())
 
 
-def _check_disk() -> dict:
-    """Check disk space usage."""
-    import shutil
-    try:
-        usage = shutil.disk_usage(".")
-        total_gb = round(usage.total / (1024 ** 3), 2)
-        used_gb = round(usage.used / (1024 ** 3), 2)
-        free_gb = round(usage.free / (1024 ** 3), 2)
-        used_pct = round(usage.used / usage.total * 100, 1)
-        status = "ok" if used_pct < 90 else ("warning" if used_pct < 95 else "error")
-        return {
-            "status": status,
-            "total_gb": total_gb,
-            "used_gb": used_gb,
-            "free_gb": free_gb,
-            "used_percent": used_pct,
-        }
-    except Exception as e:
-        return {"status": "error", "detail": str(e)}
-
-
-def _check_memory() -> dict:
-    """Check memory usage. Tries psutil first, falls back to /proc/meminfo."""
-    try:
-        import psutil
-        mem = psutil.virtual_memory()
-        return {
-            "status": "ok" if mem.percent < 90 else ("warning" if mem.percent < 95 else "error"),
-            "total_mb": round(mem.total / (1024 ** 2), 1),
-            "used_mb": round(mem.used / (1024 ** 2), 1),
-            "available_mb": round(mem.available / (1024 ** 2), 1),
-            "used_percent": mem.percent,
-            "source": "psutil",
-        }
-    except ImportError:
-        pass
-
-    # Fallback: try /proc/meminfo (Linux)
-    try:
-        info = {}
-        with open("/proc/meminfo", "r") as f:
-            for line in f:
-                parts = line.split()
-                if parts[0] in ("MemTotal:", "MemAvailable:", "MemFree:"):
-                    info[parts[0].rstrip(":")] = int(parts[1])  # kB
-        if "MemTotal" in info and "MemAvailable" in info:
-            total_mb = round(info["MemTotal"] / 1024, 1)
-            avail_mb = round(info["MemAvailable"] / 1024, 1)
-            used_mb = round(total_mb - avail_mb, 1)
-            used_pct = round(used_mb / total_mb * 100, 1)
-            return {
-                "status": "ok" if used_pct < 90 else ("warning" if used_pct < 95 else "error"),
-                "total_mb": total_mb,
-                "used_mb": used_mb,
-                "available_mb": avail_mb,
-                "used_percent": used_pct,
-                "source": "/proc/meminfo",
-            }
-    except Exception:
-        pass
-
-    # Fallback: Windows GlobalMemoryStatusEx via ctypes
-    try:
-        import ctypes
-        class MEMORYSTATUSEX(ctypes.Structure):
-            _fields_ = [
-                ("dwLength", ctypes.c_ulong),
-                ("dwMemoryLoad", ctypes.c_ulong),
-                ("ullTotalPhys", ctypes.c_ulonglong),
-                ("ullAvailPhys", ctypes.c_ulonglong),
-            ]
-        mem_status = MEMORYSTATUSEX()
-        mem_status.dwLength = ctypes.sizeof(MEMORYSTATUSEX())
-        ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(mem_status))
-        total_mb = round(mem_status.ullTotalPhys / (1024 ** 2), 1)
-        avail_mb = round(mem_status.ullAvailPhys / (1024 ** 2), 1)
-        used_mb = round(total_mb - avail_mb, 1)
-        return {
-            "status": "ok" if mem_status.dwMemoryLoad < 90 else ("warning" if mem_status.dwMemoryLoad < 95 else "error"),
-            "total_mb": total_mb,
-            "used_mb": used_mb,
-            "available_mb": avail_mb,
-            "used_percent": mem_status.dwMemoryLoad,
-            "source": "ctypes",
-        }
-    except Exception:
-        pass
-
-    return {"status": "unknown", "detail": "no memory info available"}
-
-
-async def health_api():
-    """Enhanced health check: database, disk, memory, uptime, version.
-
-    Returns 200 if all critical checks pass, 503 otherwise.
-    """
-    import time as _time
-    db_check = _check_database()
-    disk_check = _check_disk()
-    mem_check = _check_memory()
-    ver = _get_version_info()
-
-    overall_ok = db_check["status"] == "ok" and disk_check["status"] != "error"
-
-    result = {
-        "status": "ok" if overall_ok else "degraded",
-        "uptime_seconds": round(_time.time() - _START_TIME, 1),
-        "env": APP_ENV,
-        "version": ver["version"],
-        "deployed_at": ver["deployed_at"],
-        "checks": {
-            "database": db_check,
-            "disk": disk_check,
-            "memory": mem_check,
-        },
-    }
-
-    if not overall_ok:
-        raise HTTPException(status_code=503, detail=result)
-    return result
-
-
-async def health_ready_api():
-    """Lightweight readiness probe: only checks database connectivity.
-
-    Returns 200 if DB is reachable, 503 otherwise.
-    """
-    db_check = _check_database()
-    if db_check["status"] != "ok":
-        raise HTTPException(status_code=503, detail={"status": "not_ready", "database": db_check})
-    return {"status": "ok", "database": db_check}
+def quote_page():
+    """报价计算页面（带材料选择器）"""
+    from fastapi.responses import HTMLResponse
+    import os
+    html_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "html", "quote.html")
+    with open(html_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(f.read())

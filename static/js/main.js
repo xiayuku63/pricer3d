@@ -78,7 +78,6 @@ import {
     initPreview, buildStlThumbnail, buildNonStlThumbnail,
     ensureThumbnailForFile, buildThumbnails,
     openPreviewModal, closePreviewModal, previewByFilename, setupViewCube,
-    takeScreenshot,
 } from './modules/preview.js';
 import {
     initOrientationUI, syncOrientationFromMesh,
@@ -495,7 +494,6 @@ document.addEventListener('DOMContentLoaded', () => {
     _bind(dom.previewCloseBtn, 'click', closePreviewModal);
     _bind(dom.previewBackdrop, 'click', closePreviewModal);
     setupViewCube();
-    _bind($('screenshot-btn'), 'click', takeScreenshot);
 
     // Orientation
     _bind(dom.orientCenterBtn, 'click', centerModel);
@@ -659,12 +657,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     detailContent.classList.toggle('hidden');
                     const svg = toggleBtn.querySelector('svg');
                     if (svg) svg.style.transform = isHidden ? 'rotate(180deg)' : '';
-                    toggleBtn.classList.toggle('toggled', isHidden);
-                    // Hide preview badges when detail is expanded, show when collapsed
-                    const badges = document.querySelector('[data-badges="' + filename + '"]');
-                    if (badges) {
-                        badges.style.display = isHidden ? 'none' : '';
-                    }
                 }
                 return;
             }
@@ -746,12 +738,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     detailContent.classList.toggle('hidden');
                     const svg = toggleBtn.querySelector('svg');
                     if (svg) svg.style.transform = isHidden ? 'rotate(180deg)' : '';
-                    toggleBtn.classList.toggle('toggled', isHidden);
-                    // Hide preview badges when detail is expanded
-                    const badges = document.querySelector('[data-badges="' + filename + '"]');
-                    if (badges) {
-                        badges.style.display = isHidden ? 'none' : '';
-                    }
                 }
                 return;
             }

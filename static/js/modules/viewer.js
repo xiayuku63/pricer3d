@@ -37,7 +37,7 @@ export function initViewer(previewContainerEl, previewPlaceholderEl) {
     // Adaptive pixel ratio: cap at 2 on mobile to reduce GPU load
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     _isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-    renderer = new THREE.WebGLRenderer({ antialias: !_isMobile, powerPreference: 'high-performance', preserveDrawingBuffer: true });
+    renderer = new THREE.WebGLRenderer({ antialias: !_isMobile, powerPreference: 'high-performance' });
     renderer.setPixelRatio(dpr);
     renderer.setSize(previewContainer.clientWidth, previewContainer.clientHeight);
     previewContainer.appendChild(renderer.domElement);
@@ -519,18 +519,4 @@ export function resetHighlight() {
     }
     highlightMode = false;
     requestRender();
-}
-
-/**
- * 截取当前3D预览画面并下载为PNG
- */
-export function takeScreenshot() {
-    if (!renderer) return;
-    // Force a fresh render to ensure the buffer has content
-    renderer.render(scene, camera);
-    const dataUrl = renderer.domElement.toDataURL('image/png');
-    const a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = 'pricer3d-preview.png';
-    a.click();
 }

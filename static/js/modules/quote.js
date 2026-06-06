@@ -878,133 +878,14 @@ export function refreshOptionsSummary() {
 export function recalcSummaryFromCurrentResults() {
     const successItems = currentResults.filter((i) => i.status === "success" && !i._recalculating);
     const failedItems = currentResults.filter((i) => i.status === "failed");
-    const totalCost = successItems.reduce((s, i) => s + (i.cost_cny || 0), 0);
-    const totalTime = successItems.reduce((s, i) => s + (i.estimated_time_h || 0), 0);
-
-    // Update legacy hidden elements
     const sumFiles = document.getElementById('sum-total-files');
     const sumStatus = document.getElementById('sum-status');
     const sumCost = document.getElementById('sum-total-cost');
     const sumTime = document.getElementById('sum-total-time');
     if (sumFiles) sumFiles.textContent = currentResults.length;
     if (sumStatus) sumStatus.textContent = `${successItems.length} / ${failedItems.length}`;
-    if (sumCost) sumCost.textContent = '¥ ' + totalCost.toFixed(2);
-    if (sumTime) sumTime.textContent = formatTimeHMS(totalTime);
-
-    // Update legacy visible elements
-    const sumFilesL = document.getElementById('sum-total-files-legacy');
-    const sumStatusL = document.getElementById('sum-status-legacy');
-    const sumCostL = document.getElementById('sum-total-cost-legacy');
-    const sumTimeL = document.getElementById('sum-total-time-legacy');
-    if (sumFilesL) sumFilesL.textContent = currentResults.length;
-    if (sumStatusL) sumStatusL.textContent = `${successItems.length} / ${failedItems.length}`;
-    if (sumCostL) sumCostL.textContent = '¥ ' + totalCost.toFixed(2);
-    if (sumTimeL) sumTimeL.textContent = formatTimeHMS(totalTime);
-
-    // ── Enhanced Summary Panel ──
-    const panel = document.getElementById('quote-summary-panel');
-    const legacySummary = document.getElementById('legacy-summary');
-    if (panel) {
-        if (currentResults.length > 0) {
-            panel.classList.remove('hidden');
-            if (legacySummary) legacySummary.classList.add('hidden');
-
-            // Core metrics
-            const panelCost = document.getElementById('panel-total-cost');
-            const panelUnitHint = document.getElementById('panel-unit-hint');
-            const panelFileCount = document.getElementById('panel-file-count');
-            const panelSuccess = document.getElementById('panel-success-count');
-            const panelFail = document.getElementById('panel-fail-count');
-            const panelTime = document.getElementById('panel-total-time');
-
-            if (panelCost) panelCost.textContent = '¥ ' + totalCost.toFixed(2);
-            if (panelUnitHint && successItems.length > 0) {
-                const avgUnit = totalCost / successItems.reduce((s, i) => s + Math.max(1, i.quantity || 1), 0);
-                panelUnitHint.textContent = '均价 ¥' + avgUnit.toFixed(2) + '/件';
-            }
-            if (panelFileCount) panelFileCount.textContent = currentResults.length;
-            if (panelSuccess) panelSuccess.textContent = successItems.length;
-            if (panelFail) panelFail.textContent = failedItems.length;
-            if (panelTime) panelTime.textContent = formatTimeHMS(totalTime);
-
-            // Cost breakdown bar for all results
-            _renderSummaryCostBar(successItems);
-            _renderMaterialDistribution(successItems);
-        } else {
-            panel.classList.add('hidden');
-            if (legacySummary) legacySummary.classList.remove('hidden');
-        }
-    }
-}
-
-// ── Render summary cost breakdown bar ──
-function _renderSummaryCostBar(successItems) {
-    const barContainer = document.getElementById('panel-cost-bar');
-    const legendContainer = document.getElementById('panel-cost-legend');
-    if (!barContainer || !legendContainer) return;
-
-    let totalMaterial = 0, totalMachine = 0, totalPost = 0, totalSupport = 0, totalSetup = 0;
-    successItems.forEach(item => {
-        const bd = item.cost_breakdown;
-        if (bd && typeof bd === 'object') {
-            totalMaterial += Number(bd.material_cost_cny || 0);
-            totalMachine += Number(bd.machine_cost_cny || 0);
-            totalPost += Number(bd.post_process_cost_per_part_cny || 0) * Math.max(1, item.quantity || 1);
-            totalSupport += Number(bd.support_cost_per_part_cny || 0) * Math.max(1, item.quantity || 1);
-            totalSetup += Number(bd.setup_fee_cny || 0);
-        }
-    });
-
-    const rawTotal = totalMaterial + totalMachine + totalPost + totalSupport + totalSetup;
-    const pct = (val) => rawTotal > 0 ? Math.max(2, (val / rawTotal * 100)) : 0;
-
-    const segments = [
-        { label: '材料', val: totalMaterial, color: 'bg-indigo-500', legendColor: 'bg-indigo-500' },
-        { label: '机器', val: totalMachine, color: 'bg-violet-500', legendColor: 'bg-violet-500' },
-    ];
-    if (totalPost > 0) segments.push({ label: '后处理', val: totalPost, color: 'bg-amber-500', legendColor: 'bg-amber-500' });
-    if (totalSupport > 0) segments.push({ label: '支撑', val: totalSupport, color: 'bg-emerald-500', legendColor: 'bg-emerald-500' });
-    if (totalSetup > 0) segments.push({ label: '开机', val: totalSetup, color: 'bg-rose-400', legendColor: 'bg-rose-400' });
-
-    let barHtml = '';
-    segments.forEach(seg => {
-        const p = pct(seg.val);
-        barHtml += '<div class="' + seg.color + ' transition-all duration-300" style="width:' + p + '%" title="' + seg.label + ' ¥' + seg.val.toFixed(2) + ' (' + Math.round(p) + '%)"></div>';
-    });
-    barContainer.innerHTML = barHtml;
-
-    let legendHtml = '';
-    segments.forEach(seg => {
-        const p = pct(seg.val);
-        legendHtml += '<span class="flex items-center gap-1 text-[9px] text-gray-500">';
-        legendHtml += '<span class="w-2 h-2 rounded-full inline-block ' + seg.legendColor + '"></span>';
-        legendHtml += seg.label + ' ¥' + seg.val.toFixed(0) + ' (' + Math.round(p) + '%)</span>';
-    });
-    legendContainer.innerHTML = legendHtml;
-}
-
-// ── Render material distribution in summary ──
-function _renderMaterialDistribution(successItems) {
-    const container = document.getElementById('panel-material-dist');
-    if (!container) return;
-
-    const materialCounts = {};
-    successItems.forEach(item => {
-        const mat = item.material || 'Unknown';
-        materialCounts[mat] = (materialCounts[mat] || 0) + 1;
-    });
-
-    const matColors = { PLA: '#6366f1', ABS: '#f97316', PETG: '#14b8a6', Resin: '#a855f7', TPU: '#ec4899', ASA: '#eab308', Nylon: '#ef4444', PC: '#0ea5e9' };
-
-    let html = '';
-    Object.entries(materialCounts).sort((a, b) => b[1] - a[1]).forEach(([mat, count]) => {
-        const color = matColors[mat] || '#6b7280';
-        html += '<span class="material-dist-pill" style="border-color:' + color + '30;background:' + color + '0a;color:' + color + '">';
-        html += mat;
-        html += '<span class="count" style="background:' + color + '">' + count + '</span>';
-        html += '</span>';
-    });
-    container.innerHTML = html || '<span class="text-[10px] text-gray-400">-</span>';
+    if (sumCost) sumCost.textContent = '¥ ' + successItems.reduce((s, i) => s + (i.cost_cny || 0), 0).toFixed(2);
+    if (sumTime) sumTime.textContent = formatTimeHMS(successItems.reduce((s, i) => s + (i.estimated_time_h || 0), 0));
 }
 
 // ── Quote API ──
@@ -1415,7 +1296,7 @@ export function renderResultsTable() {
             // G-code 分析详情
             const gcode = breakdown?.gcode_summary;
             const gcodeToggleHtml = gcode
-                ? '<button type="button" data-toggle-gcode="' + escapeHtml(item.filename) + '" class="text-[10px] text-indigo-500 hover:text-indigo-700 underline ml-1">📊详情</button>'
+                ? '<button type="button" data-toggle-gcode="' + escapeHtml(item.filename) + '" class="text-[10px] text-indigo-500 hover:text-indigo-700 underline ml-1">' + '📊详情' + '</button>'
                 : '';
 
             const markupText = '0.00';
@@ -1463,7 +1344,7 @@ export function renderResultsTable() {
                     <div class="text-[10px] leading-tight">${recalculating ? '-' : ('¥ ' + Number(item.unit_cost_cny || 0).toFixed(2))}</div>
                     <div class="text-xs leading-tight font-medium">${recalculating ? '-' : ('¥ ' + Number(item.cost_cny || 0).toFixed(2))}</div>
                 </td>
-                <td data-role="status-cell" class="px-2 py-1.5 min-w-[160px] max-w-[260px] break-words ${recalculating ? 'text-amber-600' : 'text-green-600'}"><div>${recalculating ? t('quote.recalculating') : t('common.success')}${item._checklist_params && item._checklist_source ? ` <span class="text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1 cursor-help" title="(item._checklist_source.printer_model ? '打印机:' + item._checklist_source.printer_model + ' ' : '') + (item._checklist_source.nozzle ? '喷嘴:' + item._checklist_source.nozzle + 'mm | ' : '') + '层高:' + item._checklist_source.layer_height + 'mm 墙层数:' + item._checklist_source.wall_count + ' 填充:' + item._checklist_source.infill + '%">\u{1F4CB}\u6E05\u5355</span>` : ''}</div>${recalculating ? '' : prusaExtraHtml}${recalculating ? '' : gcodeToggleHtml}</td>
+                <td data-role="status-cell" class="px-2 py-1.5 min-w-[160px] max-w-[260px] break-words text-green-600"><div>${t('common.success')}${item._checklist_params && item._checklist_source ? ` <span class="text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1 cursor-help" title="(item._checklist_source.printer_model ? '打印机:' + item._checklist_source.printer_model + ' ' : '') + (item._checklist_source.nozzle ? '喷嘴:' + item._checklist_source.nozzle + 'mm | ' : '') + '层高:' + item._checklist_source.layer_height + 'mm 墙层数:' + item._checklist_source.wall_count + ' 填充:' + item._checklist_source.infill + '%">\u{1F4CB}\u6E05\u5355</span>` : ''}</div>${prusaExtraHtml}${gcodeToggleHtml}</td>
                 <td class="px-2 py-1.5 space-x-1"><button type="button" data-delete-file="${item.filename}" class="text-[11px] text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 rounded px-2 py-0.5">${t('common.delete')}</button></td>
             `;
         } else {
@@ -1497,7 +1378,7 @@ export function renderResultsTable() {
                 <td class="px-2 py-1.5" data-field="color">${renderedRowColors.html}</td>
                 <td class="px-2 py-1.5"><input data-field="quantity" type="number" min="1" value="${quantityValue}" class="row-edit w-14 text-[11px] border border-gray-300 rounded px-1 py-0.5" /></td>
                 <td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td>
-                <td data-role="status-cell" class="px-2 py-1.5 min-w-[160px] max-w-[260px] break-words text-red-600">${item.error || t('common.error')}${item._checklist_params && item._checklist_source ? ` <span class="text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1 cursor-help" title="(item._checklist_source.printer_model ? '打印机:' + item._checklist_source.printer_model + ' ' : '') + (item._checklist_source.nozzle ? '喷嘴:' + item._checklist_source.nozzle + 'mm | ' : '') + '层高:' + item._checklist_source.layer_height + 'mm 墙层数:' + item._checklist_source.wall_count + ' 填充:' + item._checklist_source.infill + '%">\u{1F4CB}\u6E05\u5355</span>` : ''}</td>
+                <td data-role="status-cell" class="px-2 py-1.5 min-w-[160px] max-w-[260px] break-words text-red-600"><span title="${escapeHtml(item.error || t('common.error'))}">${t('common.failed')}</span>${item._checklist_params && item._checklist_source ? ` <span class="text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1 cursor-help" title="(item._checklist_source.printer_model ? '打印机:' + item._checklist_source.printer_model + ' ' : '') + (item._checklist_source.nozzle ? '喷嘴:' + item._checklist_source.nozzle + 'mm | ' : '') + '层高:' + item._checklist_source.layer_height + 'mm 墙层数:' + item._checklist_source.wall_count + ' 填充:' + item._checklist_source.infill + '%">\u{1F4CB}\u6E05\u5355</span>` : ''}</td>
                 <td class="px-2 py-1.5 space-x-1"><button type="button" data-delete-file="${item.filename}" class="text-[11px] text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 rounded px-2 py-0.5">${t('common.delete')}</button></td>
             `;
         }
@@ -1522,21 +1403,6 @@ export function renderResultsTable() {
             td.setAttribute('colspan', '13');
             td.className = 'px-3 py-2 bg-white';
 
-            // Quick preview badges (visible when collapsed)
-            const bd = item.cost_breakdown;
-            const materialCost = bd ? Number(bd.material_cost_cny || 0) : 0;
-            const machineCost = bd ? Number(bd.machine_cost_cny || 0) : 0;
-            const unitTimeH = Number(item.unit_time_h || (item.estimated_time_h ? item.estimated_time_h / Math.max(1, item.quantity) : 0));
-            const effectiveWeight = Number(item.effective_weight_g || item.weight_g || 0) / Math.max(1, item.quantity);
-
-            let previewBadgesHtml = '<div class="detail-preview-badges" data-badges="' + escapeHtml(item.filename) + '">';
-            previewBadgesHtml += '<span class="detail-preview-badge badge-price">💰 单价 ¥' + Number(item.unit_cost_cny || 0).toFixed(2) + '</span>';
-            previewBadgesHtml += '<span class="detail-preview-badge badge-material">🧱 ' + escapeHtml(item.material || '-') + '</span>';
-            previewBadgesHtml += '<span class="detail-preview-badge badge-time">⏱️ ' + formatTimeHMS(unitTimeH) + '</span>';
-            if (effectiveWeight > 0) previewBadgesHtml += '<span class="detail-preview-badge badge-weight">⚖️ ' + effectiveWeight.toFixed(1) + 'g</span>';
-            if (materialCost > 0) previewBadgesHtml += '<span class="detail-preview-badge badge-price">材料 ¥' + materialCost.toFixed(2) + '</span>';
-            previewBadgesHtml += '</div>';
-
             // Toggle button
             const toggleBtn = document.createElement('button');
             toggleBtn.type = 'button';
@@ -1552,7 +1418,6 @@ export function renderResultsTable() {
                 _buildMaterialInfoHtml(item.material) +
                 _buildPrintSuggestionHtml(item);
 
-            td.innerHTML = previewBadgesHtml;
             td.appendChild(toggleBtn);
             td.appendChild(detailDiv);
             detailTr.appendChild(td);
@@ -1615,13 +1480,6 @@ function renderResultsCards() {
                             <span class="text-[10px] text-gray-400">（单价 ¥ ${Number(item.unit_cost_cny || 0).toFixed(2)}）</span>
                         </div>
                     </div>
-                </div>
-                <!-- 快速信息标签 -->
-                <div class="mt-2 flex flex-wrap gap-1.5">
-                    <span class="inline-flex items-center gap-1 text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-full px-2 py-0.5">💰 ¥${Number(item.unit_cost_cny || 0).toFixed(2)}/件</span>
-                    <span class="inline-flex items-center gap-1 text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full px-2 py-0.5">🧱 ${escapeHtml(item.material || '-')}</span>
-                    <span class="inline-flex items-center gap-1 text-[10px] bg-amber-50 text-amber-700 border border-amber-100 rounded-full px-2 py-0.5">⏱️ ${formatTimeHMS(item.unit_time_h || (item.estimated_time_h / Math.max(1, item.quantity)))}</span>
-                    ${(() => { const bd = item.cost_breakdown; const mc = bd ? Number(bd.material_cost_cny || 0) : 0; return mc > 0 ? '<span class="inline-flex items-center gap-1 text-[10px] bg-blue-50 text-blue-700 border border-blue-100 rounded-full px-2 py-0.5">材料 ¥' + mc.toFixed(2) + '</span>' : ''; })()}
                 </div>
                 <!-- 可编辑参数区 -->
                 <div class="mt-3 pt-3 border-t border-gray-100 grid grid-cols-2 gap-2">
@@ -2040,8 +1898,8 @@ async function _handleRowEdit(event, signal) {
     const pm = pmSel ? pmSel.value : '';
     const sp = spSel ? (spSel.value ? Number(spSel.value) : null) : null;
     if (errorContainer) errorContainer.classList.add('hidden');
-    row.querySelector('[data-role="status-cell"]').textContent = '重算中...';
-    row.querySelector('[data-role="status-cell"]').className = 'px-2 py-1.5 text-amber-600';
+    row.querySelector('[data-role="status-cell"]').textContent = '成功';
+    row.querySelector('[data-role="status-cell"]').className = 'px-2 py-1.5 text-green-600';
 
     // Mark row as pending in currentResults so total price updates immediately
     const idx = currentResults.findIndex((i) => i.filename === filename);
@@ -2085,7 +1943,7 @@ async function _handleRowEdit(event, signal) {
         renderResultsTable();
         recalcSummaryFromCurrentResults();
         if (errorMsg) { errorMsg.textContent = err.message; errorContainer.classList.remove('hidden'); }
-        row.querySelector('[data-role="status-cell"]').textContent = '重算失败';
+        row.querySelector('[data-role="status-cell"]').innerHTML = '<span title="' + escapeHtml(err.message) + '">失败</span>';
         row.querySelector('[data-role="status-cell"]').className = 'px-2 py-1.5 text-red-600';
     }
 }

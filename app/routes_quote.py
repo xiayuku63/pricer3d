@@ -283,25 +283,6 @@ async def delete_quote_history(id: int, request: Request, current_user=Depends(g
     except Exception as e:
         logger.error(f"删除报价记录失败: user_id={uid} id={id} error={str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"删除失败: {str(e)}")
-async def clear_quote_history(request: Request, current_user=Depends(get_current_user)):
-    """Clear all quote history for the current user."""
-    uid = int(current_user["id"])
-    try:
-        with get_db_session() as db:
-            count = db.query(QuoteHistory).filter(QuoteHistory.user_id == uid).count()
-            db.query(QuoteHistory).filter(QuoteHistory.user_id == uid).delete()
-        logger.info(f"用户 {uid} 清空报价历史，共删除 {count} 条记录")
-        write_audit_event(
-            action="quote.history.clear",
-            request=request,
-            user=current_user,
-            detail={"deleted_count": count},
-        )
-        return {"status": "ok", "deleted_count": count}
-    except Exception as e:
-        logger.error(f"清空报价历史失败: user_id={uid} error={str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"清空失败: {str(e)}")
-
 
 
 async def quote_history(limit: int = 20, offset: int = 0, current_user=Depends(get_current_user)):
@@ -490,68 +471,3 @@ async def export_quote_history(
     except Exception as e:
         logger.error(f"导出报价历史失败: user_id={uid} error={str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"导出失败: {str(e)}")
-
-
-# ── Quote compare ──
-
-async def compare_quote_history(
-    ids: str,
-    current_user=Depends(get_current_user),
-):
-    """Compare 2-5 quote history records by IDs (comma-separated)."""
-    uid = int(current_user["id"])
-    try:
-        id_list = [int(x.strip()) for x in ids.split(",") if x.strip()]
-    except ValueError:
-        raise HTTPException(status_code=400, detail="ids 参数格式错误，需逗号分隔的数字")
-
-    if len(id_list) < 2:
-        raise HTTPException(status_code=400, detail="至少需要选择2条记录进行对比")
-    if len(id_list) > 5:
-        raise HTTPException(status_code=400, detail="最多对比5条记录")
-
-    with get_db_session() as db:
-        rows = (
-            db.query(QuoteHistory)
-            .filter(QuoteHistory.user_id == uid, QuoteHistory.id.in_(id_list))
-            .all()
-        )
-
-    if not rows:
-        raise HTTPException(status_code=404, detail="未找到指定的报价记录")
-
-    items = []
-    for r in rows:
-        items.append({
-            "id": r.id,
-            "filename": r.filename,
-            "material": r.material,
-            "color": r.color,
-            "quantity": r.quantity,
-            "volume_cm3": round(float(r.volume_cm3 or 0), 2),
-            "weight_g": round(float(r.weight_g or 0), 2),
-            "estimated_time_h": round(float(r.estimated_time_h or 0), 2),
-            "cost_cny": round(float(r.cost_cny or 0), 2),
-            "dimensions": r.dimensions,
-            "status": r.status,
-            "created_at": r.created_at,
-        })
-
-    # Build comparison summary
-    valid = [i for i in items if i["status"] == "success"]
-    summary = {}
-    if valid:
-        costs = [i["cost_cny"] for i in valid]
-        weights = [i["weight_g"] for i in valid]
-        times = [i["estimated_time_h"] for i in valid]
-        summary = {
-            "min_cost": min(costs),
-            "max_cost": max(costs),
-            "avg_cost": round(sum(costs) / len(costs), 2),
-            "min_weight": min(weights),
-            "max_weight": max(weights),
-            "min_time": min(times),
-            "max_time": max(times),
-        }
-
-    return {"items": items, "summary": summary}

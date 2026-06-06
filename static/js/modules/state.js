@@ -41,11 +41,6 @@ export let userPreferences = {
     formula_templates: [],
     material_usage: {},   // { "PLA": 12, "ABS": 5, ... }
     color_usage: {},      // { "#ffffff": 8, "#000000": 15, ... }
-    default_quantity: 1,
-    history_page_size: 20,
-    history_sort: 'newest',
-    history_retention_days: 0,
-    history_visible_columns: ['material', 'quantity'],
 };
 export function setUserPreferences(v) {
     if (v && typeof v === 'object') {
@@ -57,11 +52,6 @@ export function setUserPreferences(v) {
             formula_templates: Array.isArray(v.formula_templates) ? v.formula_templates : [],
             material_usage: (v.material_usage && typeof v.material_usage === 'object') ? v.material_usage : {},
             color_usage: (v.color_usage && typeof v.color_usage === 'object') ? v.color_usage : {},
-            default_quantity: Number(v.default_quantity) || 1,
-            history_page_size: Number(v.history_page_size) || 20,
-            history_sort: v.history_sort || 'newest',
-            history_retention_days: Number(v.history_retention_days) || 0,
-            history_visible_columns: Array.isArray(v.history_visible_columns) ? v.history_visible_columns : ['material', 'quantity'],
         };
     }
 }
@@ -111,9 +101,7 @@ const DEFAULT_COLORS = [
 
 export let MATERIAL_OPTIONS = [
     { name: "PLA", brand: "通用", density: 1.24, price_per_kg: 200.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
-    { name: "PETG", brand: "通用", density: 1.27, price_per_kg: 230.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
     { name: "ABS", brand: "通用", density: 1.04, price_per_kg: 250.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
-    { name: "TPU", brand: "通用", density: 1.21, price_per_kg: 350.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
     { name: "Resin", brand: "通用", density: 1.11, price_per_kg: 800.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
 ];
 export let COLOR_OPTIONS = DEFAULT_COLORS.map(c => ({...c}));

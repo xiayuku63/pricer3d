@@ -6,8 +6,8 @@
                         <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
                             <h4 class="text-sm font-semibold text-gray-800">用户中心</h4>
                             <div class="flex items-center gap-2">
-                                <button id="user-center-set-defaults-btn" type="button" class="hidden text-xs px-3 py-2 rounded-md border border-indigo-300 text-indigo-700 hover:bg-indigo-50 min-h-[44px] flex items-center">设为默认</button>
-                                <button id="user-center-close-btn" type="button" class="text-gray-500 hover:text-gray-700 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center">关闭</button>
+                                <button id="user-center-set-defaults-btn" type="button" class="hidden text-xs px-3 py-1.5 rounded-md border border-indigo-300 text-indigo-700 hover:bg-indigo-50">设为默认</button>
+                                <button id="user-center-close-btn" type="button" class="text-gray-500 hover:text-gray-700">关闭</button>
                             </div>
                         </div>
                         <div class="flex flex-1 overflow-hidden min-h-[500px]">
@@ -378,8 +378,8 @@
 
                                         <!-- 默认材料与颜色 -->
                                         <div class="border border-gray-200 rounded-md p-3 mb-4">
-                                            <h6 class="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2">默认配置</h6>
-                                            <p class="text-xs text-gray-500 mb-2">设置后，新报价时将自动使用这些默认值。</p>
+                                            <h6 class="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2">默认材料与颜色</h6>
+                                            <p class="text-xs text-gray-500 mb-2">设置后，新报价时将自动选中该材料和颜色。</p>
                                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                 <div>
                                                     <label class="text-[11px] text-gray-500">默认材料</label>
@@ -394,16 +394,6 @@
                                                             <option value="">-- 不指定 --</option>
                                                         </select>
                                                     </div>
-                                                </div>
-                                                <div>
-                                                    <label class="text-[11px] text-gray-500">默认打印机</label>
-                                                    <select id="pref-default-printer" class="mt-0.5 w-full border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
-                                                        <option value="">-- 不指定 --</option>
-                                                    </select>
-                                                </div>
-                                                <div>
-                                                    <label class="text-[11px] text-gray-500">默认数量</label>
-                                                    <input id="pref-default-quantity" type="number" min="1" max="9999" value="1" class="mt-0.5 w-full border border-gray-300 bg-white rounded-sm text-xs px-2 py-1" />
                                                 </div>
                                             </div>
                                         </div>
@@ -450,62 +440,6 @@
                                                     <!-- dynamic -->
                                                 </div>
                                             </div>
-                                        </div>
-                                        <!-- 报价历史偏好 -->
-                                        <div class="border border-gray-200 rounded-md p-3 mb-4">
-                                            <h6 class="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2">📋 报价历史偏好</h6>
-                                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                                                <div>
-                                                    <label class="text-[11px] text-gray-500">每页显示条数</label>
-                                                    <select id="pref-history-page-size" class="mt-0.5 w-full border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
-                                                        <option value="10">10 条</option>
-                                                        <option value="20" selected>20 条</option>
-                                                        <option value="50">50 条</option>
-                                                        <option value="100">100 条</option>
-                                                    </select>
-                                                </div>
-                                                <div>
-                                                    <label class="text-[11px] text-gray-500">默认排序</label>
-                                                    <select id="pref-history-sort" class="mt-0.5 w-full border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
-                                                        <option value="newest">最新优先</option>
-                                                        <option value="oldest">最早优先</option>
-                                                        <option value="cost-desc">费用从高到低</option>
-                                                        <option value="cost-asc">费用从低到高</option>
-                                                    </select>
-                                                </div>
-                                                <div>
-                                                    <label class="text-[11px] text-gray-500">自动清理</label>
-                                                    <select id="pref-history-retention" class="mt-0.5 w-full border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
-                                                        <option value="0">永不清理</option>
-                                                        <option value="30">30 天后</option>
-                                                        <option value="90">90 天后</option>
-                                                        <option value="180">180 天后</option>
-                                                        <option value="365">1 年后</option>
-                                                    </select>
-                                                </div>
-                                                <div>
-                                                    <label class="text-[11px] text-gray-500">显示列</label>
-                                                    <div class="mt-0.5 flex flex-wrap gap-1">
-                                                        <label class="flex items-center gap-1 text-[10px]">
-                                                            <input type="checkbox" class="pref-history-col-cb rounded border-gray-300 text-indigo-600" value="material" checked />
-                                                            <span>材料</span>
-                                                        </label>
-                                                        <label class="flex items-center gap-1 text-[10px]">
-                                                            <input type="checkbox" class="pref-history-col-cb rounded border-gray-300 text-indigo-600" value="quantity" checked />
-                                                            <span>数量</span>
-                                                        </label>
-                                                        <label class="flex items-center gap-1 text-[10px]">
-                                                            <input type="checkbox" class="pref-history-col-cb rounded border-gray-300 text-indigo-600" value="dimensions" />
-                                                            <span>尺寸</span>
-                                                        </label>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="flex flex-wrap gap-2">
-                                                <button id="pref-history-export-btn" type="button" class="text-xs px-2 py-1 border border-blue-200 text-blue-600 rounded hover:bg-blue-50">📥 导出历史</button>
-                                                <button id="pref-history-clear-btn" type="button" class="text-xs px-2 py-1 border border-red-200 text-red-500 rounded hover:bg-red-50">🗑️ 清空历史</button>
-                                            </div>
-                                            <p id="pref-history-msg" class="text-xs hidden mt-2"></p>
                                         </div>
 
                                         <!-- 导入导出与重置 -->

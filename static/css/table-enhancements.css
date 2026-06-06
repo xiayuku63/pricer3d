@@ -43,22 +43,18 @@
     50% { border-left-color: #fbbf24; }
 }
 
-/* ── Enhanced Zebra striping ── */
+/* Zebra striping */
 #batch-results-body tr:nth-child(even) {
-    background-color: rgba(249, 250, 251, 0.6);
+    background-color: rgba(249, 250, 251, 0.5);
 }
 #batch-results-body tr:nth-child(odd) {
     background-color: #ffffff;
 }
 
-/* ── Enhanced Hover effect ── */
+/* Hover effect */
 #batch-results-body tr[data-row-file]:hover {
-    background-color: rgba(238, 242, 255, 0.5) !important;
-    transition: background-color 0.2s ease, box-shadow 0.2s ease;
-    box-shadow: 0 1px 3px rgba(99, 102, 241, 0.08);
-}
-#batch-results-body tr[data-row-file]:hover td {
-    color: #1e1b4b;
+    background-color: rgba(238, 242, 255, 0.4) !important;
+    transition: background-color 0.15s ease;
 }
 
 /* Column resize handle */
@@ -87,24 +83,12 @@ th .col-resize-handle.resizing {
     transition: transform 0.2s ease;
 }
 
-/* Sort active state */
-th[data-sort-key].sort-active {
-    background-color: rgba(99, 102, 241, 0.08);
-    color: #4338ca;
-}
-th[data-sort-key].sort-active .sort-arrow {
-    color: #6366f1;
-    font-weight: bold;
-}
-
 /* Pagination button hover */
 #table-pagination button:not(:disabled):hover {
-    background-color: #eef2ff;
-    border-color: #c7d2fe;
-    color: #4338ca;
+    background-color: #f3f4f6;
 }
 #table-pagination button:not(:disabled):active {
-    background-color: #e0e7ff;
+    background-color: #e5e7eb;
 }
 
 /* Table container scrollbar styling */
@@ -181,146 +165,4 @@ thead {
     position: sticky;
     top: 0;
     z-index: 5;
-}
-
-/* ── Enhanced Table Header ── */
-thead.bg-gray-100 {
-    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%) !important;
-    border-bottom: 2px solid #e2e8f0;
-}
-thead th {
-    font-weight: 600;
-    letter-spacing: 0.02em;
-    text-transform: none;
-    transition: background-color 0.15s ease;
-}
-thead th:hover {
-    background-color: rgba(99, 102, 241, 0.06) !important;
-}
-
-/* ── Detail Row Animations ── */
-[data-detail-content] {
-    transition: max-height 0.3s ease, opacity 0.2s ease;
-    overflow: hidden;
-}
-[data-detail-content].expanded {
-    max-height: 2000px;
-    opacity: 1;
-}
-
-/* ── Quick Preview Badges (visible when detail collapsed) ── */
-.detail-preview-badges {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    margin-top: 4px;
-}
-.detail-preview-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    padding: 2px 8px;
-    border-radius: 9999px;
-    font-size: 10px;
-    font-weight: 500;
-    border: 1px solid;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
-    cursor: default;
-}
-.detail-preview-badge:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.08);
-}
-.badge-price {
-    background: #eef2ff;
-    color: #4338ca;
-    border-color: #c7d2fe;
-}
-.badge-material {
-    background: #ecfdf5;
-    color: #065f46;
-    border-color: #a7f3d0;
-}
-.badge-time {
-    background: #fef3c7;
-    color: #92400e;
-    border-color: #fde68a;
-}
-.badge-weight {
-    background: #fce7f3;
-    color: #9d174d;
-    border-color: #fbcfe8;
-}
-
-/* ── Table Row Group Borders ── */
-#batch-results-body tr[data-detail-row] {
-    border-top: none;
-}
-#batch-results-body tr[data-detail-row] td {
-    padding-top: 0;
-}
-
-/* ── Toggle Button Animation ── */
-[data-toggle-detail] svg {
-    transition: transform 0.2s ease;
-}
-[data-toggle-detail].toggled svg {
-    transform: rotate(180deg);
-}
-
-/* ── Price Cell Emphasis ── */
-#batch-results-body td .price-highlight {
-    color: #4338ca;
-    font-weight: 600;
-}
-
-/* ── Summary Panel Animations ── */
-#quote-summary-panel {
-    animation: slideDown 0.3s ease-out;
-}
-
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        transform: translateY(-8px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* Summary panel cost bar segment hover */
-#panel-cost-bar > div {
-    transition: opacity 0.15s ease;
-    cursor: help;
-}
-#panel-cost-bar > div:hover {
-    opacity: 0.85;
-}
-
-/* ── Material Distribution Pills in Summary ── */
-.material-dist-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 2px 10px;
-    border-radius: 9999px;
-    font-size: 10px;
-    font-weight: 500;
-    background: #f0f9ff;
-    color: #0c4a6e;
-    border: 1px solid #bae6fd;
-}
-.material-dist-pill .count {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: #0ea5e9;
-    color: white;
-    font-size: 9px;
-    font-weight: 700;
 }

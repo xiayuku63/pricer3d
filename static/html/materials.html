@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>材料管理 - Pricer3D</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 深色主题 */
+        :root {
+            --bg-primary: #0f1419;
+            --bg-secondary: #1a1f2e;
+            --bg-card: #1e2332;
+            --bg-hover: #252b3b;
+            --text-primary: #e4e8f1;
+            --text-secondary: #8b95a5;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+
+        .tab-button {
+            transition: all 0.2s ease;
+            border-bottom: 2px solid transparent;
+        }
+
+        .tab-button:hover {
+            background-color: var(--bg-hover);
+        }
+
+        .tab-button.active {
+            border-bottom-color: var(--accent);
+            background-color: var(--bg-card);
+        }
+
+        .card {
+            background-color: var(--bg-card);
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.05);
+            transition: all 0.2s ease;
+        }
+
+        .card:hover {
+            border-color: rgba(59, 130, 246, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 10px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .modal-overlay {
+            background-color: rgba(0,0,0,0.7);
+            backdrop-filter: blur(4px);
+        }
+
+        .modal {
+            background-color: var(--bg-secondary);
+            border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+        }
+
+        input, select, textarea {
+            background-color: var(--bg-card);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: var(--text-primary);
+            border-radius: 8px;
+            padding: 10px 14px;
+            transition: all 0.2s;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.2);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.2s;
+            cursor: pointer;
+            border: none;
+        }
+
+        .btn-primary {
+            background-color: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .btn-secondary {
+            background-color: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .btn-secondary:hover {
+            background-color: rgba(255,255,255,0.1);
+        }
+
+        .btn-danger {
+            background-color: var(--danger);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background-color: #dc2626;
+        }
+
+        .filter-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 14px;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            background-color: var(--bg-card);
+            border: 1px solid rgba(255,255,255,0.1);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .filter-chip:hover, .filter-chip.active {
+            background-color: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .expandable-row {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .expandable-row.expanded {
+            max-height: 500px;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--bg-hover);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255,255,255,0.2);
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    <!-- 顶部导航 -->
+    <nav class="bg-[#1a1f2e] border-b border-white/5 px-6 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-4">
+            <a href="/" class="text-xl font-bold text-white flex items-center gap-2">
+                <svg class="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/>
+                </svg>
+                Pricer3D
+            </a>
+            <span class="text-gray-500">|</span>
+            <span class="text-gray-400">材料管理</span>
+        </div>
+        <a href="/" class="text-gray-400 hover:text-white transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+            </svg>
+        </a>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-6 py-6">
+        <!-- Tab 切换 -->
+        <div class="flex border-b border-white/10 mb-6">
+            <button onclick="switchTab('brands')" id="tab-brands" class="tab-button active px-6 py-3 text-sm font-medium flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                </svg>
+                品牌管理
+            </button>
+            <button onclick="switchTab('types')" id="tab-types" class="tab-button px-6 py-3 text-sm font-medium flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                </svg>
+                类型管理
+            </button>
+            <button onclick="switchTab('materials')" id="tab-materials" class="tab-button px-6 py-3 text-sm font-medium flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                </svg>
+                材料库
+            </button>
+        </div>
+
+        <!-- 品牌管理 Tab -->
+        <div id="panel-brands" class="tab-panel">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h2 class="text-xl font-semibold">品牌管理</h2>
+                    <p class="text-gray-400 text-sm mt-1">管理3D打印材料品牌</p>
+                </div>
+                <button onclick="openBrandModal()" class="btn btn-primary flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    新增品牌
+                </button>
+            </div>
+
+            <div id="brands-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                <!-- 品牌卡片动态生成 -->
+            </div>
+
+            <div id="brands-empty" class="hidden text-center py-20">
+                <svg class="w-16 h-16 mx-auto text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                </svg>
+                <p class="text-gray-400">暂无品牌数据</p>
+                <button onclick="openBrandModal()" class="btn btn-primary mt-4">创建第一个品牌</button>
+            </div>
+        </div>
+
+        <!-- 类型管理 Tab -->
+        <div id="panel-types" class="tab-panel hidden">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h2 class="text-xl font-semibold">类型管理</h2>
+                    <p class="text-gray-400 text-sm mt-1">管理材料类型（如PLA、ABS、PETG等）</p>
+                </div>
+                <button onclick="openTypeModal()" class="btn btn-primary flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    新增类型
+                </button>
+            </div>
+
+            <div class="card overflow-hidden">
+                <table class="w-full">
+                    <thead>
+                        <tr class="border-b border-white/10">
+                            <th class="text-left px-6 py-4 text-sm font-medium text-gray-400">名称</th>
+                            <th class="text-left px-6 py-4 text-sm font-medium text-gray-400">显示名称</th>
+                            <th class="text-left px-6 py-4 text-sm font-medium text-gray-400">密度 (g/cm³)</th>
+                            <th class="text-left px-6 py-4 text-sm font-medium text-gray-400">描述</th>
+                            <th class="text-right px-6 py-4 text-sm font-medium text-gray-400">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="types-table-body">
+                        <!-- 类型行动态生成 -->
+                    </tbody>
+                </table>
+                <div id="types-empty" class="hidden text-center py-16">
+                    <svg class="w-12 h-12 mx-auto text-gray-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                    </svg>
+                    <p class="text-gray-400">暂无类型数据</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 材料库 Tab -->
+        <div id="panel-materials" class="tab-panel hidden">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h2 class="text-xl font-semibold">材料库</h2>
+                    <p class="text-gray-400 text-sm mt-1">管理所有3D打印材料</p>
+                </div>
+                <button onclick="openMaterialModal()" class="btn btn-primary flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    新增材料
+                </button>
+            </div>
+
+            <!-- 筛选器 -->
+            <div class="card p-4 mb-6">
+                <div class="flex flex-wrap gap-4">
+                    <div class="flex-1 min-w-[200px]">
+                        <label class="block text-sm text-gray-400 mb-1">品牌筛选</label>
+                        <select id="filter-brand" onchange="loadMaterials()" class="w-full">
+                            <option value="">全部品牌</option>
+                        </select>
+                    </div>
+                    <div class="flex-1 min-w-[200px]">
+                        <label class="block text-sm text-gray-400 mb-1">类型筛选</label>
+                        <select id="filter-type" onchange="loadMaterials()" class="w-full">
+                            <option value="">全部类型</option>
+                        </select>
+                    </div>
+                    <div class="flex-1 min-w-[200px]">
+                        <label class="block text-sm text-gray-400 mb-1">搜索</label>
+                        <input type="text" id="filter-search" placeholder="搜索材料名称..." oninput="filterMaterials()" class="w-full">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 材料列表 -->
+            <div id="materials-list" class="space-y-3">
+                <!-- 材料卡片动态生成 -->
+            </div>
+
+            <div id="materials-empty" class="hidden text-center py-20">
+                <svg class="w-16 h-16 mx-auto text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                </svg>
+                <p class="text-gray-400">暂无材料数据</p>
+                <button onclick="openMaterialModal()" class="btn btn-primary mt-4">创建第一个材料</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 品牌模态框 -->
+    <div id="brand-modal" class="fixed inset-0 z-50 hidden">
+        <div class="modal-overlay absolute inset-0" onclick="closeBrandModal()"></div>
+        <div class="modal absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-md p-6">
+            <h3 class="text-lg font-semibold mb-4" id="brand-modal-title">新增品牌</h3>
+            <input type="hidden" id="brand-id">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">品牌名称 *</label>
+                    <input type="text" id="brand-name" placeholder="如：Bambu Lab" class="w-full">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Logo URL</label>
+                    <input type="text" id="brand-logo" placeholder="https://..." class="w-full">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">官网</label>
+                    <input type="text" id="brand-website" placeholder="https://..." class="w-full">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">排序权重</label>
+                    <input type="number" id="brand-sort" value="0" class="w-full">
+                </div>
+            </div>
+            <div class="flex justify-end gap-3 mt-6">
+                <button onclick="closeBrandModal()" class="btn btn-secondary">取消</button>
+                <button onclick="saveBrand()" class="btn btn-primary">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 类型模态框 -->
+    <div id="type-modal" class="fixed inset-0 z-50 hidden">
+        <div class="modal-overlay absolute inset-0" onclick="closeTypeModal()"></div>
+        <div class="modal absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-md p-6">
+            <h3 class="text-lg font-semibold mb-4" id="type-modal-title">新增类型</h3>
+            <input type="hidden" id="type-id">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">类型名称 *</label>
+                    <input type="text" id="type-name" placeholder="如：PLA" class="w-full">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">显示名称</label>
+                    <input type="text" id="type-display-name" placeholder="如：聚乳酸" class="w-full">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">密度 (g/cm³)</label>
+                    <input type="number" id="type-density" step="0.01" placeholder="1.24" class="w-full">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">描述</label>
+                    <textarea id="type-description" rows="3" placeholder="简要描述该材料类型..." class="w-full"></textarea>
+                </div>
+            </div>
+            <div class="flex justify-end gap-3 mt-6">
+                <button onclick="closeTypeModal()" class="btn btn-secondary">取消</button>
+                <button onclick="saveType()" class="btn btn-primary">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 材料模态框 -->
+    <div id="material-modal" class="fixed inset-0 z-50 hidden">
+        <div class="modal-overlay absolute inset-0" onclick="closeMaterialModal()"></div>
+        <div class="modal absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+            <h3 class="text-lg font-semibold mb-4" id="material-modal-title">新增材料</h3>
+            <input type="hidden" id="material-id">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">品牌 *</label>
+                    <select id="material-brand" class="w-full">
+                        <option value="">请选择品牌</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">类型 *</label>
+                    <select id="material-type" class="w-full">
+                        <option value="">请选择类型</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">材料名称 *</label>
+                    <input type="text" id="material-name" placeholder="如：PLA Basic" class="w-full">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">颜色</label>
+                    <div class="flex items-center gap-2">
+                        <input type="color" id="material-color" value="#3b82f6" class="w-10 h-10 p-1 cursor-pointer">
+                        <input type="text" id="material-color-text" placeholder="#3b82f6" class="flex-1">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">密度 (g/cm³)</label>
+                    <input type="number" id="material-density" step="0.01" placeholder="1.24" class="w-full">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">价格 (元/kg) *</label>
+                    <input type="number" id="material-price" step="0.01" placeholder="89.00" class="w-full">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">喷嘴温度范围 (°C)</label>
+                    <div class="flex items-center gap-2">
+                        <input type="number" id="material-hotend-min" placeholder="190" class="flex-1">
+                        <span class="text-gray-400">~</span>
+                        <input type="number" id="material-hotend-max" placeholder="220" class="flex-1">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">热床温度范围 (°C)</label>
+                    <div class="flex items-center gap-2">
+                        <input type="number" id="material-bed-min" placeholder="50" class="flex-1">
+                        <span class="text-gray-400">~</span>
+                        <input type="number" id="material-bed-max" placeholder="60" class="flex-1">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">最大打印速度 (mm/s)</label>
+                    <input type="number" id="material-speed-max" placeholder="150" class="w-full">
+                </div>
+            </div>
+            <div class="flex justify-between mt-6">
+                <button onclick="deleteMaterial()" id="btn-delete-material" class="btn btn-danger hidden">删除</button>
+                <div class="flex gap-3">
+                    <button onclick="closeMaterialModal()" class="btn btn-secondary">取消</button>
+                    <button onclick="saveMaterial()" class="btn btn-primary">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast 通知 -->
+    <div id="toast" class="fixed bottom-6 right-6 z-50 hidden">
+        <div class="card p-4 flex items-center gap-3 shadow-2xl">
+            <svg id="toast-icon-success" class="w-5 h-5 text-green-400 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            <svg id="toast-icon-error" class="w-5 h-5 text-red-400 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+            <span id="toast-message" class="text-sm"></span>
+        </div>
+    </div>
+
+    <script>
+        // ============ 数据状态 ============
+        let brands = [];
+        let types = [];
+        let materials = [];
+        let currentTab = 'brands';
+
+        // ============ API 调用 ============
+        const API = {
+            async get(url) {
+                const res = await fetch(url);
+                if (!res.ok) throw new Error(`GET ${url} failed: ${res.status}`);
+                return res.json();
+            },
+            async post(url, data) {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if (!res.ok) throw new Error(`POST ${url} failed: ${res.status}`);
+                return res.json();
+            },
+            async put(url, data) {
+                const res = await fetch(url, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if (!res.ok) throw new Error(`PUT ${url} failed: ${res.status}`);
+                return res.json();
+            },
+            async delete(url) {
+                const res = await fetch(url, { method: 'DELETE' });
+                if (!res.ok) throw new Error(`DELETE ${url} failed: ${res.status}`);
+                return res.json();
+            }
+        };
+
+        // ============ 初始化 ============
+        async function init() {
+            await Promise.all([
+                loadBrands(),
+                loadTypes(),
+                loadMaterials()
+            ]);
+        }
+
+        // ============ Tab 切换 ============
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`tab-${tab}`).classList.add('active');
+            document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.add('hidden'));
+            document.getElementById(`panel-${tab}`).classList.remove('hidden');
+        }
+
+        // ============ 品牌管理 ============
+        async function loadBrands() {
+            try {
+                brands = await API.get('/api/materials/brands');
+                renderBrands();
+                updateBrandSelects();
+            } catch (e) {
+                console.error('加载品牌失败:', e);
+                showToast('加载品牌失败', 'error');
+            }
+        }
+
+        function renderBrands() {
+            const grid = document.getElementById('brands-grid');
+            const empty = document.getElementById('brands-empty');
+
+            if (brands.length === 0) {
+                grid.classList.add('hidden');
+                empty.classList.remove('hidden');
+                return;
+            }
+
+            grid.classList.remove('hidden');
+            empty.classList.add('hidden');
+
+            grid.innerHTML = brands.map(b => `
+                <div class="card p-5 cursor-pointer" onclick="editBrand(${b.id})">
+                    <div class="flex items-center gap-4 mb-3">
+                        ${b.logo_url
+                            ? `<img src="${b.logo_url}" alt="${b.name}" class="w-12 h-12 rounded-lg object-cover bg-white/10">`
+                            : `<div class="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg">${b.name.charAt(0)}</div>`
+                        }
+                        <div class="flex-1 min-w-0">
+                            <h3 class="font-semibold truncate">${b.name}</h3>
+                            ${b.website ? `<a href="${b.website}" target="_blank" class="text-xs text-blue-400 hover:text-blue-300 truncate block">${b.website}</a>` : ''}
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between text-xs text-gray-500">
+                        <span>排序: ${b.sort_order || 0}</span>
+                        <span class="badge ${b.active !== false ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}">${b.active !== false ? '启用' : '禁用'}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function openBrandModal(brand = null) {
+            document.getElementById('brand-modal-title').textContent = brand ? '编辑品牌' : '新增品牌';
+            document.getElementById('brand-id').value = brand ? brand.id : '';
+            document.getElementById('brand-name').value = brand ? brand.name : '';
+            document.getElementById('brand-logo').value = brand ? (brand.logo_url || '') : '';
+            document.getElementById('brand-website').value = brand ? (brand.website || '') : '';
+            document.getElementById('brand-sort').value = brand ? (brand.sort_order || 0) : 0;
+            document.getElementById('brand-modal').classList.remove('hidden');
+        }
+
+        function closeBrandModal() {
+            document.getElementById('brand-modal').classList.add('hidden');
+        }
+
+        function editBrand(id) {
+            const brand = brands.find(b => b.id === id);
+            if (brand) openBrandModal(brand);
+        }
+
+        async function saveBrand() {
+            const id = document.getElementById('brand-id').value;
+            const data = {
+                name: document.getElementById('brand-name').value.trim(),
+                logo_url: document.getElementById('brand-logo').value.trim() || null,
+                website: document.getElementById('brand-website').value.trim() || null,
+                sort_order: parseInt(document.getElementById('brand-sort').value) || 0,
+                active: true
+            };
+
+            if (!data.name) {
+                showToast('请输入品牌名称', 'error');
+                return;
+            }
+
+            try {
+                if (id) {
+                    await API.put(`/api/materials/brands/${id}`, data);
+                    showToast('品牌已更新');
+                } else {
+                    await API.post('/api/materials/brands', data);
+                    showToast('品牌已创建');
+                }
+                closeBrandModal();
+                await loadBrands();
+            } catch (e) {
+                showToast('保存失败: ' + e.message, 'error');
+            }
+        }
+
+        // ============ 类型管理 ============
+        async function loadTypes() {
+            try {
+                types = await API.get('/api/materials/types');
+                renderTypes();
+                updateTypeSelects();
+            } catch (e) {
+                console.error('加载类型失败:', e);
+                showToast('加载类型失败', 'error');
+            }
+        }
+
+        function renderTypes() {
+            const tbody = document.getElementById('types-table-body');
+            const empty = document.getElementById('types-empty');
+
+            if (types.length === 0) {
+                tbody.innerHTML = '';
+                empty.classList.remove('hidden');
+                return;
+            }
+
+            empty.classList.add('hidden');
+
+            tbody.innerHTML = types.map(t => `
+                <tr class="border-b border-white/5 hover:bg-white/[0.02] cursor-pointer" onclick="editType(${t.id})">
+                    <td class="px-6 py-4">
+                        <span class="font-medium">${t.name}</span>
+                    </td>
+                    <td class="px-6 py-4 text-gray-400">${t.display_name || '-'}</td>
+                    <td class="px-6 py-4 text-gray-400">${t.density || '-'}</td>
+                    <td class="px-6 py-4 text-gray-400 text-sm max-w-xs truncate">${t.description || '-'}</td>
+                    <td class="px-6 py-4 text-right">
+                        <button class="text-gray-400 hover:text-white text-sm" onclick="event.stopPropagation(); editType(${t.id})">编辑</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function openTypeModal(type = null) {
+            document.getElementById('type-modal-title').textContent = type ? '编辑类型' : '新增类型';
+            document.getElementById('type-id').value = type ? type.id : '';
+            document.getElementById('type-name').value = type ? type.name : '';
+            document.getElementById('type-display-name').value = type ? (type.display_name || '') : '';
+            document.getElementById('type-density').value = type ? (type.density || '') : '';
+            document.getElementById('type-description').value = type ? (type.description || '') : '';
+            document.getElementById('type-modal').classList.remove('hidden');
+        }
+
+        function closeTypeModal() {
+            document.getElementById('type-modal').classList.add('hidden');
+        }
+
+        function editType(id) {
+            const type = types.find(t => t.id === id);
+            if (type) openTypeModal(type);
+        }
+
+        async function saveType() {
+            const id = document.getElementById('type-id').value;
+            const data = {
+                name: document.getElementById('type-name').value.trim(),
+                display_name: document.getElementById('type-display-name').value.trim() || null,
+                density: parseFloat(document.getElementById('type-density').value) || null,
+                description: document.getElementById('type-description').value.trim() || null
+            };
+
+            if (!data.name) {
+                showToast('请输入类型名称', 'error');
+                return;
+            }
+
+            try {
+                if (id) {
+                    await API.put(`/api/materials/types/${id}`, data);
+                    showToast('类型已更新');
+                } else {
+                    await API.post('/api/materials/types', data);
+                    showToast('类型已创建');
+                }
+                closeTypeModal();
+                await loadTypes();
+            } catch (e) {
+                showToast('保存失败: ' + e.message, 'error');
+            }
+        }
+
+        // ============ 材料管理 ============
+        async function loadMaterials() {
+            try {
+                const brandId = document.getElementById('filter-brand').value;
+                const typeId = document.getElementById('filter-type').value;
+
+                let url = '/api/materials';
+                const params = new URLSearchParams();
+                if (brandId) params.set('brand_id', brandId);
+                if (typeId) params.set('type_id', typeId);
+                if (params.toString()) url += '?' + params.toString();
+
+                materials = await API.get(url);
+                renderMaterials();
+            } catch (e) {
+                console.error('加载材料失败:', e);
+                showToast('加载材料失败', 'error');
+            }
+        }
+
+        function filterMaterials() {
+            const search = document.getElementById('filter-search').value.toLowerCase();
+            const filtered = search
+                ? materials.filter(m => m.name.toLowerCase().includes(search) || (m.brand_name || '').toLowerCase().includes(search))
+                : materials;
+            renderMaterialsList(filtered);
+        }
+
+        function renderMaterials() {
+            const list = document.getElementById('materials-list');
+            const empty = document.getElementById('materials-empty');
+
+            if (materials.length === 0) {
+                list.innerHTML = '';
+                empty.classList.remove('hidden');
+                return;
+            }
+
+            empty.classList.add('hidden');
+            renderMaterialsList(materials);
+        }
+
+        function renderMaterialsList(items) {
+            const list = document.getElementById('materials-list');
+            const empty = document.getElementById('materials-empty');
+
+            if (items.length === 0) {
+                list.innerHTML = '';
+                empty.classList.remove('hidden');
+                return;
+            }
+
+            empty.classList.add('hidden');
+
+            list.innerHTML = items.map(m => `
+                <div class="card overflow-hidden">
+                    <div class="p-4 flex items-center gap-4 cursor-pointer" onclick="toggleMaterialDetail('detail-${m.id}')">
+                        <!-- 颜色标识 -->
+                        <div class="w-3 h-10 rounded-full flex-shrink-0" style="background-color: ${m.color || '#3b82f6'}"></div>
+
+                        <!-- 品牌Logo -->
+                        ${m.brand_logo_url
+                            ? `<img src="${m.brand_logo_url}" class="w-8 h-8 rounded object-cover bg-white/10 flex-shrink-0">`
+                            : `<div class="w-8 h-8 rounded bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">${(m.brand_name || '?').charAt(0)}</div>`
+                        }
+
+                        <!-- 名称和标签 -->
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="font-medium">${m.name}</span>
+                                <span class="badge bg-blue-500/20 text-blue-400">${m.type_name || '未知'}</span>
+                            </div>
+                            <div class="text-sm text-gray-400 mt-0.5">${m.brand_name || '未知品牌'}</div>
+                        </div>
+
+                        <!-- 关键参数 -->
+                        <div class="hidden md:flex items-center gap-6 text-sm text-gray-400">
+                            <div class="text-center">
+                                <div class="text-white font-medium">¥${m.price_per_kg || '-'}</div>
+                                <div class="text-xs">元/kg</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-white font-medium">${m.hotend_temp_min || '?'}~${m.hotend_temp_max || '?'}°C</div>
+                                <div class="text-xs">喷嘴温度</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-white font-medium">${m.bed_temp_min || '?'}~${m.bed_temp_max || '?'}°C</div>
+                                <div class="text-xs">热床温度</div>
+                            </div>
+                        </div>
+
+                        <!-- 操作按钮 -->
+                        <button onclick="event.stopPropagation(); openMaterialModal(materials.find(x=>x.id===${m.id}))" class="btn btn-secondary text-sm px-3 py-1.5 flex-shrink-0">
+                            编辑
+                        </button>
+
+                        <!-- 展开箭头 -->
+                        <svg class="w-5 h-5 text-gray-500 flex-shrink-0 transition-transform" id="arrow-detail-${m.id}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </div>
+
+                    <!-- 展开详情 -->
+                    <div id="detail-${m.id}" class="expandable-row border-t border-white/5">
+                        <div class="p-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                            <div>
+                                <span class="text-gray-500">密度</span>
+                                <div class="mt-1">${m.density || '-'} g/cm³</div>
+                            </div>
+                            <div>
+                                <span class="text-gray-500">颜色</span>
+                                <div class="mt-1 flex items-center gap-2">
+                                    <div class="w-4 h-4 rounded" style="background-color: ${m.color || '#3b82f6'}"></div>
+                                    ${m.color || '-'}
+                                </div>
+                            </div>
+                            <div>
+                                <span class="text-gray-500">最大打印速度</span>
+                                <div class="mt-1">${m.print_speed_max || '-'} mm/s</div>
+                            </div>
+                            <div>
+                                <span class="text-gray-500">价格</span>
+                                <div class="mt-1">¥${m.price_per_kg || '-'} / kg</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function toggleMaterialDetail(id) {
+            const el = document.getElementById(id);
+            const arrow = document.getElementById('arrow-' + id);
+            el.classList.toggle('expanded');
+            if (arrow) arrow.style.transform = el.classList.contains('expanded') ? 'rotate(180deg)' : '';
+        }
+
+        function updateBrandSelects() {
+            const selects = ['filter-brand', 'material-brand'];
+            selects.forEach(selectId => {
+                const select = document.getElementById(selectId);
+                const current = select.value;
+                const isFilter = selectId.startsWith('filter');
+                select.innerHTML = `<option value="">${isFilter ? '全部品牌' : '请选择品牌'}</option>` +
+                    brands.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+                select.value = current;
+            });
+        }
+
+        function updateTypeSelects() {
+            const selects = ['filter-type', 'material-type'];
+            selects.forEach(selectId => {
+                const select = document.getElementById(selectId);
+                const current = select.value;
+                const isFilter = selectId.startsWith('filter');
+                select.innerHTML = `<option value="">${isFilter ? '全部类型' : '请选择类型'}</option>` +
+                    types.map(t => `<option value="${t.id}">${t.display_name || t.name}</option>`).join('');
+                select.value = current;
+            });
+        }
+
+        function openMaterialModal(material = null) {
+            document.getElementById('material-modal-title').textContent = material ? '编辑材料' : '新增材料';
+            document.getElementById('material-id').value = material ? material.id : '';
+            document.getElementById('material-brand').value = material ? material.brand_id : '';
+            document.getElementById('material-type').value = material ? material.type_id : '';
+            document.getElementById('material-name').value = material ? material.name : '';
+            document.getElementById('material-color').value = material ? (material.color || '#3b82f6') : '#3b82f6';
+            document.getElementById('material-color-text').value = material ? (material.color || '#3b82f6') : '#3b82f6';
+            document.getElementById('material-density').value = material ? (material.density || '') : '';
+            document.getElementById('material-price').value = material ? (material.price_per_kg || '') : '';
+            document.getElementById('material-hotend-min').value = material ? (material.hotend_temp_min || '') : '';
+            document.getElementById('material-hotend-max').value = material ? (material.hotend_temp_max || '') : '';
+            document.getElementById('material-bed-min').value = material ? (material.bed_temp_min || '') : '';
+            document.getElementById('material-bed-max').value = material ? (material.bed_temp_max || '') : '';
+            document.getElementById('material-speed-max').value = material ? (material.print_speed_max || '') : '';
+            document.getElementById('btn-delete-material').classList.toggle('hidden', !material);
+            document.getElementById('material-modal').classList.remove('hidden');
+        }
+
+        function closeMaterialModal() {
+            document.getElementById('material-modal').classList.add('hidden');
+        }
+
+        async function saveMaterial() {
+            const id = document.getElementById('material-id').value;
+            const data = {
+                brand_id: parseInt(document.getElementById('material-brand').value),
+                type_id: parseInt(document.getElementById('material-type').value),
+                name: document.getElementById('material-name').value.trim(),
+                color: document.getElementById('material-color').value,
+                density: parseFloat(document.getElementById('material-density').value) || null,
+                price_per_kg: parseFloat(document.getElementById('material-price').value),
+                hotend_temp_min: parseInt(document.getElementById('material-hotend-min').value) || null,
+                hotend_temp_max: parseInt(document.getElementById('material-hotend-max').value) || null,
+                bed_temp_min: parseInt(document.getElementById('material-bed-min').value) || null,
+                bed_temp_max: parseInt(document.getElementById('material-bed-max').value) || null,
+                print_speed_max: parseInt(document.getElementById('material-speed-max').value) || null
+            };
+
+            if (!data.brand_id) { showToast('请选择品牌', 'error'); return; }
+            if (!data.type_id) { showToast('请选择类型', 'error'); return; }
+            if (!data.name) { showToast('请输入材料名称', 'error'); return; }
+            if (!data.price_per_kg) { showToast('请输入价格', 'error'); return; }
+
+            try {
+                if (id) {
+                    await API.put(`/api/materials/${id}`, data);
+                    showToast('材料已更新');
+                } else {
+                    await API.post('/api/materials', data);
+                    showToast('材料已创建');
+                }
+                closeMaterialModal();
+                await loadMaterials();
+            } catch (e) {
+                showToast('保存失败: ' + e.message, 'error');
+            }
+        }
+
+        async function deleteMaterial() {
+            const id = document.getElementById('material-id').value;
+            if (!id || !confirm('确定要删除此材料吗？此操作不可撤销。')) return;
+
+            try {
+                await API.delete(`/api/materials/${id}`);
+                showToast('材料已删除');
+                closeMaterialModal();
+                await loadMaterials();
+            } catch (e) {
+                showToast('删除失败: ' + e.message, 'error');
+            }
+        }
+
+        // ============ 颜色同步 ============
+        document.getElementById('material-color').addEventListener('input', (e) => {
+            document.getElementById('material-color-text').value = e.target.value;
+        });
+        document.getElementById('material-color-text').addEventListener('input', (e) => {
+            if (/^#[0-9a-fA-F]{6}$/.test(e.target.value)) {
+                document.getElementById('material-color').value = e.target.value;
+            }
+        });
+
+        // ============ Toast 通知 ============
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const msg = document.getElementById('toast-message');
+            const successIcon = document.getElementById('toast-icon-success');
+            const errorIcon = document.getElementById('toast-icon-error');
+
+            msg.textContent = message;
+            successIcon.classList.toggle('hidden', type !== 'success');
+            errorIcon.classList.toggle('hidden', type !== 'error');
+
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 3000);
+        }
+
+        // ============ 启动 ============
+        init();
+    </script>
+</body>
+</html>

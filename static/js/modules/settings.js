@@ -260,10 +260,7 @@ export async function saveUserSettings() {
         const cfgModel = document.getElementById("cfg-printer-model-main");
         const cfgNozzle = document.getElementById("cfg-nozzle-diameter");
         const genPreset = document.getElementById("gen-preset-select");
-        // Check preferences tab first, then printer tab
-        const prefPrinter = document.getElementById("pref-default-printer");
-        const printerId = (prefPrinter && prefPrinter.value) ? prefPrinter.value
-            : (cfgModel && cfgModel.value) ? cfgModel.value : defaultPrinterId;
+        const printerId = (cfgModel && cfgModel.value) ? cfgModel.value : defaultPrinterId;
         const nozzle = (cfgNozzle && cfgNozzle.value) ? cfgNozzle.value : defaultNozzle;
         const presetId = (genPreset && genPreset.value) ? Number(genPreset.value) : null;
         const effectivePresetId = presetId || defaultSlicerPresetId;
@@ -274,19 +271,6 @@ export async function saveUserSettings() {
             default_printer_id: printerId || null,
             default_nozzle: nozzle || null,
             default_slicer_preset_id: effectivePresetId || null,
-            user_preferences: {
-                default_material: userPreferences.default_material,
-                default_color: userPreferences.default_color,
-                favorite_materials: userPreferences.favorite_materials,
-                favorite_colors: userPreferences.favorite_colors,
-                material_usage: userPreferences.material_usage,
-                color_usage: userPreferences.color_usage,
-                default_quantity: userPreferences.default_quantity,
-                history_page_size: userPreferences.history_page_size,
-                history_sort: userPreferences.history_sort,
-                history_retention_days: userPreferences.history_retention_days,
-                history_visible_columns: userPreferences.history_visible_columns,
-            },
         };
         const res = await authFetch('/api/user/settings', {
             method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
@@ -873,11 +857,6 @@ function _syncFavoritesToBackend() {
                     favorite_colors: userPreferences.favorite_colors,
                     material_usage: userPreferences.material_usage,
                     color_usage: userPreferences.color_usage,
-                    default_quantity: userPreferences.default_quantity,
-                    history_page_size: userPreferences.history_page_size,
-                    history_sort: userPreferences.history_sort,
-                    history_retention_days: userPreferences.history_retention_days,
-                    history_visible_columns: userPreferences.history_visible_columns,
                 },
             };
             await authFetch('/api/user/settings', {
@@ -1022,95 +1001,9 @@ export function renderPreferencesTab() {
             _renderDefaultColorOptions();
         };
     }
+
     // ── Default color select ──
     _renderDefaultColorOptions();
-    // ── Default printer select ──
-    const defaultPrinterSelect = document.getElementById('pref-default-printer');
-    if (defaultPrinterSelect) {
-        const mainPrinterSelect = document.getElementById('cfg-printer-model-main');
-        let opts = '<option value="">-- 不指定 --</option>';
-        if (mainPrinterSelect && mainPrinterSelect.options.length > 1) {
-            Array.from(mainPrinterSelect.options).forEach(opt => {
-                if (!opt.value) return;
-                const sel = defaultPrinterId === opt.value ? ' selected' : '';
-                opts += '<option value="' + opt.value + '"' + sel + '>' + opt.text + '</option>';
-            });
-        }
-        defaultPrinterSelect.innerHTML = opts;
-        defaultPrinterSelect.onchange = () => {
-            setDefaultPrinterId(defaultPrinterSelect.value || null);
-        };
-    }
-
-    // ── Default quantity ──
-    const defaultQtyInput = document.getElementById('pref-default-quantity');
-    if (defaultQtyInput) {
-        defaultQtyInput.value = userPreferences.default_quantity || 1;
-        defaultQtyInput.onchange = () => {
-            userPreferences.default_quantity = Math.max(1, Number(defaultQtyInput.value) || 1);
-            savePreferencesToStorage();
-            _syncFavoritesToBackend();
-        };
-    }
-
-    // ── History preferences ──
-    const historyPageSize = document.getElementById('pref-history-page-size');
-    if (historyPageSize) {
-        historyPageSize.value = String(userPreferences.history_page_size || 20);
-        historyPageSize.onchange = () => {
-            userPreferences.history_page_size = Number(historyPageSize.value) || 20;
-            savePreferencesToStorage();
-            _syncFavoritesToBackend();
-        };
-    }
-
-    const historySort = document.getElementById('pref-history-sort');
-    if (historySort) {
-        historySort.value = userPreferences.history_sort || 'newest';
-        historySort.onchange = () => {
-            userPreferences.history_sort = historySort.value;
-            savePreferencesToStorage();
-            _syncFavoritesToBackend();
-        };
-    }
-
-    const historyRetention = document.getElementById('pref-history-retention');
-    if (historyRetention) {
-        historyRetention.value = String(userPreferences.history_retention_days || 0);
-        historyRetention.onchange = () => {
-            userPreferences.history_retention_days = Number(historyRetention.value) || 0;
-            savePreferencesToStorage();
-            _syncFavoritesToBackend();
-        };
-    }
-
-    // ── History visible columns ──
-    const historyColCheckboxes = document.querySelectorAll('.pref-history-col-cb');
-    if (historyColCheckboxes.length > 0) {
-        const visibleCols = userPreferences.history_visible_columns || ['material', 'quantity'];
-        historyColCheckboxes.forEach(cb => {
-            cb.checked = visibleCols.includes(cb.value);
-            cb.onchange = () => {
-                const cols = [];
-                historyColCheckboxes.forEach(c => { if (c.checked) cols.push(c.value); });
-                userPreferences.history_visible_columns = cols;
-                savePreferencesToStorage();
-                _syncFavoritesToBackend();
-            };
-        });
-    }
-
-    // ── History export button ──
-    const historyExportBtn = document.getElementById('pref-history-export-btn');
-    if (historyExportBtn) {
-        historyExportBtn.onclick = () => _exportQuoteHistory();
-    }
-
-    // ── History clear button ──
-    const historyClearBtn = document.getElementById('pref-history-clear-btn');
-    if (historyClearBtn) {
-        historyClearBtn.onclick = () => _clearQuoteHistory();
-    }
 
     // ── Favorite materials list (checkboxes) ──
     const favMatContainer = document.getElementById('pref-favorite-materials');
@@ -1158,88 +1051,6 @@ export function renderPreferencesTab() {
 
     // ── Usage stats ──
     renderUsageStats('pref-usage-stats');
-}
-
-/**
- * Export quote history as CSV file.
- */
-async function _exportQuoteHistory() {
-    const msg = document.getElementById('pref-history-msg');
-    if (!authToken) { _showHistoryMsg('请先登录', false); return; }
-    try {
-        const res = await authFetch('/api/quote/history?limit=10000');
-        if (!res.ok) {
-            _showHistoryMsg('导出失败', false);
-            return;
-        }
-        const data = await res.json();
-        const records = data.items || data || [];
-        if (!records.length) {
-            _showHistoryMsg('暂无历史记录可导出', false);
-            return;
-        }
-        // Build CSV
-        const headers = ['时间', '文件名', '材料', '数量', '体积(cm³)', '重量(g)', '时间(h)', '费用(¥)', '状态'];
-        const rows = records.map(r => [
-            r.created_at || '',
-            r.filename || '',
-            r.material || '',
-            r.quantity || 1,
-            r.volume_cm3 || '',
-            r.weight_g || '',
-            r.estimated_time_h || '',
-            r.cost_cny || '',
-            r.status || '',
-        ]);
-        const BOM = '\uFEFF';
-        const csv = BOM + [headers, ...rows].map(row =>
-            row.map(cell => '"' + String(cell).replace(/"/g, '""') + '"').join(',')
-        ).join('\n');
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = '报价历史_' + new Date().toISOString().slice(0, 10) + '.csv';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        _showHistoryMsg('导出成功', true);
-    } catch (e) {
-        _showHistoryMsg('导出失败: ' + e.message, false);
-    }
-}
-
-/**
- * Clear all quote history (with confirmation).
- */
-async function _clearQuoteHistory() {
-    if (!authToken) { _showHistoryMsg('请先登录', false); return; }
-    if (!confirm('确定要清空所有报价历史记录吗？此操作不可撤销。')) return;
-    try {
-        const res = await authFetch('/api/quote/history', { method: 'DELETE' });
-        if (!res.ok) {
-            let data = null;
-            try { data = await res.json(); } catch (e) {}
-            _showHistoryMsg(data?.detail || '清空失败', false);
-            return;
-        }
-        _showHistoryMsg('历史记录已清空', true);
-    } catch (e) {
-        _showHistoryMsg('清空失败: ' + e.message, false);
-    }
-}
-
-/**
- * Show a message in the history preferences section.
- */
-function _showHistoryMsg(text, ok) {
-    const msg = document.getElementById('pref-history-msg');
-    if (!msg) return;
-    msg.textContent = text;
-    msg.className = ok ? 'text-xs text-green-600 block mt-2' : 'text-xs text-red-600 block mt-2';
-    msg.classList.remove('hidden');
-    setTimeout(() => msg.classList.add('hidden'), 3000);
 }
 
 /**

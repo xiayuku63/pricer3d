@@ -2,52 +2,11 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>用户管理 - 3D打印自动报价系统</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-50 min-h-screen p-4 lg:p-6">
-    <style>
-        @media (max-width: 640px) {
-            body { padding: 8px; overflow-x: hidden; }
-            .p-8 { padding: 16px !important; }
-            h2.text-2xl { font-size: 1.25rem; }
-            .uppercase.tracking-wide.text-sm { font-size: 0.65rem; }
-            .tab-btn {
-                min-height: 40px;
-                padding: 8px 16px;
-                font-size: 0.875rem;
-                touch-action: manipulation;
-            }
-            #search-input, #audit-q, #audit-action, #audit-username {
-                min-height: 44px;
-                font-size: 1rem;
-                padding: 10px 12px;
-            }
-            #search-btn, #audit-search-btn, #metrics-refresh-btn, #cleanup-btn {
-                min-height: 44px;
-                min-width: 44px;
-                font-size: 0.875rem;
-                padding: 10px 16px;
-            }
-            a[href="/"] {
-                min-height: 44px;
-                display: inline-flex;
-                align-items: center;
-                padding: 10px 12px;
-                font-size: 0.875rem;
-            }
-            .grid-cols-\[1fr\,auto\] {
-                grid-template-columns: 1fr;
-            }
-            .grid-cols-\[1fr\,auto\] button {
-                width: 100%;
-            }
-            table { font-size: 0.6875rem; }
-            table th, table td { padding: 6px 8px; white-space: nowrap; }
-            .overflow-x-auto { -webkit-overflow-scrolling: touch; }
-        }
-    </style>
     <div class="max-w-6xl mx-auto bg-white rounded-xl shadow-md overflow-hidden">
         <div class="p-8 space-y-5">
             <div class="flex items-start justify-between gap-4">
@@ -55,7 +14,7 @@
                     <div class="uppercase tracking-wide text-sm text-indigo-500 font-semibold mb-1">3D Printing Parts Automated Quoting System</div>
                     <h2 class="text-2xl font-bold text-gray-900">用户管理</h2>
                 </div>
-                <a href="/" class="text-sm px-3 py-2.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 min-h-[44px] inline-flex items-center">返回首页</a>
+                <a href="/" class="text-sm px-3 py-1.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50">返回首页</a>
             </div>
 
             <div class="flex flex-wrap gap-2">

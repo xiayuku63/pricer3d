@@ -4,7 +4,7 @@ services:
     container_name: pricer3d-app
     restart: unless-stopped
     ports:
-      - "127.0.0.1:5000:5000"
+      - "127.0.0.1:5001:5000"
     volumes:
       - .:/app
       - /app/venv

@@ -16,8 +16,6 @@ from .deps import get_current_user, is_admin_user, require_admin, mask_email, ma
 from .utils import normalize_materials
 from .audit import write_audit_event
 from .middleware import metrics
-from .performance_monitor import performance_monitor
-from .error_stats import error_stats
 from .database import merge_pricing_config
 from .auth import get_user_by_id
 from .backup import create_backup, list_backups, cleanup_old_backups
@@ -251,20 +249,7 @@ async def admin_list_audit(
 
 async def admin_metrics(current_user=Depends(get_current_user)):
     require_admin(current_user)
-    snapshot = metrics.snapshot()
-    snapshot["performance"] = performance_monitor.get_all_stats()
-    return snapshot
-
-
-async def admin_errors(
-    window: str = Query("1h", description="时间窗口: 1h, 24h, all"),
-    current_user=Depends(get_current_user),
-):
-    """获取错误率统计信息。支持时间窗口: 1h（最近1小时）, 24h（最近24小时）, all（全部）。"""
-    require_admin(current_user)
-    if window not in {"1h", "24h", "all"}:
-        window = "1h"
-    return error_stats.get_stats(window=window)
+    return metrics.snapshot()
 
 
 # ---------- Cleanup ----------

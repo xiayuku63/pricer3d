@@ -15,8 +15,6 @@ from .config import (
 )
 from .rate_limiter import PersistentRateLimiter
 from .metrics import InMemoryMetrics
-from .performance_monitor import performance_monitor
-from .error_stats import error_stats
 from .utils import get_client_ip
 from .logging_config import log_request
 from .errors import error_response
@@ -73,26 +71,6 @@ async def security_middleware(request: Request, call_next):
         metrics.record(path=path, status_code=status_code, duration_ms=duration_ms)
     except Exception as e:
         logger.debug("middleware: failed to record metrics: %s", e)
-
-    # Performance monitoring for key API endpoints
-    try:
-        if performance_monitor.is_monitored(path, method):
-            performance_monitor.record(
-                path=path,
-                method=method,
-                duration_ms=duration_ms,
-                status_code=status_code,
-                client_ip=client_ip,
-                request_id=request.state.request_id,
-            )
-    except Exception as e:
-        logger.debug("middleware: failed to record performance: %s", e)
-
-    # Error statistics tracking (all 4xx/5xx responses)
-    try:
-        error_stats.record(status_code=status_code, url=path)
-    except Exception as e:
-        logger.debug("middleware: failed to record error stats: %s", e)
 
     # Structured access log
     log_request(logger, method, path, status_code, duration_ms, client_ip, request.state.request_id)

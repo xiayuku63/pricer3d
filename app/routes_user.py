@@ -61,11 +61,6 @@ class UserPreferences(BaseModel):
     formula_templates: List[dict] = Field(default_factory=list, max_length=20)
     material_usage: dict = Field(default_factory=dict)
     color_usage: dict = Field(default_factory=dict)
-    default_quantity: int = Field(default=1, ge=1, le=9999)
-    history_page_size: int = Field(default=20, ge=10, le=100)
-    history_sort: str = Field(default="newest", max_length=20)
-    history_retention_days: int = Field(default=0, ge=0, le=365)
-    history_visible_columns: List[str] = Field(default_factory=lambda: ["material", "quantity"])
 
 
 class UserSettingsUpdate(BaseModel):

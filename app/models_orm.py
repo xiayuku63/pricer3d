@@ -247,3 +247,75 @@ class Todo(Base):
         Index("idx_todos_user_category", "user_id", "category_id"),
         Index("idx_todos_user_due", "user_id", "due_date", "status"),
     )
+
+
+class PrinterParam(Base):
+    """打印机高级参数（速度、加速度、抖动限制）"""
+    __tablename__ = "printer_params"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    printer_id = Column(String, nullable=False, index=True)
+    nozzle = Column(Float, nullable=False)
+    max_speed = Column(Float, default=500)  # mm/s
+    max_acceleration = Column(Float, default=10000)  # mm/s²
+    jerk_limit = Column(Float, default=0.04)  # mm/s
+    speed_enabled = Column(Integer, default=0)  # 是否启用高级参数
+    created_at = Column(String, nullable=False)
+    updated_at = Column(String, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("printer_id", "nozzle"),
+    )
+
+
+class MaterialBrand(Base):
+    """材料品牌"""
+    __tablename__ = "material_brands"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String, nullable=False, unique=True)
+    logo_url = Column(String)
+    website = Column(String)
+    sort_order = Column(Integer, default=0)
+    active = Column(Integer, default=1)
+    created_at = Column(String, nullable=False)
+
+
+class MaterialType(Base):
+    """材料类型"""
+    __tablename__ = "material_types"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String, nullable=False, unique=True)
+    display_name = Column(String, nullable=False)
+    density = Column(Float, default=1.24)  # g/cm³
+    description = Column(Text)
+    sort_order = Column(Integer, default=0)
+    active = Column(Integer, default=1)
+    created_at = Column(String, nullable=False)
+
+
+class Material(Base):
+    """具体材料（品牌+类型+参数）"""
+    __tablename__ = "materials"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    brand_id = Column(Integer, ForeignKey("material_brands.id"), nullable=False)
+    type_id = Column(Integer, ForeignKey("material_types.id"), nullable=False)
+    name = Column(String, nullable=False)
+    color = Column(String)
+    density = Column(Float)  # 覆盖类型的默认密度
+    price_per_kg = Column(Float)  # 每公斤价格
+    hotend_temp_min = Column(Integer)
+    hotend_temp_max = Column(Integer)
+    bed_temp_min = Column(Integer)
+    bed_temp_max = Column(Integer)
+    print_speed_max = Column(Float)  # 建议最大打印速度
+    description = Column(Text)
+    active = Column(Integer, default=1)
+    created_at = Column(String, nullable=False)
+    updated_at = Column(String, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("brand_id", "type_id", "name"),
+    )

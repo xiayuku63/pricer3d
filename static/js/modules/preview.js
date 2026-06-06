@@ -12,7 +12,6 @@ import {
     camera, renderer, controls, clearCurrentMesh, currentMesh,
     lookAtView, applyOrientationRotation, resetOrientation,
     setupFaceClickHandler, highlightFaces, resetHighlight, fitCameraToMesh,
-    takeScreenshot,
 } from './viewer.js';
 import { clearClusters } from './layface.js';
 import { t } from './i18n.js';

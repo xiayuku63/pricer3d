@@ -571,8 +571,6 @@ export async function saveAsNewPreset() {
 }
 
 // ── Printer presets: fetch, render, delete ──
-let _editingPresetId = null;
-
 export async function fetchPrinterPresets() {
     if (!authToken) return;
     const { printerPresetsTbody } = dom;
@@ -593,7 +591,6 @@ export async function fetchPrinterPresets() {
                 <td class="px-2 py-2 text-gray-500">${p.bed_width}×${p.bed_depth}×${p.bed_height}</td>
                 <td class="px-2 py-2 text-gray-500">${p.nozzle} mm</td>
                 <td class="px-2 py-2 text-center">
-                    <button data-pp-edit="${p.id}" data-pp-name="${p.name || ''}" data-pp-x="${p.bed_width}" data-pp-y="${p.bed_depth}" data-pp-z="${p.bed_height}" class="text-indigo-500 hover:text-indigo-700 text-xs mr-1">${t('common.edit')}</button>
                     <button data-pp-delete="${p.id}" class="text-red-500 hover:text-red-700 text-xs">${t('common.delete')}</button>
                 </td>
             </tr>
@@ -601,32 +598,7 @@ export async function fetchPrinterPresets() {
         printerPresetsTbody.querySelectorAll('[data-pp-delete]').forEach(btn => {
             btn.addEventListener('click', () => deletePrinterPreset(Number(btn.getAttribute('data-pp-delete'))));
         });
-        printerPresetsTbody.querySelectorAll('[data-pp-edit]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const id = Number(btn.getAttribute('data-pp-edit'));
-                const name = btn.getAttribute('data-pp-name') || '';
-                const x = btn.getAttribute('data-pp-x') || 256;
-                const y = btn.getAttribute('data-pp-y') || 256;
-                const z = btn.getAttribute('data-pp-z') || 256;
-                _editPrinterPreset(id, name, x, y, z);
-            });
-        });
     } catch (e) { setMsg(e.message || t('common.loadError'), false); }
-}
-function _editPrinterPreset(id, name, x, y, z) {
-    _editingPresetId = id;
-    const form = document.getElementById('printer-preset-form');
-    if (form) form.classList.remove('hidden');
-    const nameEl = document.getElementById('pp-name');
-    const xEl = document.getElementById('pp-bed-x');
-    const yEl = document.getElementById('pp-bed-y');
-    const zEl = document.getElementById('pp-bed-z');
-    if (nameEl) nameEl.value = name;
-    if (xEl) xEl.value = x;
-    if (yEl) yEl.value = y;
-    if (zEl) zEl.value = z;
-    const saveBtn = document.getElementById('pp-save-btn');
-    if (saveBtn) saveBtn.textContent = '更新';
 }
 
 export async function deletePrinterPreset(presetId) {
@@ -659,26 +631,14 @@ export async function savePrinterPreset() {
         nozzles: [0.2, 0.4, 0.6, 0.8],
     };
     try {
-        let resp;
-        if (_editingPresetId) {
-            // Update existing preset
-            resp = await authFetch(`/api/printer/presets/${_editingPresetId}`, {
-                method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
-            });
-        } else {
-            // Create new preset
-            resp = await authFetch('/api/printer/presets', {
-                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
-            });
-        }
+        const resp = await authFetch('/api/printer/presets', {
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
+        });
         if (resp.status === 401) { openLoginModal(); return; }
         const data = await resp.json();
         if (!resp.ok) throw new Error(data.detail || t('common.loadError'));
         if (nameEl) nameEl.value = '';
         document.getElementById('printer-preset-form')?.classList.add('hidden');
-        _editingPresetId = null;
-        const saveBtn = document.getElementById('pp-save-btn');
-        if (saveBtn) saveBtn.textContent = '保存';
         await fetchPrinterPresets();
         await fetchPrinterModels();
     } catch (e) { console.error(e); }
