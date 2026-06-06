@@ -1,0 +1,569 @@
+            <!-- 用户中心弹窗 -->
+            <div id="user-center-modal" class="hidden fixed inset-0 z-50">
+                <div id="user-center-backdrop" class="absolute inset-0 bg-black/50"></div>
+                <div class="relative z-10 h-full w-full flex items-center justify-center p-4">
+                    <div class="w-full max-w-5xl bg-white rounded-lg shadow-xl overflow-hidden flex flex-col h-[85vh]">
+                        <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+                            <h4 class="text-sm font-semibold text-gray-800">用户中心</h4>
+                            <div class="flex items-center gap-2">
+                                <button id="user-center-set-defaults-btn" type="button" class="hidden text-xs px-3 py-2 rounded-md border border-indigo-300 text-indigo-700 hover:bg-indigo-50 min-h-[44px] flex items-center">设为默认</button>
+                                <button id="user-center-close-btn" type="button" class="text-gray-500 hover:text-gray-700 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center">关闭</button>
+                            </div>
+                        </div>
+                        <div class="flex flex-1 overflow-hidden min-h-[500px]">
+                            <!-- 左侧导航 -->
+                            <div class="w-48 bg-gray-50 border-r border-gray-200 p-2 flex flex-col gap-1 overflow-y-auto">
+                                <button type="button" data-uc-tab="materials" class="uc-tab-btn w-full text-left px-3 py-2 rounded-md text-sm font-medium text-indigo-700 bg-indigo-50">材料设置</button>
+                                <button type="button" data-uc-tab="formulas" class="uc-tab-btn w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900">计算公式</button>
+                                <button type="button" data-uc-tab="costs" class="uc-tab-btn w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900">成本与时间</button>
+                                <button type="button" data-uc-tab="printer" class="uc-tab-btn w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900">机型配置</button>
+                                <button type="button" data-uc-tab="slicer" class="uc-tab-btn w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900">切片配置</button>
+                                <button type="button" data-uc-tab="preferences" class="uc-tab-btn w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900">偏好设置</button>
+                                <button type="button" data-uc-tab="security" class="uc-tab-btn w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900">账号安全</button>
+                            </div>
+                            
+                            <!-- 右侧内容区 -->
+                            <div class="flex-1 p-6 overflow-y-auto bg-white relative min-h-[500px]">
+                                <div id="uc-tab-materials" class="uc-tab-pane space-y-6 block">
+                                    <!-- 材料设置 -->
+                            <div>
+                                <div class="flex justify-between items-center mb-2">
+                                    <h5 class="text-sm font-medium text-gray-700">自定义材料</h5>
+                                    <button id="add-material-btn" type="button" class="text-xs text-indigo-600 hover:text-indigo-800">+ 添加材料</button>
+                                </div>
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full text-xs text-left border border-gray-200 rounded-md">
+                                        <thead class="bg-gray-50 text-gray-600">
+                                            <tr>
+                                                <th class="px-2 py-1.5 w-1/6">材料名称</th>
+                                                <th class="px-2 py-1.5 w-1/8">品牌</th>
+                                                <th class="px-2 py-1.5 w-1/8">密度 (g/cm³)</th>
+                                                <th class="px-2 py-1.5 w-1/8">单价 (元/KG)</th>
+                                                <th class="px-2 py-1.5 w-1/3">可选颜色</th>
+                                                <th class="px-2 py-1.5 w-1/12 text-center">操作</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="materials-tbody" class="bg-white divide-y divide-gray-100">
+                                            <!-- 材料行动态插入 -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                                </div>
+                                <div id="uc-tab-formulas" class="uc-tab-pane hidden space-y-6">
+                                    <!-- 颜色绑定 -->
+                            <div>
+                                <div class="flex justify-between items-center mb-2">
+                                    <h5 class="text-sm font-medium text-gray-700">计算公式</h5>
+                                    <div class="flex items-center gap-2">
+                                        <p id="formula-validate-msg" class="text-xs hidden"></p>
+                                        <button id="formula-validate-btn" type="button" class="text-xs text-indigo-600 hover:text-indigo-800">校验公式</button>
+                                        <button id="formula-reset-btn" type="button" class="text-xs text-indigo-600 hover:text-indigo-800">重置默认</button>
+                                    </div>
+                                </div>
+                                <div id="formula-container" class="space-y-3">
+                                    <div>
+                                        <label class="block text-xs text-gray-600">单件成本公式（unit_cost_cny）</label>
+                                        <textarea id="cfg-unit-cost-formula" rows="2" class="mt-1 w-full border border-gray-300 rounded-sm text-xs px-2 py-1 font-mono"></textarea>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-gray-600">总价公式（cost_cny）</label>
+                                        <textarea id="cfg-total-cost-formula" rows="2" class="mt-1 w-full border border-gray-300 rounded-sm text-xs px-2 py-1 font-mono"></textarea>
+                                    </div>
+                                    <div class="text-[11px] text-gray-500 leading-snug">
+                                        支持英文变量与中文别名；支持函数：max(), min(), abs(), round()
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <button id="formula-vars-toggle-btn" type="button" class="text-xs text-indigo-600 hover:text-indigo-800">展开变量字典</button>
+                                    </div>
+                                    <div id="formula-vars-panel" class="hidden overflow-x-auto">
+                                        <table class="min-w-full text-[11px] text-left border border-gray-200 rounded-md overflow-hidden">
+                                            <thead class="bg-gray-50 text-gray-600">
+                                                <tr>
+                                                    <th class="px-2 py-1.5">中文含义</th>
+                                                    <th class="px-2 py-1.5">中文变量</th>
+                                                    <th class="px-2 py-1.5">英文变量</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="bg-white divide-y divide-gray-100">
+                                                <tr><td class="px-2 py-1.5">有效重量（克）</td><td class="px-2 py-1.5">有效重量_g</td><td class="px-2 py-1.5">effective_weight_g</td></tr>
+                                                <tr><td class="px-2 py-1.5">材料单价（元/KG）</td><td class="px-2 py-1.5">材料单价_元每kg</td><td class="px-2 py-1.5">price_per_kg</td></tr>
+                                                <tr><td class="px-2 py-1.5">单件打印时间（小时）</td><td class="px-2 py-1.5">单件时间_h</td><td class="px-2 py-1.5">unit_time_h</td></tr>
+                                                <tr><td class="px-2 py-1.5">机台费（元/小时）</td><td class="px-2 py-1.5">机台费_元每小时</td><td class="px-2 py-1.5">machine_hourly_rate_cny</td></tr>
+                                                <tr><td class="px-2 py-1.5">后处理费（元/件）</td><td class="px-2 py-1.5">后处理费_元每件</td><td class="px-2 py-1.5">post_process_fee_per_part_cny</td></tr>
+                                                <tr><td class="px-2 py-1.5">表面积/体积比</td><td class="px-2 py-1.5">表面积体积比</td><td class="px-2 py-1.5">surface_area_to_volume_ratio</td></tr>
+                                                <tr><td class="px-2 py-1.5">支撑重量（克/件）</td><td class="px-2 py-1.5">支撑重量_g</td><td class="px-2 py-1.5">support_weight_g</td></tr>
+                                                <tr><td class="px-2 py-1.5">支撑单价（元/克）</td><td class="px-2 py-1.5">支撑单价_元每g</td><td class="px-2 py-1.5">support_price_per_g</td></tr>
+                                                <tr><td class="px-2 py-1.5">支撑费（元/件）</td><td class="px-2 py-1.5">支撑费_元每件</td><td class="px-2 py-1.5">support_cost_per_part_cny</td></tr>
+                                                <tr><td class="px-2 py-1.5">数量</td><td class="px-2 py-1.5">数量</td><td class="px-2 py-1.5">quantity</td></tr>
+                                                <tr><td class="px-2 py-1.5">上机/调机费（元/模型）</td><td class="px-2 py-1.5">上机费</td><td class="px-2 py-1.5">setup_fee_cny</td></tr>
+                                                <tr><td class="px-2 py-1.5">最低起步价（元/模型）</td><td class="px-2 py-1.5">最低起步价</td><td class="px-2 py-1.5">min_job_fee_cny</td></tr>
+                                                <tr><td class="px-2 py-1.5">单件成本（元/件）</td><td class="px-2 py-1.5">单件成本</td><td class="px-2 py-1.5">unit_cost_cny</td></tr>
+                                                <tr><td class="px-2 py-1.5">小计（元）</td><td class="px-2 py-1.5">小计</td><td class="px-2 py-1.5">subtotal_cny</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                                </div>
+                                <div id="uc-tab-costs" class="uc-tab-pane hidden space-y-6">
+                                    <div>
+                                        <h5 class="text-sm font-medium text-gray-700 mb-2">成本与时间参数</h5>
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-xs text-gray-600">机台费 (元/小时)</label>
+                                        <input id="cfg-machine-hourly-rate" type="number" step="0.01" inputmode="decimal" class="mt-1 w-full border border-gray-300 rounded-sm text-xs px-2 py-1 min-h-[40px]" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-gray-600">上机/调机费 (元/模型)</label>
+                                        <input id="cfg-setup-fee" type="number" step="0.01" inputmode="decimal" class="mt-1 w-full border border-gray-300 rounded-sm text-xs px-2 py-1 min-h-[40px]" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-gray-600">最低起步价 (元/模型)</label>
+                                        <input id="cfg-min-job-fee" type="number" step="0.01" inputmode="decimal" class="mt-1 w-full border border-gray-300 rounded-sm text-xs px-2 py-1 min-h-[40px]" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-gray-600">材料损耗 (%)</label>
+                                        <input id="cfg-material-waste" type="number" step="0.1" inputmode="decimal" class="mt-1 w-full border border-gray-300 rounded-sm text-xs px-2 py-1 min-h-[40px]" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-gray-600">支撑占比 (%)</label>
+                                        <input id="cfg-support-percent" type="number" step="0.1" inputmode="decimal" class="mt-1 w-full border border-gray-300 rounded-sm text-xs px-2 py-1 min-h-[40px]" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-gray-600">后处理费 (元/件)</label>
+                                        <input id="cfg-post-per-part" type="number" step="0.01" inputmode="decimal" class="mt-1 w-full border border-gray-300 rounded-sm text-xs px-2 py-1 min-h-[40px]" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-gray-600">时间固定开销 (分钟/件)</label>
+                                        <input id="cfg-time-overhead-min" type="number" step="0.1" inputmode="decimal" class="mt-1 w-full border border-gray-300 rounded-sm text-xs px-2 py-1 min-h-[40px]" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-gray-600">体积耗时 (分钟/cm³)</label>
+                                        <input id="cfg-time-vol-min-per-cm3" type="number" step="0.01" inputmode="decimal" class="mt-1 w-full border border-gray-300 rounded-sm text-xs px-2 py-1 min-h-[40px]" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-gray-600">支撑单价（元/克）</label>
+                                        <input id="cfg-support-price-per-g" type="number" step="0.001" inputmode="decimal" class="mt-1 w-full border border-gray-300 rounded-sm text-xs px-2 py-1 min-h-[40px]" />
+                                    </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="uc-tab-printer" class="uc-tab-pane hidden space-y-4">
+                                    <h5 class="text-sm font-medium text-gray-700">机型配置</h5>
+                                    <p class="text-xs text-gray-500">选择打印机型号和喷嘴直径，切片时将自动加载对应配置。</p>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md">
+                                        <div>
+                                            <label class="block text-xs text-gray-600">打印机型号 <span class="inline-flex items-center gap-1 ml-1 px-1.5 py-px rounded text-[10px] bg-amber-50 text-amber-700 border border-amber-200 font-normal">默认项<span class="text-gray-400 font-normal">· 点底部「保存设置」生效</span></span></label>
+                                            <select id="cfg-printer-model-main" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md text-sm">
+                                                <option value="">选择打印机...</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs text-gray-600">喷嘴直径 <span class="inline-flex items-center gap-1 ml-1 px-1.5 py-px rounded text-[10px] bg-amber-50 text-amber-700 border border-amber-200 font-normal">默认项<span class="text-gray-400 font-normal">· 点底部「保存设置」生效</span></span></label>
+                                            <select id="cfg-nozzle-diameter" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md text-sm">
+                                                <option value="">-- 请选择 --</option>
+                                                <option value="0.2">0.2 mm</option>
+                                                <option value="0.4" selected>0.4 mm</option>
+                                                <option value="0.6">0.6 mm</option>
+                                                <option value="0.8">0.8 mm</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div id="printer-bed-info" class="text-xs text-gray-400 mt-1"></div>
+
+                                    <!-- ── Printer detail info panel ── -->
+                                    <div id="printer-detail-panel" class="hidden mt-3 border border-gray-200 rounded-md p-3 bg-gray-50/50">
+                                        <h6 class="text-xs font-medium text-gray-700 mb-2">打印机参数</h6>
+                                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                            <div>
+                                                <span class="block text-[11px] text-gray-500">喷嘴直径</span>
+                                                <span id="pd-nozzle" class="text-sm font-medium text-gray-800">-</span>
+                                            </div>
+                                            <div>
+                                                <span class="block text-[11px] text-gray-500">热床尺寸</span>
+                                                <span id="pd-bed-size" class="text-sm font-medium text-gray-800">-</span>
+                                            </div>
+                                            <div>
+                                                <span class="block text-[11px] text-gray-500">打印体积</span>
+                                                <span id="pd-volume" class="text-sm font-medium text-gray-800">-</span>
+                                            </div>
+                                            <div>
+                                                <span class="block text-[11px] text-gray-500">可用喷嘴</span>
+                                                <span id="pd-nozzles" class="text-sm font-medium text-gray-800">-</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- ── Config import/export ── -->
+                                    <div class="border-t border-gray-200 pt-4 mt-4">
+                                        <div class="flex justify-between items-center mb-2">
+                                            <h6 class="text-xs font-medium text-gray-700">配置管理</h6>
+                                            <div class="flex items-center gap-2">
+                                                <button id="printer-config-export-btn" type="button" class="text-xs px-2 py-1 border border-blue-200 text-blue-600 rounded hover:bg-blue-50">导出配置</button>
+                                                <label class="text-xs px-2 py-1 border border-green-200 text-green-600 rounded hover:bg-green-50 cursor-pointer">
+                                                    导入配置
+                                                    <input id="printer-config-import-input" type="file" accept=".json" class="hidden">
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <p id="printer-config-msg" class="text-xs hidden mt-1"></p>
+                                    </div>
+
+                                    <!-- ── Printer presets management ── -->
+                                    <div class="border-t border-gray-200 pt-4 mt-4">
+                                        <div class="flex justify-between items-center mb-2">
+                                            <h6 class="text-xs font-medium text-gray-700">我的打印机预设</h6>
+                                            <button id="printer-preset-add-btn" type="button" class="text-xs text-indigo-600 hover:text-indigo-800">+ 新增</button>
+                                        </div>
+                                        <!-- Add form (hidden by default) -->
+                                        <div id="printer-preset-form" class="hidden border border-gray-200 rounded-md p-3 mb-3 space-y-2">
+                                            <div class="grid grid-cols-2 gap-2">
+                                                <div>
+                                                    <label class="text-[11px] text-gray-500">名称 <span class="text-red-500">*</span></label>
+                                                    <input id="pp-name" type="text" maxlength="60" class="w-full border border-gray-300 rounded-sm text-xs px-2 py-1 min-h-[40px]" placeholder="如：我的自定义打印机">
+                                                </div>
+                                                <div>
+                                                    <label class="text-[11px] text-gray-500">X轴 (mm)</label>
+                                                    <input id="pp-bed-x" type="number" inputmode="numeric" value="256" min="50" max="1000" class="w-full border border-gray-300 rounded-sm text-xs px-2 py-1 min-h-[40px]">
+                                                </div>
+                                                <div>
+                                                    <label class="text-[11px] text-gray-500">Y轴 (mm)</label>
+                                                    <input id="pp-bed-y" type="number" inputmode="numeric" value="256" min="50" max="1000" class="w-full border border-gray-300 rounded-sm text-xs px-2 py-1 min-h-[40px]">
+                                                </div>
+                                                <div>
+                                                    <label class="text-[11px] text-gray-500">Z轴 (mm)</label>
+                                                    <input id="pp-bed-z" type="number" inputmode="numeric" value="256" min="50" max="1000" class="w-full border border-gray-300 rounded-sm text-xs px-2 py-1 min-h-[40px]">
+                                                </div>
+                                            </div>
+                                            <div class="flex gap-2">
+                                                <button id="pp-save-btn" type="button" class="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded hover:bg-indigo-700 min-h-[40px] active:bg-indigo-800">保存</button>
+                                                <button id="pp-cancel-btn" type="button" class="text-xs px-3 py-1.5 border border-gray-300 text-gray-600 rounded hover:bg-gray-50 min-h-[40px] active:bg-gray-100">取消</button>
+                                            </div>
+                                        </div>
+                                        <!-- Preset table -->
+                                        <div class="overflow-x-auto border border-gray-200 rounded-md">
+                                            <table class="min-w-full text-xs text-left">
+                                                <thead class="bg-gray-50 text-gray-600">
+                                                    <tr>
+                                                        <th class="px-2 py-1.5">ID</th>
+                                                        <th class="px-2 py-1.5">名称</th>
+                                                        <th class="px-2 py-1.5">热床尺寸</th>
+                                                        <th class="px-2 py-1.5">喷嘴</th>
+                                                        <th class="px-2 py-1.5 w-10"></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="printer-presets-tbody" class="bg-white divide-y divide-gray-100">
+                                                    <tr><td colspan="3" class="px-2 py-3 text-gray-500">暂无预设</td></tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                    <!-- ── Printer visibility ── -->
+                                    <div class="border-t border-gray-200 pt-4 mt-4">
+                                        <div class="flex justify-between items-center mb-2">
+                                            <h6 class="text-xs font-medium text-gray-700">所有机型</h6>
+                                            <button id="printer-restore-defaults-btn" type="button" class="text-xs text-gray-500 hover:text-indigo-600">恢复默认</button>
+                                        </div>
+                                        <div id="printer-visibility-list" class="space-y-1 max-h-64 overflow-y-auto border border-gray-200 rounded-md p-2">
+                                            <span class="text-xs text-gray-400">加载中...</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div id="uc-tab-slicer" class="uc-tab-pane hidden space-y-5">
+                                    <h5 class="text-sm font-medium text-gray-700">切片配置</h5>
+                                    <p class="text-xs text-gray-500">选择一个预设查看参数，修改后可直接保存或另存为新预设。</p>
+
+                                    <!-- ── Preset selector bar ── -->
+                                    <div class="border border-indigo-200 bg-indigo-50/50 rounded-md p-3">
+                                        <div class="flex items-end gap-3 flex-wrap">
+                                            <div class="min-w-[200px]">
+                                                <label class="block text-[11px] text-gray-500">当前预设 <span class="inline-flex items-center gap-1 ml-1 px-1.5 py-px rounded text-[10px] bg-amber-50 text-amber-700 border border-amber-200 font-normal">默认项<span class="text-gray-400 font-normal">· 点底部「保存设置」生效</span></span></label>
+                                                <select id="gen-preset-select" class="mt-0.5 w-full border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
+                                                    <option value="">-- 新建 / 未选择 --</option>
+                                                </select>
+                                            </div>
+                                            <button id="gen-preset-save-btn" type="button" class="h-[30px] px-3 rounded-md bg-indigo-600 text-white text-xs hover:bg-indigo-700 whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed" disabled title="保存到当前预设">💾 保存</button>
+                                            <button id="gen-preset-saveas-btn" type="button" class="h-[30px] px-3 rounded-md bg-white border border-indigo-300 text-indigo-700 text-xs hover:bg-indigo-50 whitespace-nowrap">📋 另存为</button>
+                                            <div class="min-w-[180px]">
+                                                <label class="block text-[11px] text-gray-500">打印机型号 <span class="text-red-500">*</span></label>
+                                                <select id="gen-printer-model" class="mt-0.5 w-full border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
+                                                    <option value="">请选择打印机...</option>
+                                                </select>
+                                            </div>
+                                            <p id="slicer-presets-msg" class="text-xs hidden"></p>
+                                        </div>
+                                        <!-- Auto-generated name preview -->
+                                        <div id="gen-autoname-row" class="mt-2 hidden">
+                                            <span class="text-[11px] text-gray-500">预设名称（自动生成）：</span>
+                                            <code id="gen-autoname-preview" class="text-xs text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded font-mono"></code>
+                                        </div>
+                                    </div>
+
+                                    <!-- ── Parameters ── -->
+                                    <div class="border border-gray-200 rounded-md p-3 space-y-2">
+                                        <h6 class="text-xs font-medium text-gray-600 uppercase tracking-wide">层与外壳</h6>
+                                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                            <div>
+                                                <label class="text-[11px] text-gray-500">层高 (mm)</label>
+                                                <div class="flex items-center gap-1 mt-0.5">
+                                                    <select id="gen-layer-height" data-preset-param="layer_height" class="flex-1 border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
+                                                        <option value="0.08">0.08 精细</option><option value="0.10">0.10</option><option value="0.12">0.12</option><option value="0.16">0.16</option><option value="0.20" selected>0.20 标准</option><option value="0.28">0.28 快速</option><option value="0.32">0.32</option>
+                                                    </select>
+                                                    <button type="button" class="preset-undo-btn hidden flex-shrink-0 w-5 h-5 text-[10px] text-amber-600 hover:text-amber-800 hover:bg-amber-50 rounded-full inline-flex items-center justify-center" title="撤销修改" data-undo-for="gen-layer-height">↺</button>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label class="text-[11px] text-gray-500">外墙层数</label>
+                                                <div class="flex items-center gap-1 mt-0.5">
+                                                    <select id="gen-wall-count" data-preset-param="perimeters" class="flex-1 border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
+                                                        <option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="8">8</option>
+                                                    </select>
+                                                    <button type="button" class="preset-undo-btn hidden flex-shrink-0 w-5 h-5 text-[10px] text-amber-600 hover:text-amber-800 hover:bg-amber-50 rounded-full inline-flex items-center justify-center" title="撤销修改" data-undo-for="gen-wall-count">↺</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Infill -->
+                                    <div class="border border-gray-200 rounded-md p-3">
+                                        <h6 class="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2">填充</h6>
+                                        <div class="grid grid-cols-2 gap-2 max-w-xs">
+                                            <div>
+                                                <label class="text-[11px] text-gray-500">填充密度</label>
+                                                <div class="flex items-center gap-1 mt-0.5">
+                                                    <select id="gen-infill" data-preset-param="fill_density" class="flex-1 border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
+                                                        <option value="5">5%</option><option value="10">10%</option><option value="15">15%</option><option value="20" selected>20%</option><option value="25">25%</option><option value="30">30%</option><option value="40">40%</option><option value="50">50%</option><option value="60">60%</option><option value="80">80%</option><option value="100">100%</option>
+                                                    </select>
+                                                    <button type="button" class="preset-undo-btn hidden flex-shrink-0 w-5 h-5 text-[10px] text-amber-600 hover:text-amber-800 hover:bg-amber-50 rounded-full inline-flex items-center justify-center" title="撤销修改" data-undo-for="gen-infill">↺</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Saved presets list -->
+                                    <div>
+                                        <div class="flex justify-between items-center mb-1">
+                                            <label class="text-xs text-gray-600">所有已保存预设</label>
+                                            <div class="flex items-center gap-2">
+                                                <button id="slicer-presets-download-btn" type="button" class="text-xs px-2 py-0.5 border border-blue-200 text-blue-600 rounded hover:bg-blue-50 disabled:opacity-30 disabled:cursor-not-allowed" disabled>下载</button>
+                                                <button id="slicer-presets-delete-btn" type="button" class="text-xs px-2 py-0.5 border border-red-200 text-red-600 rounded hover:bg-red-50 disabled:opacity-30 disabled:cursor-not-allowed" disabled>删除</button>
+                                                <button id="slicer-presets-refresh-btn" type="button" class="text-xs text-indigo-600 hover:text-indigo-800">刷新</button>
+                                            </div>
+                                        </div>
+                                        <div class="overflow-x-auto border border-gray-200 rounded-md">
+                                            <table class="min-w-full text-xs text-left">
+                                                <thead class="bg-gray-50 text-gray-600">
+                                                    <tr>
+                                                        <th class="px-2 py-2 w-8"></th>
+                                                        <th class="px-2 py-2 w-16">ID</th>
+                                                        <th class="px-2 py-2">名称</th>
+                                                        <th class="px-2 py-2 w-16">格式</th>
+                                                        <th class="px-2 py-2 w-40">创建时间</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="slicer-presets-tbody" class="bg-white divide-y divide-gray-100">
+                                                    <tr><td colspan="5" class="px-2 py-3 text-gray-500">暂无预设</td></tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div id="uc-tab-preferences" class="uc-tab-pane hidden space-y-6">
+                                    <div>
+                                        <h5 class="text-sm font-medium text-gray-700 mb-3">偏好设置</h5>
+
+                                        <!-- 默认材料与颜色 -->
+                                        <div class="border border-gray-200 rounded-md p-3 mb-4">
+                                            <h6 class="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2">默认配置</h6>
+                                            <p class="text-xs text-gray-500 mb-2">设置后，新报价时将自动使用这些默认值。</p>
+                                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                <div>
+                                                    <label class="text-[11px] text-gray-500">默认材料</label>
+                                                    <select id="pref-default-material" class="mt-0.5 w-full border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
+                                                        <option value="">-- 不指定 --</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label class="text-[11px] text-gray-500">默认颜色</label>
+                                                    <div id="pref-default-color-wrapper" class="mt-0.5">
+                                                        <select id="pref-default-color" class="w-full border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
+                                                            <option value="">-- 不指定 --</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label class="text-[11px] text-gray-500">默认打印机</label>
+                                                    <select id="pref-default-printer" class="mt-0.5 w-full border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
+                                                        <option value="">-- 不指定 --</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label class="text-[11px] text-gray-500">默认数量</label>
+                                                    <input id="pref-default-quantity" type="number" min="1" max="9999" value="1" class="mt-0.5 w-full border border-gray-300 bg-white rounded-sm text-xs px-2 py-1" />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- 常用材料 -->
+                                        <div class="border border-gray-200 rounded-md p-3 mb-4">
+                                            <div class="flex justify-between items-center mb-2">
+                                                <h6 class="text-xs font-medium text-gray-600 uppercase tracking-wide">⭐ 常用材料</h6>
+                                                <span class="text-[10px] text-gray-400">勾选标记为常用，方便快速筛选</span>
+                                            </div>
+                                            <div id="pref-favorite-materials" class="space-y-1 max-h-48 overflow-y-auto">
+                                                <!-- dynamic -->
+                                            </div>
+                                        </div>
+
+                                        <!-- 常用颜色 -->
+                                        <div class="border border-gray-200 rounded-md p-3 mb-4">
+                                            <div class="flex justify-between items-center mb-2">
+                                                <h6 class="text-xs font-medium text-gray-600 uppercase tracking-wide">🎨 常用颜色</h6>
+                                                <span class="text-[10px] text-gray-400">在报价参数弹窗中点击颜色可收藏</span>
+                                            </div>
+                                            <div id="pref-favorite-colors" class="flex flex-wrap gap-2 max-h-36 overflow-y-auto">
+                                                <!-- dynamic -->
+                                            </div>
+                                        </div>
+
+                                        <!-- 使用统计 -->
+                                        <div class="border border-gray-200 rounded-md p-3 mb-4">
+                                            <h6 class="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2">📊 使用统计</h6>
+                                            <div id="pref-usage-stats">
+                                                <!-- dynamic -->
+                                            </div>
+                                        </div>
+
+                                        <!-- 公式模板 -->
+                                        <div class="border border-gray-200 rounded-md p-3 mb-4">
+                                            <div class="flex justify-between items-center mb-2">
+                                                <h6 class="text-xs font-medium text-gray-600 uppercase tracking-wide">报价公式模板</h6>
+                                                <button id="formula-templates-toggle-btn" type="button" class="text-xs text-indigo-600 hover:text-indigo-800">查看模板</button>
+                                            </div>
+                                            <div id="formula-templates-panel" class="hidden space-y-2">
+                                                <div class="text-[11px] text-gray-500 mb-2">点击模板名称可快速应用到「计算公式」页面。</div>
+                                                <div id="formula-templates-list" class="space-y-1">
+                                                    <!-- dynamic -->
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <!-- 报价历史偏好 -->
+                                        <div class="border border-gray-200 rounded-md p-3 mb-4">
+                                            <h6 class="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2">📋 报价历史偏好</h6>
+                                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                                                <div>
+                                                    <label class="text-[11px] text-gray-500">每页显示条数</label>
+                                                    <select id="pref-history-page-size" class="mt-0.5 w-full border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
+                                                        <option value="10">10 条</option>
+                                                        <option value="20" selected>20 条</option>
+                                                        <option value="50">50 条</option>
+                                                        <option value="100">100 条</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label class="text-[11px] text-gray-500">默认排序</label>
+                                                    <select id="pref-history-sort" class="mt-0.5 w-full border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
+                                                        <option value="newest">最新优先</option>
+                                                        <option value="oldest">最早优先</option>
+                                                        <option value="cost-desc">费用从高到低</option>
+                                                        <option value="cost-asc">费用从低到高</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label class="text-[11px] text-gray-500">自动清理</label>
+                                                    <select id="pref-history-retention" class="mt-0.5 w-full border border-gray-300 bg-white rounded-sm text-xs px-2 py-1">
+                                                        <option value="0">永不清理</option>
+                                                        <option value="30">30 天后</option>
+                                                        <option value="90">90 天后</option>
+                                                        <option value="180">180 天后</option>
+                                                        <option value="365">1 年后</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label class="text-[11px] text-gray-500">显示列</label>
+                                                    <div class="mt-0.5 flex flex-wrap gap-1">
+                                                        <label class="flex items-center gap-1 text-[10px]">
+                                                            <input type="checkbox" class="pref-history-col-cb rounded border-gray-300 text-indigo-600" value="material" checked />
+                                                            <span>材料</span>
+                                                        </label>
+                                                        <label class="flex items-center gap-1 text-[10px]">
+                                                            <input type="checkbox" class="pref-history-col-cb rounded border-gray-300 text-indigo-600" value="quantity" checked />
+                                                            <span>数量</span>
+                                                        </label>
+                                                        <label class="flex items-center gap-1 text-[10px]">
+                                                            <input type="checkbox" class="pref-history-col-cb rounded border-gray-300 text-indigo-600" value="dimensions" />
+                                                            <span>尺寸</span>
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="flex flex-wrap gap-2">
+                                                <button id="pref-history-export-btn" type="button" class="text-xs px-2 py-1 border border-blue-200 text-blue-600 rounded hover:bg-blue-50">📥 导出历史</button>
+                                                <button id="pref-history-clear-btn" type="button" class="text-xs px-2 py-1 border border-red-200 text-red-500 rounded hover:bg-red-50">🗑️ 清空历史</button>
+                                            </div>
+                                            <p id="pref-history-msg" class="text-xs hidden mt-2"></p>
+                                        </div>
+
+                                        <!-- 导入导出与重置 -->
+                                        <div class="border border-gray-200 rounded-md p-3">
+                                            <h6 class="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2">配置管理</h6>
+                                            <div class="flex flex-wrap gap-2 mb-3">
+                                                <button id="pref-export-btn" type="button" class="text-xs px-3 py-1.5 border border-blue-200 text-blue-600 rounded hover:bg-blue-50">📥 导出配置</button>
+                                                <button id="pref-import-btn" type="button" class="text-xs px-3 py-1.5 border border-green-200 text-green-600 rounded hover:bg-green-50">📤 导入配置</button>
+                                                <input id="pref-import-file" type="file" accept=".json" class="hidden" />
+                                            </div>
+                                            <div class="border-t border-gray-100 pt-3">
+                                                <p class="text-[11px] text-gray-500 mb-2">重置各模块到系统默认值（不可撤销）。</p>
+                                                <div class="flex flex-wrap gap-2">
+                                                    <button id="pref-reset-materials" type="button" class="text-xs px-2 py-1 border border-red-200 text-red-500 rounded hover:bg-red-50">重置材料</button>
+                                                    <button id="pref-reset-pricing" type="button" class="text-xs px-2 py-1 border border-red-200 text-red-500 rounded hover:bg-red-50">重置价格</button>
+                                                    <button id="pref-reset-printer" type="button" class="text-xs px-2 py-1 border border-red-200 text-red-500 rounded hover:bg-red-50">重置打印机</button>
+                                                    <button id="pref-reset-all" type="button" class="text-xs px-2 py-1 border border-red-300 text-red-600 rounded hover:bg-red-50 font-medium">全部重置</button>
+                                                </div>
+                                            </div>
+                                            <p id="pref-action-msg" class="text-xs hidden mt-2"></p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div id="uc-tab-security" class="uc-tab-pane hidden space-y-6">
+                                    <div>
+                                        <h5 class="text-sm font-medium text-gray-700 mb-4">修改密码</h5>
+                                        <div class="max-w-sm space-y-3">
+                                            <div>
+                                                <label class="block text-xs text-gray-600">原密码</label>
+                                                <input id="uc-old-password" type="password" autocomplete="current-password" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md text-sm min-h-[44px]" placeholder="请输入原密码" />
+                                                <span id="uc-old-password-hint" class="form-field-hint hidden"></span>
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs text-gray-600">新密码</label>
+                                                <input id="uc-new-password" type="password" autocomplete="new-password" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md text-sm min-h-[44px]" placeholder="请输入新密码（至少6位）" />
+                                                <span id="uc-new-password-hint" class="form-field-hint hidden"></span>
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs text-gray-600">确认新密码</label>
+                                                <input id="uc-confirm-password" type="password" autocomplete="new-password" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md text-sm min-h-[44px]" placeholder="请再次输入新密码" />
+                                                <span id="uc-confirm-password-hint" class="form-field-hint hidden"></span>
+                                            </div>
+                                            <p id="uc-password-msg" class="text-xs hidden"></p>
+                                            <button id="uc-change-password-btn" type="button" class="w-full py-2 px-3 rounded-md bg-indigo-600 text-white text-sm hover:bg-indigo-700 min-h-[44px] active:bg-indigo-800 transition-colors">更新密码</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="px-4 py-3 border-t border-gray-200 flex justify-between items-center bg-gray-50">
+                            <div id="user-center-hint" class="text-xs text-gray-500 invisible">提示：修改密码后需重新登录</div>
+                            <div class="flex items-center gap-4">
+                                <p id="user-center-msg" class="text-xs text-green-600 hidden">保存成功</p>
+                                <button id="user-center-save-btn" type="button" class="py-2 px-4 rounded-md bg-indigo-600 text-white text-sm hover:bg-indigo-700 min-h-[44px] active:bg-indigo-800 transition-colors">保存设置</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+

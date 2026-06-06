@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+    <title>3D打印自动报价系统 - 在线STL/STEP模型即时报价 | Pricer3D</title>
+    <meta name="description" content="Pricer3D是专业的3D打印自动报价平台，支持STL、STEP、OBJ、3MF等多种3D模型格式在线即时报价。基于PrusaSlicer切片引擎精确计算，提供FDM打印材料、价格、时间一站式报价服务。">
+    <meta name="keywords" content="3D打印报价,3D打印自动报价,STL报价,3D打印价格计算,FDM报价,3D打印在线报价,3D模型报价,3D打印服务,快速报价,PrusaSlicer">
+    <meta name="author" content="Pricer3D">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://pricer3d.top/">
+    <meta property="og:title" content="3D打印自动报价系统 - 在线STL/STEP模型即时报价">
+    <meta property="og:description" content="上传3D模型文件，即时获取FDM打印报价。支持STL、STEP、OBJ、3MF等格式，精确切片计算价格与时间。">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="3D打印自动报价系统 - Pricer3D">
+    <meta name="twitter:description" content="在线3D打印自动报价平台，上传模型即刻获得精确报价。">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class' };
+    </script>
+    <!-- Dark theme injected by JS after Tailwind CDN loads -->
+    <style id="dark-theme" disabled></style>
+    <link rel="stylesheet" href="/static/css/onboarding.css?v=1">
+    <link rel="stylesheet" href="/static/css/mobile.css?v=1">
+    <link rel="stylesheet" href="/static/css/table-enhancements.css?v=1">
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "/static/js/vendor/three.module.js",
+                "three/addons/": "/static/js/vendor/addons/"
+            }
+        }
+    </script>
+    <!-- JSON-LD Structured Data: Organization + WebApplication -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "Pricer3D",
+        "url": "https://pricer3d.top",
+        "logo": "https://pricer3d.top/static/img/logo.png",
+        "description": "Pricer3D是专业的3D打印自动报价平台，支持STL、STEP、OBJ、3MF等多种3D模型格式在线即时报价。",
+        "sameAs": [],
+        "contactPoint": {
+            "@type": "ContactPoint",
+            "email": "support@pricer3d.com",
+            "contactType": "customer service",
+            "availableLanguage": ["Chinese", "English"]
+        }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Pricer3D - 3D打印自动报价系统",
+        "url": "https://pricer3d.top",
+        "description": "上传3D模型文件，即时获取FDM打印报价。支持STL、STEP、OBJ、3MF等格式，基于PrusaSlicer切片引擎精确计算价格与时间。",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web",
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "CNY",
+            "description": "免费在线3D打印自动报价"
+        },
+        "featureList": [
+            "STL/STEP/OBJ/3MF格式支持",
+            "PrusaSlicer切片引擎精确计算",
+            "多种FDM材料报价",
+            "批量报价与折扣",
+            "3D模型在线预览",
+            "自定义切片预设"
+        ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        "name": "3D打印自动报价服务",
+        "description": "上传STL、STEP、OBJ、3MF等3D模型文件，即时获取FDM打印报价。基于PrusaSlicer切片引擎精确计算打印时间、材料用量和费用。",
+        "brand": {
+            "@type": "Brand",
+            "name": "Pricer3D"
+        },
+        "category": "3D打印服务",
+        "image": "https://pricer3d.top/static/img/og-image.png",
+        "url": "https://pricer3d.top/",
+        "offers": {
+            "@type": "AggregateOffer",
+            "priceCurrency": "CNY",
+            "lowPrice": "0",
+            "highPrice": "9999",
+            "offerCount": "5",
+            "offers": [
+                {
+                    "@type": "Offer",
+                    "name": "PLA材料打印",
+                    "price": "0.05",
+                    "priceCurrency": "CNY",
+                    "priceSpecification": {
+                        "@type": "UnitPriceSpecification",
+                        "price": "0.05",
+                        "priceCurrency": "CNY",
+                        "unitText": "克"
+                    },
+                    "description": "PLA材料FDM打印，适合原型和展示模型"
+                },
+                {
+                    "@type": "Offer",
+                    "name": "PETG材料打印",
+                    "price": "0.08",
+                    "priceCurrency": "CNY",
+                    "priceSpecification": {
+                        "@type": "UnitPriceSpecification",
+                        "price": "0.08",
+                        "priceCurrency": "CNY",
+                        "unitText": "克"
+                    },
+                    "description": "PETG材料FDM打印，耐温韧性好"
+                },
+                {
+                    "@type": "Offer",
+                    "name": "ABS材料打印",
+                    "price": "0.07",
+                    "priceCurrency": "CNY",
+                    "priceSpecification": {
+                        "@type": "UnitPriceSpecification",
+                        "price": "0.07",
+                        "priceCurrency": "CNY",
+                        "unitText": "克"
+                    },
+                    "description": "ABS材料FDM打印，耐热可后处理"
+                }
+            ]
+        },
+        "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "4.8",
+            "reviewCount": "120",
+            "bestRating": "5",
+            "worstRating": "1"
+        },
+        "review": [
+            {
+                "@type": "Review",
+                "author": {
+                    "@type": "Person",
+                    "name": "用户"
+                },
+                "reviewRating": {
+                    "@type": "Rating",
+                    "ratingValue": "5",
+                    "bestRating": "5"
+                },
+                "reviewBody": "报价速度快，价格准确，支持多种材料选择。"
+            }
+        ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "首页",
+                "item": "https://pricer3d.top/"
+            }
+        ]
+    }
+    </script>
+</head>

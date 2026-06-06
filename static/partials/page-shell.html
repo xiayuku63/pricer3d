@@ -1,0 +1,390 @@
+<body class="bg-gray-50 min-h-screen p-4 lg:p-6" style="padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left))">
+    <!-- ── Mobile Hamburger Menu ── -->
+    <button id="mobile-menu-btn" type="button" class="lg:hidden fixed top-3 left-3 z-40 p-2 rounded-lg bg-white shadow-md border border-gray-200 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-gray-50 active:bg-gray-100 transition-colors" aria-label="菜单" aria-expanded="false" aria-controls="mobile-nav-drawer">
+        <svg id="hamburger-icon" class="w-6 h-6 text-gray-700 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+        <svg id="close-icon" class="w-6 h-6 text-gray-700 transition-transform duration-200 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+    </button>
+
+    <!-- ── Mobile Navigation Drawer (slides from left) ── -->
+    <div id="mobile-nav-backdrop" class="lg:hidden fixed inset-0 bg-black/40 z-40 opacity-0 pointer-events-none transition-opacity duration-300"></div>
+    <nav id="mobile-nav-drawer" class="lg:hidden fixed top-0 left-0 bottom-0 w-[280px] max-w-[80vw] bg-white z-50 shadow-2xl transform -translate-x-full transition-transform duration-300 flex flex-col overflow-y-auto overscroll-contain" role="navigation" aria-label="主导航">
+        <!-- Drawer Header -->
+        <div class="flex items-center justify-between p-4 border-b border-gray-200">
+            <h2 class="text-lg font-bold text-gray-900">3D打印报价</h2>
+            <button id="mobile-nav-close-btn" type="button" class="p-2 rounded-lg hover:bg-gray-100 active:bg-gray-200 min-w-[44px] min-h-[44px] flex items-center justify-center transition-colors" aria-label="关闭菜单">
+                <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+
+        <!-- Navigation Items -->
+        <div class="flex-1 p-3 space-y-1">
+            <!-- Main page (quote) -->
+            <a href="/" class="mobile-nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 active:bg-indigo-100 transition-colors min-h-[48px]" data-page="quote">
+                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                <span>在线报价</span>
+            </a>
+
+            <!-- Quote History -->
+            <button id="mobile-open-quote-history-btn" type="button" class="mobile-nav-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 active:bg-indigo-100 transition-colors min-h-[48px]" data-page="history">
+                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span>报价历史</span>
+            </button>
+
+            <!-- Membership -->
+            <button id="mobile-open-membership-btn" type="button" class="mobile-nav-item hidden w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-amber-700 hover:bg-amber-50 active:bg-amber-100 transition-colors min-h-[48px]" data-page="membership">
+                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+                <span>会员服务</span>
+            </button>
+
+            <!-- User Center -->
+            <button id="mobile-open-user-center-btn" type="button" class="mobile-nav-item hidden w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 active:bg-indigo-100 transition-colors min-h-[48px]" data-page="user-center">
+                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                <span>用户中心</span>
+            </button>
+
+            <!-- Admin Users -->
+            <button id="mobile-open-admin-users-btn" type="button" class="mobile-nav-item hidden w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 active:bg-indigo-100 transition-colors min-h-[48px]" data-page="admin">
+                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                <span>用户管理</span>
+            </button>
+
+            <!-- FAQ -->
+            <a href="/faq" class="mobile-nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 active:bg-indigo-100 transition-colors min-h-[48px]">
+                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span>常见问题</span>
+            </a>
+
+            <div class="border-t border-gray-100 my-2"></div>
+
+            <!-- Language Switch -->
+            <button id="mobile-lang-switch-btn" type="button" class="mobile-nav-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors min-h-[48px]">
+                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span id="mobile-lang-label">🇨🇳 中文</span>
+            </button>
+        </div>
+
+        <!-- Drawer Footer: Login / Logout -->
+        <div class="p-3 border-t border-gray-200 space-y-1">
+            <button id="mobile-open-login-btn" type="button" class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 transition-colors min-h-[48px]">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/></svg>
+                登录
+            </button>
+            <button id="mobile-logout-btn" type="button" class="hidden w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium text-red-600 border border-red-200 hover:bg-red-50 active:bg-red-100 transition-colors min-h-[48px]">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                退出登录
+            </button>
+        </div>
+
+        <!-- App version -->
+        <div class="px-4 py-2 text-center">
+            <span id="mobile-app-version" class="text-[10px] text-gray-400"></span>
+        </div>
+    </nav>
+
+    <div class="max-w-[1600px] mx-auto bg-white rounded-xl shadow-md overflow-hidden">
+        <div class="p-5 sm:p-8">
+            <div class="flex flex-col sm:flex-row items-start sm:justify-between gap-4 mb-6">
+                <div class="w-full sm:w-auto">
+                    <div class="uppercase tracking-wide text-sm text-indigo-500 font-semibold mb-1">3D Printing Parts Automated Quoting System</div>
+                    <h2 class="text-2xl font-bold text-gray-900 inline">3D打印件自动报价系统</h2>
+                    <span id="app-version" class="ml-2 px-2 py-0.5 text-xs font-mono rounded-full bg-gray-100 text-gray-500 align-middle">—</span>
+                </div>
+                <div id="auth-area" class="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full sm:w-auto sm:justify-end">
+                    <a href="/faq" class="w-full sm:w-auto text-sm px-3 py-2.5 sm:py-1.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 min-h-[44px] sm:min-h-0 text-center">FAQ</a>
+                    <button id="lang-switch-btn" type="button" class="w-full sm:w-auto text-sm px-3 py-2.5 sm:py-1.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 min-h-[44px] sm:min-h-0">🇨🇳 中文</button>
+                    <button id="open-login-btn" type="button" class="w-full sm:w-auto text-sm px-3 py-2.5 sm:py-1.5 border border-indigo-200 text-indigo-700 rounded-md hover:bg-indigo-50 min-h-[44px] sm:min-h-0">登录</button>
+                    <button id="open-membership-btn" type="button" class="hidden w-full sm:w-auto text-sm px-3 py-2.5 sm:py-1.5 border border-amber-300 text-amber-700 rounded-md hover:bg-amber-50 font-medium bg-amber-50/50 min-h-[44px] sm:min-h-0">会员服务</button>
+                    <div id="user-menu" class="hidden relative w-full sm:w-auto">
+                        <button id="user-menu-btn" type="button" class="w-full sm:w-auto text-sm px-3 py-2.5 sm:py-1.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 min-h-[44px] sm:min-h-0"></button>
+                        <div id="user-dropdown" class="hidden absolute right-0 mt-2 w-40 rounded-md border border-gray-200 bg-white shadow-lg z-20">
+                            <button id="open-admin-users-btn" type="button" class="hidden w-full text-left text-xs px-3 py-2.5 hover:bg-gray-50 min-h-[44px]">用户管理</button>
+                            <button id="open-user-center-btn" type="button" class="w-full text-left text-xs px-3 py-2.5 hover:bg-gray-50 min-h-[44px]">用户中心</button>
+                            <button id="open-quote-history-btn" type="button" class="w-full text-left text-xs px-3 py-2.5 hover:bg-gray-50 min-h-[44px]">报价历史</button>
+                            <button id="logout-btn" type="button" class="w-full text-left text-xs px-3 py-2.5 text-red-600 hover:bg-red-50 min-h-[44px]">退出登录</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="space-y-6">
+            <!-- 结果展示区 -->
+            <div id="result-container" class="w-full">
+                <h3 class="text-lg leading-6 font-medium text-gray-900 mb-3" data-i18n="quote.quoteResults">报价结果</h3>
+                <!-- 增强版报价摘要面板 -->
+                <div id="quote-summary-panel" class="bg-white overflow-hidden shadow-lg rounded-2xl border border-gray-200 hidden">
+                    <!-- 顶部核心指标 -->
+                    <div class="bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-500 px-5 py-4 text-white">
+                        <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+                            <div>
+                                <p class="text-indigo-200 text-xs font-medium mb-1">报价总额</p>
+                                <div class="flex items-baseline gap-2">
+                                    <span class="text-3xl sm:text-4xl font-bold tracking-tight" id="panel-total-cost">¥ 0.00</span>
+                                    <span class="text-indigo-200 text-xs" id="panel-unit-hint"></span>
+                                </div>
+                            </div>
+                            <div class="flex gap-4 sm:gap-6 text-center">
+                                <div>
+                                    <p class="text-indigo-200 text-[10px] mb-0.5">文件</p>
+                                    <p class="text-lg font-semibold" id="panel-file-count">0</p>
+                                </div>
+                                <div class="border-l border-indigo-400/30 pl-4 sm:pl-6">
+                                    <p class="text-indigo-200 text-[10px] mb-0.5">成功</p>
+                                    <p class="text-lg font-semibold text-emerald-300" id="panel-success-count">0</p>
+                                </div>
+                                <div class="border-l border-indigo-400/30 pl-4 sm:pl-6">
+                                    <p class="text-indigo-200 text-[10px] mb-0.5">失败</p>
+                                    <p class="text-lg font-semibold text-rose-300" id="panel-fail-count">0</p>
+                                </div>
+                                <div class="border-l border-indigo-400/30 pl-4 sm:pl-6">
+                                    <p class="text-indigo-200 text-[10px] mb-0.5">总时间</p>
+                                    <p class="text-sm font-semibold" id="panel-total-time">-</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 费用构成 + 材料分布 -->
+                    <div class="px-5 py-3 grid grid-cols-1 sm:grid-cols-2 gap-3 bg-gray-50/50">
+                        <!-- 费用构成条 -->
+                        <div>
+                            <p class="text-[10px] font-semibold text-gray-500 mb-2 flex items-center gap-1">
+                                <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                                费用构成
+                            </p>
+                            <div id="panel-cost-bar" class="flex h-3 rounded-full overflow-hidden bg-gray-200 mb-1.5"></div>
+                            <div id="panel-cost-legend" class="flex flex-wrap gap-x-3 gap-y-0.5"></div>
+                        </div>
+                        <!-- 材料分布 -->
+                        <div>
+                            <p class="text-[10px] font-semibold text-gray-500 mb-2 flex items-center gap-1">
+                                <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                                材料分布
+                            </p>
+                            <div id="panel-material-dist" class="flex flex-wrap gap-1.5"></div>
+                        </div>
+                    </div>
+                </div>
+                <!-- 兼容旧的摘要元素（隐藏但保留，供JS引用） -->
+                <div class="hidden">
+                    <span id="sum-total-files">-</span>
+                    <span id="sum-status">-</span>
+                    <span id="sum-total-cost">-</span>
+                    <span id="sum-total-time">-</span>
+                </div>
+                <!-- 旧版摘要（fallback，无panel时显示） -->
+                <div id="legacy-summary" class="bg-gray-50 overflow-hidden shadow rounded-lg border border-gray-200">
+                    <div class="px-4 py-5 sm:p-6">
+                        <dl class="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-4">
+                            <div>
+                                <dt class="text-sm font-medium text-gray-500" data-i18n="quote.totalFiles">文件总数</dt>
+                                <dd class="mt-1 text-sm text-gray-900" id="sum-total-files-legacy">-</dd>
+                            </div>
+                            <div>
+                                <dt class="text-sm font-medium text-gray-500" data-i18n="quote.successFail">成功 / 失败</dt>
+                                <dd class="mt-1 text-sm text-gray-900" id="sum-status-legacy">-</dd>
+                            </div>
+                            <div>
+                                <dt class="text-sm font-medium text-gray-500" data-i18n="quote.totalCostCNY">总费用 (CNY)</dt>
+                                <dd class="mt-1 text-2xl font-semibold text-indigo-600" id="sum-total-cost-legacy">-</dd>
+                            </div>
+                            <div>
+                                <dt class="text-sm font-medium text-gray-500" data-i18n="quote.totalTime">总时间</dt>
+                                <dd class="mt-1 text-sm text-gray-900" id="sum-total-time-legacy">-</dd>
+                            </div>
+                        </dl>
+
+                        <!-- 批量设置工具栏 -->
+                        <div id="batch-edit-bar" class="mt-4 flex items-center gap-3 p-3 bg-indigo-50 border border-indigo-200 rounded-lg flex-wrap">
+                            <span class="text-xs font-medium text-indigo-700 whitespace-nowrap" data-i18n="quote.batchSettings">批量设置：</span>
+                            <div class="flex items-center gap-1.5">
+                                <label class="text-[11px] text-gray-600" data-i18n="quote.printerModel">打印机</label>
+                                <select id="batch-printer-model" class="text-[11px] border border-gray-300 rounded px-2 py-1 bg-white max-w-[155px]"></select>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <label class="text-[11px] text-gray-600" data-i18n="quote.nozzleDiameter">喷嘴</label>
+                                <select id="batch-nozzle-diameter" class="text-[11px] border border-gray-300 rounded px-2 py-1 bg-white w-[60px]">
+                                    <option value="">--</option>
+                                    <option value="0.2">0.2</option><option value="0.4" selected>0.4</option><option value="0.6">0.6</option><option value="0.8">0.8</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <label class="text-[11px] text-gray-600" data-i18n="quote.preset">预设</label>
+                                <select id="batch-slicer-preset" class="text-[11px] border border-gray-300 rounded px-2 py-1 bg-white max-w-[160px]">
+                                    <option value="">不使用预设</option>
+                                </select>
+                                <span id="batch-preset-params" class="text-[10px] text-gray-400 hidden"></span>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <label class="text-[11px] text-gray-600" data-i18n="quote.material">材料</label>
+                                <select id="batch-material" class="text-[11px] border border-gray-300 rounded px-2 py-1 bg-white"></select>
+                            </div>
+                            <div class="flex items-center gap-1.5" id="batch-color-cell">
+                                <label class="text-[11px] text-gray-600" data-i18n="quote.color">颜色</label>
+                                <div id="batch-color-dropdown"></div>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <label class="text-[11px] text-gray-600" data-i18n="quote.quantity">数量</label>
+                                <input id="batch-quantity" type="number" min="1" value="1" class="w-16 text-[11px] border border-gray-300 rounded px-2 py-1" />
+                            </div>
+                            <button id="batch-apply-btn" type="button" class="text-[11px] px-3 py-1.5 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors whitespace-nowrap" data-i18n="quote.applyToAll">应用到全部</button>
+                            <span id="batch-msg" class="text-[11px] text-indigo-600 hidden"></span>
+                        </div>
+
+                        <!-- 导出按钮组 -->
+                        <div class="mt-4 flex items-center gap-2 flex-wrap">
+                            <button id="export-csv-btn" type="button" class="inline-flex items-center gap-1.5 text-[11px] px-3 py-1.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                <span>导出 CSV</span>
+                            </button>
+                            <button id="export-excel-btn" type="button" class="inline-flex items-center gap-1.5 text-[11px] px-3 py-1.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                <span>导出 Excel</span>
+                            </button>
+                        </div>
+
+                        <!-- 桌面端：表格布局（lg 及以上） -->
+                        <div class="mt-4 overflow-x-auto hidden lg:block">
+                            <table class="min-w-full text-[11px] text-left border border-gray-200 rounded-md overflow-hidden">
+                                <thead class="bg-gray-100 text-gray-700">
+                                    <tr>
+                                        <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="filename" data-i18n="quote.filename">文件名 <span class="sort-arrow text-gray-400 text-[9px]"></span></th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap" data-i18n="common.preview">预览</th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="printer_model" data-i18n="quote.printerModel">打印机 <span class="sort-arrow text-gray-400 text-[9px]"></span></th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap" data-i18n="quote.preset">预设</th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="material" data-i18n="quote.material">材料 <span class="sort-arrow text-gray-400 text-[9px]"></span></th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="color" data-i18n="quote.color">颜色 <span class="sort-arrow text-gray-400 text-[9px]"></span></th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="quantity" data-i18n="quote.quantity">数量 <span class="sort-arrow text-gray-400 text-[9px]"></span></th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap" data-i18n="quote.geometry">几何信息</th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="weight" data-i18n="quote.weight">重量（单件/总） <span class="sort-arrow text-gray-400 text-[9px]"></span></th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="time" data-i18n="quote.time">时间（单件/总） <span class="sort-arrow text-gray-400 text-[9px]"></span></th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="price" data-i18n="quote.price">价格（单价/总价） <span class="sort-arrow text-gray-400 text-[9px]"></span></th>
+                                        <th class="px-2 py-1.5 min-w-[160px] max-w-[260px] cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="status" data-i18n="quote.status">状态/错误 <span class="sort-arrow text-gray-400 text-[9px]"></span></th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap" data-i18n="quote.actions">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="batch-results-body" class="bg-white">
+                                    <tr class="border-t border-gray-100">
+                                        <td class="px-2 py-2 text-gray-500" colspan="12" data-i18n="quote.noDataUpload">暂无数据，请在表格底部上传并自动报价</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <div id="table-pagination" class="flex items-center justify-between px-2 py-2 border-t border-gray-200 bg-gray-50 text-[11px] hidden">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-gray-500">每页</span>
+                                    <select id="page-size-select" class="border border-gray-300 rounded px-1 py-0.5 text-[11px] bg-white">
+                                        <option value="10">10</option>
+                                        <option value="20" selected>20</option>
+                                        <option value="50">50</option>
+                                        <option value="100">100</option>
+                                    </select>
+                                    <span class="text-gray-500">条</span>
+                                    <span id="page-info" class="text-gray-600 ml-2"></span>
+                                </div>
+                                <div class="flex items-center gap-1">
+                                    <button id="page-first" class="px-2 py-0.5 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed" disabled>«</button>
+                                    <button id="page-prev" class="px-2 py-0.5 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed" disabled>‹</button>
+                                    <div id="page-buttons" class="flex items-center gap-1"></div>
+                                    <button id="page-next" class="px-2 py-0.5 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed" disabled>›</button>
+                                    <button id="page-last" class="px-2 py-0.5 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed" disabled>»</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 材料特性说明 -->
+                        <div id="material-info-section" class="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
+                            <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
+                                <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                材料特性说明
+                            </h4>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                                <div class="flex items-start gap-2 p-2.5 bg-white rounded-md border border-gray-100">
+                                    <span class="inline-block w-2.5 h-2.5 rounded-full bg-green-400 mt-0.5 flex-shrink-0"></span>
+                                    <div>
+                                        <p class="font-medium text-gray-800">PLA</p>
+                                        <p class="text-gray-500 mt-0.5">易打印、表面光滑、适合原型和展示模型，不耐高温（~60°C）</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-start gap-2 p-2.5 bg-white rounded-md border border-gray-100">
+                                    <span class="inline-block w-2.5 h-2.5 rounded-full bg-blue-400 mt-0.5 flex-shrink-0"></span>
+                                    <div>
+                                        <p class="font-medium text-gray-800">PETG</p>
+                                        <p class="text-gray-500 mt-0.5">韧性好、耐化学、耐温~80°C，兼顾强度与打印性</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-start gap-2 p-2.5 bg-white rounded-md border border-gray-100">
+                                    <span class="inline-block w-2.5 h-2.5 rounded-full bg-orange-400 mt-0.5 flex-shrink-0"></span>
+                                    <div>
+                                        <p class="font-medium text-gray-800">ABS</p>
+                                        <p class="text-gray-500 mt-0.5">耐热~100°C、可丙酮抛光，适合功能性零件，需封闭打印环境</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 移动端：卡片布局（lg 以下） -->
+                        <div id="batch-results-cards" class="mt-4 space-y-3 lg:hidden">
+                            <p class="text-sm text-gray-500 text-center py-4" data-i18n="quote.noDataUpload">暂无数据，请在下方上传并自动报价</p>
+                        </div>
+
+                        <!-- 上传区域（独立于表格，所有屏幕尺寸可见） -->
+                        <div class="mt-4">
+                            <form id="quote-form" class="space-y-3">
+                                <div class="mt-1 flex flex-col items-center justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md bg-gray-50 hover:bg-gray-100 transition-all duration-200 cursor-pointer" id="drop-zone">
+                                    <div class="space-y-1 text-center w-full">
+                                        <!-- 拖拽图标 -->
+                                        <div id="drop-icon" class="transition-transform duration-200">
+                                            <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                                                <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                            </svg>
+                                        </div>
+                                        <div class="flex text-sm text-gray-600 justify-center">
+                                            <label for="file-upload" class="relative cursor-pointer rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500" onclick="event.stopPropagation()">
+                                                <span data-i18n="quote.selectFile">选择文件</span>
+                                                <input id="file-upload" name="files" type="file" class="sr-only" accept=".stl,.stp,.step,.obj,.3mf,.zip" multiple required>
+                                            </label>
+                                        </div>
+                                        <p id="file-name" class="text-xs text-gray-500 mt-2" data-i18n="quote.noFileSelected">未选择文件（最多20个，单文件需小于100MB）</p>
+                                        <div class="text-sm font-medium text-gray-700 mt-2" data-i18n="quote.uploadModels">上传 3D 模型（stl/stp/step/obj/3mf，最多20个，单文件&lt;100MB）</div>
+
+                                        <!-- 上传进度条 -->
+                                        <div id="upload-progress-container" class="hidden mt-3 w-full max-w-md mx-auto">
+                                            <div class="flex items-center justify-between mb-1">
+                                                <span id="upload-progress-label" class="text-xs text-gray-600">上传中...</span>
+                                                <span id="upload-progress-percent" class="text-xs font-medium text-indigo-600">0%</span>
+                                            </div>
+                                            <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                                                <div id="upload-progress-bar" class="bg-indigo-600 h-2 rounded-full transition-all duration-300 ease-out" style="width: 0%"></div>
+                                            </div>
+                                            <div id="upload-progress-detail" class="text-[10px] text-gray-400 mt-1"></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 文件预览缩略图区域 -->
+                                <div id="file-preview-chips" class="hidden mt-2 flex flex-wrap gap-2"></div>
+
+                                <!-- Toast 通知容器 -->
+                                <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+                                </div>
+
+                                <div class="mt-4 flex flex-col items-center justify-center gap-3">
+                                    <p class="text-xs text-indigo-600 mt-2 bg-indigo-50 px-3 py-1 rounded-full flex items-center gap-1">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                                        PrusaSlicer 切片精确估算已启用
+                                    </p>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            </div>
+            
+            <!-- 错误提示 -->
+            <div id="error-container" class="mt-4 hidden p-4 bg-red-50 border-l-4 border-red-400 rounded-md">
+                <p class="text-sm text-red-700 font-medium" id="error-msg"></p>
+            </div>
+
+            <!-- 登录弹窗 — GitHub 风格（多视图：登录 / 忘记密码 / 重置确认） -->

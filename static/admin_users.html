@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>用户管理 - 3D打印自动报价系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen p-4 lg:p-6">
+    <style>
+        @media (max-width: 640px) {
+            body { padding: 8px; overflow-x: hidden; }
+            .p-8 { padding: 16px !important; }
+            h2.text-2xl { font-size: 1.25rem; }
+            .uppercase.tracking-wide.text-sm { font-size: 0.65rem; }
+            .tab-btn {
+                min-height: 40px;
+                padding: 8px 16px;
+                font-size: 0.875rem;
+                touch-action: manipulation;
+            }
+            #search-input, #audit-q, #audit-action, #audit-username {
+                min-height: 44px;
+                font-size: 1rem;
+                padding: 10px 12px;
+            }
+            #search-btn, #audit-search-btn, #metrics-refresh-btn, #cleanup-btn {
+                min-height: 44px;
+                min-width: 44px;
+                font-size: 0.875rem;
+                padding: 10px 16px;
+            }
+            a[href="/"] {
+                min-height: 44px;
+                display: inline-flex;
+                align-items: center;
+                padding: 10px 12px;
+                font-size: 0.875rem;
+            }
+            .grid-cols-\[1fr\,auto\] {
+                grid-template-columns: 1fr;
+            }
+            .grid-cols-\[1fr\,auto\] button {
+                width: 100%;
+            }
+            table { font-size: 0.6875rem; }
+            table th, table td { padding: 6px 8px; white-space: nowrap; }
+            .overflow-x-auto { -webkit-overflow-scrolling: touch; }
+        }
+    </style>
+    <div class="max-w-6xl mx-auto bg-white rounded-xl shadow-md overflow-hidden">
+        <div class="p-8 space-y-5">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <div class="uppercase tracking-wide text-sm text-indigo-500 font-semibold mb-1">3D Printing Parts Automated Quoting System</div>
+                    <h2 class="text-2xl font-bold text-gray-900">用户管理</h2>
+                </div>
+                <a href="/" class="text-sm px-3 py-2.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 min-h-[44px] inline-flex items-center">返回首页</a>
+            </div>
+
+            <div class="flex flex-wrap gap-2">
+                <button data-tab="users" type="button" class="tab-btn px-3 py-1.5 rounded-md bg-indigo-600 text-white text-sm">用户</button>
+                <button data-tab="audit" type="button" class="tab-btn px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 text-sm hover:bg-gray-50">审计日志</button>
+                <button data-tab="metrics" type="button" class="tab-btn px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 text-sm hover:bg-gray-50">监控</button>
+            </div>
+
+            <p id="msg" class="hidden text-xs"></p>
+
+            <div id="tab-users" class="space-y-3">
+                <div class="grid grid-cols-[1fr,auto] gap-2">
+                    <input id="search-input" type="text" class="block w-full py-2 px-3 border border-gray-300 rounded-md text-sm" placeholder="按用户名/邮箱/手机号搜索" />
+                    <button id="search-btn" type="button" class="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm hover:bg-indigo-700">搜索</button>
+                </div>
+                <div class="overflow-x-auto border border-gray-200 rounded-md">
+                    <table class="min-w-full text-xs text-left">
+                        <thead class="bg-gray-50 text-gray-600">
+                            <tr>
+                                <th class="px-3 py-2">ID</th>
+                                <th class="px-3 py-2">用户名</th>
+                                <th class="px-3 py-2">邮箱(脱敏)</th>
+                                <th class="px-3 py-2">手机(脱敏)</th>
+                                <th class="px-3 py-2">类型</th>
+                                <th class="px-3 py-2">邮箱验证</th>
+                                <th class="px-3 py-2">手机验证</th>
+                                <th class="px-3 py-2">注册时间</th>
+                                <th class="px-3 py-2">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-tbody" class="bg-white divide-y divide-gray-100">
+                            <tr><td colspan="9" class="px-3 py-4 text-gray-500">加载中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="tab-audit" class="space-y-3 hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-[1fr,1fr,1fr,auto] gap-2">
+                    <input id="audit-q" type="text" class="block w-full py-2 px-3 border border-gray-300 rounded-md text-sm" placeholder="全文搜索：action/用户名/IP/path/request_id" />
+                    <input id="audit-action" type="text" class="block w-full py-2 px-3 border border-gray-300 rounded-md text-sm" placeholder="action 过滤（可选）" />
+                    <input id="audit-username" type="text" class="block w-full py-2 px-3 border border-gray-300 rounded-md text-sm" placeholder="用户名过滤（可选）" />
+                    <button id="audit-search-btn" type="button" class="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm hover:bg-indigo-700">查询</button>
+                </div>
+                <div class="overflow-x-auto border border-gray-200 rounded-md">
+                    <table class="min-w-full text-xs text-left">
+                        <thead class="bg-gray-50 text-gray-600">
+                            <tr>
+                                <th class="px-3 py-2">时间</th>
+                                <th class="px-3 py-2">action</th>
+                                <th class="px-3 py-2">用户</th>
+                                <th class="px-3 py-2">IP</th>
+                                <th class="px-3 py-2">请求</th>
+                                <th class="px-3 py-2">request_id</th>
+                                <th class="px-3 py-2">detail</th>
+                            </tr>
+                        </thead>
+                        <tbody id="audit-tbody" class="bg-white divide-y divide-gray-100">
+                            <tr><td colspan="7" class="px-3 py-4 text-gray-500">加载中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="tab-metrics" class="space-y-3 hidden">
+                <div class="flex flex-wrap gap-2 items-center">
+                    <button id="metrics-refresh-btn" type="button" class="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm hover:bg-indigo-700">刷新</button>
+                    <button id="cleanup-btn" type="button" class="px-4 py-2 rounded-md border border-gray-300 text-gray-700 text-sm hover:bg-gray-50">清理过期数据</button>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div class="border border-gray-200 rounded-md p-3 bg-gray-50">
+                        <div class="text-xs text-gray-500">运行时长</div>
+                        <div id="m-uptime" class="text-lg font-semibold text-gray-900">-</div>
+                    </div>
+                    <div class="border border-gray-200 rounded-md p-3 bg-gray-50">
+                        <div class="text-xs text-gray-500">请求数(Tracked)</div>
+                        <div id="m-req" class="text-lg font-semibold text-gray-900">-</div>
+                    </div>
+                    <div class="border border-gray-200 rounded-md p-3 bg-gray-50">
+                        <div class="text-xs text-gray-500">平均耗时(ms)</div>
+                        <div id="m-avg" class="text-lg font-semibold text-gray-900">-</div>
+                    </div>
+                    <div class="border border-gray-200 rounded-md p-3 bg-gray-50">
+                        <div class="text-xs text-gray-500">P95 耗时(ms)</div>
+                        <div id="m-p95" class="text-lg font-semibold text-gray-900">-</div>
+                    </div>
+                </div>
+                <div class="overflow-x-auto border border-gray-200 rounded-md">
+                    <table class="min-w-full text-xs text-left">
+                        <thead class="bg-gray-50 text-gray-600">
+                            <tr>
+                                <th class="px-3 py-2">Path</th>
+                                <th class="px-3 py-2">Count</th>
+                                <th class="px-3 py-2">5xx</th>
+                                <th class="px-3 py-2">Avg(ms)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="metrics-tbody" class="bg-white divide-y divide-gray-100">
+                            <tr><td colspan="4" class="px-3 py-4 text-gray-500">加载中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="/static/js/admin_users.js"></script>
+</body>
+</html>

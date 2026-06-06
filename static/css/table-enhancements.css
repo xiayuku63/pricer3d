@@ -1,0 +1,326 @@
+/* ── Quote Results Table Enhancements ── */
+
+/* Row status highlighting */
+.table-row-failed {
+    border-left: 3px solid #ef4444 !important;
+}
+.table-row-failed td:first-child {
+    position: relative;
+}
+.table-row-failed td:first-child::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: #ef4444;
+}
+
+.table-row-success {
+    border-left: 3px solid #22c55e !important;
+}
+.table-row-success td:first-child {
+    position: relative;
+}
+.table-row-success td:first-child::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: #22c55e;
+}
+
+.table-row-pending {
+    border-left: 3px solid #f59e0b !important;
+    animation: pulse-border 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-border {
+    0%, 100% { border-left-color: #f59e0b; }
+    50% { border-left-color: #fbbf24; }
+}
+
+/* ── Enhanced Zebra striping ── */
+#batch-results-body tr:nth-child(even) {
+    background-color: rgba(249, 250, 251, 0.6);
+}
+#batch-results-body tr:nth-child(odd) {
+    background-color: #ffffff;
+}
+
+/* ── Enhanced Hover effect ── */
+#batch-results-body tr[data-row-file]:hover {
+    background-color: rgba(238, 242, 255, 0.5) !important;
+    transition: background-color 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 1px 3px rgba(99, 102, 241, 0.08);
+}
+#batch-results-body tr[data-row-file]:hover td {
+    color: #1e1b4b;
+}
+
+/* Column resize handle */
+th[data-sort-key] {
+    position: relative;
+}
+th .col-resize-handle {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    cursor: col-resize;
+    background: transparent;
+    transition: background-color 0.15s;
+    z-index: 10;
+}
+th .col-resize-handle:hover,
+th .col-resize-handle.resizing {
+    background-color: #6366f1;
+}
+
+/* Sort arrow transitions */
+.sort-arrow {
+    display: inline-block;
+    transition: transform 0.2s ease;
+}
+
+/* Sort active state */
+th[data-sort-key].sort-active {
+    background-color: rgba(99, 102, 241, 0.08);
+    color: #4338ca;
+}
+th[data-sort-key].sort-active .sort-arrow {
+    color: #6366f1;
+    font-weight: bold;
+}
+
+/* Pagination button hover */
+#table-pagination button:not(:disabled):hover {
+    background-color: #eef2ff;
+    border-color: #c7d2fe;
+    color: #4338ca;
+}
+#table-pagination button:not(:disabled):active {
+    background-color: #e0e7ff;
+}
+
+/* Table container scrollbar styling */
+.overflow-x-auto::-webkit-scrollbar {
+    height: 6px;
+}
+.overflow-x-auto::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
+}
+.overflow-x-auto::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+.overflow-x-auto::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Status cell special styling */
+td[data-role="status-cell"] {
+    position: relative;
+}
+
+/* Success status badge */
+.status-badge-success {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 6px;
+    border-radius: 9999px;
+    font-size: 10px;
+    font-weight: 500;
+    background: #dcfce7;
+    color: #166534;
+    border: 1px solid #bbf7d0;
+}
+
+/* Failed status badge */
+.status-badge-failed {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 6px;
+    border-radius: 9999px;
+    font-size: 10px;
+    font-weight: 500;
+    background: #fef2f2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+}
+
+/* Pending status badge */
+.status-badge-pending {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 6px;
+    border-radius: 9999px;
+    font-size: 10px;
+    font-weight: 500;
+    background: #fffbeb;
+    color: #92400e;
+    border: 1px solid #fde68a;
+}
+
+/* Selected row highlight */
+#batch-results-body tr.selected-row {
+    background-color: rgba(199, 210, 254, 0.3) !important;
+    box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.3);
+}
+
+/* Table header sticky */
+thead {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+}
+
+/* ── Enhanced Table Header ── */
+thead.bg-gray-100 {
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%) !important;
+    border-bottom: 2px solid #e2e8f0;
+}
+thead th {
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: none;
+    transition: background-color 0.15s ease;
+}
+thead th:hover {
+    background-color: rgba(99, 102, 241, 0.06) !important;
+}
+
+/* ── Detail Row Animations ── */
+[data-detail-content] {
+    transition: max-height 0.3s ease, opacity 0.2s ease;
+    overflow: hidden;
+}
+[data-detail-content].expanded {
+    max-height: 2000px;
+    opacity: 1;
+}
+
+/* ── Quick Preview Badges (visible when detail collapsed) ── */
+.detail-preview-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+}
+.detail-preview-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    font-size: 10px;
+    font-weight: 500;
+    border: 1px solid;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    cursor: default;
+}
+.detail-preview-badge:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+}
+.badge-price {
+    background: #eef2ff;
+    color: #4338ca;
+    border-color: #c7d2fe;
+}
+.badge-material {
+    background: #ecfdf5;
+    color: #065f46;
+    border-color: #a7f3d0;
+}
+.badge-time {
+    background: #fef3c7;
+    color: #92400e;
+    border-color: #fde68a;
+}
+.badge-weight {
+    background: #fce7f3;
+    color: #9d174d;
+    border-color: #fbcfe8;
+}
+
+/* ── Table Row Group Borders ── */
+#batch-results-body tr[data-detail-row] {
+    border-top: none;
+}
+#batch-results-body tr[data-detail-row] td {
+    padding-top: 0;
+}
+
+/* ── Toggle Button Animation ── */
+[data-toggle-detail] svg {
+    transition: transform 0.2s ease;
+}
+[data-toggle-detail].toggled svg {
+    transform: rotate(180deg);
+}
+
+/* ── Price Cell Emphasis ── */
+#batch-results-body td .price-highlight {
+    color: #4338ca;
+    font-weight: 600;
+}
+
+/* ── Summary Panel Animations ── */
+#quote-summary-panel {
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Summary panel cost bar segment hover */
+#panel-cost-bar > div {
+    transition: opacity 0.15s ease;
+    cursor: help;
+}
+#panel-cost-bar > div:hover {
+    opacity: 0.85;
+}
+
+/* ── Material Distribution Pills in Summary ── */
+.material-dist-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 10px;
+    border-radius: 9999px;
+    font-size: 10px;
+    font-weight: 500;
+    background: #f0f9ff;
+    color: #0c4a6e;
+    border: 1px solid #bae6fd;
+}
+.material-dist-pill .count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #0ea5e9;
+    color: white;
+    font-size: 9px;
+    font-weight: 700;
+}

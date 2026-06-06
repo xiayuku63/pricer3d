@@ -1,0 +1,10 @@
+# robots.txt for pricer3d.top
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin/
+Disallow: /pay/
+Disallow: /healthz
+Disallow: /readyz
+
+Sitemap: https://pricer3d.top/static/sitemap.xml

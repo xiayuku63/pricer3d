@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+    <title>注册账号 - 3D打印自动报价系统 | Pricer3D</title>
+    <meta name="description" content="注册Pricer3D账号，享受3D打印自动报价服务。支持历史报价记录、会员优惠、批量报价等高级功能。快速注册，即刻开始在线3D打印报价。">
+    <meta name="keywords" content="3D打印注册,3D打印报价注册,Pricer3D注册,3D打印账号,3D打印会员,批量报价">
+    <meta name="author" content="Pricer3D">
+    <meta name="robots" content="index, follow">
+    <meta property="og:title" content="注册账号 - Pricer3D 3D打印自动报价系统">
+    <meta property="og:description" content="注册Pricer3D账号，享受3D打印自动报价服务、历史记录、会员优惠等高级功能。">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="注册 - Pricer3D">
+    <meta name="twitter:description" content="注册Pricer3D账号，获取3D打印自动报价高级功能。">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="canonical" href="https://pricer3d.top/register">
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "首页",
+                "item": "https://pricer3d.top/"
+            },
+            {
+                "@type": "ListItem",
+                "position": 2,
+                "name": "注册账号",
+                "item": "https://pricer3d.top/register"
+            }
+        ]
+    }
+    </script>
+    <style>
+        [data-theme="dark"] body { background-color: #0f172a; }
+        [data-theme="dark"] .bg-white { background-color: #1e293b; }
+        [data-theme="dark"] .bg-gray-50 { background-color: #0f172a; }
+        [data-theme="dark"] .text-gray-900 { color: #f1f5f9; }
+        [data-theme="dark"] .text-gray-700 { color: #cbd5e1; }
+        [data-theme="dark"] .text-gray-600 { color: #94a3b8; }
+        [data-theme="dark"] .text-gray-500 { color: #64748b; }
+        [data-theme="dark"] .border-gray-300 { border-color: #475569; }
+        [data-theme="dark"] .border-gray-200 { border-color: #334155; }
+        [data-theme="dark"] input, [data-theme="dark"] select { background-color: #334155; color: #e2e8f0; border-color: #475569; }
+        [data-theme="dark"] input::placeholder { color: #64748b; }
+        [data-theme="dark"] .hover\:bg-gray-50:hover { background-color: #334155; }
+        [data-theme="dark"] .hover\:bg-indigo-50:hover { background-color: #312e81; }
+        [data-theme="dark"] .text-indigo-600 { color: #818cf8; }
+        [data-theme="dark"] .text-indigo-700 { color: #a5b4fc; }
+        [data-theme="dark"] .text-indigo-500 { color: #6366f1; }
+        [data-theme="dark"] .text-green-600 { color: #4ade80; }
+        [data-theme="dark"] .text-red-600 { color: #f87171; }
+        [data-theme="dark"] .border-indigo-200 { border-color: #4338ca; }
+        [data-theme="dark"] .bg-gray-100 { background-color: #1e293b; }
+        [data-theme="dark"] .bg-indigo-50 { background-color: #312e81; }
+        [data-theme="dark"] .bg-green-50 { background-color: #064e3b; }
+        body, .bg-white, input, select { transition: background-color 0.3s, color 0.3s, border-color 0.3s; }
+
+        /* Step indicator styles */
+        .step-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0;
+        }
+        .step-item {
+            display: flex;
+            align-items: center;
+        }
+        .step-circle {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: 2px solid #e2e8f0;
+            color: #94a3b8;
+            background: white;
+        }
+        [data-theme="dark"] .step-circle {
+            background: #1e293b;
+            border-color: #475569;
+            color: #94a3b8;
+        }
+        .step-circle.active {
+            border-color: #6366f1;
+            background: #6366f1;
+            color: white;
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
+        }
+        .step-circle.completed {
+            border-color: #22c55e;
+            background: #22c55e;
+            color: white;
+        }
+        .step-label {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-left: 8px;
+            white-space: nowrap;
+            transition: color 0.3s;
+        }
+        .step-label.active {
+            color: #6366f1;
+            font-weight: 600;
+        }
+        .step-label.completed {
+            color: #22c55e;
+        }
+        .step-line {
+            width: 48px;
+            height: 2px;
+            background: #e2e8f0;
+            margin: 0 8px;
+            transition: background 0.3s;
+        }
+        .step-line.completed {
+            background: #22c55e;
+        }
+
+        /* Mobile: step indicator responsive */
+        @media (max-width: 640px) {
+            body { padding: 8px !important; overflow-x: hidden; }
+            .p-5.sm\:p-8 { padding: 16px !important; }
+            .step-circle {
+                width: 32px;
+                height: 32px;
+                font-size: 13px;
+            }
+            .step-label {
+                font-size: 11px;
+                margin-left: 4px;
+            }
+            .step-line {
+                width: 24px;
+                margin: 0 4px;
+            }
+            .step-indicator { gap: 0; }
+            a[href="/"] { min-height: 44px; display: flex; align-items: center; padding: 8px; }
+            .validation-icon { right: 10px; width: 16px; height: 16px; }
+        }
+        @media (max-width: 374px) {
+            .step-label { display: none; }
+            .step-line { width: 20px; margin: 0 2px; }
+        }
+        [data-theme="dark"] .step-line { background: #475569; }
+        [data-theme="dark"] .step-line.completed { background: #22c55e; }
+
+        /* Password strength bar */
+        .strength-bar-container {
+            display: flex;
+            gap: 4px;
+            margin-top: 6px;
+        }
+        .strength-segment {
+            flex: 1;
+            height: 4px;
+            border-radius: 2px;
+            background: #e2e8f0;
+            transition: background 0.3s;
+        }
+        [data-theme="dark"] .strength-segment { background: #475569; }
+        .strength-segment.filled-weak { background: #ef4444; }
+        .strength-segment.filled-medium { background: #f59e0b; }
+        .strength-segment.filled-strong { background: #22c55e; }
+
+        /* Validation icon */
+        .validation-icon {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 18px;
+            height: 18px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .validation-icon.visible { opacity: 1; }
+
+        /* Fade transitions for steps */
+        .step-panel {
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Email status badge */
+        .email-status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .email-status-sent {
+            background: #dbeafe;
+            color: #2563eb;
+        }
+        [data-theme="dark"] .email-status-sent {
+            background: #1e3a5f;
+            color: #60a5fa;
+        }
+        .email-status-verified {
+            background: #dcfce7;
+            color: #16a34a;
+        }
+        [data-theme="dark"] .email-status-verified {
+            background: #064e3b;
+            color: #4ade80;
+        }
+        .email-status-expired {
+            background: #fef3c7;
+            color: #d97706;
+        }
+        [data-theme="dark"] .email-status-expired {
+            background: #451a03;
+            color: #fbbf24;
+        }
+    </style>
+    <script>
+        (() => {
+            const t = localStorage.getItem('pricer3d_theme_v1');
+            if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+        })();
+    </script>
+</head>
+<body class="bg-gray-50 min-h-screen p-4 lg:p-6" style="padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left))">
+    <div class="max-w-lg mx-auto bg-white rounded-xl shadow-md overflow-hidden">
+        <div class="p-5 sm:p-8 space-y-6">
+            <!-- Header -->
+            <div class="flex flex-col sm:flex-row items-start sm:justify-between gap-4">
+                <a href="/" class="hover:opacity-80">
+                    <div class="uppercase tracking-wide text-sm text-indigo-500 font-semibold mb-1">3D Printing Parts Automated Quoting System</div>
+                    <h2 class="text-2xl font-bold text-gray-900">用户注册</h2>
+                </a>
+                <a href="/" class="text-sm px-3 py-2.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 whitespace-nowrap shrink-0 min-h-[44px] flex items-center">返回首页</a>
+            </div>
+
+            <!-- Step Indicator -->
+            <div class="step-indicator py-2" id="step-indicator">
+                <div class="step-item">
+                    <div class="step-circle active" id="step-circle-1">1</div>
+                    <span class="step-label active" id="step-label-1">基本信息</span>
+                </div>
+                <div class="step-line" id="step-line-1"></div>
+                <div class="step-item">
+                    <div class="step-circle" id="step-circle-2">2</div>
+                    <span class="step-label" id="step-label-2">邮箱验证</span>
+                </div>
+                <div class="step-line" id="step-line-2"></div>
+                <div class="step-item">
+                    <div class="step-circle" id="step-circle-3">3</div>
+                    <span class="step-label" id="step-label-3">完成注册</span>
+                </div>
+            </div>
+
+            <!-- Step 1: Basic Info -->
+            <div id="step-1-panel" class="step-panel space-y-4">
+                <!-- Username -->
+                <div class="relative">
+                    <label class="block text-sm font-medium text-gray-700">用户名</label>
+                    <div class="relative">
+                        <input id="reg-username" type="text" autocomplete="off" class="mt-1 block w-full py-2.5 px-3 pr-10 border border-gray-300 rounded-md text-sm min-h-[44px]" placeholder="字母/数字/._-，3-50位" />
+                        <div id="username-icon" class="validation-icon"></div>
+                    </div>
+                    <p id="reg-username-check" class="hidden text-xs mt-1"></p>
+                </div>
+
+                <!-- Password -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">密码</label>
+                    <div class="relative">
+                        <input id="reg-password" type="password" autocomplete="new-password" class="mt-1 block w-full py-2.5 px-3 pr-10 border border-gray-300 rounded-md text-sm min-h-[44px]" placeholder="至少8位，字母+数字" />
+                        <button id="toggle-password" type="button" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center">
+                            <svg id="eye-open" class="w-4 h-4 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                            <svg id="eye-closed" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.542 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
+                        </button>
+                    </div>
+                    <!-- Password Strength Indicator -->
+                    <div id="password-strength-container" class="hidden mt-2">
+                        <div class="strength-bar-container">
+                            <div class="strength-segment" id="str-seg-1"></div>
+                            <div class="strength-segment" id="str-seg-2"></div>
+                            <div class="strength-segment" id="str-seg-3"></div>
+                            <div class="strength-segment" id="str-seg-4"></div>
+                        </div>
+                        <div class="flex justify-between items-center mt-1">
+                            <p id="password-strength-text" class="text-xs"></p>
+                            <p id="password-hint" class="text-xs text-gray-400"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Channel Selection -->
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="reg-channel-email" type="button" class="w-full px-3 py-2.5 rounded-md bg-indigo-600 text-white text-sm min-h-[44px]">邮箱注册</button>
+                    <button id="reg-channel-phone" type="button" class="w-full px-3 py-2.5 rounded-md border border-gray-300 text-gray-700 text-sm hover:bg-gray-50 min-h-[44px]">手机注册</button>
+                </div>
+
+                <!-- Email Section -->
+                <div id="reg-email-section">
+                    <label class="block text-sm font-medium text-gray-700">邮箱</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-[1fr,auto] gap-2">
+                        <input id="reg-email" type="email" autocomplete="email" class="mt-1 block w-full py-2.5 px-3 border border-gray-300 rounded-md text-sm min-h-[44px]" placeholder="name@example.com" />
+                    </div>
+                    <p id="reg-email-check" class="hidden text-xs mt-1"></p>
+                </div>
+
+                <!-- Phone Section -->
+                <div id="reg-phone-section" class="hidden">
+                    <label class="block text-sm font-medium text-gray-700">手机号</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-[1fr,auto] gap-2">
+                        <input id="reg-phone" type="tel" class="mt-1 block w-full py-2.5 px-3 border border-gray-300 rounded-md text-sm min-h-[44px]" placeholder="+86..." />
+                    </div>
+                    <p id="reg-phone-check" class="hidden text-xs mt-1"></p>
+                </div>
+
+                <!-- Legal -->
+                <label class="flex items-start gap-2 text-xs text-gray-600 min-h-[44px]">
+                    <input id="reg-accept-legal" type="checkbox" class="mt-0.5 w-5 h-5 flex-shrink-0" />
+                    <span>
+                        我已阅读并同意
+                        <a href="/legal/terms" target="_blank" rel="noopener" class="text-indigo-600 hover:text-indigo-800">《用户协议》</a>
+                        和
+                        <a href="/legal/privacy" target="_blank" rel="noopener" class="text-indigo-600 hover:text-indigo-800">《隐私政策》</a>
+                    </span>
+                </label>
+
+                <!-- Step 1 Error/Info -->
+                <p id="reg-step1-msg" class="hidden text-xs"></p>
+
+                <!-- Next Button -->
+                <button id="step1-next-btn" type="button" class="w-full py-3 px-3 rounded-md bg-indigo-600 text-white text-sm hover:bg-indigo-700 flex items-center justify-center gap-2 min-h-[44px]">
+                    <span>下一步：验证邮箱</span>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                </button>
+            </div>
+
+            <!-- Step 2: Email/Phone Verification -->
+            <div id="step-2-panel" class="step-panel space-y-4 hidden">
+                <!-- Verification target display -->
+                <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs text-gray-500 mb-1">验证方式</p>
+                            <p id="verify-target-display" class="text-sm font-medium text-gray-900"></p>
+                        </div>
+                        <div id="email-status-display">
+                            <!-- Email status badge will be inserted here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Email Code Input -->
+                <div id="verify-email-section">
+                    <label class="block text-sm font-medium text-gray-700">邮箱验证码</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-[1fr,auto] gap-2">
+                        <input id="reg-email-code" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" class="mt-1 block w-full py-2.5 px-3 border border-gray-300 rounded-md text-sm tracking-[0.3em] font-mono min-h-[44px]" placeholder="请输入6位验证码" />
+                        <button id="send-email-code-btn" type="button" class="px-3 py-2.5 rounded-md border border-indigo-200 text-indigo-700 text-xs hover:bg-indigo-50 w-full sm:w-auto sm:mt-1 whitespace-nowrap min-h-[44px]">发送验证码</button>
+                    </div>
+                    <p id="verify-code-hint" class="text-xs mt-1 text-gray-400">验证码有效期10分钟，请查收邮件</p>
+                </div>
+
+                <!-- Phone Code Input -->
+                <div id="verify-phone-section" class="hidden">
+                    <label class="block text-sm font-medium text-gray-700">短信验证码</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-[1fr,auto] gap-2">
+                        <input id="reg-phone-code" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" class="mt-1 block w-full py-2.5 px-3 border border-gray-300 rounded-md text-sm tracking-[0.3em] font-mono min-h-[44px]" placeholder="请输入6位验证码" />
+                        <button id="send-phone-code-btn" type="button" class="px-3 py-2.5 rounded-md border border-indigo-200 text-indigo-700 text-xs hover:bg-indigo-50 w-full sm:w-auto sm:mt-1 whitespace-nowrap min-h-[44px]">发送验证码</button>
+                    </div>
+                </div>
+
+                <!-- Step 2 Error/Info -->
+                <p id="reg-step2-msg" class="hidden text-xs"></p>
+
+                <!-- Navigation -->
+                <div class="grid grid-cols-2 gap-3">
+                    <button id="step2-back-btn" type="button" class="py-2.5 px-3 rounded-md border border-gray-300 text-gray-700 text-sm hover:bg-gray-50 flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                        <span>返回修改</span>
+                    </button>
+                    <button id="step2-next-btn" type="button" class="py-2.5 px-3 rounded-md bg-indigo-600 text-white text-sm hover:bg-indigo-700 flex items-center justify-center gap-2">
+                        <span>下一步</span>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 3: Complete / Review -->
+            <div id="step-3-panel" class="step-panel space-y-4 hidden">
+                <div class="text-center py-4">
+                    <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-indigo-50 mb-4">
+                        <svg class="w-8 h-8 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900 mb-1">确认注册信息</h3>
+                    <p class="text-sm text-gray-500">请确认以下信息无误后完成注册</p>
+                </div>
+
+                <!-- Summary Card -->
+                <div class="bg-gray-50 rounded-lg p-4 border border-gray-200 space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs text-gray-500">用户名</span>
+                        <span id="summary-username" class="text-sm font-medium text-gray-900"></span>
+                    </div>
+                    <div class="border-t border-gray-200"></div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs text-gray-500">注册方式</span>
+                        <span id="summary-channel" class="text-sm text-gray-900"></span>
+                    </div>
+                    <div class="border-t border-gray-200"></div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs text-gray-500">验证状态</span>
+                        <span id="summary-verified" class="text-sm text-green-600 flex items-center gap-1">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            已验证
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Captcha -->
+                <div class="grid grid-cols-1 sm:grid-cols-[1fr,auto] gap-2 items-end">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">图形验证码</label>
+                        <input id="reg-captcha-code" type="text" maxlength="8" autocomplete="off" autocapitalize="characters" class="mt-1 block w-full py-2.5 px-3 border border-gray-300 rounded-md text-sm min-h-[44px]" placeholder="请输入 4 位验证码" />
+                    </div>
+                    <div class="grid grid-cols-[1fr,auto] gap-2">
+                        <img id="reg-captcha-img" alt="验证码" class="h-11 w-full sm:w-36 border border-gray-200 rounded-md bg-white object-contain" />
+                        <button id="reg-captcha-refresh-btn" type="button" class="h-11 px-3 rounded-md border border-indigo-200 text-indigo-700 text-xs hover:bg-indigo-50 whitespace-nowrap min-h-[44px]">刷新</button>
+                    </div>
+                </div>
+
+                <!-- Step 3 Error/Info -->
+                <p id="reg-step3-msg" class="hidden text-xs"></p>
+
+                <!-- Submit -->
+                <div class="grid grid-cols-2 gap-3">
+                    <button id="step3-back-btn" type="button" class="py-2.5 px-3 rounded-md border border-gray-300 text-gray-700 text-sm hover:bg-gray-50 flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                        <span>返回</span>
+                    </button>
+                    <button id="reg-submit-btn" type="button" class="py-2.5 px-3 rounded-md bg-indigo-600 text-white text-sm hover:bg-indigo-700 flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        <span>完成注册</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Global message -->
+            <p id="reg-msg" class="hidden text-xs"></p>
+        </div>
+    </div>
+
+    <script type="module" src="/static/js/register.js?v=2"></script>
+</body>
+</html>

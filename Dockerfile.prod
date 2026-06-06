@@ -1,0 +1,37 @@
+FROM ubuntu:24.04
+
+# Use Aliyun mirrors for faster builds in China
+RUN sed -i 's|http://archive.ubuntu.com|http://mirrors.aliyun.com|g; s|http://security.ubuntu.com|http://mirrors.aliyun.com|g' /etc/apt/sources.list.d/ubuntu.sources && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    python3 python3-venv python3-pip \
+    ca-certificates \
+    prusa-slicer \
+    logrotate \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY requirements.txt .
+
+# Use Tsinghua PyPI mirror for faster installs in China
+RUN python3 -m venv /app/venv && \
+    /app/venv/bin/pip install --no-cache-dir \
+    -i https://pypi.tuna.tsinghua.edu.cn/simple \
+    --trusted-host pypi.tuna.tsinghua.edu.cn \
+    -r requirements.txt
+
+COPY . .
+
+RUN mkdir -p /app/data/uploads /app/data/outputs /app/data/user /app/data/backups /app/data/logs
+
+# Logrotate configuration
+COPY deploy/logrotate-pricer3d.conf /etc/logrotate.d/pricer3d
+RUN chmod 644 /etc/logrotate.d/pricer3d
+
+COPY deploy/docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:5000/healthz')" || exit 1
+
+EXPOSE 5000
+ENTRYPOINT ["docker-entrypoint.sh"]
