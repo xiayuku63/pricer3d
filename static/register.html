@@ -327,18 +327,6 @@
                     </div>
                 </div>
 
-                <!-- Captcha -->
-                <div class="grid grid-cols-1 sm:grid-cols-[1fr,auto] gap-2 items-end">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">图形验证码</label>
-                        <input id="reg-captcha-code" type="text" maxlength="8" autocomplete="off" autocapitalize="characters" class="mt-1 block w-full py-2.5 px-3 border border-gray-300 rounded-md text-sm min-h-[44px]" placeholder="请输入 4 位验证码" />
-                    </div>
-                    <div class="grid grid-cols-[1fr,auto] gap-2">
-                        <img id="reg-captcha-img" alt="验证码" class="h-11 w-full sm:w-36 border border-gray-200 rounded-md bg-white object-contain" />
-                        <button id="reg-captcha-refresh-btn" type="button" class="h-11 px-3 rounded-md border border-indigo-200 text-indigo-700 text-xs hover:bg-indigo-50 whitespace-nowrap min-h-[44px]">刷新</button>
-                    </div>
-                </div>
-
                 <!-- Step 2 Error/Info -->
                 <p id="reg-step2-msg" class="hidden text-xs"></p>
 
@@ -383,6 +371,18 @@
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                             已验证
                         </span>
+                    </div>
+                </div>
+
+                <!-- Captcha -->
+                <div class="grid grid-cols-1 sm:grid-cols-[1fr,auto] gap-2 items-end">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">图形验证码</label>
+                        <input id="reg-captcha-code" type="text" maxlength="8" autocomplete="off" autocapitalize="characters" class="mt-1 block w-full py-2.5 px-3 border border-gray-300 rounded-md text-sm min-h-[44px]" placeholder="请输入 4 位验证码" />
+                    </div>
+                    <div class="grid grid-cols-[1fr,auto] gap-2">
+                        <img id="reg-captcha-img" alt="验证码" class="h-11 w-full sm:w-36 border border-gray-200 rounded-md bg-white object-contain" />
+                        <button id="reg-captcha-refresh-btn" type="button" class="h-11 px-3 rounded-md border border-indigo-200 text-indigo-700 text-xs hover:bg-indigo-50 whitespace-nowrap min-h-[44px]">刷新</button>
                     </div>
                 </div>
 

@@ -491,7 +491,7 @@ async function handleResetConfirm() {
     let valid = true;
     if (!code) { _showFieldError('reset-code-err', t('auth.enterCaptcha')); valid = false; }
     if (!newPassword) { _showFieldError('reset-new-password-err', t('auth.enterNewPassword')); valid = false; }
-    else if (newPassword.length < 6 || !/[A-Za-z]/.test(newPassword) || !/\d/.test(newPassword)) {
+    else if (newPassword.length < 8 || !/[A-Za-z]/.test(newPassword) || !/\d/.test(newPassword)) {
         _showFieldError('reset-new-password-err', t('auth.passwordRequirements'));
         valid = false;
     }

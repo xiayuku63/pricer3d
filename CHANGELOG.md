@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [v0.18.0] - 2026-06-06
+
+### Fixed
+- 注册流程验证码从步骤2移至步骤3（提交前验证），提升用户体验
+
+
 ## [v0.13.0] - 2026-05-30
 
 ### Added

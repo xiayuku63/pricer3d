@@ -335,7 +335,7 @@ export async function changePassword() {
     const confPwd = ucConfirmPassword?.value;
     if (!oldPwd || !newPwd || !confPwd) { showPwdMsg(t('settings.allPasswordFieldsRequired'), false); return; }
     if (newPwd !== confPwd) { showPwdMsg(t('settings.passwordsMismatch'), false); return; }
-    if (newPwd.length < 6) { showPwdMsg(t('settings.passwordTooShort'), false); return; }
+    if (newPwd.length < 8) { showPwdMsg(t('settings.passwordTooShort'), false); return; }
     try {
         const res = await authFetch('/api/users/change-password', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -475,9 +475,9 @@ export function initPasswordFormValidation() {
 
     if (newPwd) {
         newPwd.addEventListener('input', () => {
-            if (newPwd.value.length > 0 && newPwd.value.length < 6) {
-                setFieldValidation(newPwd, 'error', '密码至少需要 6 位');
-            } else if (newPwd.value.length >= 6) {
+            if (newPwd.value.length > 0 && newPwd.value.length < 8) {
+                setFieldValidation(newPwd, 'error', '密码至少需要 8 位');
+            } else if (newPwd.value.length >= 8) {
                 setFieldValidation(newPwd, 'success');
             } else {
                 setFieldValidation(newPwd, 'clear');

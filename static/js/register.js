@@ -221,8 +221,6 @@ function goToStep(step) {
             verifyEmailSection.classList.add('hidden');
             verifyPhoneSection.classList.remove('hidden');
         }
-        // Load captcha for step 2
-        refreshCaptcha();
     }
 
     if (step === 3) {
@@ -233,6 +231,8 @@ function goToStep(step) {
         } else {
             summaryChannel.textContent = '📱 ' + phoneEl.value.trim();
         }
+        // Load fresh captcha for step 3
+        refreshCaptcha();
     }
 
     // Scroll to top of form
@@ -724,7 +724,6 @@ step1NextBtn.addEventListener('click', async () => {
 
 step2NextBtn.addEventListener('click', async () => {
     clearMsg(step2Msg);
-    const captchaCode = (captchaCodeEl.value || '').trim();
 
     if (registerChannel === 'email') {
         const emailCode = (emailCodeEl.value || '').trim();
@@ -734,11 +733,6 @@ step2NextBtn.addEventListener('click', async () => {
         const phoneCode = (phoneCodeEl.value || '').trim();
         if (!phoneCode) return showMsg('请输入短信验证码', 'error', step2Msg);
         if (phoneCode.length !== 6) return showMsg('验证码为6位数字', 'error', step2Msg);
-    }
-
-    if (!captchaId || !captchaCode) {
-        await refreshCaptcha();
-        return showMsg('请完成图形验证码', 'error', step2Msg);
     }
 
     if (registerChannel === 'email') {
@@ -776,6 +770,12 @@ submitBtn.addEventListener('click', async () => {
     const phoneCode = (phoneCodeEl.value || '').trim();
     const captchaCode = (captchaCodeEl.value || '').trim();
     const acceptLegal = !!(acceptLegalEl && acceptLegalEl.checked);
+
+    // Validate captcha
+    if (!captchaId || !captchaCode) {
+        await refreshCaptcha();
+        return showMsg('请完成图形验证码', 'error', step3Msg);
+    }
 
     // Disable button, show loading
     submitBtn.disabled = true;
