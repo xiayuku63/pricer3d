@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>待办事项</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 24px;
+            font-size: 2rem;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+        .add-form {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .add-form input[type="text"] {
+            flex: 1;
+            min-width: 200px;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .add-form input[type="text"]:focus {
+            border-color: #667eea;
+        }
+        .add-form select {
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            background: white;
+            cursor: pointer;
+        }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        .btn-primary:hover { background: #5a6fd6; }
+        .btn-danger {
+            background: #e53e3e;
+            color: white;
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+        .btn-danger:hover { background: #c53030; }
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+        .filters {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+        .filter-btn {
+            padding: 8px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 20px;
+            background: white;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        .filter-btn:hover { border-color: #667eea; color: #667eea; }
+        .filter-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        .todo-list { list-style: none; }
+        .todo-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            border-bottom: 1px solid #f0f0f0;
+            transition: background 0.15s;
+        }
+        .todo-item:hover { background: #f8fafc; }
+        .todo-item:last-child { border-bottom: none; }
+        .todo-checkbox {
+            width: 22px;
+            height: 22px;
+            cursor: pointer;
+            accent-color: #667eea;
+        }
+        .todo-content { flex: 1; }
+        .todo-text {
+            font-size: 15px;
+            color: #2d3748;
+            transition: all 0.2s;
+        }
+        .todo-item.completed .todo-text {
+            text-decoration: line-through;
+            color: #a0aec0;
+        }
+        .todo-meta {
+            display: flex;
+            gap: 8px;
+            margin-top: 4px;
+            align-items: center;
+        }
+        .category-tag {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            color: white;
+        }
+        .cat-work { background: #4299e1; }
+        .cat-personal { background: #48bb78; }
+        .cat-study { background: #ed8936; }
+        .cat-other { background: #a0aec0; }
+        .todo-date {
+            font-size: 11px;
+            color: #a0aec0;
+        }
+        .todo-actions {
+            display: flex;
+            gap: 6px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .todo-item:hover .todo-actions { opacity: 1; }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #a0aec0;
+        }
+        .empty-state svg { margin-bottom: 12px; }
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            color: #718096;
+            font-size: 13px;
+            border-bottom: 1px solid #f0f0f0;
+            margin-bottom: 12px;
+        }
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-overlay.show { display: flex; }
+        .modal {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .modal h3 { margin-bottom: 16px; color: #2d3748; }
+        .modal input, .modal select {
+            width: 100%;
+            padding: 10px 14px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-bottom: 12px;
+            outline: none;
+        }
+        .modal input:focus, .modal select:focus { border-color: #667eea; }
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 8px;
+        }
+        .btn-cancel {
+            background: #edf2f7;
+            color: #4a5568;
+        }
+        @media (max-width: 600px) {
+            body { padding: 12px; }
+            h1 { font-size: 1.5rem; }
+            .card { padding: 16px; }
+            .add-form { flex-direction: column; }
+            .todo-actions { opacity: 1; }
+            .filters { gap: 4px; }
+            .filter-btn { padding: 6px 10px; font-size: 12px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📋 待办事项</h1>
+
+        <!-- 添加表单 -->
+        <div class="card">
+            <form class="add-form" id="addForm">
+                <input type="text" id="todoInput" placeholder="输入新的待办事项..." required>
+                <select id="categorySelect">
+                    <option value="work">工作</option>
+                    <option value="personal">个人</option>
+                    <option value="study">学习</option>
+                    <option value="other">其他</option>
+                </select>
+                <button type="submit" class="btn btn-primary">添加</button>
+            </form>
+        </div>
+
+        <!-- 待办列表 -->
+        <div class="card">
+            <div class="filters">
+                <button class="filter-btn active" data-filter="all">全部</button>
+                <button class="filter-btn" data-filter="active">未完成</button>
+                <button class="filter-btn" data-filter="completed">已完成</button>
+                <button class="filter-btn" data-filter="work">工作</button>
+                <button class="filter-btn" data-filter="personal">个人</button>
+                <button class="filter-btn" data-filter="study">学习</button>
+                <button class="filter-btn" data-filter="other">其他</button>
+            </div>
+
+            <div class="stats" id="stats"></div>
+
+            <ul class="todo-list" id="todoList"></ul>
+        </div>
+    </div>
+
+    <!-- 编辑弹窗 -->
+    <div class="modal-overlay" id="editModal">
+        <div class="modal">
+            <h3>编辑待办事项</h3>
+            <input type="text" id="editInput" placeholder="待办事项内容">
+            <select id="editCategory">
+                <option value="work">工作</option>
+                <option value="personal">个人</option>
+                <option value="study">学习</option>
+                <option value="other">其他</option>
+            </select>
+            <div class="modal-actions">
+                <button class="btn btn-cancel" onclick="closeModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveEdit()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const STORAGE_KEY = 'pricer3d_todos';
+        let todos = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        let currentFilter = 'all';
+        let editingId = null;
+
+        const categoryNames = { work: '工作', personal: '个人', study: '学习', other: '其他' };
+
+        function saveTodos() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));
+        }
+
+        function generateId() {
+            return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+        }
+
+        function formatDate(ts) {
+            const d = new Date(ts);
+            const month = d.getMonth() + 1;
+            const day = d.getDate();
+            const hour = d.getHours().toString().padStart(2, '0');
+            const min = d.getMinutes().toString().padStart(2, '0');
+            return `${month}/${day} ${hour}:${min}`;
+        }
+
+        function getFilteredTodos() {
+            if (currentFilter === 'all') return todos;
+            if (currentFilter === 'active') return todos.filter(t => !t.completed);
+            if (currentFilter === 'completed') return todos.filter(t => t.completed);
+            return todos.filter(t => t.category === currentFilter);
+        }
+
+        function render() {
+            const list = document.getElementById('todoList');
+            const stats = document.getElementById('stats');
+            const filtered = getFilteredTodos();
+
+            const total = todos.length;
+            const completed = todos.filter(t => t.completed).length;
+            stats.innerHTML = `<span>共 ${total} 项</span><span>已完成 ${completed} / 未完成 ${total - completed}</span>`;
+
+            if (filtered.length === 0) {
+                list.innerHTML = `<div class="empty-state">
+                    <svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="#cbd5e0">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                    </svg>
+                    <p>暂无待办事项</p>
+                </div>`;
+                return;
+            }
+
+            list.innerHTML = filtered.map(todo => `
+                <li class="todo-item ${todo.completed ? 'completed' : ''}" data-id="${todo.id}">
+                    <input type="checkbox" class="todo-checkbox" ${todo.completed ? 'checked' : ''}
+                        onchange="toggleTodo('${todo.id}')">
+                    <div class="todo-content">
+                        <div class="todo-text">${escapeHtml(todo.text)}</div>
+                        <div class="todo-meta">
+                            <span class="category-tag cat-${todo.category}">${categoryNames[todo.category]}</span>
+                            <span class="todo-date">${formatDate(todo.createdAt)}</span>
+                        </div>
+                    </div>
+                    <div class="todo-actions">
+                        <button class="btn btn-sm btn-primary" onclick="editTodo('${todo.id}')">编辑</button>
+                        <button class="btn btn-danger" onclick="deleteTodo('${todo.id}')">删除</button>
+                    </div>
+                </li>
+            `).join('');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 添加
+        document.getElementById('addForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const input = document.getElementById('todoInput');
+            const category = document.getElementById('categorySelect').value;
+            const text = input.value.trim();
+            if (!text) return;
+
+            todos.unshift({
+                id: generateId(),
+                text,
+                category,
+                completed: false,
+                createdAt: Date.now()
+            });
+            saveTodos();
+            input.value = '';
+            render();
+        });
+
+        // 切换状态
+        function toggleTodo(id) {
+            const todo = todos.find(t => t.id === id);
+            if (todo) {
+                todo.completed = !todo.completed;
+                saveTodos();
+                render();
+            }
+        }
+
+        // 删除
+        function deleteTodo(id) {
+            if (confirm('确定删除此待办事项？')) {
+                todos = todos.filter(t => t.id !== id);
+                saveTodos();
+                render();
+            }
+        }
+
+        // 编辑
+        function editTodo(id) {
+            const todo = todos.find(t => t.id === id);
+            if (!todo) return;
+            editingId = id;
+            document.getElementById('editInput').value = todo.text;
+            document.getElementById('editCategory').value = todo.category;
+            document.getElementById('editModal').classList.add('show');
+            document.getElementById('editInput').focus();
+        }
+
+        function saveEdit() {
+            const text = document.getElementById('editInput').value.trim();
+            const category = document.getElementById('editCategory').value;
+            if (!text) return;
+            const todo = todos.find(t => t.id === editingId);
+            if (todo) {
+                todo.text = text;
+                todo.category = category;
+                saveTodos();
+                render();
+            }
+            closeModal();
+        }
+
+        function closeModal() {
+            document.getElementById('editModal').classList.remove('show');
+            editingId = null;
+        }
+
+        // 筛选
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                currentFilter = this.dataset.filter;
+                render();
+            });
+        });
+
+        // 关闭弹窗
+        document.getElementById('editModal').addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
+        });
+
+        // 初始渲染
+        render();
+    </script>
+</body>
+</html>

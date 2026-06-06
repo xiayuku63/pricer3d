@@ -251,6 +251,9 @@ export async function fetchPrinterModels() {
                 if (dom.printerBedInfo) {
                     dom.printerBedInfo.textContent = t('printer.bedInfo', { x: printer.bed_width, y: printer.bed_depth, z: printer.bed_height });
                 }
+                updatePrinterDetailPanel(printer);
+            } else {
+                updatePrinterDetailPanel(null);
             }
         };
         cfgPrinter.onchange = updateNozzleAndBed;
@@ -261,7 +264,20 @@ export async function fetchPrinterModels() {
             if (dom.printerBedInfo) {
                 dom.printerBedInfo.textContent = t('printer.bedInfo', { x: printer.bed_width, y: printer.bed_depth, z: printer.bed_height });
             }
+            updatePrinterDetailPanel(printer);
         }
+    }
+
+    // ── Update detail panel when nozzle changes ──
+    if (dom.cfgNozzleDiameter) {
+        dom.cfgNozzleDiameter.addEventListener('change', function() {
+            var cfgPrinterEl = document.getElementById("cfg-printer-model-main");
+            var printer = cfgPrinterEl ? visibleModels.find(function(p) { return p.id === cfgPrinterEl.value; }) : null;
+            if (printer) {
+                var pdNozzle = document.getElementById('pd-nozzle');
+                if (pdNozzle) pdNozzle.textContent = dom.cfgNozzleDiameter.value + ' mm';
+            }
+        });
     }
 }
 
@@ -565,13 +581,15 @@ export async function fetchPrinterPresets() {
         const data = await resp.json();
         const items = data.items || [];
         if (!items.length) {
-            printerPresetsTbody.innerHTML = '<tr><td colspan="3" class="px-2 py-3 text-gray-500">' + t('slicer.noPresets') + '</td></tr>';
+            printerPresetsTbody.innerHTML = '<tr><td colspan="5" class="px-2 py-3 text-gray-500">' + t('slicer.noPresets') + '</td></tr>';
             return;
         }
         printerPresetsTbody.innerHTML = items.map(p => `
             <tr>
                 <td class="px-2 py-2 font-mono">${p.id}</td>
                 <td class="px-2 py-2">${p.name || '-'}</td>
+                <td class="px-2 py-2 text-gray-500">${p.bed_width}×${p.bed_depth}×${p.bed_height}</td>
+                <td class="px-2 py-2 text-gray-500">${p.nozzle} mm</td>
                 <td class="px-2 py-2 text-center">
                     <button data-pp-delete="${p.id}" class="text-red-500 hover:text-red-700 text-xs">${t('common.delete')}</button>
                 </td>
@@ -659,4 +677,99 @@ export function restoreDefaultPrinters() {
     setHiddenPrinters([]);
     renderPrinterVisibilityList();
     fetchPrinterModels();
+}
+
+// ── Update printer detail panel ──
+export function updatePrinterDetailPanel(printer) {
+    const panel = document.getElementById('printer-detail-panel');
+    if (!panel) return;
+    if (!printer) {
+        panel.classList.add('hidden');
+        return;
+    }
+    panel.classList.remove('hidden');
+    const pdNozzle = document.getElementById('pd-nozzle');
+    const pdBedSize = document.getElementById('pd-bed-size');
+    const pdVolume = document.getElementById('pd-volume');
+    const pdNozzles = document.getElementById('pd-nozzles');
+    if (pdNozzle) pdNozzle.textContent = (printer.nozzle || 0.4) + ' mm';
+    if (pdBedSize) pdBedSize.textContent = printer.bed_width + '×' + printer.bed_depth + '×' + printer.bed_height + ' mm';
+    const volL = ((printer.bed_width * printer.bed_depth * printer.bed_height) / 1000000).toFixed(1);
+    if (pdVolume) pdVolume.textContent = volL + ' L';
+    if (pdNozzles) pdNozzles.textContent = (printer.nozzles || []).map(n => n + ' mm').join(', ');
+}
+
+// ── Export / Import printer configuration ──
+function _setPrinterConfigMsg(text, ok) {
+    const msg = document.getElementById('printer-config-msg');
+    if (!msg) return;
+    msg.textContent = text;
+    msg.className = ok ? 'text-xs text-green-600 mt-1' : 'text-xs text-red-600 mt-1';
+    msg.classList.remove('hidden');
+    if (text) setTimeout(() => msg.classList.add('hidden'), 3000);
+}
+
+export async function exportPrinterConfig() {
+    if (!authToken) { openLoginModal(); return; }
+    try {
+        const resp = await authFetch('/api/user/settings/export');
+        if (resp.status === 401) { openLoginModal(); return; }
+        if (!resp.ok) {
+            const data = await resp.json().catch(() => ({}));
+            throw new Error(data.detail || '导出失败');
+        }
+        const data = await resp.json();
+        // Extract printer-related config
+        const printerConfig = {
+            version: 1,
+            exported_at: new Date().toISOString(),
+            default_printer_id: data.default_printer_id,
+            default_nozzle: data.default_nozzle,
+            default_slicer_preset_id: data.default_slicer_preset_id,
+            pricing_config: data.pricing_config,
+            materials: data.materials,
+        };
+        const blob = new Blob([JSON.stringify(printerConfig, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'pricer3d_printer_config_' + new Date().toISOString().slice(0, 10) + '.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        _setPrinterConfigMsg('配置已导出', true);
+    } catch (e) {
+        _setPrinterConfigMsg(e.message || '导出失败', false);
+    }
+}
+
+export async function importPrinterConfig(file) {
+    if (!authToken) { openLoginModal(); return; }
+    if (!file) { _setPrinterConfigMsg('请选择配置文件', false); return; }
+    try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        if (!data.version) { _setPrinterConfigMsg('无效的配置文件', false); return; }
+        const resp = await authFetch('/api/user/settings/import', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        if (resp.status === 401) { openLoginModal(); return; }
+        if (!resp.ok) {
+            const errData = await resp.json().catch(() => ({}));
+            throw new Error(errData.detail || '导入失败');
+        }
+        _setPrinterConfigMsg('配置已导入，正在刷新...', true);
+        // Reload settings and printer models
+        setTimeout(async () => {
+            const { fetchUserSettings } = await import('./settings.js');
+            await fetchUserSettings();
+            await fetchPrinterModels();
+            await fetchPrinterPresets();
+        }, 500);
+    } catch (e) {
+        _setPrinterConfigMsg(e.message || '导入失败', false);
+    }
 }

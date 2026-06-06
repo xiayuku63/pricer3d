@@ -16,6 +16,14 @@ let mouse = new THREE.Vector2();
 let highlightGroup = null;
 let highlightMode = false;
 
+// Mobile touch state
+let _isMobile = false;
+let _touchStartTime = 0;
+let _touchMoved = false;
+let _gestureHintShown = false;
+let _lastPinchDist = 0;
+let _renderRequested = true;  // dirty flag for on-demand rendering
+
 export function initViewer(previewContainerEl, previewPlaceholderEl) {
     previewContainer = previewContainerEl;
     previewPlaceholder = previewPlaceholderEl;
@@ -26,14 +34,59 @@ export function initViewer(previewContainerEl, previewPlaceholderEl) {
     camera = new THREE.PerspectiveCamera(45, previewContainer.clientWidth / previewContainer.clientHeight, 0.1, 10000);
     camera.position.set(0, 0, 120);
 
-    renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setPixelRatio(window.devicePixelRatio || 1);
+    // Adaptive pixel ratio: cap at 2 on mobile to reduce GPU load
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    _isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    renderer = new THREE.WebGLRenderer({ antialias: !_isMobile, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(dpr);
     renderer.setSize(previewContainer.clientWidth, previewContainer.clientHeight);
     previewContainer.appendChild(renderer.domElement);
 
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
+
+    // Mobile touch optimization
+    if (_isMobile) {
+        controls.rotateSpeed = 0.5;          // slower rotation for precision
+        controls.panSpeed = 0.6;
+        controls.zoomSpeed = 1.2;
+        controls.minDistance = 20;            // prevent zooming too close
+        controls.maxDistance = 2000;          // prevent zooming too far
+        controls.touches = {
+            ONE: THREE.TOUCH.ROTATE,
+            TWO: THREE.TOUCH.DOLLY_PAN,
+        };
+        // Reduce damping on mobile for snappier feel
+        controls.dampingFactor = 0.12;
+
+        // Track touch movement to distinguish tap vs drag
+        renderer.domElement.addEventListener('touchstart', (e) => {
+            _touchStartTime = Date.now();
+            _touchMoved = false;
+            if (e.touches.length === 2) {
+                // Track initial pinch distance
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                _lastPinchDist = Math.sqrt(dx * dx + dy * dy);
+            }
+            requestRender();
+        }, { passive: true });
+
+        renderer.domElement.addEventListener('touchmove', (e) => {
+            _touchMoved = true;
+            requestRender();
+        }, { passive: true });
+
+        // Show gesture hint on first load
+        if (!_gestureHintShown) {
+            _gestureHintShown = true;
+            showGestureHint();
+        }
+    }
+
+    // Mark render needed when controls change
+    controls.addEventListener('change', requestRender);
 
     raycaster = new THREE.Raycaster();
 
@@ -73,13 +126,24 @@ export function initViewer(previewContainerEl, previewPlaceholderEl) {
     // 打印平面中心位置常量（供所有加载函数使用）
     window._BED_CENTER = BED_HALF;
 
-    renderer.domElement.addEventListener('click', (event) => {
+    function handleInteraction(event) {
         if (!currentMesh) return;
         const rect = renderer.domElement.getBoundingClientRect();
-        mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-        mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+        let clientX, clientY;
+        if (event.touches && event.touches.length > 0) {
+            clientX = event.touches[0].clientX;
+            clientY = event.touches[0].clientY;
+        } else if (event.changedTouches && event.changedTouches.length > 0) {
+            clientX = event.changedTouches[0].clientX;
+            clientY = event.changedTouches[0].clientY;
+        } else {
+            clientX = event.clientX;
+            clientY = event.clientY;
+        }
+        mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
         raycaster.setFromCamera(mouse, camera);
-        // Lay on Face cluster 命中检测（通过全局回调）— 需在 faceClickCallback 检查之前
+        // Lay on Face cluster hit detection
         if (typeof window.__onLayFaceClick === 'function') {
             if (window.__onLayFaceClick(raycaster)) return;
         }
@@ -107,17 +171,54 @@ export function initViewer(previewContainerEl, previewPlaceholderEl) {
             const normalWorld = normalLocal.applyMatrix3(normalMatrix).normalize();
             faceClickCallback(normalWorld);
         }
-    });
+    }
+    renderer.domElement.addEventListener('click', handleInteraction);
+    renderer.domElement.addEventListener('touchend', (e) => {
+        // Only trigger face click on quick taps (< 300ms, no drag)
+        const elapsed = Date.now() - _touchStartTime;
+        if (elapsed < 300 && !_touchMoved) {
+            handleInteraction(e);
+        }
+    }, { passive: true });
 
     stlLoader = new STLLoader();
     initialised = true;
 
+    // On-demand rendering loop (saves battery on mobile)
     function animate() {
         requestAnimationFrame(animate);
-        controls.update();
-        renderer.render(scene, camera);
+        const controlsUpdated = controls.update();
+        if (_renderRequested || controlsUpdated) {
+            renderer.render(scene, camera);
+            _renderRequested = false;
+        }
     }
     animate();
+}
+
+/** Request a render on next frame */
+function requestRender() {
+    _renderRequested = true;
+}
+
+/** Show a one-time gesture hint overlay on mobile */
+function showGestureHint() {
+    const hint = document.createElement('div');
+    hint.className = 'viewer-gesture-hint';
+    hint.innerHTML = `
+        <div style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+            background:rgba(0,0,0,0.75);color:#fff;padding:12px 20px;border-radius:12px;
+            font-size:13px;z-index:9999;pointer-events:none;display:flex;gap:20px;
+            align-items:center;backdrop-filter:blur(4px);transition:opacity 0.5s">
+            <span>👆 拖动旋转</span>
+            <span>🤏 双指缩放</span>
+            <span>✌️ 双指平移</span>
+        </div>`;
+    document.body.appendChild(hint);
+    setTimeout(() => {
+        hint.style.opacity = '0';
+        setTimeout(() => hint.remove(), 600);
+    }, 3500);
 }
 
 export function fitCameraToMesh(meshObject) {
@@ -341,6 +442,7 @@ export function applyOrientationRotation(data) {
     currentMesh.updateMatrixWorld();
     var box = new THREE.Box3().setFromObject(currentMesh);
     currentMesh.position.z -= box.min.z;
+    requestRender();
 }
 
 export function resetOrientation() {
@@ -353,6 +455,7 @@ export function resetOrientation() {
     currentMesh.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(currentMesh);
     currentMesh.position.z -= box.min.z;
+    requestRender();
 }
 
 export function updateViewerSize() {
@@ -360,6 +463,7 @@ export function updateViewerSize() {
     camera.aspect = previewContainer.clientWidth / previewContainer.clientHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(previewContainer.clientWidth, previewContainer.clientHeight);
+    requestRender();
 }
 
 export function setupFaceClickHandler(callback) {
@@ -401,6 +505,7 @@ export function highlightFaces(faces) {
             highlightGroup.add(triMesh);
         }
     }
+    requestRender();
 }
 
 export function resetHighlight() {
@@ -413,4 +518,5 @@ export function resetHighlight() {
         highlightGroup = null;
     }
     highlightMode = false;
+    requestRender();
 }

@@ -25,7 +25,7 @@ import {
     PRICING_CONFIG, MATERIAL_OPTIONS, setMaterialOptions,
     loadUserSession, clearUserSession, saveUserSession, loadSlicerPresetSelection,
     saveSlicerPresetSelection, formatColorLabel, formatTimeHMS, escapeHtml,
-    renderColorDropdown, getColorsForMaterial, colorToObj,
+    renderColorDropdown, getColorsForMaterial, colorToObj, pickAllowedColor,
     authFetch,
     getActivePrinterCompoundId,
 } from './modules/state.js';
@@ -41,6 +41,9 @@ import {
     syncPricingFromInputs, openColorEditor, closeColorEditor,
     addColorToMaterial, removeColorFromMaterial, validateCurrentFormulas,
     saveUserSettings, setAsDefaults, changePassword,
+    initMobileFormOptimizations,
+    loadPreferences, initPreferencesUI,
+    renderPreferencesTab,
 } from './modules/settings.js';
 import {
     initPresets, preloadPrinterSelectors, fetchPrinterModels, fetchSlicerPresets,
@@ -49,6 +52,7 @@ import {
     downloadSelectedPreset, deleteSelectedPreset,
     fetchPrinterPresets, savePrinterPreset, deletePrinterPreset,
     renderPrinterVisibilityList, restoreDefaultPrinters,
+    updatePrinterDetailPanel, exportPrinterConfig, importPrinterConfig,
 } from './modules/presets.js';
 import {
     initMembership, openMembershipModal, closeMembershipModal,
@@ -56,12 +60,20 @@ import {
 } from './modules/membership.js';
 import {
     initQuote, quoteSingleFileWithOptions, quoteSelectedFiles,
+    quoteSelectedFilesWithProgress,
     mergeResultsByFilename, normalizeResultsWithCurrentOptions,
     reQuoteAllSelectedFiles, renderResultsTable, recalcSummaryFromCurrentResults,
     handleRowEditChange, refreshOptionsSummary, setOpenLoginModalRef,
     refreshBatchMaterialDropdown, refreshBatchColorDropdown, batchApplyToAll,
     handleCardEditChange, exportCSV, exportExcel,
+    initTableEnhancements,
+    openMaterialCompare,
 } from './modules/quote.js';
+import {
+    validateFiles, setupEnhancedDragDrop, renderFilePreviewChips,
+    showToast, showProgress, updateProgress, showProgressSuccess, showProgressError,
+    hideProgress, uploadWithProgress, getFilesSizeSummary, formatFileSize,
+} from './modules/upload.js';
 import {
     initPreview, buildStlThumbnail, buildNonStlThumbnail,
     ensureThumbnailForFile, buildThumbnails,
@@ -173,15 +185,36 @@ document.addEventListener('DOMContentLoaded', () => {
         formulaVarsPanel: $('formula-vars-panel'),
     };
 
+    // ── Mobile Navigation Drawer DOM refs ──
+    const mobileNav = {
+        menuBtn: $('mobile-menu-btn'),
+        drawer: $('mobile-nav-drawer'),
+        backdrop: $('mobile-nav-backdrop'),
+        closeBtn: $('mobile-nav-close-btn'),
+        openLoginBtn: $('mobile-open-login-btn'),
+        logoutBtn: $('mobile-logout-btn'),
+        openMembershipBtn: $('mobile-open-membership-btn'),
+        openUserCenterBtn: $('mobile-open-user-center-btn'),
+        openAdminUsersBtn: $('mobile-open-admin-users-btn'),
+        openQuoteHistoryBtn: $('mobile-open-quote-history-btn'),
+        langSwitchBtn: $('mobile-lang-switch-btn'),
+        langLabel: $('mobile-lang-label'),
+        appVersion: $('mobile-app-version'),
+    };
+
     // ── Init all modules with their DOM refs ──
     initAuth(dom);
     initSettings(dom);
     initPresets(dom);
     initMembership(dom);
     initQuote(dom);
+    initTableEnhancements();
     initPreview(dom);
     initOrientationUI(dom);
     initOnboarding();
+    initMobileFormOptimizations();
+    // Load user preferences (favorites, usage stats) from localStorage + backend
+    loadPreferences();
 
     // Break circular dep: quote.js needs openLoginModal from auth.js
     setOpenLoginModalRef(openLoginModal);
@@ -216,6 +249,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (langSwitchBtn) {
         const updateLangBtn = () => {
             langSwitchBtn.textContent = `${langFlag(lang)} ${langLabel(lang)}`;
+            // Sync mobile lang label
+            if (mobileNav.langLabel) mobileNav.langLabel.textContent = `${langFlag(lang)} ${langLabel(lang)}`;
         };
         updateLangBtn();
         langSwitchBtn.addEventListener('click', () => {
@@ -237,6 +272,7 @@ document.addEventListener('DOMContentLoaded', () => {
         dom.userDropdown.classList.add('hidden');
         if (!currentUser) return;
         renderUserCenterUI();
+        renderPreferencesTab();
         if (dom.userCenterSetDefaultsBtn) dom.userCenterSetDefaultsBtn.classList.toggle('hidden', !(currentUser && currentUser.is_admin));
         if (dom.ucOldPassword) dom.ucOldPassword.value = '';
         if (dom.ucNewPassword) dom.ucNewPassword.value = '';
@@ -312,6 +348,20 @@ document.addEventListener('DOMContentLoaded', () => {
         // Select a color item
         const item = e.target.closest('.color-dd-item');
         if (item) {
+            // Check if the star/favorite button was clicked
+            const favBtn = e.target.closest('.color-fav-toggle');
+            if (favBtn) {
+                e.stopPropagation();
+                const hex = favBtn.getAttribute('data-color-hex');
+                if (hex) {
+                    import('./modules/settings.js').then(mod => {
+                        const nowFav = mod.toggleFavoriteColor(hex);
+                        favBtn.classList.toggle('text-yellow-500', nowFav);
+                        favBtn.classList.toggle('text-gray-300', !nowFav);
+                    });
+                }
+                return;
+            }
             e.stopPropagation();
             const hex = item.getAttribute('data-color-hex');
             if (!hex) return;
@@ -435,6 +485,8 @@ document.addEventListener('DOMContentLoaded', () => {
             dom.optColor.innerHTML = rendered.html;
             dom.optQuantity.value = String(quoteOptions.quantity);
             dom.optionsModal.classList.remove('hidden');
+            // Initialize preferences UI (favorites, quick-select)
+            initPreferencesUI();
         });
     }
 
@@ -472,6 +524,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // Printer visibility
     const ppRestoreBtn = document.getElementById('printer-restore-defaults-btn');
     if (ppRestoreBtn) ppRestoreBtn.addEventListener('click', restoreDefaultPrinters);
+
+    // Printer config export/import
+    const ppExportBtn = document.getElementById('printer-config-export-btn');
+    const ppImportInput = document.getElementById('printer-config-import-input');
+    if (ppExportBtn) ppExportBtn.addEventListener('click', exportPrinterConfig);
+    if (ppImportInput) ppImportInput.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (file) importPrinterConfig(file);
+        e.target.value = ''; // reset so same file can be re-selected
+    });
 
     // User center tabs
     dom.ucTabBtns.forEach(btn => {
@@ -583,6 +645,57 @@ document.addEventListener('DOMContentLoaded', () => {
             const previewBtn = event.target.closest('[data-preview-file]');
             if (previewBtn) {
                 previewByFilename(previewBtn.getAttribute('data-preview-file'), previewBtn.getAttribute('data-preview-ext'));
+                return;
+            }
+            // Toggle detail sections (cost breakdown / material info / print suggestions)
+            const toggleBtn = event.target.closest('[data-toggle-detail]');
+            if (toggleBtn) {
+                const filename = toggleBtn.getAttribute('data-toggle-detail');
+                const detailContent = document.querySelector('[data-detail-content="' + filename + '"]');
+                if (detailContent) {
+                    const isHidden = detailContent.classList.contains('hidden');
+                    detailContent.classList.toggle('hidden');
+                    const svg = toggleBtn.querySelector('svg');
+                    if (svg) svg.style.transform = isHidden ? 'rotate(180deg)' : '';
+                }
+                return;
+            }
+            // Re-quote single file
+            const requoteBtn = event.target.closest('[data-requote-file]');
+            if (requoteBtn) {
+                const filename = requoteBtn.getAttribute('data-requote-file');
+                const file = selectedFilesMap.get(filename);
+                if (file) {
+                    const existing = currentResults.find((r) => r && r.filename === filename);
+                    const material = existing?.material || quoteOptions.material;
+                    const allowedColors = getColorsForMaterial(material);
+                    const color = pickAllowedColor(allowedColors, existing?.color, quoteOptions.color);
+                    const quantity = existing?.quantity || quoteOptions.quantity || 1;
+                    const pm = existing?._printer_model || '';
+                    const sp = existing?._slicer_preset_id;
+                    const idx = currentResults.findIndex((i) => i && i.filename === filename);
+                    if (idx >= 0) currentResults[idx] = { ...currentResults[idx], _recalculating: true };
+                    renderResultsTable();
+                    recalcSummaryFromCurrentResults();
+                    quoteSingleFileWithOptions(file, { material, color, quantity, _printer_model: pm, _slicer_preset_id: sp })
+                        .then((updated) => {
+                            mergeResultsByFilename([updated]);
+                            renderResultsTable();
+                            recalcSummaryFromCurrentResults();
+                        })
+                        .catch((err) => {
+                            mergeResultsByFilename([{ filename, status: 'failed', error: err.message || '重算失败', material, color, quantity }]);
+                            renderResultsTable();
+                            recalcSummaryFromCurrentResults();
+                        });
+                }
+                return;
+            }
+            // Material comparison button
+            const compareBtn = event.target.closest('[data-compare-material]');
+            if (compareBtn) {
+                openMaterialCompare(compareBtn.getAttribute('data-compare-material'));
+                return;
             }
         });
     }
@@ -613,6 +726,26 @@ document.addEventListener('DOMContentLoaded', () => {
             const previewBtn = event.target.closest('[data-preview-file]');
             if (previewBtn) {
                 previewByFilename(previewBtn.getAttribute('data-preview-file'), previewBtn.getAttribute('data-preview-ext'));
+                return;
+            }
+            // Toggle detail sections for mobile cards
+            const toggleBtn = event.target.closest('[data-toggle-detail]');
+            if (toggleBtn) {
+                const filename = toggleBtn.getAttribute('data-toggle-detail');
+                const detailContent = document.querySelector('[data-detail-content="' + filename + '"]');
+                if (detailContent) {
+                    const isHidden = detailContent.classList.contains('hidden');
+                    detailContent.classList.toggle('hidden');
+                    const svg = toggleBtn.querySelector('svg');
+                    if (svg) svg.style.transform = isHidden ? 'rotate(180deg)' : '';
+                }
+                return;
+            }
+            // Material comparison button (mobile cards)
+            const compareBtn = event.target.closest('[data-compare-material]');
+            if (compareBtn) {
+                openMaterialCompare(compareBtn.getAttribute('data-compare-material'));
+                return;
             }
         });
     }
@@ -623,152 +756,164 @@ document.addEventListener('DOMContentLoaded', () => {
     if (exportCsvBtn) exportCsvBtn.addEventListener('click', exportCSV);
     if (exportExcelBtn) exportExcelBtn.addEventListener('click', exportExcel);
 
-    // File upload
+    // ── File upload (enhanced with validation, progress, preview chips) ──
+    async function _handleFileSelection(newFiles) {
+        if (!newFiles || newFiles.length === 0) return;
+
+        // Validate files
+        const { validFiles, invalidFiles, errors } = validateFiles(newFiles, selectedFilesMap);
+
+        // Show validation errors as toasts
+        if (errors.length > 0) {
+            errors.forEach(err => {
+                if (err.type === 'count') {
+                    showToast(err.message, 'error', 5000);
+                } else if (err.type === 'files') {
+                    err.invalidFiles.forEach(inf => {
+                        showToast(`${inf.file.name}: ${inf.reason}`, 'warning', 5000);
+                    });
+                }
+            });
+        }
+
+        if (validFiles.length === 0) return;
+
+        _hideError();
+
+        // Check if any file is a ZIP — route to /api/quote/zip
+        const zipFiles = validFiles.filter(function(f) { return f.name.toLowerCase().endsWith('.zip'); });
+        const modelFiles = validFiles.filter(function(f) { return !f.name.toLowerCase().endsWith('.zip'); });
+
+        if (zipFiles.length > 0) {
+            if (zipFiles.length > 1 && modelFiles.length === 0) {
+                showToast('一次只能上传一个 ZIP 文件', 'error');
+                return;
+            }
+
+            if (!authToken) {
+                setPendingQuoteFiles(validFiles);
+                dom.fileNameDisplay.textContent = '当前列表共 ' + selectedFilesMap.size + ' 个文件，请登录后继续报价';
+                showToast('请先登录后再上传报价', 'warning');
+                openLoginModal();
+                return;
+            }
+
+            dom.fileNameDisplay.textContent = '正在解析 ZIP 文件中的清单与模型...';
+            dom.fileNameDisplay.classList.add('text-indigo-600', 'font-medium');
+            showProgress('解析 ZIP 文件...');
+
+            try {
+                const zipFormData = new FormData();
+                zipFormData.append('file', zipFiles[0]);
+                zipFormData.append('material', quoteOptions.material);
+                zipFormData.append('color', quoteOptions.color);
+                zipFormData.append('quantity', String(quoteOptions.quantity));
+
+                const zipPrinterModel = getActivePrinterCompoundId();
+                if (zipPrinterModel) zipFormData.append('printer_model', zipPrinterModel);
+                const zipPresetEl = document.getElementById('batch-slicer-preset');
+                const zipPresetId = (zipPresetEl && zipPresetEl.value) ? Number(zipPresetEl.value) : null;
+                if (zipPresetId) zipFormData.append('slicer_preset_id', String(zipPresetId));
+
+                const zipResult = await uploadWithProgress('/api/quote/zip', zipFormData, authToken);
+                if (!zipResult.ok) throw new Error(zipResult.error || 'ZIP 上传失败');
+                const zipData = zipResult.data;
+
+                mergeResultsByFilename(zipData.results || []);
+                renderResultsTable();
+                recalcSummaryFromCurrentResults();
+
+                const zipModelFiles = [];
+                for (let ri = 0; ri < (zipData.results || []).length; ri++) {
+                    const r = zipData.results[ri];
+                    if (r.checklist_file_path) {
+                        try {
+                            const fileResp = await authFetch('/api/quote/zip/file?file_path=' + encodeURIComponent(r.checklist_file_path));
+                            if (fileResp.ok) {
+                                const blob = await fileResp.blob();
+                                const modelFile = new File([blob], r.filename, { type: 'application/octet-stream' });
+                                selectedFilesMap.set(r.filename, modelFile);
+                                zipModelFiles.push(modelFile);
+                            }
+                        } catch (fe) {
+                            console.warn('Failed to fetch model file for preview:', r.filename, fe);
+                        }
+                    }
+                }
+                if (zipModelFiles.length > 0) {
+                    await buildThumbnails(zipModelFiles);
+                    renderResultsTable();
+                }
+
+                if (zipData.match_status) {
+                    const ms = zipData.match_status;
+                    const statusClass = ms.mode === 'all' ? 'text-green-700 bg-green-50 border-green-300'
+                        : ms.mode === 'partial' ? 'text-amber-700 bg-amber-50 border-amber-300'
+                        : 'text-red-700 bg-red-50 border-red-300';
+                    dom.fileNameDisplay.innerHTML = '<span class="inline-block px-2 py-0.5 rounded border text-xs ' + statusClass + '">' + escapeHtml(ms.message) + '</span>';
+                    dom.fileNameDisplay.classList.add('text-indigo-600', 'font-medium');
+                    showToast(ms.message, ms.mode === 'all' ? 'success' : 'warning');
+                } else {
+                    dom.fileNameDisplay.textContent = 'ZIP 报价完成，共 ' + (zipData.results || []).length + ' 个文件';
+                    showToast(`ZIP 处理完成，共 ${(zipData.results || []).length} 个文件`, 'success');
+                }
+
+                showProgressSuccess('ZIP 解析完成');
+                hideProgress();
+
+                if (modelFiles.length > 0) {
+                    modelFiles.forEach(function(f) { selectedFilesMap.set(f.name, f); });
+                    await buildThumbnails(modelFiles);
+                    await quoteSelectedFilesWithProgress(modelFiles);
+                }
+            } catch (err) {
+                showProgressError(err.message || 'ZIP 解析失败');
+                hideProgress();
+                showToast(err.message || 'ZIP 解析失败', 'error');
+                dom.fileNameDisplay.textContent = 'ZIP 文件处理失败';
+            }
+            return;
+        }
+
+        // Normal model file upload (enhanced flow with progress)
+        modelFiles.forEach((file) => selectedFilesMap.set(file.name, file));
+        dom.fileNameDisplay.classList.add('text-indigo-600', 'font-medium');
+
+        // Show file preview chips
+        renderFilePreviewChips(modelFiles);
+
+        if (!authToken) {
+            setPendingQuoteFiles(modelFiles);
+            dom.fileNameDisplay.textContent = `当前列表共 ${selectedFilesMap.size} 个文件，请登录后继续为新增 ${modelFiles.length} 个文件自动报价`;
+            showToast('请先登录后再上传报价', 'warning');
+            openLoginModal();
+            return;
+        }
+
+        dom.fileNameDisplay.textContent = `当前列表共 ${selectedFilesMap.size} 个文件，正在为新增 ${modelFiles.length} 个文件生成静态图与自动报价...`;
+        showToast(`开始处理 ${modelFiles.length} 个文件...`, 'info', 2000);
+
+        try {
+            showProgress(`生成模型预览 (${modelFiles.length} 个文件)...`);
+            await buildThumbnails(modelFiles);
+            // Update preview chips with thumbnails
+            renderFilePreviewChips(modelFiles);
+            await quoteSelectedFilesWithProgress(modelFiles);
+            dom.fileNameDisplay.textContent = `当前列表共 ${selectedFilesMap.size} 个文件，新增 ${modelFiles.length} 个文件报价完成`;
+            renderFilePreviewChips([]);
+        } catch (err) {
+            showProgressError(err.message || '报价失败');
+            hideProgress();
+            showToast(err.message || '报价失败，请重试', 'error');
+            dom.fileNameDisplay.textContent = `当前列表共 ${selectedFilesMap.size} 个文件，新增 ${modelFiles.length} 个文件自动报价失败`;
+        }
+    }
+
     if (dom.fileInput) {
         dom.fileInput.addEventListener('change', async (e) => {
             const newFiles = Array.from(e.target.files || []);
             dom.fileInput.value = '';
-            if (newFiles.length === 0) return;
-
-            const combined = new Map(selectedFilesMap);
-            newFiles.forEach((file) => combined.set(file.name, file));
-
-            if (combined.size > MAX_FILES) {
-                _showError(`最多支持 ${MAX_FILES} 个文件（当前已选择 ${selectedFilesMap.size} 个，本次新增 ${newFiles.length} 个）`);
-                return;
-            }
-            const invalidByType = newFiles.find((f) => {
-                const name = f.name.toLowerCase();
-                return !ALLOWED_EXTENSIONS.some((ext) => name.endsWith(ext));
-            });
-            if (invalidByType) {
-                _showError(`不支持的格式：${invalidByType.name}。仅支持 ${ALLOWED_EXTENSIONS.join('/')}`);
-                return;
-            }
-            const invalidBySize = newFiles.find((f) => f.size >= MAX_FILE_SIZE);
-            if (invalidBySize) {
-                _showError(`文件过大：${invalidBySize.name}，单文件必须小于100MB`);
-                return;
-            }
-
-            _hideError();
-
-            // Check if any file is a ZIP — route to /api/quote/zip
-            const zipFiles = newFiles.filter(function(f) { return f.name.toLowerCase().endsWith('.zip'); });
-            const modelFiles = newFiles.filter(function(f) { return !f.name.toLowerCase().endsWith('.zip'); });
-
-            if (zipFiles.length > 0) {
-                // Only support single ZIP upload at a time (combined with model files is ok)
-                if (zipFiles.length > 1 && modelFiles.length === 0) {
-                    _showError('一次只能上传一个 ZIP 文件');
-                    return;
-                }
-
-                if (!authToken) {
-                    setPendingQuoteFiles(newFiles);
-                    dom.fileNameDisplay.textContent = '当前列表共 ' + selectedFilesMap.size + ' 个文件，请登录后继续报价';
-                    _showError('请先登录后再上传报价');
-                    openLoginModal();
-                    return;
-                }
-
-                dom.fileNameDisplay.textContent = '正在解析 ZIP 文件中的清单与模型...';
-                dom.fileNameDisplay.classList.add('text-indigo-600', 'font-medium');
-
-                try {
-                    // Upload ZIP to new endpoint
-                    const zipFormData = new FormData();
-                    zipFormData.append('file', zipFiles[0]);
-                    zipFormData.append('material', quoteOptions.material);
-                    zipFormData.append('color', quoteOptions.color);
-                    zipFormData.append('quantity', String(quoteOptions.quantity));
-
-                    // Send printer and slicer preset from batch toolbar for checklist-less models
-                    const zipPrinterModel = getActivePrinterCompoundId();
-                    if (zipPrinterModel) zipFormData.append('printer_model', zipPrinterModel);
-                    const zipPresetEl = document.getElementById('batch-slicer-preset');
-                    const zipPresetId = (zipPresetEl && zipPresetEl.value) ? Number(zipPresetEl.value) : null;
-                    if (zipPresetId) zipFormData.append('slicer_preset_id', String(zipPresetId));
-
-                    const zipResp = await authFetch('/api/quote/zip', { method: 'POST', body: zipFormData });
-                    const zipData = await zipResp.json();
-                    if (!zipResp.ok) throw new Error(zipData.detail || 'ZIP 上传失败');
-
-                    // Process results
-                    mergeResultsByFilename(zipData.results || []);
-                    renderResultsTable();
-                    recalcSummaryFromCurrentResults();
-
-                    // Rebuild selectedFilesMap + thumbnails for ZIP-uploaded models
-                    // These files aren't in selectedFilesMap since they came from the ZIP,
-                    // so previews and batch re-quote won't work. Fetch each file from backend.
-                    const zipModelFiles = [];
-                    for (let ri = 0; ri < (zipData.results || []).length; ri++) {
-                        const r = zipData.results[ri];
-                        if (r.checklist_file_path) {
-                            try {
-                                const fileResp = await authFetch('/api/quote/zip/file?file_path=' + encodeURIComponent(r.checklist_file_path));
-                                if (fileResp.ok) {
-                                    const blob = await fileResp.blob();
-                                    const modelFile = new File([blob], r.filename, { type: 'application/octet-stream' });
-                                    selectedFilesMap.set(r.filename, modelFile);
-                                    zipModelFiles.push(modelFile);
-                                }
-                            } catch (fe) {
-                                console.warn('Failed to fetch model file for preview:', r.filename, fe);
-                            }
-                        }
-                    }
-                    if (zipModelFiles.length > 0) {
-                        await buildThumbnails(zipModelFiles);
-                        renderResultsTable();
-                    }
-
-                    // Show match status message
-                    if (zipData.match_status) {
-                        const ms = zipData.match_status;
-                        const statusClass = ms.mode === 'all' ? 'text-green-700 bg-green-50 border-green-300'
-                            : ms.mode === 'partial' ? 'text-amber-700 bg-amber-50 border-amber-300'
-                            : 'text-red-700 bg-red-50 border-red-300';
-                        dom.fileNameDisplay.innerHTML = '<span class="inline-block px-2 py-0.5 rounded border text-xs ' + statusClass + '">' + escapeHtml(ms.message) + '</span>';
-                        dom.fileNameDisplay.classList.add('text-indigo-600', 'font-medium');
-                    } else {
-                        dom.fileNameDisplay.textContent = 'ZIP 报价完成，共 ' + (zipData.results || []).length + ' 个文件';
-                    }
-
-                    // Also process any non-ZIP model files from same selection
-                    if (modelFiles.length > 0) {
-                        modelFiles.forEach(function(f) { selectedFilesMap.set(f.name, f); });
-                        await buildThumbnails(modelFiles);
-                        await quoteSelectedFiles(modelFiles);
-                    }
-                } catch (err) {
-                    _showError(err.message || 'ZIP 解析失败');
-                    dom.fileNameDisplay.textContent = 'ZIP 文件处理失败';
-                }
-                return;
-            }
-
-            // Normal model file upload (existing flow)
-            newFiles.forEach((file) => selectedFilesMap.set(file.name, file));
-            dom.fileNameDisplay.classList.add('text-indigo-600', 'font-medium');
-
-            if (!authToken) {
-                setPendingQuoteFiles(newFiles);
-                dom.fileNameDisplay.textContent = `当前列表共 ${selectedFilesMap.size} 个文件，请登录后继续为新增 ${newFiles.length} 个文件自动报价`;
-                _showError('请先登录后再上传报价');
-                openLoginModal();
-                return;
-            }
-            dom.fileNameDisplay.textContent = `当前列表共 ${selectedFilesMap.size} 个文件，正在为新增 ${newFiles.length} 个文件生成静态图与自动报价...`;
-            try {
-                await buildThumbnails(newFiles);
-                await quoteSelectedFiles(newFiles);
-                dom.fileNameDisplay.textContent = `当前列表共 ${selectedFilesMap.size} 个文件，新增 ${newFiles.length} 个文件报价完成`;
-            } catch (err) {
-                _showError(err.message);
-                dom.fileNameDisplay.textContent = `当前列表共 ${selectedFilesMap.size} 个文件，新增 ${newFiles.length} 个文件自动报价失败`;
-            }
+            await _handleFileSelection(newFiles);
         });
     }
 
@@ -788,45 +933,205 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             versionEl.textContent = text;
             versionEl.title = `环境: ${data.env || 'unknown'}`;
+            // Also update mobile nav version
+            if (mobileNav.appVersion) mobileNav.appVersion.textContent = text;
         } catch (e) {
             versionEl.textContent = 'v?';
         }
     }
 
-    // Drag & drop
-    const dropZone = document.getElementById('drop-zone');
-    if (dropZone) {
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
-            dropZone.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); });
+    // Enhanced Drag & Drop (using upload module)
+    if (dom.fileInput) {
+        setupEnhancedDragDrop(dom.fileInput, async (droppedFiles) => {
+            await _handleFileSelection(droppedFiles);
         });
-        dropZone.addEventListener('dragenter', () => dropZone.classList.add('border-indigo-400', 'bg-indigo-50'));
-        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('border-indigo-400', 'bg-indigo-50'));
-        dropZone.addEventListener('dragover', () => dropZone.classList.add('border-indigo-400', 'bg-indigo-50'));
-        dropZone.addEventListener('drop', (e) => {
-            dropZone.classList.remove('border-indigo-400', 'bg-indigo-50');
-            const droppedFiles = Array.from(e.dataTransfer.files);
-            const valid = droppedFiles.filter(f => {
-                const ext = '.' + f.name.split('.').pop().toLowerCase();
-                return ALLOWED_EXTENSIONS.includes(ext) && f.size < MAX_FILE_SIZE;
-            });
-            if (valid.length === 0) {
-                _showError('不支持的文件格式或文件过大（支持 .stl/.step/.stp/.obj/.3mf，最大100MB）');
-                return;
+    }
+
+    // File preview chip remove button handler
+    const previewChipsContainer = document.getElementById('file-preview-chips');
+    if (previewChipsContainer) {
+        previewChipsContainer.addEventListener('click', (e) => {
+            const removeBtn = e.target.closest('[data-remove-file]');
+            if (removeBtn) {
+                const filename = removeBtn.getAttribute('data-remove-file');
+                selectedFilesMap.delete(filename);
+                thumbnailMap.delete(filename);
+                setCurrentResults(currentResults.filter((i) => i && i.filename !== filename));
+                renderResultsTable();
+                recalcSummaryFromCurrentResults();
+                renderFilePreviewChips([]);
+                if (selectedFilesMap.size === 0) {
+                    dom.fileNameDisplay.textContent = '未选择文件（最多20个，单文件需小于100MB）';
+                    dom.fileNameDisplay.classList.remove('text-indigo-600', 'font-medium');
+                } else {
+                    dom.fileNameDisplay.textContent = `当前列表共 ${selectedFilesMap.size} 个文件`;
+                }
             }
-            if (valid.length + selectedFilesMap.size > MAX_FILES) {
-                _showError(`单次最多上传 ${MAX_FILES} 个文件`);
-                return;
-            }
-            const dt = new DataTransfer();
-            valid.forEach(f => dt.items.add(f));
-            dom.fileInput.files = dt.files;
-            dom.fileInput.dispatchEvent(new Event('change'));
         });
     }
 
     // ═══════════════════════════════════════════════
     //  Startup
     // ═══════════════════════════════════════════════
+
+    // ═══════════════════════════════════════════════
+    //  Mobile Navigation Drawer
+    // ═══════════════════════════════════════════════
+    function openMobileNav() {
+        if (!mobileNav.drawer) return;
+        mobileNav.drawer.classList.add('open');
+        mobileNav.backdrop.classList.add('visible');
+        mobileNav.menuBtn.classList.add('open');
+        mobileNav.menuBtn.setAttribute('aria-expanded', 'true');
+        document.body.classList.add('nav-open');
+        syncMobileNavAuthState();
+    }
+
+    function closeMobileNav() {
+        if (!mobileNav.drawer) return;
+        mobileNav.drawer.classList.remove('open');
+        mobileNav.backdrop.classList.remove('visible');
+        mobileNav.menuBtn.classList.remove('open');
+        mobileNav.menuBtn.setAttribute('aria-expanded', 'false');
+        document.body.classList.remove('nav-open');
+    }
+
+    function syncMobileNavAuthState() {
+        // Sync mobile drawer buttons with desktop auth state
+        if (currentUser) {
+            if (mobileNav.openLoginBtn) mobileNav.openLoginBtn.classList.add('hidden');
+            if (mobileNav.logoutBtn) mobileNav.logoutBtn.classList.remove('hidden');
+            if (mobileNav.openMembershipBtn) mobileNav.openMembershipBtn.classList.toggle('hidden', false);
+            if (mobileNav.openUserCenterBtn) mobileNav.openUserCenterBtn.classList.remove('hidden');
+            if (mobileNav.openAdminUsersBtn) mobileNav.openAdminUsersBtn.classList.toggle('hidden', !currentUser.is_admin);
+        } else {
+            if (mobileNav.openLoginBtn) mobileNav.openLoginBtn.classList.remove('hidden');
+            if (mobileNav.logoutBtn) mobileNav.logoutBtn.classList.add('hidden');
+            if (mobileNav.openMembershipBtn) mobileNav.openMembershipBtn.classList.add('hidden');
+            if (mobileNav.openUserCenterBtn) mobileNav.openUserCenterBtn.classList.add('hidden');
+            if (mobileNav.openAdminUsersBtn) mobileNav.openAdminUsersBtn.classList.add('hidden');
+        }
+    }
+
+    // Set active nav item based on current page
+    function highlightActiveMobileNavItem() {
+        const path = window.location.pathname;
+        document.querySelectorAll('.mobile-nav-item').forEach(item => item.classList.remove('active'));
+        let activeSelector = '[data-page="quote"]';
+        if (path.includes('/admin/users')) activeSelector = '[data-page="admin"]';
+        const activeItem = document.querySelector(`.mobile-nav-item${activeSelector}`);
+        if (activeItem) activeItem.classList.add('active');
+    }
+    highlightActiveMobileNavItem();
+
+    // Wire hamburger button
+    _bind(mobileNav.menuBtn, 'click', () => {
+        if (mobileNav.drawer?.classList.contains('open')) {
+            closeMobileNav();
+        } else {
+            openMobileNav();
+        }
+    });
+
+    // Wire close button and backdrop
+    _bind(mobileNav.closeBtn, 'click', closeMobileNav);
+    _bind(mobileNav.backdrop, 'click', closeMobileNav);
+
+    // Wire mobile nav action buttons (delegate to desktop handlers)
+    _bind(mobileNav.openLoginBtn, 'click', () => { closeMobileNav(); openLoginModal(); });
+    _bind(mobileNav.logoutBtn, 'click', () => { closeMobileNav(); handleLogout(); });
+    _bind(mobileNav.openMembershipBtn, 'click', () => { closeMobileNav(); openMembershipModal(); });
+    _bind(mobileNav.openQuoteHistoryBtn, 'click', () => {
+        closeMobileNav();
+        loadQuoteHistory(authToken);
+        // Try to find and click the desktop history button to open modal
+        const histBtn = document.getElementById('open-quote-history-btn');
+        if (histBtn) histBtn.click();
+    });
+    if (mobileNav.openUserCenterBtn) mobileNav.openUserCenterBtn.addEventListener('click', () => {
+        closeMobileNav();
+        if (!currentUser) return;
+        renderUserCenterUI();
+        renderPreferencesTab();
+        if (dom.userCenterSetDefaultsBtn) dom.userCenterSetDefaultsBtn.classList.toggle('hidden', !(currentUser && currentUser.is_admin));
+        if (dom.ucOldPassword) dom.ucOldPassword.value = '';
+        if (dom.ucNewPassword) dom.ucNewPassword.value = '';
+        if (dom.ucConfirmPassword) dom.ucConfirmPassword.value = '';
+        if (dom.ucPasswordMsg) { dom.ucPasswordMsg.textContent = ''; dom.ucPasswordMsg.className = 'text-xs hidden'; }
+        const defaultTab = document.querySelector('.uc-tab-btn[data-uc-tab="materials"]');
+        if (defaultTab) defaultTab.click();
+        dom.userCenterModal.classList.remove('hidden');
+        fetchPrinterModels();
+        fetchSlicerPresets();
+        fetchPrinterPresets();
+        renderPrinterVisibilityList();
+    });
+    _bind(mobileNav.openAdminUsersBtn, 'click', () => { closeMobileNav(); window.location.href = '/admin/users'; });
+
+    // Wire mobile language switcher
+    if (mobileNav.langSwitchBtn) {
+        const updateMobileLangBtn = () => {
+            if (mobileNav.langLabel) mobileNav.langLabel.textContent = `${langFlag(lang)} ${langLabel(lang)}`;
+        };
+        updateMobileLangBtn();
+        mobileNav.langSwitchBtn.addEventListener('click', () => {
+            toggleLang();
+            updateMobileLangBtn();
+        });
+    }
+
+    // Sync mobile app version with desktop
+    if (mobileNav.appVersion) {
+        const desktopVersion = document.getElementById('app-version');
+        if (desktopVersion) {
+            const observer = new MutationObserver(() => {
+                mobileNav.appVersion.textContent = desktopVersion.textContent;
+            });
+            observer.observe(desktopVersion, { childList: true, characterData: true, subtree: true });
+        }
+    }
+
+    // ── Swipe-to-close gesture ──
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchMoveX = 0;
+    let isSwiping = false;
+
+    if (mobileNav.drawer) {
+        mobileNav.drawer.addEventListener('touchstart', (e) => {
+            if (!mobileNav.drawer.classList.contains('open')) return;
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+            isSwiping = false;
+        }, { passive: true });
+
+        mobileNav.drawer.addEventListener('touchmove', (e) => {
+            if (!mobileNav.drawer.classList.contains('open')) return;
+            const dx = e.touches[0].clientX - touchStartX;
+            const dy = e.touches[0].clientY - touchStartY;
+            // Only trigger if horizontal swipe is dominant
+            if (Math.abs(dx) > Math.abs(dy) && dx < -30) {
+                isSwiping = true;
+            }
+        }, { passive: true });
+
+        mobileNav.drawer.addEventListener('touchend', () => {
+            if (isSwiping) {
+                closeMobileNav();
+                isSwiping = false;
+            }
+        }, { passive: true });
+    }
+
+    // Close mobile nav on Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && mobileNav.drawer?.classList.contains('open')) {
+            closeMobileNav();
+        }
+    });
+
+    // Export syncMobileNavAuthState so auth.js can call it after login/logout
+    window.__syncMobileNavAuthState = syncMobileNavAuthState;
     loadAppVersion();
     preloadPrinterSelectors();
     window.addEventListener('resize', updateViewerSize);

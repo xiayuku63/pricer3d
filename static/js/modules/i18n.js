@@ -273,6 +273,18 @@ STRINGS = {
     'material.genericBrand': '通用',
     'material.colorExists': '该颜色已存在',
 
+    // ── Preferences / 偏好 ──
+    'preference.favorites': '收藏',
+    'preference.frequentlyUsed': '常用',
+    'preference.colorFavorites': '颜色收藏',
+    'preference.frequentColors': '常用颜色',
+    'preference.materialStats': '材料使用统计',
+    'preference.colorStats': '颜色使用统计',
+    'preference.noStats': '暂无使用记录',
+    'preference.addFavorite': '添加收藏',
+    'preference.removeFavorite': '取消收藏',
+    'preference.toggleFavorite': '切换收藏',
+
     // ── Settings / 用户中心 ──
     'settings.title': '用户中心',
     'settings.profile': '个人资料',
@@ -601,6 +613,18 @@ STRINGS = {
     'material.defaultColors': 'Default Colors',
     'material.genericBrand': 'Generic',
     'material.colorExists': 'Color already exists',
+
+    // ── Preferences ──
+    'preference.favorites': 'Favorites',
+    'preference.frequentlyUsed': 'Frequently Used',
+    'preference.colorFavorites': 'Color Favorites',
+    'preference.frequentColors': 'Frequent Colors',
+    'preference.materialStats': 'Material Usage',
+    'preference.colorStats': 'Color Usage',
+    'preference.noStats': 'No usage records yet',
+    'preference.addFavorite': 'Add to Favorites',
+    'preference.removeFavorite': 'Remove from Favorites',
+    'preference.toggleFavorite': 'Toggle Favorite',
 
     // ── Settings ──
     'settings.title': 'Settings',

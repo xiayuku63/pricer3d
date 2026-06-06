@@ -419,7 +419,7 @@ async def auth_me(current_user=Depends(get_current_user)):
         }
     except Exception as e:
         logger.error(f"获取用户信息失败: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="获取用户信息失败，请稍后重试")
+        raise HTTPException(status_code=500, detail=f"INTERNAL_ERROR: 获取用户信息失败 ({str(e)})")
 
 
 # ── Password Reset ──

@@ -32,6 +32,49 @@ export function setDefaultPrinterId(v) { defaultPrinterId = v; }
 export function setDefaultNozzle(v) { defaultNozzle = v; }
 export function setDefaultSlicerPresetId(v) { defaultSlicerPresetId = v; }
 
+// ── User preferences (default material, color, favorites, formula templates) ──
+export let userPreferences = {
+    default_material: null,
+    default_color: null,
+    favorite_materials: [],
+    favorite_colors: [],
+    formula_templates: [],
+    material_usage: {},   // { "PLA": 12, "ABS": 5, ... }
+    color_usage: {},      // { "#ffffff": 8, "#000000": 15, ... }
+};
+export function setUserPreferences(v) {
+    if (v && typeof v === 'object') {
+        userPreferences = {
+            default_material: v.default_material || null,
+            default_color: v.default_color || null,
+            favorite_materials: Array.isArray(v.favorite_materials) ? v.favorite_materials : [],
+            favorite_colors: Array.isArray(v.favorite_colors) ? v.favorite_colors : [],
+            formula_templates: Array.isArray(v.formula_templates) ? v.formula_templates : [],
+            material_usage: (v.material_usage && typeof v.material_usage === 'object') ? v.material_usage : {},
+            color_usage: (v.color_usage && typeof v.color_usage === 'object') ? v.color_usage : {},
+        };
+    }
+}
+
+// ── Preference localStorage persistence ──
+const PREFS_STORAGE_KEY = 'pricer3d_user_prefs_v1';
+
+export function loadPreferencesFromStorage() {
+    try {
+        const raw = localStorage.getItem(PREFS_STORAGE_KEY);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            setUserPreferences(parsed);
+        }
+    } catch (e) { /* ignore */ }
+}
+
+export function savePreferencesToStorage() {
+    try {
+        localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(userPreferences));
+    } catch (e) { /* ignore */ }
+}
+
 // ── Collections ──
 export const selectedFilesMap = new Map();
 export const thumbnailMap = new Map();
@@ -269,11 +312,14 @@ export function renderColorDropdown(name, selectedColor, compact) {
 
     const listItems = normColors.map(c => {
         const hex = c.hex || '#d1d5db';
+        const isFav = userPreferences.favorite_colors.some(fc => fc.toLowerCase() === hex.toLowerCase());
+        const favClass = isFav ? 'text-yellow-500' : 'text-gray-300';
         return '<button type="button" class="color-dd-item flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-gray-50 border-b border-gray-100 last:border-0 text-left'
             + (c.hex === safeHex ? ' bg-indigo-50' : '')
             + '" data-color-hex="' + hex + '">'
             + '<span class="w-5 h-5 rounded-sm border border-gray-400 flex-shrink-0" style="background:' + hex + '"></span>'
             + '<span class="flex-1 font-mono text-xs">' + hex + '</span>'
+            + '<button type="button" class="color-fav-toggle ' + favClass + ' hover:text-yellow-500 text-sm flex-shrink-0" data-color-hex="' + hex + '" title="收藏">★</button>'
             + '</button>';
     }).join('');
 

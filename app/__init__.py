@@ -74,7 +74,10 @@ def create_app() -> FastAPI:
         check_register_exists, register, login, admin_login, auth_me,
         password_reset_request, password_reset_confirm,
     )
-    from .routes_user import get_user_settings, update_user_settings, change_password
+    from .routes_user import (
+        get_user_settings, update_user_settings, change_password,
+        export_user_settings, import_user_settings, reset_user_section,
+    )
     from .routes_slicer import (
         api_list_slicer_presets, api_get_slicer_preset, api_generate_slicer_preset, api_upsert_slicer_preset,
         api_download_slicer_preset, api_delete_slicer_preset, api_list_printers,
@@ -120,6 +123,9 @@ def create_app() -> FastAPI:
     app.get("/api/user/settings")(get_user_settings)
     app.put("/api/user/settings")(update_user_settings)
     app.post("/api/users/change-password")(change_password)
+    app.get("/api/user/settings/export")(export_user_settings)
+    app.post("/api/user/settings/import")(import_user_settings)
+    app.post("/api/user/settings/reset")(reset_user_section)
 
     # slicer
     app.get("/api/slicer/presets")(api_list_slicer_presets)
@@ -171,11 +177,29 @@ def create_app() -> FastAPI:
     from .routes_preview import router as preview_router
     app.include_router(preview_router)
 
+    # todo
+    from .todo_api import router as todo_router
+    app.include_router(todo_router)
+
     # orientation
     app.post("/api/orientation/optimize")(optimize_orientation)
     app.post("/api/orientation/faces")(list_stable_faces)
     app.post("/api/orientation/coplanar")(list_coplanar_clusters)
     app.post("/api/orientation/train")(train_sample)
+
+    # todo
+    from .routes_todo import (
+        list_categories, create_category, delete_category,
+        list_todos, get_todo, create_todo, update_todo, delete_todo,
+    )
+    app.get("/api/categories")(list_categories)
+    app.post("/api/categories")(create_category)
+    app.delete("/api/categories/{category_id}")(delete_category)
+    app.get("/api/todos")(list_todos)
+    app.get("/api/todos/{todo_id}")(get_todo)
+    app.post("/api/todos")(create_todo)
+    app.put("/api/todos/{todo_id}")(update_todo)
+    app.delete("/api/todos/{todo_id}")(delete_todo)
 
     # pages
     app.get("/", response_class=HTMLResponse)(index)

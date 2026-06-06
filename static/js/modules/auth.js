@@ -307,6 +307,10 @@ export function renderAuthUI() {
         if (userDropdown) userDropdown.classList.add('hidden');
         if (openAdminUsersBtn) openAdminUsersBtn.classList.add('hidden');
     }
+    // Sync mobile navigation drawer auth state
+    if (typeof window.__syncMobileNavAuthState === 'function') {
+        try { window.__syncMobileNavAuthState(); } catch(e) {}
+    }
 }
 
 // ── Validation: Login ──

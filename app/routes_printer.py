@@ -36,7 +36,7 @@ async def api_list_printer_presets(current_user=Depends(get_current_user)):
         return {"items": items}
     except Exception as e:
         logger.error(f"获取打印机预设列表失败: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="操作失败，请稍后重试")
+        raise HTTPException(status_code=500, detail=f"INTERNAL_ERROR: {str(e)}")
 
 
 async def api_get_printer_preset(preset_id: int, current_user=Depends(get_current_user)):
@@ -49,7 +49,7 @@ async def api_get_printer_preset(preset_id: int, current_user=Depends(get_curren
         raise
     except Exception as e:
         logger.error(f"获取打印机预设详情失败: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="操作失败，请稍后重试")
+        raise HTTPException(status_code=500, detail=f"INTERNAL_ERROR: {str(e)}")
 
 
 async def api_create_printer_preset(payload: PrinterPresetRequest, request: Request,
@@ -75,7 +75,7 @@ async def api_create_printer_preset(payload: PrinterPresetRequest, request: Requ
         raise
     except Exception as e:
         logger.error(f"创建打印机预设失败: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="操作失败，请稍后重试")
+        raise HTTPException(status_code=500, detail=f"INTERNAL_ERROR: {str(e)}")
 
 
 async def api_delete_printer_preset(preset_id: int, request: Request,
@@ -95,7 +95,7 @@ async def api_delete_printer_preset(preset_id: int, request: Request,
         raise
     except Exception as e:
         logger.error(f"删除打印机预设失败: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="操作失败，请稍后重试")
+        raise HTTPException(status_code=500, detail=f"INTERNAL_ERROR: {str(e)}")
 
 
 async def api_download_printer_profile(preset_id: int,
@@ -111,4 +111,4 @@ async def api_download_printer_profile(preset_id: int,
         raise
     except Exception as e:
         logger.error(f"下载打印机配置失败: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="操作失败，请稍后重试")
+        raise HTTPException(status_code=500, detail=f"INTERNAL_ERROR: {str(e)}")

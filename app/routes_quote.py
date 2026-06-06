@@ -119,7 +119,7 @@ async def get_quote(
                     return {
                         "filename": fname,
                         "status": "failed",
-                        "error": "报价处理失败，请重试",
+                        "error": f"INTERNAL_ERROR: {str(e)}",
                         "cost_cny": 0, "weight_g": 0, "estimated_time_h": 0,
                     }
 
@@ -182,7 +182,7 @@ async def get_quote(
         raise
     except Exception as e:
         logger.error(f"处理报价请求失败: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="报价请求处理失败，请稍后重试")
+        raise HTTPException(status_code=500, detail=f"INTERNAL_ERROR: 报价请求失败 ({str(e)})")
 
 
 class FormulaValidateRequest(BaseModel):

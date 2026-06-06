@@ -511,7 +511,7 @@ async def zip_quote(
         raise
     except Exception as e:
         logger.error(f"ZIP quote failed: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="ZIP 报价失败，请稍后重试")
+        raise HTTPException(status_code=500, detail=f"INTERNAL_ERROR: ZIP 报价失败 ({str(e)})")
 
 
 async def download_zip_model(

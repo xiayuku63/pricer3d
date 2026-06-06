@@ -41,6 +41,7 @@ class User(Base):
     default_printer_id = Column(String)
     default_nozzle = Column(String)
     default_slicer_preset_id = Column(Integer)
+    user_preferences = Column(Text)  # JSON: default_material, default_color, favorite_materials, formula_templates
 
 
 class PrinterPreset(Base):
@@ -208,3 +209,41 @@ class RateLimitState(Base):
     rate_key = Column(String, primary_key=True)
     bucket_json = Column(Text, nullable=False)
     updated_at = Column(String)
+
+
+class Category(Base):
+    __tablename__ = "categories"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(100), nullable=False)
+    user_id = Column(Integer, nullable=False, index=True)
+    created_at = Column(String, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "name"),
+        Index("idx_categories_created_at", "created_at"),
+    )
+
+
+class Todo(Base):
+    __tablename__ = "todos"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    title = Column(String(200), nullable=False)
+    description = Column(Text)
+    status = Column(String(20), nullable=False, default="pending")
+    priority = Column(Integer, nullable=False, default=0)
+    category_id = Column(Integer, index=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    due_date = Column(String)
+    created_at = Column(String, nullable=False)
+    updated_at = Column(String, nullable=False)
+
+    __table_args__ = (
+        Index("idx_todos_status", "status"),
+        Index("idx_todos_priority", "priority"),
+        Index("idx_todos_due_date", "due_date"),
+        Index("idx_todos_user_status", "user_id", "status"),
+        Index("idx_todos_user_category", "user_id", "category_id"),
+        Index("idx_todos_user_due", "user_id", "due_date", "status"),
+    )
