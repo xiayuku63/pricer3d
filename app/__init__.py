@@ -100,6 +100,7 @@ def create_app() -> FastAPI:
     from .routes_pages import (
         index, register_page, legal_terms, legal_privacy, admin_users_page,
         pay_mock, healthz, readyz, version,
+        printer_params_page, materials_page,
     )
     from .schemas.auth import TokenResponse, CaptchaResponse
     from .schemas.quote import QuoteResponse, FormulaValidateRequest, QuoteHistoryItem
@@ -177,6 +178,14 @@ def create_app() -> FastAPI:
     from .routes_preview import router as preview_router
     app.include_router(preview_router)
 
+    # printer params
+    from .routes_printer_params import router as printer_params_router
+    app.include_router(printer_params_router)
+
+    # materials
+    from .routes_materials import router as materials_router
+    app.include_router(materials_router)
+
     # todo
     from .todo_api import router as todo_router
     app.include_router(todo_router)
@@ -213,5 +222,9 @@ def create_app() -> FastAPI:
     app.get("/healthz")(healthz)
     app.get("/readyz")(readyz)
     app.get("/api/version")(version)
+
+    # new management pages
+    app.get("/printer-params", response_class=HTMLResponse)(printer_params_page)
+    app.get("/materials", response_class=HTMLResponse)(materials_page)
 
     return app

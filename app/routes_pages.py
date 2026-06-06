@@ -426,3 +426,21 @@ def version():
     except Exception:
         pass
     return result
+
+
+def printer_params_page():
+    """打印机参数管理页面"""
+    from fastapi.responses import HTMLResponse
+    import os
+    html_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "html", "printer_params.html")
+    with open(html_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(f.read())
+
+
+def materials_page():
+    """材料管理页面"""
+    from fastapi.responses import HTMLResponse
+    import os
+    html_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "html", "materials.html")
+    with open(html_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(f.read())
