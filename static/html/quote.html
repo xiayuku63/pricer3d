@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>报价计算 - Pricer3D</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 深色主题 - 与材料管理页面一致 */
+        :root {
+            --bg-primary: #0f1419;
+            --bg-secondary: #1a1f2e;
+            --bg-card: #1e2332;
+            --bg-hover: #252b3b;
+            --text-primary: #e4e8f1;
+            --text-secondary: #8b95a5;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+
+        .card {
+            background-color: var(--bg-card);
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.05);
+            transition: all 0.2s ease;
+        }
+
+        .card:hover {
+            border-color: rgba(59, 130, 246, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+        }
+
+        input, select, textarea {
+            background-color: var(--bg-card);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: var(--text-primary);
+            border-radius: 8px;
+            padding: 10px 14px;
+            transition: all 0.2s;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.2);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.2s;
+            cursor: pointer;
+            border: none;
+        }
+
+        .btn-primary {
+            background-color: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .btn-secondary {
+            background-color: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .btn-secondary:hover {
+            background-color: rgba(255,255,255,0.1);
+        }
+
+        /* 级联选择器样式 */
+        .cascade-select {
+            position: relative;
+        }
+
+        .cascade-select select {
+            width: 100%;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%238b95a5' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 36px;
+        }
+
+        .cascade-select select:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* 材料信息卡片 */
+        .material-info {
+            background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-secondary) 100%);
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--bg-hover);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        /* 加载动画 */
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: var(--accent);
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    <!-- 顶部导航 -->
+    <nav class="bg-[#1a1f2e] border-b border-white/5 px-6 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-4">
+            <a href="/" class="text-xl font-bold text-white flex items-center gap-2">
+                <svg class="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/>
+                </svg>
+                Pricer3D
+            </a>
+            <span class="text-gray-500">|</span>
+            <span class="text-gray-400">报价计算</span>
+        </div>
+        <div class="flex items-center gap-4">
+            <a href="/materials" class="text-gray-400 hover:text-white transition-colors text-sm">
+                材料管理
+            </a>
+            <a href="/" class="text-gray-400 hover:text-white transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                </svg>
+            </a>
+        </div>
+    </nav>
+
+    <div class="max-w-4xl mx-auto px-6 py-8">
+        <!-- 页面标题 -->
+        <div class="mb-8">
+            <h1 class="text-2xl font-bold mb-2">3D打印报价计算</h1>
+            <p class="text-gray-400">选择材料和参数，快速计算打印成本</p>
+        </div>
+
+        <!-- 材料选择区域 -->
+        <div class="card p-6 mb-6">
+            <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                </svg>
+                材料选择
+            </h2>
+
+            <!-- 品牌-类型级联选择器 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <!-- 品牌选择 -->
+                <div class="cascade-select">
+                    <label class="block text-sm text-gray-400 mb-2">品牌 *</label>
+                    <select id="brand-select" class="w-full" onchange="onBrandChange()">
+                        <option value="">加载中...</option>
+                    </select>
+                </div>
+
+                <!-- 材料类型选择 -->
+                <div class="cascade-select">
+                    <label class="block text-sm text-gray-400 mb-2">材料类型 *</label>
+                    <select id="type-select" class="w-full" disabled onchange="onTypeChange()">
+                        <option value="">请先选择品牌</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- 具体材料选择（可选） -->
+            <div class="cascade-select mb-4">
+                <label class="block text-sm text-gray-400 mb-2">具体材料（可选）</label>
+                <select id="material-select" class="w-full" disabled onchange="onMaterialChange()">
+                    <option value="">请先选择品牌和类型</option>
+                </select>
+            </div>
+
+            <!-- 材料信息展示 -->
+            <div id="material-info" class="material-info hidden">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div>
+                        <span class="text-xs text-gray-500">密度</span>
+                        <div id="info-density" class="text-sm font-medium mt-1">-</div>
+                    </div>
+                    <div>
+                        <span class="text-xs text-gray-500">价格</span>
+                        <div id="info-price" class="text-sm font-medium mt-1">-</div>
+                    </div>
+                    <div>
+                        <span class="text-xs text-gray-500">喷嘴温度</span>
+                        <div id="info-hotend" class="text-sm font-medium mt-1">-</div>
+                    </div>
+                    <div>
+                        <span class="text-xs text-gray-500">热床温度</span>
+                        <div id="info-bed" class="text-sm font-medium mt-1">-</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 打印参数区域 -->
+        <div class="card p-6 mb-6">
+            <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+                打印参数
+            </h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- 重量输入 -->
+                <div>
+                    <label class="block text-sm text-gray-400 mb-2">模型重量 (g) *</label>
+                    <input type="number" id="input-weight" step="0.1" placeholder="100" class="w-full" oninput="calculateCost()">
+                </div>
+
+                <!-- 密度输入（可自动填充） -->
+                <div>
+                    <label class="block text-sm text-gray-400 mb-2">材料密度 (g/cm³)</label>
+                    <input type="number" id="input-density" step="0.01" placeholder="1.24" class="w-full" oninput="calculateCost()">
+                    <span class="text-xs text-gray-500 mt-1 block">选择材料后自动填充</span>
+                </div>
+
+                <!-- 价格输入（可自动填充） -->
+                <div>
+                    <label class="block text-sm text-gray-400 mb-2">材料价格 (元/kg)</label>
+                    <input type="number" id="input-price" step="0.01" placeholder="89.00" class="w-full" oninput="calculateCost()">
+                    <span class="text-xs text-gray-500 mt-1 block">选择材料后自动填充</span>
+                </div>
+
+                <!-- 打印时间输入 -->
+                <div>
+                    <label class="block text-sm text-gray-400 mb-2">打印时间 (小时)</label>
+                    <input type="number" id="input-time" step="0.5" placeholder="2.5" class="w-full" oninput="calculateCost()">
+                </div>
+
+                <!-- 电费单价 -->
+                <div>
+                    <label class="block text-sm text-gray-400 mb-2">电费单价 (元/度)</label>
+                    <input type="number" id="input-electricity" step="0.01" placeholder="0.6" value="0.6" class="w-full" oninput="calculateCost()">
+                </div>
+
+                <!-- 打印机功率 -->
+                <div>
+                    <label class="block text-sm text-gray-400 mb-2">打印机功率 (W)</label>
+                    <input type="number" id="input-power" step="10" placeholder="300" value="300" class="w-full" oninput="calculateCost()">
+                </div>
+            </div>
+        </div>
+
+        <!-- 计算结果区域 -->
+        <div class="card p-6">
+            <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                <svg class="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                </svg>
+                报价结果
+            </h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <!-- 材料成本 -->
+                <div class="bg-[#252b3b] rounded-lg p-4 text-center">
+                    <div class="text-xs text-gray-400 mb-2">材料成本</div>
+                    <div id="result-material" class="text-2xl font-bold text-blue-400">¥0.00</div>
+                </div>
+
+                <!-- 电费成本 -->
+                <div class="bg-[#252b3b] rounded-lg p-4 text-center">
+                    <div class="text-xs text-gray-400 mb-2">电费成本</div>
+                    <div id="result-electricity" class="text-2xl font-bold text-green-400">¥0.00</div>
+                </div>
+
+                <!-- 总成本 -->
+                <div class="bg-[#252b3b] rounded-lg p-4 text-center">
+                    <div class="text-xs text-gray-400 mb-2">总成本</div>
+                    <div id="result-total" class="text-2xl font-bold text-yellow-400">¥0.00</div>
+                </div>
+            </div>
+
+            <!-- 建议售价 -->
+            <div class="bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg p-4 border border-blue-500/20">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="text-sm text-gray-400 mb-1">建议售价（30%利润率）</div>
+                        <div id="result-suggested" class="text-3xl font-bold text-white">¥0.00</div>
+                    </div>
+                    <button onclick="copyResult()" class="btn btn-secondary text-sm">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+                        </svg>
+                        复制报价
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast 通知 -->
+    <div id="toast" class="fixed bottom-6 right-6 z-50 hidden">
+        <div class="card p-4 flex items-center gap-3 shadow-2xl">
+            <svg id="toast-icon-success" class="w-5 h-5 text-green-400 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            <svg id="toast-icon-error" class="w-5 h-5 text-red-400 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+            <span id="toast-message" class="text-sm"></span>
+        </div>
+    </div>
+
+    <script>
+        // ============ 数据状态 ============
+        let brands = [];
+        let types = [];
+        let materials = [];
+        let selectedBrand = null;
+        let selectedType = null;
+        let selectedMaterial = null;
+
+        // ============ API 调用 ============
+        const API = {
+            async get(url) {
+                const res = await fetch(url);
+                if (!res.ok) throw new Error(`GET ${url} failed: ${res.status}`);
+                return res.json();
+            }
+        };
+
+        // ============ 初始化 ============
+        async function init() {
+            try {
+                await Promise.all([
+                    loadBrands(),
+                    loadTypes()
+                ]);
+            } catch (e) {
+                console.error('初始化失败:', e);
+                showToast('加载数据失败，请刷新页面重试', 'error');
+            }
+        }
+
+        // ============ 加载品牌列表 ============
+        async function loadBrands() {
+            try {
+                brands = await API.get('/api/materials/brands');
+                updateBrandSelect();
+            } catch (e) {
+                console.error('加载品牌失败:', e);
+                document.getElementById('brand-select').innerHTML = '<option value="">加载失败</option>';
+                throw e;
+            }
+        }
+
+        // ============ 加载类型列表 ============
+        async function loadTypes() {
+            try {
+                types = await API.get('/api/materials/types');
+            } catch (e) {
+                console.error('加载类型失败:', e);
+                throw e;
+            }
+        }
+
+        // ============ 更新品牌下拉框 ============
+        function updateBrandSelect() {
+            const select = document.getElementById('brand-select');
+            select.innerHTML = '<option value="">请选择品牌</option>' +
+                brands.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+        }
+
+        // ============ 品牌选择变化 ============
+        function onBrandChange() {
+            const brandId = document.getElementById('brand-select').value;
+            selectedBrand = brandId ? brands.find(b => b.id == brandId) : null;
+            selectedType = null;
+            selectedMaterial = null;
+
+            // 更新类型下拉框
+            updateTypeSelect(brandId);
+
+            // 清空材料选择
+            document.getElementById('material-select').innerHTML = '<option value="">请先选择类型</option>';
+            document.getElementById('material-select').disabled = true;
+
+            // 隐藏材料信息
+            document.getElementById('material-info').classList.add('hidden');
+
+            // 重新计算
+            calculateCost();
+        }
+
+        // ============ 更新类型下拉框（级联） ============
+        async function updateTypeSelect(brandId) {
+            const typeSelect = document.getElementById('type-select');
+
+            if (!brandId) {
+                typeSelect.innerHTML = '<option value="">请先选择品牌</option>';
+                typeSelect.disabled = true;
+                return;
+            }
+
+            // 加载该品牌下的材料，获取可用的类型
+            try {
+                typeSelect.innerHTML = '<option value="">加载中...</option>';
+                typeSelect.disabled = true;
+
+                const brandMaterials = await API.get(`/api/materials?brand_id=${brandId}`);
+                
+                // 提取该品牌下可用的类型ID
+                const availableTypeIds = [...new Set(brandMaterials.map(m => m.type_id))];
+                
+                // 过滤出可用的类型
+                const availableTypes = types.filter(t => availableTypeIds.includes(t.id));
+
+                if (availableTypes.length === 0) {
+                    typeSelect.innerHTML = '<option value="">该品牌暂无材料</option>';
+                    typeSelect.disabled = true;
+                    return;
+                }
+
+                typeSelect.innerHTML = '<option value="">请选择材料类型</option>' +
+                    availableTypes.map(t => `<option value="${t.id}" data-density="${t.density || ''}">${t.display_name || t.name}</option>`).join('');
+                typeSelect.disabled = false;
+
+                // 保存品牌下的材料列表供后续使用
+                materials = brandMaterials;
+
+            } catch (e) {
+                console.error('加载品牌材料失败:', e);
+                typeSelect.innerHTML = '<option value="">加载失败</option>';
+                typeSelect.disabled = true;
+            }
+        }
+
+        // ============ 类型选择变化 ============
+        function onTypeChange() {
+            const typeId = document.getElementById('type-select').value;
+            const typeOption = document.getElementById('type-select').selectedOptions[0];
+            selectedType = typeId ? types.find(t => t.id == typeId) : null;
+            selectedMaterial = null;
+
+            // 更新材料下拉框
+            updateMaterialSelect(typeId);
+
+            // 自动填充密度
+            if (selectedType && selectedType.density) {
+                document.getElementById('input-density').value = selectedType.density;
+            }
+
+            // 隐藏材料信息
+            document.getElementById('material-info').classList.add('hidden');
+
+            // 重新计算
+            calculateCost();
+        }
+
+        // ============ 更新材料下拉框（级联） ============
+        function updateMaterialSelect(typeId) {
+            const materialSelect = document.getElementById('material-select');
+
+            if (!typeId) {
+                materialSelect.innerHTML = '<option value="">请先选择类型</option>';
+                materialSelect.disabled = true;
+                return;
+            }
+
+            // 过滤该类型下的具体材料
+            const typeMaterials = materials.filter(m => m.type_id == typeId);
+
+            if (typeMaterials.length === 0) {
+                materialSelect.innerHTML = '<option value="">该类型暂无具体材料</option>';
+                materialSelect.disabled = true;
+                return;
+            }
+
+            materialSelect.innerHTML = '<option value="">请选择具体材料（可选）</option>' +
+                typeMaterials.map(m => `<option value="${m.id}">${m.name} (${m.color || '默认色'})</option>`).join('');
+            materialSelect.disabled = false;
+        }
+
+        // ============ 材料选择变化 ============
+        function onMaterialChange() {
+            const materialId = document.getElementById('material-select').value;
+            selectedMaterial = materialId ? materials.find(m => m.id == materialId) : null;
+
+            const infoPanel = document.getElementById('material-info');
+
+            if (selectedMaterial) {
+                // 自动填充参数
+                if (selectedMaterial.density) {
+                    document.getElementById('input-density').value = selectedMaterial.density;
+                }
+                if (selectedMaterial.price_per_kg) {
+                    document.getElementById('input-price').value = selectedMaterial.price_per_kg;
+                }
+
+                // 显示材料信息
+                document.getElementById('info-density').textContent = selectedMaterial.density ? `${selectedMaterial.density} g/cm³` : '-';
+                document.getElementById('info-price').textContent = selectedMaterial.price_per_kg ? `¥${selectedMaterial.price_per_kg}/kg` : '-';
+                document.getElementById('info-hotend').textContent = (selectedMaterial.hotend_temp_min && selectedMaterial.hotend_temp_max) 
+                    ? `${selectedMaterial.hotend_temp_min}-${selectedMaterial.hotend_temp_max}°C` : '-';
+                document.getElementById('info-bed').textContent = (selectedMaterial.bed_temp_min && selectedMaterial.bed_temp_max)
+                    ? `${selectedMaterial.bed_temp_min}-${selectedMaterial.bed_temp_max}°C` : '-';
+
+                infoPanel.classList.remove('hidden');
+            } else {
+                infoPanel.classList.add('hidden');
+            }
+
+            // 重新计算
+            calculateCost();
+        }
+
+        // ============ 计算成本 ============
+        function calculateCost() {
+            const weight = parseFloat(document.getElementById('input-weight').value) || 0;
+            const density = parseFloat(document.getElementById('input-density').value) || 0;
+            const pricePerKg = parseFloat(document.getElementById('input-price').value) || 0;
+            const timeHours = parseFloat(document.getElementById('input-time').value) || 0;
+            const electricityPrice = parseFloat(document.getElementById('input-electricity').value) || 0.6;
+            const powerWatts = parseFloat(document.getElementById('input-power').value) || 300;
+
+            // 材料成本 = 重量(g) / 1000 * 单价(元/kg)
+            const materialCost = (weight / 1000) * pricePerKg;
+
+            // 电费成本 = 时间(h) * 功率(W) / 1000 * 电费单价(元/度)
+            const electricityCost = timeHours * (powerWatts / 1000) * electricityPrice;
+
+            // 总成本
+            const totalCost = materialCost + electricityCost;
+
+            // 建议售价（30%利润率）
+            const suggestedPrice = totalCost / (1 - 0.3);
+
+            // 更新显示
+            document.getElementById('result-material').textContent = `¥${materialCost.toFixed(2)}`;
+            document.getElementById('result-electricity').textContent = `¥${electricityCost.toFixed(2)}`;
+            document.getElementById('result-total').textContent = `¥${totalCost.toFixed(2)}`;
+            document.getElementById('result-suggested').textContent = `¥${suggestedPrice.toFixed(2)}`;
+        }
+
+        // ============ 复制报价 ============
+        function copyResult() {
+            const brand = selectedBrand ? selectedBrand.name : '未选择';
+            const type = selectedType ? (selectedType.display_name || selectedType.name) : '未选择';
+            const material = selectedMaterial ? selectedMaterial.name : '自定义';
+            const total = document.getElementById('result-total').textContent;
+            const suggested = document.getElementById('result-suggested').textContent;
+
+            const text = `【Pricer3D 报价单】\n品牌: ${brand}\n类型: ${type}\n材料: ${material}\n总成本: ${total}\n建议售价: ${suggested}`;
+
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('报价已复制到剪贴板');
+            }).catch(() => {
+                showToast('复制失败，请手动复制', 'error');
+            });
+        }
+
+        // ============ Toast 通知 ============
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const msg = document.getElementById('toast-message');
+            const successIcon = document.getElementById('toast-icon-success');
+            const errorIcon = document.getElementById('toast-icon-error');
+
+            msg.textContent = message;
+            successIcon.classList.toggle('hidden', type !== 'success');
+            errorIcon.classList.toggle('hidden', type !== 'error');
+
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 3000);
+        }
+
+        // ============ 启动 ============
+        init();
+    </script>
+</body>
+</html>

@@ -452,6 +452,9 @@ def generate_prusa_config(
     bed_width: float = 256,
     bed_depth: float = 256,
     max_print_height_mm: float = 256,
+    max_speed: float = 500,
+    max_acceleration: float = 10000,
+    jerk_limit: float = 0.04,
 ) -> str:
     """
     Generate a PrusaSlicer-compatible INI config snippet.
@@ -523,6 +526,12 @@ resolution = 0.0125
 extrusion_multiplier = 0.98
 bed_shape = 0x0,{int(bed_width)}x0,{int(bed_width)}x{int(bed_depth)},0x{int(bed_depth)}
 max_print_height = {int(max_print_height_mm)}
+machine_max_feedrate_x = {int(max_speed)}
+machine_max_feedrate_y = {int(max_speed)}
+machine_max_acceleration_x = {int(max_acceleration)}
+machine_max_acceleration_y = {int(max_acceleration)}
+machine_max_jerk_x = {jerk_limit}
+machine_max_jerk_y = {jerk_limit}
 min_layer_height = 0.08
 max_layer_height = 0.32
 """)

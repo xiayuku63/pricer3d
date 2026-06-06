@@ -444,3 +444,12 @@ def materials_page():
     html_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "html", "materials.html")
     with open(html_path, "r", encoding="utf-8") as f:
         return HTMLResponse(f.read())
+
+
+def quote_page():
+    """报价计算页面（带材料选择器）"""
+    from fastapi.responses import HTMLResponse
+    import os
+    html_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "html", "quote.html")
+    with open(html_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(f.read())

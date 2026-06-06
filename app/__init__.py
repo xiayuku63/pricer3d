@@ -100,7 +100,7 @@ def create_app() -> FastAPI:
     from .routes_pages import (
         index, register_page, legal_terms, legal_privacy, admin_users_page,
         pay_mock, healthz, readyz, version,
-        printer_params_page, materials_page,
+        printer_params_page, materials_page, quote_page,
     )
     from .schemas.auth import TokenResponse, CaptchaResponse
     from .schemas.quote import QuoteResponse, FormulaValidateRequest, QuoteHistoryItem
@@ -226,5 +226,6 @@ def create_app() -> FastAPI:
     # new management pages
     app.get("/printer-params", response_class=HTMLResponse)(printer_params_page)
     app.get("/materials", response_class=HTMLResponse)(materials_page)
+    app.get("/quote", response_class=HTMLResponse)(quote_page)
 
     return app
