@@ -2,12 +2,16 @@
 
 import json
 import base64
+import logging
 from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import HTTPException
 
-from .database import get_db_conn
+from .db import get_db_session
+from .models_orm import PrinterPreset
+
+_logger = logging.getLogger(__name__)
 
 PRINTER_PRESET_NAME_MAX_LEN = 60
 
@@ -16,27 +20,29 @@ def list_printer_presets(user_id: int) -> list[dict]:
     uid = int(user_id or 0)
     if uid <= 0:
         return []
-    with get_db_conn() as conn:
-        rows = conn.execute(
-            "SELECT id, name, bed_width, bed_depth, bed_height, nozzle, nozzles, created_at "
-            "FROM printer_presets WHERE user_id = ? ORDER BY id DESC",
-            (uid,),
-        ).fetchall()
+    with get_db_session() as db:
+        rows = (
+            db.query(PrinterPreset)
+            .filter(PrinterPreset.user_id == uid)
+            .order_by(PrinterPreset.id.desc())
+            .all()
+        )
     out = []
     for r in rows or []:
         try:
-            nozzles = json.loads(str(r["nozzles"] or "[]"))
-        except Exception:
+            nozzles = json.loads(str(r.nozzles or "[]"))
+        except Exception as e:
+            _logger.debug("printer_presets: failed to parse nozzles JSON for preset id=%s: %s", r.id, e)
             nozzles = [0.4]
         out.append({
-            "id": int(r["id"]),
-            "name": str(r["name"] or ""),
-            "bed_width": float(r["bed_width"]),
-            "bed_depth": float(r["bed_depth"]),
-            "bed_height": float(r["bed_height"]),
-            "nozzle": float(r["nozzle"]),
+            "id": int(r.id),
+            "name": str(r.name or ""),
+            "bed_width": float(r.bed_width),
+            "bed_depth": float(r.bed_depth),
+            "bed_height": float(r.bed_height),
+            "nozzle": float(r.nozzle),
             "nozzles": nozzles,
-            "created_at": str(r["created_at"] or ""),
+            "created_at": str(r.created_at or ""),
         })
     return out
 
@@ -46,32 +52,34 @@ def get_printer_preset_by_id(user_id: int, preset_id: int) -> Optional[dict]:
     pid = int(preset_id or 0)
     if uid <= 0 or pid <= 0:
         return None
-    with get_db_conn() as conn:
-        row = conn.execute(
-            "SELECT id, name, bed_width, bed_depth, bed_height, nozzle, nozzles, profile_b64, created_at "
-            "FROM printer_presets WHERE id = ? AND user_id = ?",
-            (pid, uid),
-        ).fetchone()
+    with get_db_session() as db:
+        row = (
+            db.query(PrinterPreset)
+            .filter(PrinterPreset.id == pid, PrinterPreset.user_id == uid)
+            .first()
+        )
     if not row:
         return None
     try:
-        nozzles = json.loads(str(row["nozzles"] or "[]"))
-    except Exception:
+        nozzles = json.loads(str(row.nozzles or "[]"))
+    except Exception as e:
+        _logger.debug("printer_presets: failed to parse nozzles JSON for preset id=%s: %s", row.id, e)
         nozzles = [0.4]
     try:
-        profile = base64.b64decode(str(row["profile_b64"] or "").encode("ascii"), validate=False)
-    except Exception:
+        profile = base64.b64decode(str(row.profile_b64 or "").encode("ascii"), validate=False)
+    except Exception as e:
+        _logger.debug("printer_presets: failed to decode profile_b64 for preset id=%s: %s", row.id, e)
         profile = b""
     return {
-        "id": int(row["id"]),
-        "name": str(row["name"] or ""),
-        "bed_width": float(row["bed_width"]),
-        "bed_depth": float(row["bed_depth"]),
-        "bed_height": float(row["bed_height"]),
-        "nozzle": float(row["nozzle"]),
+        "id": int(row.id),
+        "name": str(row.name or ""),
+        "bed_width": float(row.bed_width),
+        "bed_depth": float(row.bed_depth),
+        "bed_height": float(row.bed_height),
+        "nozzle": float(row.nozzle),
         "nozzles": nozzles,
         "profile": bytes(profile),
-        "created_at": str(row["created_at"] or ""),
+        "created_at": str(row.created_at or ""),
     }
 
 
@@ -142,45 +150,46 @@ def upsert_printer_preset(user_id: int, name: str, bed_width: float, bed_depth: 
     created_at = datetime.now(timezone.utc).isoformat()
     nozzles_json = json.dumps(nzs)
 
-    with get_db_conn() as conn:
-        conn.execute(
-            """
-            INSERT INTO printer_presets (user_id, name, bed_width, bed_depth, bed_height,
-                nozzle, nozzles, profile_b64, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(user_id, name) DO UPDATE SET
-                bed_width = excluded.bed_width,
-                bed_depth = excluded.bed_depth,
-                bed_height = excluded.bed_height,
-                nozzle = excluded.nozzle,
-                nozzles = excluded.nozzles,
-                profile_b64 = excluded.profile_b64,
-                created_at = excluded.created_at
-            """,
-            (uid, preset_name, bw, bd, bh, nz, nozzles_json, b64, created_at),
+    with get_db_session() as db:
+        existing = (
+            db.query(PrinterPreset)
+            .filter(PrinterPreset.user_id == uid, PrinterPreset.name == preset_name)
+            .first()
         )
-        row = conn.execute(
-            "SELECT id, name, bed_width, bed_depth, bed_height, nozzle, nozzles, created_at "
-            "FROM printer_presets WHERE user_id = ? AND name = ?",
-            (uid, preset_name),
-        ).fetchone()
-        conn.commit()
-    if not row:
-        raise HTTPException(status_code=500, detail="打印机预设保存失败")
-    try:
-        saved_nozzles = json.loads(str(row["nozzles"] or "[]"))
-    except Exception:
-        saved_nozzles = [0.4]
-    return {
-        "id": int(row["id"]),
-        "name": str(row["name"]),
-        "bed_width": float(row["bed_width"]),
-        "bed_depth": float(row["bed_depth"]),
-        "bed_height": float(row["bed_height"]),
-        "nozzle": float(row["nozzle"]),
-        "nozzles": saved_nozzles,
-        "created_at": str(row["created_at"]),
-    }
+        if existing:
+            existing.bed_width = bw
+            existing.bed_depth = bd
+            existing.bed_height = bh
+            existing.nozzle = nz
+            existing.nozzles = nozzles_json
+            existing.profile_b64 = b64
+            existing.created_at = created_at
+            row = existing
+        else:
+            row = PrinterPreset(
+                user_id=uid,
+                name=preset_name,
+                bed_width=bw,
+                bed_depth=bd,
+                bed_height=bh,
+                nozzle=nz,
+                nozzles=nozzles_json,
+                profile_b64=b64,
+                created_at=created_at,
+            )
+            db.add(row)
+            db.flush()
+        result = {
+            "id": int(row.id),
+            "name": str(row.name),
+            "bed_width": float(row.bed_width),
+            "bed_depth": float(row.bed_depth),
+            "bed_height": float(row.bed_height),
+            "nozzle": float(row.nozzle),
+            "nozzles": nzs,
+            "created_at": str(row.created_at),
+        }
+    return result
 
 
 def delete_printer_preset(user_id: int, preset_id: int) -> bool:
@@ -188,10 +197,9 @@ def delete_printer_preset(user_id: int, preset_id: int) -> bool:
     pid = int(preset_id or 0)
     if uid <= 0 or pid <= 0:
         return False
-    with get_db_conn() as conn:
-        cur = conn.execute("DELETE FROM printer_presets WHERE id = ? AND user_id = ?", (pid, uid))
-        conn.commit()
-        return int(cur.rowcount or 0) > 0
+    with get_db_session() as db:
+        count = db.query(PrinterPreset).filter(PrinterPreset.id == pid, PrinterPreset.user_id == uid).delete()
+        return count > 0
 
 
 def download_printer_profile(user_id: int, preset_id: int) -> Optional[bytes]:

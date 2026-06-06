@@ -69,8 +69,8 @@ async def security_middleware(request: Request, call_next):
 
     try:
         metrics.record(path=path, status_code=status_code, duration_ms=duration_ms)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("middleware: failed to record metrics: %s", e)
 
     # Structured access log
     log_request(logger, method, path, status_code, duration_ms, client_ip, request.state.request_id)

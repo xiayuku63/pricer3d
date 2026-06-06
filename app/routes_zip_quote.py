@@ -29,7 +29,6 @@ from .config import (
     SUPPORTED_EXTENSIONS,
     QUOTE_CONCURRENCY,
 )
-from .database import get_db_conn
 from .deps import get_current_user, get_membership_effective
 from .audit import write_audit_event
 
@@ -274,16 +273,15 @@ async def zip_quote(
             }
 
         # Get user materials + pricing + defaults
-        with get_db_conn() as conn:
-            row = conn.execute(
-                "SELECT materials, pricing_config, default_printer_id, default_nozzle, default_slicer_preset_id FROM users WHERE id = ?",
-                (current_user["id"],),
-            ).fetchone()
-        user_materials = json.loads(row["materials"]) if row and row["materials"] else DEFAULT_MATERIALS
-        pricing_config = json.loads(row["pricing_config"]) if row and row["pricing_config"] else DEFAULT_PRICING_CONFIG
-        default_printer_id = row["default_printer_id"] if row else None
-        default_nozzle = row["default_nozzle"] if row else None
-        default_slicer_preset_id = int(row["default_slicer_preset_id"]) if row and row["default_slicer_preset_id"] is not None else None
+        from .db import get_db_session
+        from .models_orm import User as UserORM
+        with get_db_session() as db:
+            u = db.query(UserORM).filter(UserORM.id == current_user["id"]).first()
+        user_materials = json.loads(u.materials) if u and u.materials else DEFAULT_MATERIALS
+        pricing_config = json.loads(u.pricing_config) if u and u.pricing_config else DEFAULT_PRICING_CONFIG
+        default_printer_id = u.default_printer_id if u else None
+        default_nozzle = u.default_nozzle if u else None
+        default_slicer_preset_id = u.default_slicer_preset_id if u else None
 
         # Build match status message
         total_stl = len(stl_files)
@@ -513,7 +511,7 @@ async def zip_quote(
         raise
     except Exception as e:
         logger.error(f"ZIP quote failed: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"INTERNAL_ERROR: ZIP 报价失败 ({str(e)})")
+        raise HTTPException(status_code=500, detail="ZIP 报价失败，请稍后重试")
 
 
 async def download_zip_model(

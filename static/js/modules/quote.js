@@ -214,6 +214,55 @@ export async function reQuoteAllSelectedFiles(reasonLabel) {
 }
 
 // ── Results table ──
+
+// Helper: build preview button HTML for a result row
+function _buildPreviewHtml(item, ext) {
+    const thumbnail = thumbnailMap.get(item.filename) || buildPlaceholderThumbnail(ext);
+    const isRealThumbnail = thumbnail && thumbnail.startsWith('data:image/png');
+    return isRealThumbnail
+        ? `<button type="button" data-preview-file="${item.filename}" data-preview-ext="${ext}" class="block rounded border border-gray-200 overflow-hidden hover:border-indigo-300 transition-colors"><img src="${thumbnail}" alt="静态图" class="w-32 h-20 object-cover bg-white" /></button>`
+        : `<button type="button" data-preview-file="${item.filename}" data-preview-ext="${ext}" class="text-[12px] text-indigo-600 hover:text-indigo-700 border border-indigo-200 hover:border-indigo-300 rounded px-2 py-0.5">预览</button>`;
+}
+
+// Helper: build per-file printer + preset dropdowns HTML
+function _buildRowDropdownsHtml(item) {
+    const printerModels = getCachedPrinterModels();
+    const selectedPrinterId = (item._printer_model || '').replace(/_\d{2}$/, '');
+    const pmOptions = printerModels.map(p =>
+        `<option value="${p.id}" ${p.id === selectedPrinterId ? 'selected' : ''}>${p.name}</option>`
+    ).join('');
+    const presets = slicerPresets || [];
+    const presetOptions = ['<option value="">' + t('quote.presetNone') + '</option>',
+        ...presets.map(p => `<option value="${p.id}" ${String(p.id) === String(item._slicer_preset_id || '') ? 'selected' : ''}>${p.name || '#' + p.id}</option>`)
+    ].join('');
+    return { pmOptions, presetOptions };
+}
+
+// Helper: build the common first 7 columns (filename, preview, printer, preset, material, color, quantity)
+function _buildCommonRowHtml(item, ext, selectedMaterial, selectedColor, quantityValue) {
+    const previewButtonHtml = _buildPreviewHtml(item, ext);
+    const { pmOptions, presetOptions } = _buildRowDropdownsHtml(item);
+    const materialOptionsHtml = MATERIAL_OPTIONS.map((m) => `<option value="${m.name}" ${m.name === selectedMaterial ? 'selected' : ''}>${m.name}</option>`).join('');
+    const renderedRowColors = renderColorDropdown(selectedMaterial, selectedColor, true);
+    return {
+        previewButtonHtml, pmOptions, presetOptions, materialOptionsHtml,
+        renderedRowColors,
+        cols: `<td class="px-2 py-1.5">${item.filename}</td>
+                <td class="px-2 py-1.5">${previewButtonHtml}</td>
+                <td class="px-2 py-1.5"><select data-field="_printer_model" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5 max-w-[110px]">${pmOptions}</select></td>
+                <td class="px-2 py-1.5"><select data-field="_slicer_preset_id" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5 max-w-[100px]">${presetOptions}</select></td>
+                <td class="px-2 py-1.5"><select data-field="material" class="row-edit text-[11px] border border-gray-300 rounded px-1 py-0.5">${materialOptionsHtml}</select></td>
+                <td class="px-2 py-1.5" data-field="color">${renderedRowColors.html}</td>
+                <td class="px-2 py-1.5"><input data-field="quantity" type="number" min="1" value="${quantityValue}" class="row-edit w-14 text-[11px] border border-gray-300 rounded px-1 py-0.5" /></td>`,
+    };
+}
+
+// Helper: build checklist badge HTML
+function _buildChecklistHtml(item) {
+    if (!item._checklist_params || !item._checklist_source) return '';
+    return ` <span class="text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1 cursor-help" title="${(item._checklist_source.printer_model ? '打印机:' + item._checklist_source.printer_model + ' ' : '') + (item._checklist_source.nozzle ? '喷嘴:' + item._checklist_source.nozzle + 'mm | ' : '') + '层高:' + item._checklist_source.layer_height + 'mm 墙层数:' + item._checklist_source.wall_count + ' 填充:' + item._checklist_source.infill + '%'}">\u{1F4CB}\u6E05\u5355</span>`;
+}
+
 export function renderResultsTable() {
     const tbody = document.getElementById('batch-results-body');
     if (!tbody) return;
@@ -238,7 +287,7 @@ export function renderResultsTable() {
             const prusaExtraHtml = showPrusaStatus
                 ? (prusaUsed
                     ? '<div class="text-[10px] text-indigo-600">' + t('quote.prusaEnabled') + '</div>'
-                    : (prusaError ? `<div class="text-[10px] text-amber-700">PrusaSlicer失败：${prusaError}</div>` : ''))
+                    : (prusaError ? `<div class="text-[10px] text-amber-700 line-clamp-2" title="PrusaSlicer失败：${prusaError}">PrusaSlicer失败：${prusaError}</div>` : ''))
                 : '';
 
             // G-code 分析详情
@@ -292,7 +341,7 @@ export function renderResultsTable() {
                     <div class="text-[10px] leading-tight">${recalculating ? '-' : ('¥ ' + Number(item.unit_cost_cny || 0).toFixed(2))}</div>
                     <div class="text-xs leading-tight font-medium">${recalculating ? '-' : ('¥ ' + Number(item.cost_cny || 0).toFixed(2))}</div>
                 </td>
-                <td data-role="status-cell" class="px-2 py-1.5 ${recalculating ? 'text-amber-600' : 'text-green-600'}"><div>${recalculating ? t('quote.recalculating') : t('common.success')}${item._checklist_params && item._checklist_source ? ` <span class="text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1 cursor-help" title="(item._checklist_source.printer_model ? '打印机:' + item._checklist_source.printer_model + ' ' : '') + (item._checklist_source.nozzle ? '喷嘴:' + item._checklist_source.nozzle + 'mm | ' : '') + '层高:' + item._checklist_source.layer_height + 'mm 墙层数:' + item._checklist_source.wall_count + ' 填充:' + item._checklist_source.infill + '%">\u{1F4CB}\u6E05\u5355</span>` : ''}</div>${recalculating ? '' : prusaExtraHtml}${recalculating ? '' : gcodeToggleHtml}</td>
+                <td data-role="status-cell" class="px-2 py-1.5 min-w-[160px] max-w-[260px] break-words ${recalculating ? 'text-amber-600' : 'text-green-600'}"><div>${recalculating ? t('quote.recalculating') : t('common.success')}${item._checklist_params && item._checklist_source ? ` <span class="text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1 cursor-help" title="(item._checklist_source.printer_model ? '打印机:' + item._checklist_source.printer_model + ' ' : '') + (item._checklist_source.nozzle ? '喷嘴:' + item._checklist_source.nozzle + 'mm | ' : '') + '层高:' + item._checklist_source.layer_height + 'mm 墙层数:' + item._checklist_source.wall_count + ' 填充:' + item._checklist_source.infill + '%">\u{1F4CB}\u6E05\u5355</span>` : ''}</div>${recalculating ? '' : prusaExtraHtml}${recalculating ? '' : gcodeToggleHtml}</td>
                 <td class="px-2 py-1.5 space-x-1"><button type="button" data-delete-file="${item.filename}" class="text-[11px] text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 rounded px-2 py-0.5">${t('common.delete')}</button></td>
             `;
         } else {
@@ -326,12 +375,11 @@ export function renderResultsTable() {
                 <td class="px-2 py-1.5" data-field="color">${renderedRowColors.html}</td>
                 <td class="px-2 py-1.5"><input data-field="quantity" type="number" min="1" value="${quantityValue}" class="row-edit w-14 text-[11px] border border-gray-300 rounded px-1 py-0.5" /></td>
                 <td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td>
-                <td data-role="status-cell" class="px-2 py-1.5 text-red-600">${item.error || t('common.error')}${item._checklist_params && item._checklist_source ? ` <span class="text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1 cursor-help" title="(item._checklist_source.printer_model ? '打印机:' + item._checklist_source.printer_model + ' ' : '') + (item._checklist_source.nozzle ? '喷嘴:' + item._checklist_source.nozzle + 'mm | ' : '') + '层高:' + item._checklist_source.layer_height + 'mm 墙层数:' + item._checklist_source.wall_count + ' 填充:' + item._checklist_source.infill + '%">\u{1F4CB}\u6E05\u5355</span>` : ''}</td>
+                <td data-role="status-cell" class="px-2 py-1.5 min-w-[160px] max-w-[260px] break-words text-red-600"><div class="line-clamp-3" title="${escapeHtml(item.error || t('common.error'))}">${item.error || t('common.error')}</div>${item._checklist_params && item._checklist_source ? ` <span class="text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1 cursor-help" title="(item._checklist_source.printer_model ? '打印机:' + item._checklist_source.printer_model + ' ' : '') + (item._checklist_source.nozzle ? '喷嘴:' + item._checklist_source.nozzle + 'mm | ' : '') + '层高:' + item._checklist_source.layer_height + 'mm 墙层数:' + item._checklist_source.wall_count + ' 填充:' + item._checklist_source.infill + '%">\u{1F4CB}\u6E05\u5355</span>` : ''}</td>
                 <td class="px-2 py-1.5 space-x-1"><button type="button" data-delete-file="${item.filename}" class="text-[11px] text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 rounded px-2 py-0.5">${t('common.delete')}</button></td>
             `;
         }
         tbody.appendChild(tr);
-
         // ── G-code 详情展开行 ──
         const gcodeData = !item._recalculating && item.status === 'success' && item.cost_breakdown?.gcode_summary;
         if (gcodeData) {
@@ -343,6 +391,290 @@ export function renderResultsTable() {
             tbody.appendChild(detailTr);
         }
     });
+
+    // ── 同步渲染移动端卡片视图 ──
+    renderResultsCards();
+}
+
+// ── 移动端卡片布局渲染 ──
+function renderResultsCards() {
+    const container = document.getElementById('batch-results-cards');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!currentResults.length) {
+        container.innerHTML = '<p class="text-sm text-gray-500 text-center py-4">' + t('common.noData') + '</p>';
+        return;
+    }
+
+    currentResults.forEach((item) => {
+        const ext = item.filename && item.filename.includes('.') ? item.filename.split('.').pop().toLowerCase() : '-';
+        const thumbnail = thumbnailMap.get(item.filename) || buildPlaceholderThumbnail(ext);
+        const isRealThumbnail = thumbnail && thumbnail.startsWith('data:image/png');
+        const previewHtml = isRealThumbnail
+            ? `<button type="button" data-preview-file="${item.filename}" data-preview-ext="${ext}" class="block rounded border border-gray-200 overflow-hidden hover:border-indigo-300 transition-colors w-full"><img src="${thumbnail}" alt="预览" class="w-full h-28 object-cover bg-white" /></button>`
+            : `<button type="button" data-preview-file="${item.filename}" data-preview-ext="${ext}" class="w-full text-[12px] text-indigo-600 hover:text-indigo-700 border border-indigo-200 hover:border-indigo-300 rounded px-3 py-2">预览模型</button>`;
+
+        const printerModels = getCachedPrinterModels();
+        const selectedPrinterId = (item._printer_model || '').replace(/_\d{2}$/, '');
+        const pmOptions = printerModels.map(p =>
+            `<option value="${p.id}" ${p.id === selectedPrinterId ? 'selected' : ''}>${p.name}</option>`
+        ).join('');
+        const presets = slicerPresets || [];
+        const presetOptions = ['<option value="">' + t('quote.presetNone') + '</option>',
+            ...presets.map(p => `<option value="${p.id}" ${String(p.id) === String(item._slicer_preset_id || '') ? 'selected' : ''}>${p.name || '#' + p.id}</option>`)
+        ].join('');
+        const materialOptionsHtml = MATERIAL_OPTIONS.map((m) => `<option value="${m.name}" ${m.name === (item.material || quoteOptions.material) ? 'selected' : ''}>${m.name}</option>`).join('');
+        const quantityValue = item.quantity || quoteOptions.quantity || 1;
+
+        if (item.status === 'success' && !item._recalculating) {
+            const card = document.createElement('div');
+            card.className = 'bg-white border border-gray-200 rounded-lg p-4 shadow-sm';
+            card.setAttribute('data-card-file', item.filename);
+            card.innerHTML = `
+                <div class="flex gap-3">
+                    <div class="w-28 flex-shrink-0">${previewHtml}</div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-[12px] font-medium text-gray-900 truncate" title="${escapeHtml(item.filename)}">${escapeHtml(item.filename)}</p>
+                        <div class="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+                            <div><span class="text-gray-400">重量</span> <span class="font-medium">${(item.weight_g / Math.max(1, item.quantity)).toFixed(1)}g / ${item.weight_g}g</span></div>
+                            <div><span class="text-gray-400">时间</span> <span class="font-medium">${formatTimeHMS(item.unit_time_h || (item.estimated_time_h / Math.max(1, item.quantity)))} / ${formatTimeHMS(item.estimated_time_h)}</span></div>
+                            <div><span class="text-gray-400">体积</span> <span class="font-medium">${item.volume_cm3} cm³</span></div>
+                            <div><span class="text-gray-400">尺寸</span> <span class="font-medium">${item.dimensions}</span></div>
+                        </div>
+                        <div class="mt-2 flex items-baseline gap-1">
+                            <span class="text-base font-semibold text-indigo-600">¥ ${Number(item.cost_cny || 0).toFixed(2)}</span>
+                            <span class="text-[10px] text-gray-400">（单价 ¥ ${Number(item.unit_cost_cny || 0).toFixed(2)}）</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- 可编辑参数区 -->
+                <div class="mt-3 pt-3 border-t border-gray-100 grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="text-[10px] text-gray-400 block">${t('quote.printerModel')}</label>
+                        <select data-field="_printer_model" class="card-edit w-full text-[10px] border border-gray-300 rounded px-1.5 py-1 bg-white">${pmOptions}</select>
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-gray-400 block">${t('quote.preset')}</label>
+                        <select data-field="_slicer_preset_id" class="card-edit w-full text-[10px] border border-gray-300 rounded px-1.5 py-1 bg-white">${presetOptions}</select>
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-gray-400 block">${t('quote.material')}</label>
+                        <select data-field="material" class="card-edit w-full text-[11px] border border-gray-300 rounded px-1.5 py-1 bg-white">${materialOptionsHtml}</select>
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-gray-400 block">${t('quote.quantity')}</label>
+                        <input data-field="quantity" type="number" min="1" value="${quantityValue}" class="card-edit w-full text-[11px] border border-gray-300 rounded px-1.5 py-1" />
+                    </div>
+                </div>
+                <div class="mt-3 flex items-center justify-between">
+                    <span class="text-[11px] text-green-600">${t('common.success')}</span>
+                    <button type="button" data-delete-file="${item.filename}" class="text-[11px] text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 rounded px-2 py-0.5">${t('common.delete')}</button>
+                </div>
+            `;
+            container.appendChild(card);
+        } else if (item._recalculating) {
+            const card = document.createElement('div');
+            card.className = 'bg-white border border-amber-200 rounded-lg p-4 shadow-sm';
+            card.setAttribute('data-card-file', item.filename);
+            card.innerHTML = `
+                <div class="flex gap-3">
+                    <div class="w-28 flex-shrink-0">${previewHtml}</div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-[12px] font-medium text-gray-900 truncate" title="${escapeHtml(item.filename)}">${escapeHtml(item.filename)}</p>
+                        <p class="mt-3 text-[12px] text-amber-600">${t('quote.recalculating')}</p>
+                    </div>
+                </div>
+            `;
+            container.appendChild(card);
+        } else {
+            const card = document.createElement('div');
+            card.className = 'bg-white border border-red-200 rounded-lg p-4 shadow-sm';
+            card.setAttribute('data-card-file', item.filename);
+            card.innerHTML = `
+                <div class="flex gap-3">
+                    <div class="w-28 flex-shrink-0">${previewHtml}</div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-[12px] font-medium text-gray-900 truncate" title="${escapeHtml(item.filename)}">${escapeHtml(item.filename)}</p>
+                        <div class="mt-2 grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="text-[10px] text-gray-400 block">${t('quote.material')}</label>
+                                <select data-field="material" class="card-edit w-full text-[11px] border border-gray-300 rounded px-1.5 py-1 bg-white">${materialOptionsHtml}</select>
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-gray-400 block">${t('quote.quantity')}</label>
+                                <input data-field="quantity" type="number" min="1" value="${quantityValue}" class="card-edit w-full text-[11px] border border-gray-300 rounded px-1.5 py-1" />
+                            </div>
+                        </div>
+                        <p class="mt-2 text-[11px] text-red-600 line-clamp-3" title="${escapeHtml(item.error || t('common.error'))}">${escapeHtml(item.error || t('common.error'))}</p>
+                    </div>
+                </div>
+                <div class="mt-2 flex justify-end">
+                    <button type="button" data-delete-file="${item.filename}" class="text-[11px] text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 rounded px-2 py-0.5">${t('common.delete')}</button>
+                </div>
+            `;
+            container.appendChild(card);
+        }
+    });
+}
+
+// ── 卡片编辑事件处理（与表格行编辑共用逻辑） ──
+export function handleCardEditChange(event) {
+    const target = event.target;
+    if (!target.classList.contains('card-edit')) return;
+    const card = target.closest('[data-card-file]');
+    if (!card) return;
+    const filename = card.getAttribute('data-card-file');
+    if (_rowEditTimers.has(filename)) { clearTimeout(_rowEditTimers.get(filename)); }
+    if (_rowEditSignals.has(filename)) { _rowEditSignals.get(filename).cancelled = true; }
+    _rowEditTimers.set(filename, setTimeout(async () => {
+        _rowEditTimers.delete(filename);
+        const signal = { cancelled: false };
+        _rowEditSignals.set(filename, signal);
+        await _handleCardEdit(card, filename, signal);
+        if (_rowEditSignals.get(filename) === signal) _rowEditSignals.delete(filename);
+    }, 400));
+}
+
+async function _handleCardEdit(card, filename, signal) {
+    const { errorContainer, errorMsg } = dom;
+    if (!authToken) {
+        if (errorMsg) { errorMsg.textContent = '请先登录后再修改报价参数'; errorContainer.classList.remove('hidden'); }
+        _openLoginModal?.(); return;
+    }
+    const file = selectedFilesMap.get(filename);
+    if (!file) return;
+    const material = card.querySelector('[data-field="material"]').value;
+    const quantity = Number.parseInt(card.querySelector('[data-field="quantity"]').value, 10);
+    if (!Number.isFinite(quantity) || quantity < 1) {
+        if (errorMsg) { errorMsg.textContent = t('quote.countMustBePositive'); errorContainer.classList.remove('hidden'); }
+        return;
+    }
+    const pmSel = card.querySelector('[data-field="_printer_model"]');
+    const spSel = card.querySelector('[data-field="_slicer_preset_id"]');
+    const pm = pmSel ? pmSel.value : '';
+    const sp = spSel ? (spSel.value ? Number(spSel.value) : null) : null;
+    if (errorContainer) errorContainer.classList.add('hidden');
+
+    const idx = currentResults.findIndex((i) => i.filename === filename);
+    const prevItem = idx >= 0 ? { ...currentResults[idx] } : null;
+    if (idx >= 0) {
+        currentResults[idx] = { ...currentResults[idx], _recalculating: true };
+    }
+    renderResultsTable();
+
+    try {
+        const currentColor = idx >= 0 ? (currentResults[idx].color || quoteOptions.color) : quoteOptions.color;
+        await ensureThumbnailForFile(file, currentColor);
+        if (signal.cancelled) {
+            if (prevItem && idx >= 0) currentResults[idx] = prevItem;
+            return;
+        }
+        const opts = { material, color: currentColor, quantity, _printer_model: pm };
+        if (sp !== null) opts._slicer_preset_id = sp;
+        const updated = await quoteSingleFileWithOptions(file, opts);
+        if (signal.cancelled) {
+            if (prevItem && idx >= 0) currentResults[idx] = prevItem;
+            return;
+        }
+        if (idx >= 0) {
+            currentResults[idx] = {
+                ...updated,
+                _printer_model: pm || prevItem?._printer_model,
+            };
+            if (sp !== null) currentResults[idx]._slicer_preset_id = sp;
+        }
+        renderResultsTable();
+        recalcSummaryFromCurrentResults();
+    } catch (err) {
+        if (signal.cancelled) return;
+        if (prevItem && idx >= 0) currentResults[idx] = prevItem;
+        renderResultsTable();
+        recalcSummaryFromCurrentResults();
+        if (errorMsg) { errorMsg.textContent = err.message; errorContainer.classList.remove('hidden'); }
+    }
+}
+
+// ── 导出功能 ──
+export function exportCSV() {
+    if (!currentResults.length) return;
+    const headers = ['文件名', '打印机', '材料', '颜色', '数量', '体积(cm³)', '表面积(cm²)', '尺寸', '重量(g)', '打印时间(h)', '单价(CNY)', '总价(CNY)', '状态'];
+    const rows = currentResults.map(item => [
+        item.filename,
+        item._printer_model || '',
+        item.material || '',
+        item.color || '',
+        item.quantity || 1,
+        item.volume_cm3 || '',
+        item.surface_area_cm2 || '',
+        item.dimensions || '',
+        item.weight_g || '',
+        item.estimated_time_h || '',
+        item.unit_cost_cny || '',
+        item.cost_cny || '',
+        item.status === 'success' ? '成功' : (item.error || '失败'),
+    ]);
+    const csvContent = [headers, ...rows].map(row =>
+        row.map(cell => '"' + String(cell).replace(/"/g, '""') + '"').join(',')
+    ).join('\n');
+
+    const BOM = '\uFEFF';
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `报价结果_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+export function exportExcel() {
+    if (!currentResults.length) return;
+    const headers = ['文件名', '打印机', '材料', '颜色', '数量', '体积(cm³)', '表面积(cm²)', '尺寸', '重量(g)', '打印时间(h)', '单价(CNY)', '总价(CNY)', '状态'];
+    const rows = currentResults.map(item => [
+        item.filename,
+        item._printer_model || '',
+        item.material || '',
+        item.color || '',
+        item.quantity || 1,
+        item.volume_cm3 || '',
+        item.surface_area_cm2 || '',
+        item.dimensions || '',
+        item.weight_g || '',
+        item.estimated_time_h || '',
+        item.unit_cost_cny || '',
+        item.cost_cny || '',
+        item.status === 'success' ? '成功' : (item.error || '失败'),
+    ]);
+
+    // 构建简单的 XML Spreadsheet (Excel 2003 XML) 无需第三方库
+    let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
+    xml += '<?mso-application progid="Excel.Sheet"?>\n';
+    xml += '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"\n';
+    xml += ' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">\n';
+    xml += '<Worksheet ss:Name="报价结果"><Table>\n';
+    // Header row
+    xml += '<Row>';
+    headers.forEach(h => { xml += `<Cell><Data ss:Type="String">${h}</Data></Cell>`; });
+    xml += '</Row>\n';
+    // Data rows
+    rows.forEach(row => {
+        xml += '<Row>';
+        row.forEach(cell => {
+            const type = (typeof cell === 'number' || (typeof cell === 'string' && /^[\d.]+$/.test(cell) && cell !== '')) ? 'Number' : 'String';
+            xml += `<Cell><Data ss:Type="${type}">${escapeHtml(String(cell))}</Data></Cell>`;
+        });
+        xml += '</Row>\n';
+    });
+    xml += '</Table></Worksheet></Workbook>';
+
+    const blob = new Blob([xml], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `报价结果_${new Date().toISOString().slice(0, 10)}.xls`;
+    a.click();
+    URL.revokeObjectURL(url);
 }
 
 // ── G-code 详情构建 ──

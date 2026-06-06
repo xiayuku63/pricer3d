@@ -1,6 +1,7 @@
 """Dependencies – FastAPI dependency injection (get_current_user, require_admin, etc.)."""
 
 import time
+import logging
 from typing import Optional
 from datetime import datetime, timezone
 
@@ -9,9 +10,12 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 
 from .config import JWT_SECRET_KEY, JWT_ALGORITHM, MEMBER_DISCOUNT_PERCENT, ADMIN_USERNAMES, TERMS_VERSION, PRIVACY_VERSION
-from .database import get_db_conn
+from .db import get_db_session
+from .models_orm import User
 from .auth import get_user_by_id
 from .errors import UnauthorizedError, ForbiddenError, ValidationError
+
+_logger = logging.getLogger(__name__)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
@@ -47,7 +51,8 @@ def get_membership_effective(user_row) -> tuple[str, Optional[int]]:
         raw_exp = user_row["membership_expires_at"]
         if raw_exp is not None and str(raw_exp).strip() != "":
             expires_ts = int(float(str(raw_exp)))
-    except Exception:
+    except Exception as e:
+        _logger.debug("deps: failed to parse membership_expires_at: %s", e)
         expires_ts = None
     if raw_level != "member":
         return "free", expires_ts
@@ -68,16 +73,13 @@ def require_legal_acceptance_or_raise(accept_terms: bool, accept_privacy: bool) 
 
 def record_legal_acceptance(user_id: int) -> None:
     now_iso = datetime.now(timezone.utc).isoformat()
-    with get_db_conn() as conn:
-        conn.execute(
-            """
-            UPDATE users
-            SET terms_accepted_at = ?, privacy_accepted_at = ?, terms_version = ?, privacy_version = ?
-            WHERE id = ?
-            """,
-            (now_iso, now_iso, TERMS_VERSION, PRIVACY_VERSION, int(user_id)),
-        )
-        conn.commit()
+    with get_db_session() as db:
+        user = db.query(User).filter(User.id == int(user_id)).first()
+        if user:
+            user.terms_accepted_at = now_iso
+            user.privacy_accepted_at = now_iso
+            user.terms_version = TERMS_VERSION
+            user.privacy_version = PRIVACY_VERSION
 
 
 def require_admin(current_user):

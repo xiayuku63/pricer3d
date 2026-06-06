@@ -60,6 +60,7 @@ import {
     reQuoteAllSelectedFiles, renderResultsTable, recalcSummaryFromCurrentResults,
     handleRowEditChange, refreshOptionsSummary, setOpenLoginModalRef,
     refreshBatchMaterialDropdown, refreshBatchColorDropdown, batchApplyToAll,
+    handleCardEditChange, exportCSV, exportExcel,
 } from './modules/quote.js';
 import {
     initPreview, buildStlThumbnail, buildNonStlThumbnail,
@@ -72,6 +73,7 @@ import {
 } from './modules/orientation-ui.js';
 import { initTheme } from './modules/theme.js';
 import { t, lang, toggleLang, langFlag, langLabel, initI18n } from './modules/i18n.js';
+import { initOnboarding, checkAndStart as checkOnboarding, startGuide } from './modules/onboarding.js';
 
 // ═══════════════════════════════════════════════
 //  App entry point
@@ -179,6 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initQuote(dom);
     initPreview(dom);
     initOrientationUI(dom);
+    initOnboarding();
 
     // Break circular dep: quote.js needs openLoginModal from auth.js
     setOpenLoginModalRef(openLoginModal);
@@ -189,12 +192,24 @@ document.addEventListener('DOMContentLoaded', () => {
     // ── Quote history ──
     initQuoteHistory();
 
+    // ── Helpers: reduce boilerplate ──
+    function _showError(msg) {
+        if (dom.errorMsg) dom.errorMsg.textContent = msg;
+        if (dom.errorContainer) dom.errorContainer.classList.remove('hidden');
+    }
+    function _hideError() {
+        if (dom.errorContainer) dom.errorContainer.classList.add('hidden');
+    }
+    function _bind(el, event, handler) {
+        if (el) el.addEventListener(event, handler);
+    }
+
     // ═══════════════════════════════════════════════
     //  Event wiring
     // ═══════════════════════════════════════════════
 
     // Auth - form events are wired by _wireLoginForm() in auth.js init
-    if (dom.openLoginBtn) dom.openLoginBtn.addEventListener('click', openLoginModal);
+    _bind(dom.openLoginBtn, 'click', openLoginModal);
 
     // Language switcher
     const langSwitchBtn = document.getElementById('lang-switch-btn');
@@ -215,9 +230,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (key) el.textContent = t(key);
         });
     });
-    if (dom.userMenuBtn) dom.userMenuBtn.addEventListener('click', () => dom.userDropdown.classList.toggle('hidden'));
-    if (dom.openAdminUsersBtn) dom.openAdminUsersBtn.addEventListener('click', () => { dom.userDropdown.classList.add('hidden'); window.location.href = '/admin/users'; });
-    if (dom.openMembershipBtn) dom.openMembershipBtn.addEventListener('click', () => { dom.userDropdown.classList.add('hidden'); openMembershipModal(); });
+    _bind(dom.userMenuBtn, 'click', () => dom.userDropdown.classList.toggle('hidden'));
+    _bind(dom.openAdminUsersBtn, 'click', () => { dom.userDropdown.classList.add('hidden'); window.location.href = '/admin/users'; });
+    _bind(dom.openMembershipBtn, 'click', () => { dom.userDropdown.classList.add('hidden'); openMembershipModal(); });
     if (dom.openUserCenterBtn) dom.openUserCenterBtn.addEventListener('click', () => {
         dom.userDropdown.classList.add('hidden');
         if (!currentUser) return;
@@ -235,23 +250,23 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchPrinterPresets();
         renderPrinterVisibilityList();
     });
-    if (dom.logoutBtn) dom.logoutBtn.addEventListener('click', handleLogout);
+    _bind(dom.logoutBtn, 'click', handleLogout);
     document.addEventListener('click', (event) => {
         if (dom.userMenu && !dom.userMenu.contains(event.target)) dom.userDropdown.classList.add('hidden');
     });
 
     // Membership
-    if (dom.membershipCloseBtn) dom.membershipCloseBtn.addEventListener('click', closeMembershipModal);
-    if (dom.membershipBackdrop) dom.membershipBackdrop.addEventListener('click', closeMembershipModal);
-    if (dom.membershipRefreshBtn) dom.membershipRefreshBtn.addEventListener('click', refreshMembershipStatus);
-    if (dom.membershipOrdersBtn) dom.membershipOrdersBtn.addEventListener('click', toggleMembershipOrders);
+    _bind(dom.membershipCloseBtn, 'click', closeMembershipModal);
+    _bind(dom.membershipBackdrop, 'click', closeMembershipModal);
+    _bind(dom.membershipRefreshBtn, 'click', refreshMembershipStatus);
+    _bind(dom.membershipOrdersBtn, 'click', toggleMembershipOrders);
 
     // Slicer presets
-    if (dom.slicerPresetsRefreshBtn) dom.slicerPresetsRefreshBtn.addEventListener('click', fetchSlicerPresets);
-    if (dom.slicerPresetsDownloadBtn) dom.slicerPresetsDownloadBtn.addEventListener('click', downloadSelectedPreset);
-    if (dom.slicerPresetsDeleteBtn) dom.slicerPresetsDeleteBtn.addEventListener('click', deleteSelectedPreset);
-    if (dom.slicerPresetUploadBtn) dom.slicerPresetUploadBtn.addEventListener('click', uploadSlicerPreset);
-    if (dom.slicerPresetGenerateBtn) dom.slicerPresetGenerateBtn.addEventListener('click', generateSlicerPreset);
+    _bind(dom.slicerPresetsRefreshBtn, 'click', fetchSlicerPresets);
+    _bind(dom.slicerPresetsDownloadBtn, 'click', downloadSelectedPreset);
+    _bind(dom.slicerPresetsDeleteBtn, 'click', deleteSelectedPreset);
+    _bind(dom.slicerPresetUploadBtn, 'click', uploadSlicerPreset);
+    _bind(dom.slicerPresetGenerateBtn, 'click', generateSlicerPreset);
 
     // ── Slicer preset form: select preset → load params ──
     if (dom.genPresetSelect) {
@@ -269,24 +284,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ── Slicer preset form: save button ──
-    if (dom.genPresetSaveBtn) {
-        dom.genPresetSaveBtn.addEventListener('click', saveCurrentPreset);
-    }
+    _bind(dom.genPresetSaveBtn, 'click', saveCurrentPreset);
 
     // ── Slicer preset form: save-as button (direct save with auto-generated name)
-    if (dom.genPresetSaveasBtn) {
-        dom.genPresetSaveasBtn.addEventListener('click', saveAsNewPreset);
-    }
+    _bind(dom.genPresetSaveasBtn, 'click', saveAsNewPreset);
 
-    // ── Global: close color dropdowns on outside click ──
+    // ── Global: color dropdown close on outside click + toggle + item selection ──
     document.addEventListener('click', (e) => {
+        // Close all color dropdowns on outside click
         if (!e.target.closest('.color-dd-wrapper')) {
             document.querySelectorAll('.color-dd-list:not(.hidden)').forEach(l => l.classList.add('hidden'));
         }
-    });
-
-    // ── Global: color dropdown toggle + item selection ──
-    document.addEventListener('click', (e) => {
         // Toggle dropdown
         const trigger = e.target.closest('.color-dd-trigger');
         if (trigger) {
@@ -372,8 +380,8 @@ document.addEventListener('DOMContentLoaded', () => {
         refreshOptionsSummary();
         dom.optionsModal.classList.add('hidden');
     });
-    if (dom.optionsCloseBtn) dom.optionsCloseBtn.addEventListener('click', () => dom.optionsModal.classList.add('hidden'));
-    if (dom.optionsBackdrop) dom.optionsBackdrop.addEventListener('click', () => dom.optionsModal.classList.add('hidden'));
+    _bind(dom.optionsCloseBtn, 'click', () => dom.optionsModal.classList.add('hidden'));
+    _bind(dom.optionsBackdrop, 'click', () => dom.optionsModal.classList.add('hidden'));
 
     // Batch edit bar
     const batchMaterial = document.getElementById('batch-material');
@@ -431,22 +439,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Preview modal
-    if (dom.previewCloseBtn) dom.previewCloseBtn.addEventListener('click', closePreviewModal);
-    if (dom.previewBackdrop) dom.previewBackdrop.addEventListener('click', closePreviewModal);
+    _bind(dom.previewCloseBtn, 'click', closePreviewModal);
+    _bind(dom.previewBackdrop, 'click', closePreviewModal);
     setupViewCube();
 
     // Orientation
-    if (dom.orientCenterBtn) dom.orientCenterBtn.addEventListener('click', centerModel);
-    if (dom.orientResetBtn) dom.orientResetBtn.addEventListener('click', resetOrientationHandler);
-    if (dom.layFaceBtn) dom.layFaceBtn.addEventListener('click', toggleLayFace);
-    if (dom.orientTrainBtn) dom.orientTrainBtn.addEventListener('click', submitTraining);
+    _bind(dom.orientCenterBtn, 'click', centerModel);
+    _bind(dom.orientResetBtn, 'click', resetOrientationHandler);
+    _bind(dom.layFaceBtn, 'click', toggleLayFace);
+    _bind(dom.orientTrainBtn, 'click', submitTraining);
 
     // User center
-    if (dom.userCenterCloseBtn) dom.userCenterCloseBtn.addEventListener('click', () => { dom.userCenterModal.classList.add('hidden'); dom.userCenterMsg.classList.add('hidden'); });
-    if (dom.userCenterBackdrop) dom.userCenterBackdrop.addEventListener('click', () => { dom.userCenterModal.classList.add('hidden'); dom.userCenterMsg.classList.add('hidden'); });
-    if (dom.userCenterSaveBtn) dom.userCenterSaveBtn.addEventListener('click', saveUserSettings);
-    if (dom.userCenterSetDefaultsBtn) dom.userCenterSetDefaultsBtn.addEventListener('click', setAsDefaults);
-    if (dom.ucChangePasswordBtn) dom.ucChangePasswordBtn.addEventListener('click', changePassword);
+    const hideUserCenter = () => { dom.userCenterModal.classList.add('hidden'); dom.userCenterMsg.classList.add('hidden'); };
+    _bind(dom.userCenterCloseBtn, 'click', hideUserCenter);
+    _bind(dom.userCenterBackdrop, 'click', hideUserCenter);
+    _bind(dom.userCenterSaveBtn, 'click', saveUserSettings);
+    _bind(dom.userCenterSetDefaultsBtn, 'click', setAsDefaults);
+    _bind(dom.ucChangePasswordBtn, 'click', changePassword);
 
     // Printer preset management
     const ppAddBtn = document.getElementById('printer-preset-add-btn');
@@ -578,6 +587,42 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // 移动端卡片事件
+    const cardsContainer = document.getElementById('batch-results-cards');
+    if (cardsContainer) {
+        cardsContainer.addEventListener('change', handleCardEditChange);
+        cardsContainer.addEventListener('click', (event) => {
+            const deleteBtn = event.target.closest('[data-delete-file]');
+            if (deleteBtn) {
+                const filename = deleteBtn.getAttribute('data-delete-file');
+                selectedFilesMap.delete(filename);
+                thumbnailMap.delete(filename);
+                setCurrentResults(currentResults.filter((i) => i && i.filename !== filename));
+                renderResultsTable();
+                recalcSummaryFromCurrentResults();
+                if (selectedFilesMap.size === 0) {
+                    dom.fileNameDisplay.textContent = '未选择文件（最多20个，单文件需小于100MB）';
+                    dom.fileNameDisplay.classList.remove('text-indigo-600', 'font-medium');
+                } else {
+                    dom.fileNameDisplay.textContent = `当前列表共 ${selectedFilesMap.size} 个文件`;
+                    dom.fileNameDisplay.classList.add('text-indigo-600', 'font-medium');
+                }
+                closePreviewModal();
+                return;
+            }
+            const previewBtn = event.target.closest('[data-preview-file]');
+            if (previewBtn) {
+                previewByFilename(previewBtn.getAttribute('data-preview-file'), previewBtn.getAttribute('data-preview-ext'));
+            }
+        });
+    }
+
+    // 导出按钮
+    const exportCsvBtn = document.getElementById('export-csv-btn');
+    const exportExcelBtn = document.getElementById('export-excel-btn');
+    if (exportCsvBtn) exportCsvBtn.addEventListener('click', exportCSV);
+    if (exportExcelBtn) exportExcelBtn.addEventListener('click', exportExcel);
+
     // File upload
     if (dom.fileInput) {
         dom.fileInput.addEventListener('change', async (e) => {
@@ -589,8 +634,7 @@ document.addEventListener('DOMContentLoaded', () => {
             newFiles.forEach((file) => combined.set(file.name, file));
 
             if (combined.size > MAX_FILES) {
-                dom.errorMsg.textContent = `最多支持 ${MAX_FILES} 个文件（当前已选择 ${selectedFilesMap.size} 个，本次新增 ${newFiles.length} 个）`;
-                dom.errorContainer.classList.remove('hidden');
+                _showError(`最多支持 ${MAX_FILES} 个文件（当前已选择 ${selectedFilesMap.size} 个，本次新增 ${newFiles.length} 个）`);
                 return;
             }
             const invalidByType = newFiles.find((f) => {
@@ -598,18 +642,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 return !ALLOWED_EXTENSIONS.some((ext) => name.endsWith(ext));
             });
             if (invalidByType) {
-                dom.errorMsg.textContent = `不支持的格式：${invalidByType.name}。仅支持 ${ALLOWED_EXTENSIONS.join('/')}`;
-                dom.errorContainer.classList.remove('hidden');
+                _showError(`不支持的格式：${invalidByType.name}。仅支持 ${ALLOWED_EXTENSIONS.join('/')}`);
                 return;
             }
             const invalidBySize = newFiles.find((f) => f.size >= MAX_FILE_SIZE);
             if (invalidBySize) {
-                dom.errorMsg.textContent = `文件过大：${invalidBySize.name}，单文件必须小于100MB`;
-                dom.errorContainer.classList.remove('hidden');
+                _showError(`文件过大：${invalidBySize.name}，单文件必须小于100MB`);
                 return;
             }
 
-            dom.errorContainer.classList.add('hidden');
+            _hideError();
 
             // Check if any file is a ZIP — route to /api/quote/zip
             const zipFiles = newFiles.filter(function(f) { return f.name.toLowerCase().endsWith('.zip'); });
@@ -618,16 +660,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (zipFiles.length > 0) {
                 // Only support single ZIP upload at a time (combined with model files is ok)
                 if (zipFiles.length > 1 && modelFiles.length === 0) {
-                    dom.errorMsg.textContent = '一次只能上传一个 ZIP 文件';
-                    dom.errorContainer.classList.remove('hidden');
+                    _showError('一次只能上传一个 ZIP 文件');
                     return;
                 }
 
                 if (!authToken) {
                     setPendingQuoteFiles(newFiles);
                     dom.fileNameDisplay.textContent = '当前列表共 ' + selectedFilesMap.size + ' 个文件，请登录后继续报价';
-                    dom.errorMsg.textContent = '请先登录后再上传报价';
-                    dom.errorContainer.classList.remove('hidden');
+                    _showError('请先登录后再上传报价');
                     openLoginModal();
                     return;
                 }
@@ -637,21 +677,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 try {
                     // Upload ZIP to new endpoint
-                    var zipFormData = new FormData();
+                    const zipFormData = new FormData();
                     zipFormData.append('file', zipFiles[0]);
                     zipFormData.append('material', quoteOptions.material);
                     zipFormData.append('color', quoteOptions.color);
                     zipFormData.append('quantity', String(quoteOptions.quantity));
 
                     // Send printer and slicer preset from batch toolbar for checklist-less models
-                    var zipPrinterModel = getActivePrinterCompoundId();
+                    const zipPrinterModel = getActivePrinterCompoundId();
                     if (zipPrinterModel) zipFormData.append('printer_model', zipPrinterModel);
-                    var zipPresetEl = document.getElementById('batch-slicer-preset');
-                    var zipPresetId = (zipPresetEl && zipPresetEl.value) ? Number(zipPresetEl.value) : null;
+                    const zipPresetEl = document.getElementById('batch-slicer-preset');
+                    const zipPresetId = (zipPresetEl && zipPresetEl.value) ? Number(zipPresetEl.value) : null;
                     if (zipPresetId) zipFormData.append('slicer_preset_id', String(zipPresetId));
 
-                    var zipResp = await authFetch('/api/quote/zip', { method: 'POST', body: zipFormData });
-                    var zipData = await zipResp.json();
+                    const zipResp = await authFetch('/api/quote/zip', { method: 'POST', body: zipFormData });
+                    const zipData = await zipResp.json();
                     if (!zipResp.ok) throw new Error(zipData.detail || 'ZIP 上传失败');
 
                     // Process results
@@ -662,15 +702,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Rebuild selectedFilesMap + thumbnails for ZIP-uploaded models
                     // These files aren't in selectedFilesMap since they came from the ZIP,
                     // so previews and batch re-quote won't work. Fetch each file from backend.
-                    var zipModelFiles = [];
-                    for (var ri = 0; ri < (zipData.results || []).length; ri++) {
-                        var r = zipData.results[ri];
+                    const zipModelFiles = [];
+                    for (let ri = 0; ri < (zipData.results || []).length; ri++) {
+                        const r = zipData.results[ri];
                         if (r.checklist_file_path) {
                             try {
-                                var fileResp = await authFetch('/api/quote/zip/file?file_path=' + encodeURIComponent(r.checklist_file_path));
+                                const fileResp = await authFetch('/api/quote/zip/file?file_path=' + encodeURIComponent(r.checklist_file_path));
                                 if (fileResp.ok) {
-                                    var blob = await fileResp.blob();
-                                    var modelFile = new File([blob], r.filename, { type: 'application/octet-stream' });
+                                    const blob = await fileResp.blob();
+                                    const modelFile = new File([blob], r.filename, { type: 'application/octet-stream' });
                                     selectedFilesMap.set(r.filename, modelFile);
                                     zipModelFiles.push(modelFile);
                                 }
@@ -686,8 +726,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     // Show match status message
                     if (zipData.match_status) {
-                        var ms = zipData.match_status;
-                        var statusClass = ms.mode === 'all' ? 'text-green-700 bg-green-50 border-green-300'
+                        const ms = zipData.match_status;
+                        const statusClass = ms.mode === 'all' ? 'text-green-700 bg-green-50 border-green-300'
                             : ms.mode === 'partial' ? 'text-amber-700 bg-amber-50 border-amber-300'
                             : 'text-red-700 bg-red-50 border-red-300';
                         dom.fileNameDisplay.innerHTML = '<span class="inline-block px-2 py-0.5 rounded border text-xs ' + statusClass + '">' + escapeHtml(ms.message) + '</span>';
@@ -703,8 +743,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         await quoteSelectedFiles(modelFiles);
                     }
                 } catch (err) {
-                    dom.errorMsg.textContent = err.message || 'ZIP 解析失败';
-                    dom.errorContainer.classList.remove('hidden');
+                    _showError(err.message || 'ZIP 解析失败');
                     dom.fileNameDisplay.textContent = 'ZIP 文件处理失败';
                 }
                 return;
@@ -717,8 +756,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!authToken) {
                 setPendingQuoteFiles(newFiles);
                 dom.fileNameDisplay.textContent = `当前列表共 ${selectedFilesMap.size} 个文件，请登录后继续为新增 ${newFiles.length} 个文件自动报价`;
-                dom.errorMsg.textContent = '请先登录后再上传报价';
-                dom.errorContainer.classList.remove('hidden');
+                _showError('请先登录后再上传报价');
                 openLoginModal();
                 return;
             }
@@ -728,8 +766,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 await quoteSelectedFiles(newFiles);
                 dom.fileNameDisplay.textContent = `当前列表共 ${selectedFilesMap.size} 个文件，新增 ${newFiles.length} 个文件报价完成`;
             } catch (err) {
-                dom.errorMsg.textContent = err.message;
-                dom.errorContainer.classList.remove('hidden');
+                _showError(err.message);
                 dom.fileNameDisplay.textContent = `当前列表共 ${selectedFilesMap.size} 个文件，新增 ${newFiles.length} 个文件自动报价失败`;
             }
         });
@@ -773,13 +810,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 return ALLOWED_EXTENSIONS.includes(ext) && f.size < MAX_FILE_SIZE;
             });
             if (valid.length === 0) {
-                dom.errorMsg.textContent = '不支持的文件格式或文件过大（支持 .stl/.step/.stp/.obj/.3mf，最大100MB）';
-                dom.errorContainer.classList.remove('hidden');
+                _showError('不支持的文件格式或文件过大（支持 .stl/.step/.stp/.obj/.3mf，最大100MB）');
                 return;
             }
             if (valid.length + selectedFilesMap.size > MAX_FILES) {
-                dom.errorMsg.textContent = `单次最多上传 ${MAX_FILES} 个文件`;
-                dom.errorContainer.classList.remove('hidden');
+                _showError(`单次最多上传 ${MAX_FILES} 个文件`);
                 return;
             }
             const dt = new DataTransfer();
@@ -808,5 +843,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeAuth().then(() => {
         // Load presets for model-page selector after auth
         if (authToken) fetchSlicerPresets();
+        // Check if this user needs the onboarding guide
+        if (authToken) checkOnboarding();
     });
 });

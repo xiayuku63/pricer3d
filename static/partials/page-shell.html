@@ -5,7 +5,7 @@
                 <div>
                     <div class="uppercase tracking-wide text-sm text-indigo-500 font-semibold mb-1">3D Printing Parts Automated Quoting System</div>
                     <h2 class="text-2xl font-bold text-gray-900 inline">3D打印件自动报价系统</h2>
-                    <span id="app-version" class="ml-2 px-2 py-0.5 text-xs font-mono rounded-full bg-gray-100 text-gray-500 align-middle">v0.13.0</span>
+                    <span id="app-version" class="ml-2 px-2 py-0.5 text-xs font-mono rounded-full bg-gray-100 text-gray-500 align-middle">—</span>
                 </div>
                 <div id="auth-area" class="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:justify-end">
                     <button id="lang-switch-btn" type="button" class="w-full sm:w-auto text-sm px-3 py-1.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50">🇨🇳 中文</button>
@@ -84,23 +84,36 @@
                             <span id="batch-msg" class="text-[11px] text-indigo-600 hidden"></span>
                         </div>
 
-                        <div class="mt-4 overflow-x-auto">
-                            <table class="min-w-full text-[11px] text-left border border-gray-200 rounded-md overflow-hidden whitespace-nowrap">
+                        <!-- 导出按钮组 -->
+                        <div class="mt-4 flex items-center gap-2 flex-wrap">
+                            <button id="export-csv-btn" type="button" class="inline-flex items-center gap-1.5 text-[11px] px-3 py-1.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                <span>导出 CSV</span>
+                            </button>
+                            <button id="export-excel-btn" type="button" class="inline-flex items-center gap-1.5 text-[11px] px-3 py-1.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                <span>导出 Excel</span>
+                            </button>
+                        </div>
+
+                        <!-- 桌面端：表格布局（lg 及以上） -->
+                        <div class="mt-4 overflow-x-auto hidden lg:block">
+                            <table class="min-w-full text-[11px] text-left border border-gray-200 rounded-md overflow-hidden">
                                 <thead class="bg-gray-100 text-gray-700">
                                     <tr>
-                                        <th class="px-2 py-1.5" data-i18n="quote.filename">文件名</th>
-                                        <th class="px-2 py-1.5" data-i18n="common.preview">预览</th>
-                                        <th class="px-2 py-1.5" data-i18n="quote.printerModel">打印机</th>
-                                        <th class="px-2 py-1.5" data-i18n="quote.preset">预设</th>
-                                        <th class="px-2 py-1.5" data-i18n="quote.material">材料</th>
-                                        <th class="px-2 py-1.5" data-i18n="quote.color">颜色</th>
-                                        <th class="px-2 py-1.5" data-i18n="quote.quantity">数量</th>
-                                        <th class="px-2 py-1.5" data-i18n="quote.geometry">几何信息</th>
-                                        <th class="px-2 py-1.5" data-i18n="quote.weight">重量（单件/总）</th>
-                                        <th class="px-2 py-1.5" data-i18n="quote.time">时间（单件/总）</th>
-                                        <th class="px-2 py-1.5" data-i18n="quote.price">价格（单价/总价）</th>
-                                        <th class="px-2 py-1.5" data-i18n="quote.status">状态/错误</th>
-                                        <th class="px-2 py-1.5" data-i18n="quote.actions">操作</th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap" data-i18n="quote.filename">文件名</th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap" data-i18n="common.preview">预览</th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap" data-i18n="quote.printerModel">打印机</th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap" data-i18n="quote.preset">预设</th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap" data-i18n="quote.material">材料</th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap" data-i18n="quote.color">颜色</th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap" data-i18n="quote.quantity">数量</th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap" data-i18n="quote.geometry">几何信息</th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap" data-i18n="quote.weight">重量（单件/总）</th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap" data-i18n="quote.time">时间（单件/总）</th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap" data-i18n="quote.price">价格（单价/总价）</th>
+                                        <th class="px-2 py-1.5 min-w-[160px] max-w-[260px]" data-i18n="quote.status">状态/错误</th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap" data-i18n="quote.actions">操作</th>
                                     </tr>
                                 </thead>
                                 <tbody id="batch-results-body" class="bg-white">
@@ -108,37 +121,40 @@
                                         <td class="px-2 py-2 text-gray-500" colspan="12" data-i18n="quote.noDataUpload">暂无数据，请在表格底部上传并自动报价</td>
                                     </tr>
                                 </tbody>
-                                <tfoot class="bg-white border-t border-gray-200">
-                                    <tr>
-                                        <td class="px-2 py-3" colspan="12">
-                                            <form id="quote-form" class="space-y-3">
-                                                <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md bg-gray-50 hover:bg-gray-100 transition-colors" id="drop-zone">
-                                                    <div class="space-y-1 text-center">
-                                                        <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
-                                                            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                                                        </svg>
-                                                        <div class="flex text-sm text-gray-600 justify-center">
-                                                            <label for="file-upload" class="relative cursor-pointer rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500">
-                                                                <span data-i18n="quote.selectFile">选择文件</span>
-                                                                <input id="file-upload" name="files" type="file" class="sr-only" accept=".stl,.stp,.step,.obj,.3mf,.zip" multiple required>
-                                                            </label>
-                                                        </div>
-                                                        <p id="file-name" class="text-xs text-gray-500 mt-2" data-i18n="quote.noFileSelected">未选择文件（最多20个，单文件需小于100MB）</p>
-                                                        <div class="text-sm font-medium text-gray-700 mt-2" data-i18n="quote.uploadModels">上传 3D 模型（stl/stp/step/obj/3mf，最多20个，单文件&lt;100MB）</div>
-                                                    </div>
-                                                </div>
-
-                                                <div class="mt-4 flex flex-col items-center justify-center gap-3">
-                                                    <p class="text-xs text-indigo-600 mt-2 bg-indigo-50 px-3 py-1 rounded-full flex items-center gap-1">
-                                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                                                        PrusaSlicer 切片精确估算已启用
-                                                    </p>
-                                                </div>
-                                            </form>
-                                        </td>
-                                    </tr>
-                                </tfoot>
                             </table>
+                        </div>
+
+                        <!-- 移动端：卡片布局（lg 以下） -->
+                        <div id="batch-results-cards" class="mt-4 space-y-3 lg:hidden">
+                            <p class="text-sm text-gray-500 text-center py-4" data-i18n="quote.noDataUpload">暂无数据，请在下方上传并自动报价</p>
+                        </div>
+
+                        <!-- 上传区域（独立于表格，所有屏幕尺寸可见） -->
+                        <div class="mt-4">
+                            <form id="quote-form" class="space-y-3">
+                                <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md bg-gray-50 hover:bg-gray-100 transition-colors" id="drop-zone">
+                                    <div class="space-y-1 text-center">
+                                        <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                                            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                        </svg>
+                                        <div class="flex text-sm text-gray-600 justify-center">
+                                            <label for="file-upload" class="relative cursor-pointer rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500">
+                                                <span data-i18n="quote.selectFile">选择文件</span>
+                                                <input id="file-upload" name="files" type="file" class="sr-only" accept=".stl,.stp,.step,.obj,.3mf,.zip" multiple required>
+                                            </label>
+                                        </div>
+                                        <p id="file-name" class="text-xs text-gray-500 mt-2" data-i18n="quote.noFileSelected">未选择文件（最多20个，单文件需小于100MB）</p>
+                                        <div class="text-sm font-medium text-gray-700 mt-2" data-i18n="quote.uploadModels">上传 3D 模型（stl/stp/step/obj/3mf，最多20个，单文件&lt;100MB）</div>
+                                    </div>
+                                </div>
+
+                                <div class="mt-4 flex flex-col items-center justify-center gap-3">
+                                    <p class="text-xs text-indigo-600 mt-2 bg-indigo-50 px-3 py-1 rounded-full flex items-center gap-1">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                                        PrusaSlicer 切片精确估算已启用
+                                    </p>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 </div>

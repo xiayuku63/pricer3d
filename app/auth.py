@@ -5,6 +5,7 @@ import re
 import ssl
 import smtplib
 import hashlib
+import logging
 from email.message import EmailMessage
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -30,7 +31,9 @@ from .config import (
     VERIFY_CODE_MAX_ATTEMPTS,
     VERIFY_SEND_COOLDOWN_SECONDS,
 )
-from .database import get_db_conn, get_app_defaults
+from .db import get_db_session
+from .models_orm import User, VerificationCode, LoginFailure
+from .database import get_app_defaults
 from .utils import (
     normalize_email,
     normalize_phone,
@@ -39,6 +42,36 @@ from .utils import (
     generate_numeric_code,
 )
 from .config import DEFAULT_MATERIALS, DEFAULT_COLORS, DEFAULT_PRICING_CONFIG
+
+_logger = logging.getLogger(__name__)
+
+
+def _user_to_dict(user) -> dict:
+    """Convert a User ORM object to a dict with string keys."""
+    if user is None:
+        return None
+    return {
+        "id": user.id,
+        "username": user.username,
+        "password_hash": user.password_hash,
+        "created_at": user.created_at,
+        "materials": user.materials,
+        "colors": user.colors,
+        "pricing_config": user.pricing_config,
+        "email": user.email,
+        "phone": user.phone,
+        "email_verified": user.email_verified,
+        "phone_verified": user.phone_verified,
+        "membership_level": user.membership_level,
+        "membership_expires_at": user.membership_expires_at,
+        "terms_accepted_at": user.terms_accepted_at,
+        "privacy_accepted_at": user.privacy_accepted_at,
+        "terms_version": user.terms_version,
+        "privacy_version": user.privacy_version,
+        "default_printer_id": user.default_printer_id,
+        "default_nozzle": user.default_nozzle,
+        "default_slicer_preset_id": user.default_slicer_preset_id,
+    }
 
 
 # ---------- password ----------
@@ -64,30 +97,21 @@ def create_access_token(user_id: int, username: str, expire_hours: Optional[int]
 # ---------- user queries ----------
 
 def get_user_by_username(username: str):
-    with get_db_conn() as conn:
-        row = conn.execute(
-            "SELECT id, username, password_hash, created_at, email, phone, email_verified, phone_verified, membership_level, membership_expires_at FROM users WHERE username = ?",
-            (username,),
-        ).fetchone()
-    return row
+    with get_db_session() as db:
+        user = db.query(User).filter(User.username == username).first()
+        return _user_to_dict(user)
 
 
 def get_user_by_email(email: str):
-    with get_db_conn() as conn:
-        row = conn.execute(
-            "SELECT id, username, password_hash, created_at, email, phone, email_verified, phone_verified, membership_level, membership_expires_at FROM users WHERE email = ?",
-            (email,),
-        ).fetchone()
-    return row
+    with get_db_session() as db:
+        user = db.query(User).filter(User.email == email).first()
+        return _user_to_dict(user)
 
 
 def get_user_by_phone(phone: str):
-    with get_db_conn() as conn:
-        row = conn.execute(
-            "SELECT id, username, password_hash, created_at, email, phone, email_verified, phone_verified, membership_level, membership_expires_at FROM users WHERE phone = ?",
-            (phone,),
-        ).fetchone()
-    return row
+    with get_db_session() as db:
+        user = db.query(User).filter(User.phone == phone).first()
+        return _user_to_dict(user)
 
 
 def get_user_by_identifier(identifier: str):
@@ -102,12 +126,9 @@ def get_user_by_identifier(identifier: str):
 
 
 def get_user_by_id(user_id: int):
-    with get_db_conn() as conn:
-        row = conn.execute(
-            "SELECT id, username, created_at, email, phone, email_verified, phone_verified, membership_level, membership_expires_at FROM users WHERE id = ?",
-            (user_id,),
-        ).fetchone()
-    return row
+    with get_db_session() as db:
+        user = db.query(User).filter(User.id == user_id).first()
+        return _user_to_dict(user)
 
 
 def authenticate_user(identifier: str, password: str):
@@ -126,13 +147,19 @@ def create_verification_code(channel: str, target: str) -> tuple[str, int]:
     now = time.time()
     expires_at = now + VERIFY_CODE_TTL_SECONDS
     created_at = datetime.now(timezone.utc).isoformat()
-    with get_db_conn() as conn:
-        cur = conn.execute(
-            "INSERT INTO verification_codes (channel, target, code_hash, expires_at, created_at, used_at, attempts) VALUES (?, ?, ?, ?, ?, NULL, 0)",
-            (channel, target, hash_verify_code(code), str(expires_at), created_at),
+    with get_db_session() as db:
+        vc = VerificationCode(
+            channel=channel,
+            target=target,
+            code_hash=hash_verify_code(code),
+            expires_at=str(expires_at),
+            created_at=created_at,
+            used_at=None,
+            attempts=0,
         )
-        conn.commit()
-        row_id = int(cur.lastrowid or 0)
+        db.add(vc)
+        db.flush()
+        row_id = vc.id
     return code, row_id
 
 
@@ -140,47 +167,45 @@ def delete_verification_code_row(row_id: int) -> None:
     rid = int(row_id or 0)
     if rid <= 0:
         return
-    with get_db_conn() as conn:
-        conn.execute("DELETE FROM verification_codes WHERE id = ?", (rid,))
-        conn.commit()
+    with get_db_session() as db:
+        db.query(VerificationCode).filter(VerificationCode.id == rid).delete()
 
 
 def consume_verification_code(channel: str, target: str, code: str) -> bool:
     now = time.time()
     now_iso = datetime.now(timezone.utc).isoformat()
     supplied = hash_verify_code(code)
-    with get_db_conn() as conn:
-        row = conn.execute(
-            """
-            SELECT id, code_hash, expires_at, attempts
-            FROM verification_codes
-            WHERE channel = ? AND target = ? AND used_at IS NULL
-            ORDER BY id DESC
-            LIMIT 1
-            """,
-            (channel, target),
-        ).fetchone()
+    with get_db_session() as db:
+        row = (
+            db.query(VerificationCode)
+            .filter(
+                VerificationCode.channel == channel,
+                VerificationCode.target == target,
+                VerificationCode.used_at.is_(None),
+            )
+            .order_by(VerificationCode.id.desc())
+            .first()
+        )
         if not row:
             return False
         try:
-            expires_at = float(row["expires_at"])
-        except Exception:
+            expires_at = float(row.expires_at)
+        except Exception as e:
+            _logger.debug("auth: failed to parse verification code expires_at: %s", e)
             return False
         if now > expires_at:
-            conn.execute("UPDATE verification_codes SET used_at = ? WHERE id = ?", (now_iso, row["id"]))
-            conn.commit()
+            row.used_at = now_iso
             return False
-        attempts = int(row["attempts"] or 0) + 1
+        attempts = int(row.attempts or 0) + 1
         if attempts > VERIFY_CODE_MAX_ATTEMPTS:
-            conn.execute("UPDATE verification_codes SET attempts = ?, used_at = ? WHERE id = ?", (attempts, now_iso, row["id"]))
-            conn.commit()
+            row.attempts = attempts
+            row.used_at = now_iso
             return False
-        if supplied != str(row["code_hash"] or ""):
-            conn.execute("UPDATE verification_codes SET attempts = ? WHERE id = ?", (attempts, row["id"]))
-            conn.commit()
+        if supplied != str(row.code_hash or ""):
+            row.attempts = attempts
             return False
-        conn.execute("UPDATE verification_codes SET attempts = ?, used_at = ? WHERE id = ?", (attempts, now_iso, row["id"]))
-        conn.commit()
+        row.attempts = attempts
+        row.used_at = now_iso
         return True
 
 
@@ -297,35 +322,33 @@ def create_user(username: str, password: str, email: Optional[str], phone: Optio
     membership_expires_at = None
     accepted_at = datetime.now(timezone.utc).isoformat()
     try:
-        with get_db_conn() as conn:
-            conn.execute(
-                "INSERT INTO users (username, password_hash, created_at, materials, colors, pricing_config, email, phone, email_verified, phone_verified, membership_level, membership_expires_at, terms_accepted_at, privacy_accepted_at, terms_version, privacy_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    username,
-                    password_hash,
-                    created_at,
-                    materials_json,
-                    colors_json,
-                    pricing_json,
-                    email,
-                    phone,
-                    email_verified,
-                    phone_verified,
-                    membership_level,
-                    membership_expires_at,
-                    accepted_at,
-                    accepted_at,
-                    "v1",
-                    "v1",
-                ),
+        with get_db_session() as db:
+            user = User(
+                username=username,
+                password_hash=password_hash,
+                created_at=created_at,
+                materials=materials_json,
+                colors=colors_json,
+                pricing_config=pricing_json,
+                email=email,
+                phone=phone,
+                email_verified=email_verified,
+                phone_verified=phone_verified,
+                membership_level=membership_level,
+                membership_expires_at=membership_expires_at,
+                terms_accepted_at=accepted_at,
+                privacy_accepted_at=accepted_at,
+                terms_version="v1",
+                privacy_version="v1",
             )
-            conn.commit()
-            user = conn.execute("SELECT id, username, created_at FROM users WHERE id = last_insert_rowid()").fetchone()
+            db.add(user)
+            db.flush()
+            result = {"id": user.id, "username": user.username, "created_at": user.created_at}
     except Exception:
         raise HTTPException(status_code=409, detail="用户名或邮箱/手机号已存在")
-    if not user:
+    if not result:
         raise HTTPException(status_code=500, detail="REGISTRATION_FAILED")
-    return dict(user)
+    return result
 
 
 # ---------- login failure tracking ----------
@@ -338,16 +361,14 @@ def _login_failure_key_hash(identifier: str) -> str:
 def is_login_locked(identifier: str) -> tuple[bool, int]:
     key_hash = _login_failure_key_hash(identifier)
     now = time.time()
-    with get_db_conn() as conn:
-        row = conn.execute(
-            "SELECT locked_until FROM login_failures WHERE key_hash = ?",
-            (key_hash,),
-        ).fetchone()
+    with get_db_session() as db:
+        row = db.query(LoginFailure).filter(LoginFailure.key_hash == key_hash).first()
     if not row:
         return False, 0
     try:
-        locked_until = float(row["locked_until"] or 0)
-    except Exception:
+        locked_until = float(row.locked_until or 0)
+    except Exception as e:
+        _logger.debug("auth: failed to parse locked_until in is_login_locked: %s", e)
         locked_until = 0.0
     if locked_until and now < locked_until:
         return True, max(1, int(locked_until - now))
@@ -356,9 +377,8 @@ def is_login_locked(identifier: str) -> tuple[bool, int]:
 
 def clear_login_failures(identifier: str) -> None:
     key_hash = _login_failure_key_hash(identifier)
-    with get_db_conn() as conn:
-        conn.execute("DELETE FROM login_failures WHERE key_hash = ?", (key_hash,))
-        conn.commit()
+    with get_db_session() as db:
+        db.query(LoginFailure).filter(LoginFailure.key_hash == key_hash).delete()
 
 
 def record_login_failure(identifier: str) -> tuple[bool, int]:
@@ -367,19 +387,18 @@ def record_login_failure(identifier: str) -> tuple[bool, int]:
     now = time.time()
     now_iso = datetime.now(timezone.utc).isoformat()
     window_start = now - LOGIN_FAILED_WINDOW_SECONDS
-    with get_db_conn() as conn:
-        row = conn.execute(
-            "SELECT fail_count, first_failed_at, locked_until FROM login_failures WHERE key_hash = ?",
-            (key_hash,),
-        ).fetchone()
+    with get_db_session() as db:
+        row = db.query(LoginFailure).filter(LoginFailure.key_hash == key_hash).first()
         if row:
             try:
-                first_failed_at = float(row["first_failed_at"] or 0)
-            except Exception:
+                first_failed_at = float(row.first_failed_at or 0)
+            except Exception as e:
+                _logger.debug("auth: failed to parse first_failed_at: %s", e)
                 first_failed_at = 0.0
             try:
-                locked_until = float(row["locked_until"] or 0)
-            except Exception:
+                locked_until = float(row.locked_until or 0)
+            except Exception as e:
+                _logger.debug("auth: failed to parse locked_until in record_login_failure: %s", e)
                 locked_until = 0.0
             if locked_until and now < locked_until:
                 return True, max(1, int(locked_until - now))
@@ -387,7 +406,7 @@ def record_login_failure(identifier: str) -> tuple[bool, int]:
                 fail_count = 1
                 first_failed_at = now
             else:
-                fail_count = int(row["fail_count"] or 0) + 1
+                fail_count = int(row.fail_count or 0) + 1
             locked = False
             remaining = 0
             new_locked_until = 0.0
@@ -395,23 +414,19 @@ def record_login_failure(identifier: str) -> tuple[bool, int]:
                 locked = True
                 new_locked_until = now + LOGIN_LOCK_SECONDS
                 remaining = int(LOGIN_LOCK_SECONDS)
-            conn.execute(
-                """
-                UPDATE login_failures
-                SET fail_count = ?, first_failed_at = ?, last_failed_at = ?, locked_until = ?
-                WHERE key_hash = ?
-                """,
-                (int(fail_count), str(first_failed_at), str(now), str(new_locked_until), key_hash),
-            )
-            conn.commit()
+            row.fail_count = int(fail_count)
+            row.first_failed_at = str(first_failed_at)
+            row.last_failed_at = str(now)
+            row.locked_until = str(new_locked_until)
             return locked, remaining
         else:
-            conn.execute(
-                """
-                INSERT INTO login_failures (created_at, key_hash, fail_count, first_failed_at, last_failed_at, locked_until)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                (now_iso, key_hash, 1, str(now), str(now), "0"),
+            lf = LoginFailure(
+                created_at=now_iso,
+                key_hash=key_hash,
+                fail_count=1,
+                first_failed_at=str(now),
+                last_failed_at=str(now),
+                locked_until="0",
             )
-            conn.commit()
+            db.add(lf)
             return False, 0

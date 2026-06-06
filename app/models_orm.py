@@ -38,6 +38,28 @@ class User(Base):
     privacy_accepted_at = Column(String)
     terms_version = Column(String)
     privacy_version = Column(String)
+    default_printer_id = Column(String)
+    default_nozzle = Column(String)
+    default_slicer_preset_id = Column(Integer)
+
+
+class PrinterPreset(Base):
+    __tablename__ = "printer_presets"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    name = Column(String, nullable=False)
+    bed_width = Column(Float, nullable=False, default=256)
+    bed_depth = Column(Float, nullable=False, default=256)
+    bed_height = Column(Float, nullable=False, default=256)
+    nozzle = Column(Float, nullable=False, default=0.4)
+    nozzles = Column(Text, nullable=False, default='[0.4]')
+    profile_b64 = Column(Text, nullable=False)
+    created_at = Column(String, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "name"),
+    )
 
 
 class SlicerPreset(Base):
@@ -133,6 +155,7 @@ class MembershipPlan(Base):
     currency = Column(String, nullable=False)
     duration_days = Column(Integer, nullable=False)
     active = Column(Integer, default=1)
+    created_at = Column(String)
 
     __table_args__ = (
         Index("idx_mp_active", "active"),

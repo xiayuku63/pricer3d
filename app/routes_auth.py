@@ -1,5 +1,6 @@
 """Auth routes – captcha, verification, register, login, me."""
 
+import os
 import time
 import secrets
 import logging
@@ -33,7 +34,7 @@ from .config import (
 )
 from .models import RegisterRequest, LoginRequest, VerifySendRequest, VerifyConfirmRequest, RegisterCheckRequest
 from pydantic import BaseModel, Field
-from .database import get_db_conn, get_app_defaults
+from .database import get_app_defaults
 from .utils import (
     normalize_email,
     normalize_phone,
@@ -327,9 +328,14 @@ async def login(payload: LoginRequest, request: Request):
 # ---------- Admin Login (no captcha, no legal, dev only) ----------
 
 async def admin_login(request: Request):
-    """Admin quick login — no captcha, no legal acceptance. Auto-creates admin user."""
+    """Admin quick login — no captcha, no legal acceptance. Auto-creates admin user.
+    Only available in development environment."""
     import json
     from .auth import get_password_hash, verify_password
+
+    # --- P0 security fix: admin-login only allowed in development ---
+    if os.environ.get("APP_ENV", "").lower() != "development":
+        raise HTTPException(status_code=403, detail="ADMIN_LOGIN_DEV_ONLY")
 
     admin_username = "admin"
     admin_password = "admin"
@@ -344,16 +350,25 @@ async def admin_login(request: Request):
         colors_json = json.dumps(defaults.get("colors") or DEFAULT_COLORS)
         pricing_json = json.dumps(defaults.get("pricing_config") or DEFAULT_PRICING_CONFIG)
         accepted_at = datetime.now(timezone.utc).isoformat()
-        with get_db_conn() as conn:
-            conn.execute(
-                """INSERT INTO users (username, password_hash, created_at, materials, colors, pricing_config,
-                   email, phone, email_verified, phone_verified, membership_level, membership_expires_at,
-                   terms_accepted_at, privacy_accepted_at, terms_version, privacy_version)
-                   VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, 0, 0, 'free', NULL, ?, ?, 'v1', 'v1')""",
-                (admin_username, password_hash, created_at, materials_json, colors_json, pricing_json,
-                 accepted_at, accepted_at),
-            )
-            conn.commit()
+        from .db import get_db_session
+        from .models_orm import User as UserORM
+        with get_db_session() as db:
+            db.add(UserORM(
+                username=admin_username,
+                password_hash=password_hash,
+                created_at=created_at,
+                materials=materials_json,
+                colors=colors_json,
+                pricing_config=pricing_json,
+                email_verified=0,
+                phone_verified=0,
+                membership_level="free",
+                terms_accepted_at=accepted_at,
+                privacy_accepted_at=accepted_at,
+                terms_version="v1",
+                privacy_version="v1",
+            ))
+            db.commit()
         user = get_user_by_username(admin_username)
         if not user:
             raise HTTPException(status_code=500, detail="ADMIN_CREATION_FAILED")
@@ -404,7 +419,7 @@ async def auth_me(current_user=Depends(get_current_user)):
         }
     except Exception as e:
         logger.error(f"获取用户信息失败: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"INTERNAL_ERROR: 获取用户信息失败 ({str(e)})")
+        raise HTTPException(status_code=500, detail="获取用户信息失败，请稍后重试")
 
 
 # ── Password Reset ──
@@ -480,9 +495,11 @@ async def password_reset_confirm(payload: ResetConfirmModel, request: Request):
 
     from .auth import get_password_hash
     new_hash = get_password_hash(new_password)
-    with get_db_conn() as conn:
-        conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (new_hash, int(user["id"])))
-        conn.commit()
+    from .db import get_db_session
+    from .models_orm import User as UserORM
+    with get_db_session() as db:
+        db.query(UserORM).filter(UserORM.id == int(user["id"])).update({"password_hash": new_hash})
+        db.commit()
 
     # Clear login failures for this user
     clear_login_failures(str(user["username"]) or "")

@@ -35,8 +35,8 @@ async def lifespan(app: FastAPI):
     try:
         from .middleware import rate_limiter
         rate_limiter.restore_state()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("startup: failed to restore rate limiter state: %s", e)
     logger.info("pricer3d startup complete, env=%s", APP_ENV)
 
     yield  # App runs here
@@ -60,7 +60,7 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=ALLOWED_ORIGINS,
-        allow_methods=["GET", "POST", "PUT", "OPTIONS"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type"],
         allow_credentials=False,
     )
@@ -91,7 +91,7 @@ def create_app() -> FastAPI:
     from .routes_billing import (
         billing_plans, billing_checkout, billing_orders, billing_mock_complete, billing_webhook,
     )
-    from .routes_quote import get_quote, validate_formula, quote_history
+    from .routes_quote import get_quote, validate_formula, quote_history, delete_quote_history, export_quote_history
     from .routes_zip_quote import zip_quote, download_zip_model
     from .routes_orientation import optimize_orientation, list_stable_faces, list_coplanar_clusters, train_sample
     from .routes_pages import (
@@ -159,6 +159,8 @@ def create_app() -> FastAPI:
     # quote
     app.post("/api/quote", response_model=QuoteResponse)(get_quote)
     app.get("/api/quote/history", response_model=PaginatedData[QuoteHistoryItem])(quote_history)
+    app.delete("/api/quote/history/{id}")(delete_quote_history)
+    app.get("/api/quote/export")(export_quote_history)
     app.post("/api/formula/validate", response_model=dict)(validate_formula)
 
     # zip quote

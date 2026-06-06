@@ -9,7 +9,9 @@ from fastapi import Request, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from .config import DEFAULT_MATERIALS, DEFAULT_COLORS, DEFAULT_PRICING_CONFIG, APP_DEFAULTS_KEY, AUDIT_RETENTION_DAYS
-from .database import get_db_conn
+from .db import get_db_session
+from .models_orm import User, AppDefault, AuditEvent, VerificationCode, IdempotencyResponse, LoginFailure
+from sqlalchemy import or_, func, cast, Float, and_
 from .deps import get_current_user, is_admin_user, require_admin, mask_email, mask_phone
 from .utils import normalize_materials
 from .audit import write_audit_event
@@ -35,17 +37,17 @@ async def admin_get_defaults(current_user=Depends(get_current_user)):
 
 async def admin_set_defaults_from_me(request: Request, current_user=Depends(get_current_user)):
     require_admin(current_user)
-    with get_db_conn() as conn:
-        row = conn.execute("SELECT materials, colors, pricing_config FROM users WHERE id = ?", (current_user["id"],)).fetchone()
-    raw_materials = json.loads(row["materials"]) if row and row["materials"] else DEFAULT_MATERIALS
-    colors = json.loads(row["colors"]) if row and row["colors"] else DEFAULT_COLORS
+    with get_db_session() as db:
+        row = db.query(User.materials, User.colors, User.pricing_config).filter(User.id == current_user["id"]).first()
+    raw_materials = json.loads(row.materials) if row and row.materials else DEFAULT_MATERIALS
+    colors = json.loads(row.colors) if row and row.colors else DEFAULT_COLORS
     materials = normalize_materials(raw_materials, fallback_colors=colors)
     derived_colors = []
     for m in materials:
         for c in m.get("colors", []):
             if c not in derived_colors:
                 derived_colors.append(c)
-    raw_pricing = json.loads(row["pricing_config"]) if row and row["pricing_config"] else DEFAULT_PRICING_CONFIG
+    raw_pricing = json.loads(row.pricing_config) if row and row.pricing_config else DEFAULT_PRICING_CONFIG
     pricing_config = merge_pricing_config(raw_pricing)
     unit_ok, unit_err, _ = validate_formula_expression(str(pricing_config.get("unit_cost_formula") or "").strip())
     total_ok, total_err, _ = validate_formula_expression(str(pricing_config.get("total_cost_formula") or "").strip())
@@ -59,20 +61,22 @@ async def admin_set_defaults_from_me(request: Request, current_user=Depends(get_
     payload = {"materials": materials, "colors": derived_colors, "pricing_config": pricing_config}
     now_iso = datetime.now(timezone.utc).isoformat()
     value_json = json.dumps(payload, ensure_ascii=False)
-    with get_db_conn() as conn:
-        conn.execute(
-            """
-            INSERT INTO app_defaults (key, value_json, updated_at, updated_by, updated_by_username)
-            VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT(key) DO UPDATE SET
-                value_json = excluded.value_json,
-                updated_at = excluded.updated_at,
-                updated_by = excluded.updated_by,
-                updated_by_username = excluded.updated_by_username
-            """,
-            (APP_DEFAULTS_KEY, value_json, now_iso, int(current_user["id"]), str(current_user["username"])),
-        )
-        conn.commit()
+    with get_db_session() as db:
+        existing = db.query(AppDefault).filter(AppDefault.key == APP_DEFAULTS_KEY).first()
+        if existing:
+            existing.value_json = value_json
+            existing.updated_at = now_iso
+            existing.updated_by = int(current_user["id"])
+            existing.updated_by_username = str(current_user["username"])
+        else:
+            ad = AppDefault(
+                key=APP_DEFAULTS_KEY,
+                value_json=value_json,
+                updated_at=now_iso,
+                updated_by=int(current_user["id"]),
+                updated_by_username=str(current_user["username"]),
+            )
+            db.add(ad)
     write_audit_event(
         action="admin.defaults.update",
         request=request,
@@ -94,42 +98,48 @@ async def admin_list_users(
     safe_limit = max(1, min(int(limit), 200))
     safe_offset = max(0, int(offset))
     keyword = f"%{(q or '').strip()}%"
-    with get_db_conn() as conn:
-        total_row = conn.execute(
-            """
-            SELECT COUNT(*) AS c
-            FROM users
-            WHERE username LIKE ? OR IFNULL(email, '') LIKE ? OR IFNULL(phone, '') LIKE ?
-            """,
-            (keyword, keyword, keyword),
-        ).fetchone()
-        rows = conn.execute(
-            """
-            SELECT id, username, email, phone, created_at, email_verified, phone_verified, membership_level, membership_expires_at
-            FROM users
-            WHERE username LIKE ? OR IFNULL(email, '') LIKE ? OR IFNULL(phone, '') LIKE ?
-            ORDER BY id DESC
-            LIMIT ? OFFSET ?
-            """,
-            (keyword, keyword, keyword, safe_limit, safe_offset),
-        ).fetchall()
+    with get_db_session() as db:
+        total = (
+            db.query(func.count(User.id))
+            .filter(
+                or_(
+                    User.username.like(keyword),
+                    func.ifnull(User.email, "").like(keyword),
+                    func.ifnull(User.phone, "").like(keyword),
+                )
+            )
+            .scalar()
+        )
+        rows = (
+            db.query(User)
+            .filter(
+                or_(
+                    User.username.like(keyword),
+                    func.ifnull(User.email, "").like(keyword),
+                    func.ifnull(User.phone, "").like(keyword),
+                )
+            )
+            .order_by(User.id.desc())
+            .offset(safe_offset)
+            .limit(safe_limit)
+            .all()
+        )
     items = []
     for row in rows:
         items.append(
             {
-                "id": row["id"],
-                "username": row["username"],
-                "email_masked": mask_email(row["email"]),
-                "phone_masked": mask_phone(row["phone"]),
-                "email_verified": bool(row["email_verified"] or 0),
-                "phone_verified": bool(row["phone_verified"] or 0),
-                "membership_level": (str(row["membership_level"] or "free").strip().lower() or "free"),
-                "membership_expires_at": row["membership_expires_at"],
-                "created_at": row["created_at"],
+                "id": row.id,
+                "username": row.username,
+                "email_masked": mask_email(row.email),
+                "phone_masked": mask_phone(row.phone),
+                "email_verified": bool(row.email_verified or 0),
+                "phone_verified": bool(row.phone_verified or 0),
+                "membership_level": (str(row.membership_level or "free").strip().lower() or "free"),
+                "membership_expires_at": row.membership_expires_at,
+                "created_at": row.created_at,
             }
         )
-    total = int(total_row["c"] or 0) if total_row else 0
-    return {"total": total, "limit": safe_limit, "offset": safe_offset, "items": items}
+    return {"total": total or 0, "limit": safe_limit, "offset": safe_offset, "items": items}
 
 
 async def admin_update_user_membership(
@@ -143,22 +153,21 @@ async def admin_update_user_membership(
     level = (payload.membership_level or "").strip().lower()
     if level not in {"free", "member"}:
         raise HTTPException(status_code=400, detail="membership_level 仅支持 free / member")
-    with get_db_conn() as conn:
-        row = conn.execute("SELECT id, username, membership_level FROM users WHERE id = ?", (safe_id,)).fetchone()
+    with get_db_session() as db:
+        row = db.query(User).filter(User.id == safe_id).first()
         if not row:
             raise HTTPException(status_code=404, detail="用户不存在")
+        target_username = row.username
+        row.membership_level = level
         if payload.membership_expires_at is not None:
-            conn.execute("UPDATE users SET membership_level = ?, membership_expires_at = ? WHERE id = ?", (level, payload.membership_expires_at, safe_id))
-        else:
-            conn.execute("UPDATE users SET membership_level = ? WHERE id = ?", (level, safe_id))
-        conn.commit()
+            row.membership_expires_at = payload.membership_expires_at
     write_audit_event(
         action="admin.user.membership.update",
         request=request,
         user=current_user,
         detail={
             "target_user_id": safe_id,
-            "target_username": row["username"],
+            "target_username": target_username,
             "membership_level": level,
         },
     )
@@ -181,55 +190,59 @@ async def admin_list_audit(
     keyword = f"%{(q or '').strip()}%"
     action_kw = f"%{(action or '').strip()}%"
     user_kw = f"%{(username or '').strip()}%"
-    with get_db_conn() as conn:
-        total_row = conn.execute(
-            """
-            SELECT COUNT(*) AS c
-            FROM audit_events
-            WHERE (action LIKE ?)
-              AND (IFNULL(username, '') LIKE ?)
-              AND (? = '%%' OR action LIKE ? OR IFNULL(username, '') LIKE ? OR IFNULL(ip, '') LIKE ? OR IFNULL(method, '') LIKE ? OR IFNULL(path, '') LIKE ? OR IFNULL(request_id, '') LIKE ?)
-            """,
-            (action_kw, user_kw, keyword, keyword, keyword, keyword, keyword, keyword, keyword),
-        ).fetchone()
-        rows = conn.execute(
-            """
-            SELECT id, created_at, user_id, username, action, ip, method, path, request_id, idempotency_key, detail_json
-            FROM audit_events
-            WHERE (action LIKE ?)
-              AND (IFNULL(username, '') LIKE ?)
-              AND (? = '%%' OR action LIKE ? OR IFNULL(username, '') LIKE ? OR IFNULL(ip, '') LIKE ? OR IFNULL(method, '') LIKE ? OR IFNULL(path, '') LIKE ? OR IFNULL(request_id, '') LIKE ?)
-            ORDER BY id DESC
-            LIMIT ? OFFSET ?
-            """,
-            (action_kw, user_kw, keyword, keyword, keyword, keyword, keyword, keyword, keyword, safe_limit, safe_offset),
-        ).fetchall()
+    with get_db_session() as db:
+        # Build base filter
+        base_filter = (
+            AuditEvent.action.like(action_kw),
+            func.ifnull(AuditEvent.username, "").like(user_kw),
+        )
+        keyword_filter = or_(
+            keyword == "%%",
+            AuditEvent.action.like(keyword),
+            func.ifnull(AuditEvent.username, "").like(keyword),
+            func.ifnull(AuditEvent.ip, "").like(keyword),
+            func.ifnull(AuditEvent.method, "").like(keyword),
+            func.ifnull(AuditEvent.path, "").like(keyword),
+            func.ifnull(AuditEvent.request_id, "").like(keyword),
+        )
+        total = (
+            db.query(func.count(AuditEvent.id))
+            .filter(*base_filter, keyword_filter)
+            .scalar()
+        )
+        rows = (
+            db.query(AuditEvent)
+            .filter(*base_filter, keyword_filter)
+            .order_by(AuditEvent.id.desc())
+            .offset(safe_offset)
+            .limit(safe_limit)
+            .all()
+        )
     items = []
     for row in rows:
         detail = {}
         try:
-            detail = json.loads(row["detail_json"] or "{}")
+            detail = json.loads(row.detail_json or "{}")
             if not isinstance(detail, dict):
                 detail = {"_": detail}
         except Exception:
             detail = {}
         items.append(
             {
-                "id": row["id"],
-                "created_at": row["created_at"],
-                "user_id": row["user_id"],
-                "username": row["username"],
-                "action": row["action"],
-                "ip": row["ip"],
-                "method": row["method"],
-                "path": row["path"],
-                "request_id": row["request_id"],
-                "idempotency_key": row["idempotency_key"],
+                "id": row.id,
+                "created_at": row.created_at,
+                "user_id": row.user_id,
+                "username": row.username,
+                "action": row.action,
+                "ip": row.ip,
+                "method": row.method,
+                "path": row.path,
+                "request_id": row.request_id,
+                "idempotency_key": row.idempotency_key,
                 "detail": detail,
             }
         )
-    total = int(total_row["c"] or 0) if total_row else 0
-    return {"total": total, "limit": safe_limit, "offset": safe_offset, "items": items}
+    return {"total": total or 0, "limit": safe_limit, "offset": safe_offset, "items": items}
 
 
 # ---------- Metrics ----------
@@ -248,29 +261,49 @@ async def admin_cleanup(request: Request, current_user=Depends(get_current_user)
     cutoff_audit = datetime.now(timezone.utc) - timedelta(days=max(1, AUDIT_RETENTION_DAYS))
     cutoff_audit_iso = cutoff_audit.isoformat()
     deleted = {"verification_codes": 0, "idempotency_responses": 0, "login_failures": 0, "audit_events": 0}
-    with get_db_conn() as conn:
-        cur = conn.execute(
-            "DELETE FROM verification_codes WHERE used_at IS NOT NULL OR CAST(expires_at AS REAL) < ?",
-            (float(now),),
+    with get_db_session() as db:
+        # Delete expired/used verification codes
+        count = (
+            db.query(VerificationCode)
+            .filter(
+                or_(
+                    VerificationCode.used_at.isnot(None),
+                    cast(VerificationCode.expires_at, Float) < float(now),
+                )
+            )
+            .delete(synchronize_session=False)
         )
-        deleted["verification_codes"] = int(cur.rowcount or 0)
-        cur = conn.execute(
-            "DELETE FROM idempotency_responses WHERE CAST(expires_at AS REAL) < ?",
-            (float(now),),
+        deleted["verification_codes"] = count
+
+        # Delete expired idempotency responses
+        count = (
+            db.query(IdempotencyResponse)
+            .filter(cast(IdempotencyResponse.expires_at, Float) < float(now))
+            .delete(synchronize_session=False)
         )
-        deleted["idempotency_responses"] = int(cur.rowcount or 0)
-        cur = conn.execute(
-            """
-            DELETE FROM login_failures
-            WHERE (CAST(locked_until AS REAL) < ?)
-              AND (CAST(last_failed_at AS REAL) < ?)
-            """,
-            (float(now), float(now - max(3600, LOGIN_FAILED_WINDOW_SECONDS))),
+        deleted["idempotency_responses"] = count
+
+        # Delete old login failures
+        count = (
+            db.query(LoginFailure)
+            .filter(
+                and_(
+                    cast(LoginFailure.locked_until, Float) < float(now),
+                    cast(LoginFailure.last_failed_at, Float) < float(now - max(3600, LOGIN_FAILED_WINDOW_SECONDS)),
+                )
+            )
+            .delete(synchronize_session=False)
         )
-        deleted["login_failures"] = int(cur.rowcount or 0)
-        cur = conn.execute("DELETE FROM audit_events WHERE created_at < ?", (cutoff_audit_iso,))
-        deleted["audit_events"] = int(cur.rowcount or 0)
-        conn.commit()
+        deleted["login_failures"] = count
+
+        # Delete old audit events
+        count = (
+            db.query(AuditEvent)
+            .filter(AuditEvent.created_at < cutoff_audit_iso)
+            .delete(synchronize_session=False)
+        )
+        deleted["audit_events"] = count
+
     write_audit_event(action="admin.maintenance.cleanup", request=request, user=current_user, detail={"deleted": deleted})
     return {"status": "ok", "deleted": deleted, "audit_retention_days": AUDIT_RETENTION_DAYS}
 

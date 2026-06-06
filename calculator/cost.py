@@ -325,7 +325,7 @@ def calculate_cost(
             if model_dimensions:
                 model_z = float(model_dimensions.get("z", 0))
                 if model_z > _printer_max_z > 0:
-                    slicer_error_msg = "模型尺寸超出打印机最大打印面积，请更换打印机或拆分模型"
+                    slicer_error_msg = "超出打印面积，请换打印机或拆分模型"
                     logger.warning(f"PrusaSlicer skipped: model_z={model_z:.1f} > printer_max_z={_printer_max_z:.0f} ({_printer_name})")
                     raise RuntimeError(slicer_error_msg)
             base_name = os.path.splitext(os.path.basename(model_path))[0]
@@ -365,7 +365,7 @@ def calculate_cost(
             logger.error(f"PrusaSlicer failed for {model_path}: {e}")
             slicer_time_s = None
             slicer_filament_g_per_part = None
-            slicer_error_msg = f"PrusaSlicer: {e}"
+            slicer_error_msg = str(e)
             # Clean up 3MF temp STL
             if _tmp_3mf_stl and os.path.exists(_tmp_3mf_stl):
                 try: os.unlink(_tmp_3mf_stl)

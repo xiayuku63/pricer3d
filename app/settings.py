@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     resend_api_key: str = ""
 
     # ── Dev ──
-    show_dev_codes: bool = True
+    show_dev_codes: bool = False
 
     # ── Payment ──
     payment_provider: str = "mock"

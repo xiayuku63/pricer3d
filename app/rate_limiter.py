@@ -1,9 +1,11 @@
 """Database-backed rate limiter with in-memory cache for performance."""
 
 import time
+import logging
 import threading
 from collections import defaultdict, deque
 
+_logger = logging.getLogger(__name__)
 
 class PersistentRateLimiter:
     """Hybrid rate limiter: fast in-memory check + optional DB persistence."""
@@ -36,45 +38,50 @@ class PersistentRateLimiter:
             return
         self._last_flush[key] = now
         try:
-            from .database import get_db_conn
-            with get_db_conn() as conn:
-                conn.execute(
-                    """INSERT OR REPLACE INTO rate_limit_state (rate_key, bucket_json, updated_at)
-                       VALUES (?, ?, ?)""",
-                    (key[:200], f'{{"count":{count},"limit":{limit},"window":{window}}}',
-                     time.strftime('%Y-%m-%dT%H:%M:%S', time.gmtime(now))),
-                )
-                conn.commit()
-        except Exception:
-            pass
+            from .db import get_db_session
+            from .models_orm import RateLimitState
+            with get_db_session() as db:
+                existing = db.query(RateLimitState).filter(RateLimitState.rate_key == key[:200]).first()
+                bucket_json = f'{{"count":{count},"limit":{limit},"window":{window}}}'
+                updated_at = time.strftime('%Y-%m-%dT%H:%M:%S', time.gmtime(now))
+                if existing:
+                    existing.bucket_json = bucket_json
+                    existing.updated_at = updated_at
+                else:
+                    rls = RateLimitState(
+                        rate_key=key[:200],
+                        bucket_json=bucket_json,
+                        updated_at=updated_at,
+                    )
+                    db.add(rls)
+        except Exception as e:
+            _logger.warning("rate_limiter: failed to persist state for key=%s: %s", key, e)
 
     def restore_state(self) -> None:
         """Restore rate limit state from DB on startup."""
         try:
-            from .database import get_db_conn
+            from .db import get_db_session
+            from .models_orm import RateLimitState
             now = time.time()
-            with get_db_conn() as conn:
-                rows = conn.execute(
-                    "SELECT rate_key, bucket_json FROM rate_limit_state WHERE CAST(updated_at AS REAL) > ?",
-                    (str(now - 7200),),  # Last 2 hours
-                ).fetchall()
+            with get_db_session() as db:
+                rows = db.query(RateLimitState).all()
+                row_data = [(r.rate_key, r.bucket_json) for r in rows]
             with self._lock:
-                for row in rows:
+                for rate_key, bucket_json in row_data:
                     try:
                         import json
-                        data = json.loads(row["bucket_json"])
+                        data = json.loads(bucket_json)
                         count = int(data.get("count", 0))
                         if count > 0:
-                            # Pre-populate bucket with approximate timestamps
-                            key = row["rate_key"]
+                            key = rate_key
                             bucket = self._buckets[key]
                             spacing = float(data.get("window", 60)) / max(count, 1)
                             for i in range(count):
                                 bucket.append(now - (count - i) * spacing)
-                    except Exception:
-                        pass
-        except Exception:
-            pass
+                    except Exception as e:
+                        _logger.debug("rate_limiter: failed to restore state for row key=%s: %s", rate_key, e)
+        except Exception as e:
+            _logger.warning("rate_limiter: failed to restore state from DB: %s", e)
 
     def get_state(self, key: str) -> dict:
         """Get current state for a key (for monitoring)."""

@@ -3,6 +3,7 @@
 import os
 import io
 import time
+import logging
 import secrets
 import hashlib
 import threading
@@ -11,6 +12,8 @@ from typing import Optional
 from fastapi import HTTPException
 
 from .config import JWT_SECRET_KEY, CAPTCHA_MAX_ATTEMPTS, CAPTCHA_TTL_SECONDS
+
+_logger = logging.getLogger(__name__)
 
 
 class CaptchaStore:
@@ -86,7 +89,8 @@ def generate_captcha_text(length: int) -> str:
 def captcha_image_bytes(text: str) -> tuple[str, bytes]:
     try:
         from PIL import Image, ImageDraw, ImageFont, ImageFilter
-    except Exception:
+    except Exception as e:
+        _logger.debug("captcha: PIL not available, falling back to SVG: %s", e)
         svg = captcha_svg_fallback(text)
         return "image/svg+xml", svg.encode("utf-8")
 
@@ -125,7 +129,8 @@ def captcha_image_bytes(text: str) -> tuple[str, bytes]:
                     continue
             font = ImageFont.truetype(fp, font_size)
             break
-        except Exception:
+        except Exception as e:
+            _logger.debug("captcha: failed to load font %s: %s", fp, e)
             font = None
     if font is None:
         font = ImageFont.load_default()

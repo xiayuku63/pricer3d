@@ -9,7 +9,6 @@ from fastapi.responses import HTMLResponse
 import time
 
 from .config import APP_ENV, TERMS_VERSION, PRIVACY_VERSION, SMTP_FROM
-from .database import get_db_conn
 
 _START_TIME = time.time()
 
@@ -392,9 +391,10 @@ def healthz():
 def readyz():
     import shutil
     try:
-        with get_db_conn() as conn:
-            row = conn.execute("SELECT COUNT(*) as c FROM users").fetchone()
-            user_count = int(row["c"] or 0) if row else 0
+        from .db import get_db_session
+        from .models_orm import User as UserORM
+        with get_db_session() as db:
+            user_count = db.query(UserORM).count()
         disk = shutil.disk_usage(".")
         return {
             "status": "ok",

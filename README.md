@@ -101,6 +101,9 @@ pricer3d/
 │   ├── docker_deploy.sh             # 部署脚本
 │   ├── nginx_pricer3d.conf          # Nginx 反向代理配置
 │   ├── nginx_docker.conf            # Docker 内 Nginx
+│   ├── init-ssl.sh                  # ★ 首次 SSL 证书申请脚本
+│   ├── test-nginx-config.sh         # Nginx 配置语法测试
+│   ├── HTTPS_SETUP.md               # HTTPS 部署文档
 │   ├── pricer3d.service             # Systemd 服务文件
 │   ├── backup_app_db.sh             # 数据库备份
 │   ├── backup_cron.sh               # 定时备份
@@ -330,8 +333,13 @@ python main.py                    # 启动开发服务器（8000 端口，reload
 docker restart pricer3d-app       # 重启生产容器
 docker logs pricer3d-app --tail 50  # 查看日志
 
+# HTTPS 部署（首次申请证书）
+./deploy/init-ssl.sh your-email@example.com
+./deploy/test-nginx-config.sh     # 测试 nginx 配置语法
+
 # 访问
-curl http://127.0.0.1:5000/       # 生产（Docker）
+curl https://pricer3d.top/         # 生产（HTTPS）
+curl http://127.0.0.1:5000/        # 本地开发
 curl http://127.0.0.1:5000/healthz  # 健康检查
 ```
 

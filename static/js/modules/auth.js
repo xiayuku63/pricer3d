@@ -538,6 +538,9 @@ export async function handleAuthSuccess(data) {
     await fetchPrinterModels();
     closeLoginModal();
 
+    // Notify onboarding to check if guide should start
+    window.dispatchEvent(new CustomEvent('pricer3d-auth-success'));
+
     const { errorContainer, fileNameDisplay } = dom;
     if (errorContainer) errorContainer.classList.add('hidden');
 

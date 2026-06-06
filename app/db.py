@@ -47,6 +47,28 @@ def get_session() -> Session:
         db.close()
 
 
+from contextlib import contextmanager
+
+
+@contextmanager
+def get_db_session():
+    """Context manager yielding a SQLAlchemy Session with auto-commit/rollback.
+
+    Use this as a drop-in replacement for get_db_conn():
+        with get_db_session() as db:
+            db.query(User).filter(...)
+    """
+    db = SessionLocal()
+    try:
+        yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
 def init_orm() -> None:
     """Create all tables from ORM models. Safe to call repeatedly."""
     from . import models_orm  # noqa — ensure models are registered
