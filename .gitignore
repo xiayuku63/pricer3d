@@ -18,3 +18,5 @@ build/
 *.local
 *.local.*
 venv/venv11/Lib/site-packages/pip/
+venv/
+venv11/
