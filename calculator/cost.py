@@ -336,6 +336,14 @@ def calculate_cost(
 
             output_gcode = os.path.join(outputs_job_dir, f"{output_prefix}.gcode")
             # Always single slice with supports — no diff mode (too slow, 2x slicing)
+            # 从 pricing_config 提取打印机速度参数
+            _pp_max_speed = cfg.get("_printer_max_speed")
+            _pp_max_accel = cfg.get("_printer_max_acceleration")
+            _pp_jerk = cfg.get("_printer_jerk_limit")
+            _speed_kwargs = {}
+            if _pp_max_speed: _speed_kwargs["max_speed"] = float(_pp_max_speed)
+            if _pp_max_accel: _speed_kwargs["max_acceleration"] = float(_pp_max_accel)
+            if _pp_jerk: _speed_kwargs["jerk_limit"] = float(_pp_jerk)
             stats = run_prusa_slice(
                 actual_slice_path, output_gcode,
                 layer_height=layer_height_mm,
@@ -347,6 +355,7 @@ def calculate_cost(
                 printer_profile_path=_printer_profile,
                 top_shell_layers=top_shell_layers,
                 bottom_shell_layers=bottom_shell_layers,
+                **_speed_kwargs,
             )
             if stats.get("time_s", 0) > 0:
                 correction = float(cfg.get("prusa_time_correction") or 1.0)
@@ -583,6 +592,62 @@ async def process_single_file(
                 "_saved_path": model_saved_path,
             }
 
+        # ── 尺寸校验：模型是否超出打印机范围 ──
+        printer_model_id = pricing_config.get("printer_model")
+        _printer_bed = None
+        _speed_params = {}
+        if printer_model_id:
+            try:
+                from app.db import get_db_session
+                from app.models_orm import PrinterPreset, PrinterParam
+                import json as _json
+                with get_db_session() as _db:
+                    # 查找打印机预设获取尺寸
+                    preset = _db.query(PrinterPreset).filter(
+                        PrinterPreset.id == int(printer_model_id)
+                    ).first() if str(printer_model_id).isdigit() else None
+                    if preset:
+                        _printer_bed = {
+                            "name": preset.name,
+                            "bed_width": float(preset.bed_width),
+                            "bed_depth": float(preset.bed_depth),
+                            "bed_height": float(preset.bed_height),
+                        }
+                    # 查找速度参数
+                    pp = _db.query(PrinterParam).filter(
+                        PrinterParam.printer_id == str(printer_model_id)
+                    ).first()
+                    if pp and pp.speed_enabled:
+                        _speed_params = {
+                            "max_speed": float(pp.max_speed or 500),
+                            "max_acceleration": float(pp.max_acceleration or 10000),
+                            "jerk_limit": float(pp.jerk_limit or 0.04),
+                        }
+            except Exception as _e:
+                logger.warning(f"查询打印机参数失败: {_e}")
+
+        # 尺寸超出检测
+        if _printer_bed and dimensions:
+            dx = float(dimensions.get("x", 0))
+            dy = float(dimensions.get("y", 0))
+            dz = float(dimensions.get("z", 0))
+            bw = _printer_bed["bed_width"]
+            bd = _printer_bed["bed_depth"]
+            bh = _printer_bed["bed_height"]
+            if dx > bw or dy > bd or dz > bh:
+                return {
+                    "filename": filename,
+                    "status": "failed",
+                    "error": f"模型尺寸 ({dx}×{dy}×{dz}mm) 超出打印机 {_printer_bed['name']} 的打印范围 ({bw}×{bd}×{bh}mm)",
+                    "_saved_path": model_saved_path,
+                }
+
+        # 将速度参数注入 pricing_config 供 calculate_cost 使用
+        if _speed_params:
+            pricing_config["_printer_max_speed"] = _speed_params.get("max_speed", 500)
+            pricing_config["_printer_max_acceleration"] = _speed_params.get("max_acceleration", 10000)
+            pricing_config["_printer_jerk_limit"] = _speed_params.get("jerk_limit", 0.04)
+
         unit_cost, model_weight_g, unit_print_time_h, total_cost, effective_weight_g, total_print_time_h, breakdown = calculate_cost(
             volume,
             surface_area,
@@ -651,7 +716,8 @@ async def process_single_file(
             "_printer_model": pricing_config.get("printer_model") if pricing_config else None,
             "_saved_path": model_saved_path,
             "cost_breakdown": breakdown,
-            "effective_weight_g": round(effective_weight_g * quantity, 2)
+            "effective_weight_g": round(effective_weight_g * quantity, 2),
+            "_printer_speed_params": _speed_params if _speed_params else None,
         }
     except Exception as e:
         msg = str(e or "").strip()
