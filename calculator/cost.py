@@ -598,22 +598,20 @@ async def process_single_file(
         _speed_params = {}
         if printer_model_id:
             try:
+                # 查找内置打印机尺寸
+                from app.printers import PRINTER_MODELS
+                _pm = next((p for p in PRINTER_MODELS if p["id"] == str(printer_model_id)), None)
+                if _pm:
+                    _printer_bed = {
+                        "name": _pm["name"],
+                        "bed_width": float(_pm["bed_width"]),
+                        "bed_depth": float(_pm["bed_depth"]),
+                        "bed_height": float(_pm["bed_height"]),
+                    }
+                # 查找速度参数（数据库）
                 from app.db import get_db_session
-                from app.models_orm import PrinterPreset, PrinterParam
-                import json as _json
+                from app.models_orm import PrinterParam
                 with get_db_session() as _db:
-                    # 查找打印机预设获取尺寸
-                    preset = _db.query(PrinterPreset).filter(
-                        PrinterPreset.id == int(printer_model_id)
-                    ).first() if str(printer_model_id).isdigit() else None
-                    if preset:
-                        _printer_bed = {
-                            "name": preset.name,
-                            "bed_width": float(preset.bed_width),
-                            "bed_depth": float(preset.bed_depth),
-                            "bed_height": float(preset.bed_height),
-                        }
-                    # 查找速度参数
                     pp = _db.query(PrinterParam).filter(
                         PrinterParam.printer_id == str(printer_model_id)
                     ).first()
