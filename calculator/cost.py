@@ -624,7 +624,7 @@ async def process_single_file(
             except Exception as _e:
                 logger.warning(f"查询打印机参数失败: {_e}")
 
-        # 尺寸超出检测
+        # 尺寸超出检测 — 仍返回几何信息，仅标记失败
         if _printer_bed and dimensions:
             dx = float(dimensions.get("x", 0))
             dy = float(dimensions.get("y", 0))
@@ -633,10 +633,23 @@ async def process_single_file(
             bd = _printer_bed["bed_depth"]
             bh = _printer_bed["bed_height"]
             if dx > bw or dy > bd or dz > bh:
+                dimensions_str = f"{dx} × {dy} × {dz} mm"
                 return {
                     "filename": filename,
                     "status": "failed",
                     "error": f"模型尺寸 ({dx}×{dy}×{dz}mm) 超出打印机 {_printer_bed['name']} 的打印范围 ({bw}×{bd}×{bh}mm)",
+                    "volume_cm3": round(volume / 1000, 2),
+                    "surface_area_cm2": round(surface_area / 100, 2),
+                    "dimensions": dimensions_str,
+                    "weight_g": 0,
+                    "estimated_time_h": 0,
+                    "unit_time_h": 0,
+                    "cost_cny": 0,
+                    "unit_cost_cny": 0,
+                    "quantity": quantity,
+                    "color": color,
+                    "material": material,
+                    "_printer_model": pricing_config.get("printer_model") if pricing_config else None,
                     "_saved_path": model_saved_path,
                 }
 
