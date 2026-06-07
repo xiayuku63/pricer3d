@@ -936,8 +936,21 @@ export function renderResultsTable() {
                 gcodeHtml = '<div class="mb-3">' + _buildGcodeDetailHtml(gcodeData, false, item) + '</div>';
             }
 
+            // 速度参数（只读，绑定打印机）
+            let speedHtml = '';
+            if (item._printer_speed_params) {
+                const sp = item._printer_speed_params;
+                speedHtml = '<div class="mb-3 p-2 bg-amber-50 border border-amber-200 rounded-lg">' +
+                    '<div class="text-[11px] font-semibold text-amber-700 mb-1">⚡ 打印机速度参数（硬件绑定）</div>' +
+                    '<div class="grid grid-cols-3 gap-x-4 gap-y-0.5 text-[11px] text-gray-600">' +
+                    '<div>最大速度: <span class="font-medium text-gray-800">' + (sp.max_speed || '-') + ' mm/s</span></div>' +
+                    '<div>最大加速度: <span class="font-medium text-gray-800">' + (sp.max_acceleration || '-') + ' mm/s²</span></div>' +
+                    '<div>Jerk限制: <span class="font-medium text-gray-800">' + (sp.jerk_limit || '-') + ' mm/s</span></div>' +
+                    '</div></div>';
+            }
+
             // 费用明细 + 材料说明 + 打印建议
-            detailDiv.innerHTML = gcodeHtml +
+            detailDiv.innerHTML = gcodeHtml + speedHtml +
                 '<div class="grid grid-cols-1 lg:grid-cols-3 gap-2">' +
                 _buildCostBreakdownHtml(item) +
                 _buildMaterialInfoHtml(item.material) +
@@ -1038,6 +1051,7 @@ function renderResultsCards() {
                 <div class="hidden mt-2" data-detail-content="${escapeHtml(item.filename)}">
 
                     ${item.cost_breakdown?.gcode_summary ? '<div class="mb-3">' + _buildGcodeDetailHtml(item.cost_breakdown.gcode_summary, false, item) + '</div>' : ''}
+                    ${item._printer_speed_params ? '<div class="mb-3 p-2 bg-amber-50 border border-amber-200 rounded-lg"><div class="text-[11px] font-semibold text-amber-700 mb-1">⚡ 打印机速度参数（硬件绑定）</div><div class="grid grid-cols-3 gap-x-4 gap-y-0.5 text-[11px] text-gray-600"><div>最大速度: <span class="font-medium text-gray-800">' + item._printer_speed_params.max_speed + ' mm/s</span></div><div>最大加速度: <span class="font-medium text-gray-800">' + item._printer_speed_params.max_acceleration + ' mm/s²</span></div><div>Jerk限制: <span class="font-medium text-gray-800">' + item._printer_speed_params.jerk_limit + ' mm/s</span></div></div></div>' : ''}
                     <div class="grid grid-cols-1 gap-2">
                         ${_buildCostBreakdownHtml(item)}
                         ${_buildMaterialInfoHtml(item.material || quoteOptions.material)}
