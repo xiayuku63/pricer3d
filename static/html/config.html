@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>配置管理 - Pricer3D</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root { --bg-primary: #0f1419; --bg-secondary: #1a1f2e; --bg-card: #1e2332; --text-primary: #e4e8f1; --text-secondary: #8b95a5; --accent: #3b82f6; }
+        body { background-color: #f9fafb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        .tab-btn { padding: 10px 20px; font-size: 14px; font-weight: 500; border-bottom: 2px solid transparent; color: #6b7280; transition: all 0.2s; cursor: pointer; background: none; border-top: none; border-left: none; border-right: none; }
+        .tab-btn:hover { color: #374151; }
+        .tab-btn.active { color: #4f46e5; border-bottom-color: #4f46e5; }
+        .tab-pane { display: none; }
+        .tab-pane.active { display: block; }
+    </style>
+</head>
+<body class="min-h-screen">
+    <!-- 顶部导航 -->
+    <nav class="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-4">
+            <a href="/" class="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <svg class="w-7 h-7 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-2.516-.547H13V6a2 2 0 00-2-2H9a2 2 0 00-2 2v1.172a6 6 0 00-1.707 4.172l-1.366 4.098a2 2 0 001.92 2.602h3.44a2 2 0 001.92-1.33l.5-1.33h4.46a2 2 0 002-2v-1.078a6 6 0 00.428-2.222z"/></svg>
+                Pricer3D
+            </a>
+            <span class="text-sm text-gray-400">配置管理</span>
+        </div>
+        <a href="/" class="text-sm text-indigo-600 hover:text-indigo-800">← 返回报价</a>
+    </nav>
+
+    <div class="max-w-5xl mx-auto px-4 py-6">
+        <!-- Tab 按钮 -->
+        <div class="flex border-b border-gray-200 mb-6">
+            <button class="tab-btn active" data-tab="printer">🖨️ 打印机配置</button>
+            <button class="tab-btn" data-tab="material">🧪 材料配置</button>
+            <button class="tab-btn" data-tab="print">📐 打印参数</button>
+        </div>
+
+        <!-- Tab 1: 打印机配置 -->
+        <div id="tab-printer" class="tab-pane active space-y-6">
+            <div class="bg-white rounded-lg border border-gray-200 p-5">
+                <h3 class="text-sm font-semibold text-gray-800 mb-1">打印机型号与喷嘴</h3>
+                <p class="text-xs text-gray-500 mb-4">选择默认打印机和喷嘴直径，切片时自动加载对应的硬件配置（含速度、加速度等参数）。</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md">
+                    <div>
+                        <label class="block text-xs text-gray-600 mb-1">打印机型号</label>
+                        <select id="cfg-printer" class="w-full py-2 px-3 border border-gray-300 bg-white rounded-md text-sm">
+                            <option value="">选择打印机...</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-600 mb-1">喷嘴直径</label>
+                        <select id="cfg-nozzle" class="w-full py-2 px-3 border border-gray-300 bg-white rounded-md text-sm">
+                            <option value="">-- 请选择 --</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="printer-bed-info" class="text-xs text-gray-400 mt-2"></div>
+                <!-- 打印机详情面板 -->
+                <div id="printer-detail" class="hidden mt-4 border border-gray-200 rounded-md p-4 bg-gray-50">
+                    <h4 class="text-xs font-medium text-gray-700 mb-3">硬件参数</h4>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+                        <div><span class="text-gray-500">喷嘴直径</span><div id="pd-nozzle" class="font-medium text-gray-800 mt-0.5">-</div></div>
+                        <div><span class="text-gray-500">热床尺寸</span><div id="pd-bed" class="font-medium text-gray-800 mt-0.5">-</div></div>
+                        <div><span class="text-gray-500">打印体积</span><div id="pd-vol" class="font-medium text-gray-800 mt-0.5">-</div></div>
+                        <div><span class="text-gray-500">可用喷嘴</span><div id="pd-nozzles" class="font-medium text-gray-800 mt-0.5">-</div></div>
+                    </div>
+                    <!-- 速度参数（只读展示） -->
+                    <div id="speed-info" class="mt-3 pt-3 border-t border-gray-200">
+                        <h4 class="text-xs font-medium text-gray-700 mb-2 flex items-center gap-1">
+                            <svg class="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                            速度参数 <span class="text-gray-400 font-normal">（由打印机硬件决定）</span>
+                        </h4>
+                        <div id="speed-grid" class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-end">
+                <button id="save-printer-btn" class="px-5 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">保存打印机配置</button>
+            </div>
+            <p id="printer-msg" class="text-xs hidden"></p>
+        </div>
+
+        <!-- Tab 2: 材料配置 -->
+        <div id="tab-material" class="tab-pane space-y-6">
+            <div class="bg-white rounded-lg border border-gray-200 p-5">
+                <div class="flex justify-between items-center mb-3">
+                    <div>
+                        <h3 class="text-sm font-semibold text-gray-800">自定义材料</h3>
+                        <p class="text-xs text-gray-500 mt-0.5">管理材料的密度、单价、颜色等参数。</p>
+                    </div>
+                    <button id="add-material-btn" class="text-xs text-indigo-600 hover:text-indigo-800 px-3 py-1.5 border border-indigo-200 rounded-md hover:bg-indigo-50">+ 添加材料</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-xs text-left border border-gray-200 rounded-md">
+                        <thead class="bg-gray-50 text-gray-600">
+                            <tr>
+                                <th class="px-3 py-2">材料名称</th>
+                                <th class="px-3 py-2">品牌</th>
+                                <th class="px-3 py-2">密度 (g/cm³)</th>
+                                <th class="px-3 py-2">单价 (元/KG)</th>
+                                <th class="px-3 py-2">可选颜色</th>
+                                <th class="px-3 py-2 text-center">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="materials-tbody" class="bg-white divide-y divide-gray-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 3: 打印参数 -->
+        <div id="tab-print-params" class="tab-pane space-y-6">
+            <div class="bg-white rounded-lg border border-gray-200 p-5">
+                <h3 class="text-sm font-semibold text-gray-800 mb-1">切片预设管理</h3>
+                <p class="text-xs text-gray-500 mb-4">管理打印参数预设（层高、壁数、填充率等），保存后可在报价时快速选择。</p>
+                <!-- 预设选择 -->
+                <div class="border border-indigo-200 bg-indigo-50/50 rounded-md p-4 mb-4">
+                    <div class="flex items-end gap-3 flex-wrap">
+                        <div class="min-w-[200px]">
+                            <label class="block text-[11px] text-gray-500 mb-0.5">当前预设</label>
+                            <select id="preset-select" class="w-full border border-gray-300 bg-white rounded text-xs px-2 py-1.5">
+                                <option value="">-- 新建 / 未选择 --</option>
+                            </select>
+                        </div>
+                        <button id="preset-save-btn" class="h-[30px] px-3 rounded-md bg-indigo-600 text-white text-xs hover:bg-indigo-700 disabled:opacity-40" disabled>💾 保存</button>
+                        <button id="preset-saveas-btn" class="h-[30px] px-3 rounded-md bg-white border border-indigo-300 text-indigo-700 text-xs hover:bg-indigo-50">📋 另存为</button>
+                        <button id="preset-delete-btn" class="h-[30px] px-3 rounded-md bg-white border border-red-200 text-red-600 text-xs hover:bg-red-50 hidden">🗑️ 删除</button>
+                    </div>
+                </div>
+                <!-- 参数编辑 -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-[11px] text-gray-500 mb-0.5">层高 (mm)</label>
+                        <input id="param-layer-height" type="number" step="0.05" min="0.05" max="1.0" value="0.2" class="w-full border border-gray-300 rounded px-2 py-1.5 text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-gray-500 mb-0.5">壁层数</label>
+                        <input id="param-wall-count" type="number" min="1" max="10" value="3" class="w-full border border-gray-300 rounded px-2 py-1.5 text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-gray-500 mb-0.5">填充率 (%)</label>
+                        <input id="param-infill" type="number" min="0" max="100" value="20" class="w-full border border-gray-300 rounded px-2 py-1.5 text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-gray-500 mb-0.5">顶层层数</label>
+                        <input id="param-top-layers" type="number" min="1" max="20" value="5" class="w-full border border-gray-300 rounded px-2 py-1.5 text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-gray-500 mb-0.5">底层层数</label>
+                        <input id="param-bottom-layers" type="number" min="1" max="20" value="5" class="w-full border border-gray-300 rounded px-2 py-1.5 text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-gray-500 mb-0.5">底边宽度 (mm)</label>
+                        <input id="param-brim" type="number" min="0" max="20" value="0" class="w-full border border-gray-300 rounded px-2 py-1.5 text-xs">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+                btn.classList.add('active');
+                const tabId = btn.getAttribute('data-tab');
+                const pane = document.getElementById('tab-' + (tabId === 'print' ? 'print-params' : tabId));
+                if (pane) pane.classList.add('active');
+            });
+        });
+
+        // Load printer models
+        async function loadPrinters() {
+            try {
+                const resp = await fetch('/api/printers');
+                if (!resp.ok) return;
+                const printers = await resp.json();
+                const sel = document.getElementById('cfg-printer');
+                printers.forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p.id;
+                    opt.textContent = p.name;
+                    sel.appendChild(opt);
+                });
+            } catch (e) { console.error('Failed to load printers:', e); }
+        }
+
+        // Printer change handler
+        const printerSel = document.getElementById('cfg-printer');
+        const nozzleSel = document.getElementById('cfg-nozzle');
+        printerSel.addEventListener('change', () => {
+            const pid = printerSel.value;
+            // Find printer data
+            fetch('/api/printers').then(r => r.json()).then(printers => {
+                const p = printers.find(x => x.id === pid);
+                if (!p) {
+                    document.getElementById('printer-detail').classList.add('hidden');
+                    nozzleSel.innerHTML = '<option value="">-- 请选择 --</option>';
+                    return;
+                }
+                // Update nozzle options
+                nozzleSel.innerHTML = '';
+                (p.nozzles || [0.4]).forEach(n => {
+                    const opt = document.createElement('option');
+                    opt.value = n;
+                    opt.textContent = n + ' mm';
+                    if (n === p.nozzle) opt.selected = true;
+                    nozzleSel.appendChild(opt);
+                });
+                // Update detail panel
+                document.getElementById('printer-detail').classList.remove('hidden');
+                document.getElementById('pd-nozzle').textContent = (p.nozzle || 0.4) + ' mm';
+                document.getElementById('pd-bed').textContent = p.bed_width + '×' + p.bed_depth + '×' + p.bed_height + ' mm';
+                document.getElementById('pd-vol').textContent = ((p.bed_width * p.bed_depth * p.bed_height) / 1e6).toFixed(1) + ' L';
+                document.getElementById('pd-nozzles').textContent = (p.nozzles || []).map(n => n + 'mm').join(', ');
+                document.getElementById('printer-bed-info').textContent = '打印尺寸: ' + p.bed_width + '×' + p.bed_depth + '×' + p.bed_height + ' mm';
+                // Load speed info from INI
+                loadSpeedInfo(pid);
+            });
+        });
+
+        // Load speed params from printer profile (read-only display)
+        async function loadSpeedInfo(printerId) {
+            const grid = document.getElementById('speed-grid');
+            grid.innerHTML = '<span class="text-gray-400 col-span-4">加载中...</span>';
+            try {
+                // The speed params are embedded in the printer INI, we read them via the printer profile
+                // For now, show the default values from the built-in profiles
+                const defaults = {
+                    'perimeter_speed': { label: '外壁速度', unit: 'mm/s' },
+                    'infill_speed': { label: '填充速度', unit: 'mm/s' },
+                    'travel_speed': { label: '移动速度', unit: 'mm/s' },
+                    'default_acceleration': { label: '默认加速度', unit: 'mm/s²' },
+                    'first_layer_speed': { label: '首层速度', unit: 'mm/s' },
+                    'external_perimeter_speed': { label: '外轮廓速度', unit: 'mm/s' },
+                    'solid_infill_speed': { label: '实心填充速度', unit: 'mm/s' },
+                    'top_solid_infill_speed': { label: '顶面填充速度', unit: 'mm/s' },
+                };
+                // Try to get from printer params API
+                const resp = await fetch('/api/printer-params/' + encodeURIComponent(printerId));
+                let params = null;
+                if (resp.ok) {
+                    const data = await resp.json();
+                    params = Array.isArray(data) ? data[0] : data;
+                }
+                grid.innerHTML = '';
+                // Show what we know
+                const items = [];
+                if (params) {
+                    if (params.max_speed) items.push(['最大速度', params.max_speed, 'mm/s']);
+                    if (params.max_acceleration) items.push(['最大加速度', params.max_acceleration, 'mm/s²']);
+                    if (params.jerk_limit) items.push(['Jerk限制', params.jerk_limit, 'mm/s']);
+                }
+                items.push(['切片引擎', 'PrusaSlicer', '']);
+                items.push(['配置来源', '打印机INI文件', '']);
+                items.forEach(([k, v, u]) => {
+                    const d = document.createElement('div');
+                    d.innerHTML = '<span class="text-gray-500">' + k + '</span><div class="font-medium text-gray-800 mt-0.5">' + v + (u ? ' ' + u : '') + '</div>';
+                    grid.appendChild(d);
+                });
+            } catch (e) {
+                grid.innerHTML = '<span class="text-gray-400">无法加载速度参数</span>';
+            }
+        }
+
+        loadPrinters();
+    </script>
+</body>
+</html>
