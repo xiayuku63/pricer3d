@@ -598,9 +598,9 @@ async def process_single_file(
         _speed_params = {}
         if printer_model_id:
             try:
-                # 查找内置打印机尺寸
-                from app.printers import PRINTER_MODELS
-                _pm = next((p for p in PRINTER_MODELS if p["id"] == str(printer_model_id)), None)
+                # 查找内置打印机尺寸（使用 resolve_printer 支持 compound ID 如 bambu_a1_mini_04）
+                from app.printers import resolve_printer
+                _pm = resolve_printer(str(printer_model_id))
                 if _pm:
                     _printer_bed = {
                         "name": _pm["name"],
@@ -608,12 +608,15 @@ async def process_single_file(
                         "bed_depth": float(_pm["bed_depth"]),
                         "bed_height": float(_pm["bed_height"]),
                     }
-                # 查找速度参数（数据库）
+                # 查找速度参数（数据库中 printer_id 是基础 ID，如 bambu_a1_mini）
+                _base_printer_id = str(printer_model_id)
+                if _pm and _pm.get("id"):
+                    _base_printer_id = _pm["id"]
                 from app.db import get_db_session
                 from app.models_orm import PrinterParam
                 with get_db_session() as _db:
                     pp = _db.query(PrinterParam).filter(
-                        PrinterParam.printer_id == str(printer_model_id)
+                        PrinterParam.printer_id == _base_printer_id
                     ).first()
                     if pp and pp.speed_enabled:
                         _speed_params = {

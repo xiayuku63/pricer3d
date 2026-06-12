@@ -41,7 +41,8 @@ class User(Base):
     default_printer_id = Column(String)
     default_nozzle = Column(String)
     default_slicer_preset_id = Column(Integer)
-    user_preferences = Column(Text)  # JSON: default_material, default_color, favorite_materials, formula_templates
+    default_material = Column(String)
+    default_color = Column(String)
 
 
 class PrinterPreset(Base):

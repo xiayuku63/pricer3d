@@ -71,6 +71,8 @@ def _user_to_dict(user) -> dict:
         "default_printer_id": user.default_printer_id,
         "default_nozzle": user.default_nozzle,
         "default_slicer_preset_id": user.default_slicer_preset_id,
+        "default_material": user.default_material,
+        "default_color": user.default_color,
     }
 
 

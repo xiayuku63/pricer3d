@@ -12,8 +12,8 @@ import {
     defaultPrinterId, setDefaultPrinterId,
     defaultNozzle, setDefaultNozzle,
     defaultSlicerPresetId, setDefaultSlicerPresetId,
-    userPreferences, setUserPreferences,
-    savePreferencesToStorage, loadPreferencesFromStorage,
+    defaultMaterial, setDefaultMaterial,
+    defaultColor, setDefaultColor,
 } from './state.js';
 import { t } from './i18n.js';
 import { openLoginModal } from './auth.js';
@@ -37,10 +37,19 @@ export async function fetchUserSettings() {
             setDefaultPrinterId(data.default_printer_id || null);
             setDefaultNozzle(data.default_nozzle || null);
             setDefaultSlicerPresetId(data.default_slicer_preset_id || null);
+            setDefaultMaterial(data.default_material || null);
+            setDefaultColor(data.default_color || null);
             // Sync default preset to quote options so auto-quote uses it
             if (data.default_slicer_preset_id) {
                 quoteOptions.slicer_preset_id = data.default_slicer_preset_id;
                 saveSlicerPresetSelection();
+            }
+            // Sync default material/color to quote options
+            if (data.default_material) {
+                quoteOptions.material = data.default_material;
+            }
+            if (data.default_color) {
+                quoteOptions.color = data.default_color;
             }
         }
     } catch (e) { console.error("Failed to fetch user settings", e); }
@@ -92,22 +101,106 @@ export function renderUserCenterUI() {
     } = dom;
 
     if (materialsTbody) {
-        materialsTbody.innerHTML = MATERIAL_OPTIONS.map((m, idx) => `
+        const majorBrands = [
+            { value: '通用', label: t('material.genericBrand') },
+            { value: 'eSUN', label: t('material.brandESUN') },
+            { value: 'Polymaker', label: 'Polymaker' },
+            { value: 'Hatchbox', label: 'Hatchbox' },
+            { value: 'Prusament', label: 'Prusament' },
+            { value: 'SUNLU', label: 'SUNLU' },
+            { value: 'Creality', label: 'Creality' },
+            { value: 'Overture', label: 'Overture' },
+            { value: 'ColorFabb', label: 'ColorFabb' },
+            { value: 'MatterHackers', label: 'MatterHackers' },
+            { value: 'Bambu Lab', label: 'Bambu Lab' },
+            { value: 'Anycubic', label: 'Anycubic' },
+            { value: 'Elegoo', label: 'Elegoo' },
+            { value: 'Jayo', label: 'Jayo' },
+            { value: 'Eryone', label: 'Eryone' },
+            { value: 'custom', label: t('material.brandCustom') },
+        ];
+        materialsTbody.innerHTML = MATERIAL_OPTIONS.map((m, idx) => {
+            const brand = m.brand || '通用';
+            const isCustom = !majorBrands.some(b => b.value === brand);
+            const brandOptionsHtml = majorBrands.map(b => {
+                if (b.value === 'custom') return `<option value="custom" ${isCustom ? 'selected' : ''}>${b.label}</option>`;
+                return `<option value="${b.value}" ${brand === b.value ? 'selected' : ''}>${b.label}</option>`;
+            }).join('');
+            const customBrandInput = isCustom ? `<input type="text" class="w-full border-gray-400 rounded-sm text-xs px-2 py-1.5 mt-1" value="${escapeHtml(brand)}" data-idx="${idx}" data-field="brand">` : '';
+            
+            return `
             <tr>
-                <td class="px-2 py-2"><input type="text" class="w-full border-gray-400 rounded-sm text-xs px-1 py-1" value="${escapeHtml(m.name)}" data-idx="${idx}" data-field="name"></td>
-                <td class="px-2 py-2"><input type="text" class="w-full border-gray-400 rounded-sm text-xs px-1 py-1" value="${escapeHtml(m.brand || t('material.genericBrand'))}" data-idx="${idx}" data-field="brand"></td>
-                <td class="px-2 py-2"><input type="number" step="0.01" class="w-full border-gray-400 rounded-sm text-xs px-1 py-1" value="${m.density}" data-idx="${idx}" data-field="density"></td>
-                <td class="px-2 py-2"><input type="number" step="0.01" class="w-full border-gray-400 rounded-sm text-xs px-1 py-1" value="${m.price_per_kg}" data-idx="${idx}" data-field="price_per_kg"></td>
-                <td class="px-2 py-2">
-                    <div class="flex flex-wrap items-center gap-1">
-                        ${materialColorsArray(m).map(c => `<span class="w-4 h-4 rounded-sm border border-gray-400 inline-block cursor-pointer" style="background:${c.hex}" title="${escapeHtml(c.name)}" data-color-idx="${idx}" data-color-hex="${c.hex}"></span>`).join('')}
-                        <button type="button" class="text-xs text-indigo-600 hover:text-indigo-800 edit-colors-btn" data-idx="${idx}">${t('common.edit')}</button>
+                <td class="px-3 py-2.5">
+                    <select class="w-full border-gray-300 rounded-md text-xs px-2 py-1.5 material-brand-select min-w-[120px]" data-idx="${idx}" data-field="brand">${brandOptionsHtml}</select>
+                    <div class="custom-brand-input" data-idx="${idx}">${customBrandInput}</div>
+                </td>
+                <td class="px-3 py-2.5"><input type="text" class="w-full border-gray-300 rounded-md text-xs px-2 py-1.5" value="${escapeHtml(m.name)}" data-idx="${idx}" data-field="name"></td>
+                <td class="px-3 py-2.5"><input type="number" step="0.01" class="w-full border-gray-300 rounded-md text-xs px-2 py-1.5" value="${m.density}" data-idx="${idx}" data-field="density"></td>
+                <td class="px-3 py-2.5"><input type="number" step="0.01" class="w-full border-gray-300 rounded-md text-xs px-2 py-1.5" value="${m.price_per_kg}" data-idx="${idx}" data-field="price_per_kg"></td>
+                <td class="px-3 py-2.5">
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        ${materialColorsArray(m).map(c => `<span class="w-5 h-5 rounded-sm border border-gray-400 inline-block cursor-pointer" style="background:${c.hex}" title="${escapeHtml(c.name)}" data-color-idx="${idx}" data-color-hex="${c.hex}"></span>`).join('')}
+                        <button type="button" class="text-xs text-indigo-600 hover:text-indigo-800 edit-colors-btn ml-1" data-idx="${idx}">${t('common.edit')}</button>
                     </div>
                 </td>
-                <td class="px-2 py-2 text-center"><button type="button" class="text-red-500 hover:text-red-700 delete-material-btn" data-idx="${idx}">${t('common.delete')}</button></td>
+                <td class="px-3 py-2.5 text-center"><button type="button" class="text-red-500 hover:text-red-700 delete-material-btn" data-idx="${idx}">${t('common.delete')}</button></td>
             </tr>
-        `).join('');
+        `}).join('');    }
+
+    // Populate default material dropdown
+    const defaultMaterialSel = document.getElementById('uc-default-material');
+    if (defaultMaterialSel) {
+        defaultMaterialSel.innerHTML = '<option value="">' + t('settings.notSet') + '</option>' +
+            MATERIAL_OPTIONS.map(m => `<option value="${escapeHtml(m.name)}" ${defaultMaterial === m.name ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('');
     }
+
+    // Populate default color dropdown using renderColorDropdown (色块+hex)
+    const colorDropdownContainer = document.getElementById('uc-default-color-dropdown');
+    if (colorDropdownContainer) {
+        const matName = defaultMaterial || (MATERIAL_OPTIONS[0] ? MATERIAL_OPTIONS[0].name : '');
+        const rendered = renderColorDropdown(matName, defaultColor || '');
+        colorDropdownContainer.innerHTML = rendered.html;
+        // Store the selected color in a hidden data attribute for save
+        colorDropdownContainer.setAttribute('data-selected-color', rendered.selected || '');
+    }
+
+    // Update color dropdown when material changes
+    if (defaultMaterialSel) {
+        defaultMaterialSel.addEventListener('change', () => {
+            const matName = defaultMaterialSel.value;
+            if (colorDropdownContainer) {
+                const rendered = renderColorDropdown(matName, '');
+                colorDropdownContainer.innerHTML = rendered.html;
+                colorDropdownContainer.setAttribute('data-selected-color', rendered.selected || '');
+            }
+        });
+    }
+
+    // Handle color selection in user center (delegated event)
+    if (colorDropdownContainer) {
+        colorDropdownContainer.addEventListener('click', (e) => {
+            const item = e.target.closest('.color-dd-item');
+            if (item) {
+                const hex = item.getAttribute('data-color-hex');
+                if (hex) {
+                    colorDropdownContainer.setAttribute('data-selected-color', hex);
+                    // Sync model page color
+                    quoteOptions.color = hex;
+                    // Update batch color dropdown swatch
+                    const batchColorContainer = document.getElementById('batch-color-dropdown');
+                    if (batchColorContainer) {
+                        const batchSwatch = batchColorContainer.querySelector('.color-dd-swatch');
+                        if (batchSwatch) batchSwatch.style.background = hex;
+                        const batchLabel = batchColorContainer.querySelector('.color-dd-label');
+                        if (batchLabel) batchLabel.textContent = hex;
+                        const batchValueInput = batchColorContainer.querySelector('.row-color-value');
+                        if (batchValueInput) batchValueInput.value = hex;
+                    }
+                }
+            }
+        });
+    }
+
     if (cfgMachineHourlyRate) cfgMachineHourlyRate.value = String(PRICING_CONFIG.machine_hourly_rate_cny ?? 15);
     if (cfgSetupFee) cfgSetupFee.value = String(PRICING_CONFIG.setup_fee_cny ?? 0);
     if (cfgMinJobFee) cfgMinJobFee.value = String(PRICING_CONFIG.min_job_fee_cny ?? 0);
@@ -249,11 +342,22 @@ export async function validateCurrentFormulas() {
 
 // ── Save user settings ──
 export async function saveUserSettings() {
-    const { userCenterModal, userCenterMsg } = dom;
+    const { userCenterModal, userCenterMsg, userCenterSaveBtn } = dom;
     if (!authToken) return;
+    
+    // Show loading state on button
+    const originalBtnText = userCenterSaveBtn ? userCenterSaveBtn.textContent : '';
+    if (userCenterSaveBtn) {
+        userCenterSaveBtn.disabled = true;
+        userCenterSaveBtn.textContent = t('settings.saving');
+    }
+    
     try {
         const formulaOk = await validateCurrentFormulas();
-        if (!formulaOk) return;
+        if (!formulaOk) {
+            if (userCenterSaveBtn) { userCenterSaveBtn.disabled = false; userCenterSaveBtn.textContent = originalBtnText; }
+            return;
+        }
         syncPricingFromInputs();
 
         // Capture user center printer / nozzle / preset as defaults
@@ -265,12 +369,20 @@ export async function saveUserSettings() {
         const presetId = (genPreset && genPreset.value) ? Number(genPreset.value) : null;
         const effectivePresetId = presetId || defaultSlicerPresetId;
 
+        // Capture default material and color
+        const defaultMaterialSel = document.getElementById("uc-default-material");
+        const colorDropdownContainer = document.getElementById("uc-default-color-dropdown");
+        const newDefaultMaterial = (defaultMaterialSel && defaultMaterialSel.value) ? defaultMaterialSel.value : null;
+        const newDefaultColor = colorDropdownContainer ? (colorDropdownContainer.getAttribute('data-selected-color') || null) : null;
+
         const payload = {
             materials: MATERIAL_OPTIONS,
             pricing_config: PRICING_CONFIG,
             default_printer_id: printerId || null,
             default_nozzle: nozzle || null,
             default_slicer_preset_id: effectivePresetId || null,
+            default_material: newDefaultMaterial,
+            default_color: newDefaultColor,
         };
         const res = await authFetch('/api/user/settings', {
             method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
@@ -281,11 +393,19 @@ export async function saveUserSettings() {
             try { data = await res.json(); } catch (e) {}
             throw new Error((data && data.detail) ? String(data.detail) : t('settings.saveError'));
         }
-        if (userCenterMsg) { userCenterMsg.classList.remove('hidden'); setTimeout(() => userCenterMsg.classList.add('hidden'), 3000); }
+        // Show success feedback on button
+        if (userCenterSaveBtn) {
+            userCenterSaveBtn.textContent = t('settings.saved');
+            userCenterSaveBtn.classList.add('bg-green-600');
+            userCenterSaveBtn.classList.remove('bg-indigo-600');
+        }
+        if (userCenterMsg) { userCenterMsg.classList.remove('hidden'); }
         // Update local defaults so subsequent page loads see them
         setDefaultPrinterId(printerId || null);
         setDefaultNozzle(nozzle || null);
         setDefaultSlicerPresetId(effectivePresetId || null);
+        setDefaultMaterial(newDefaultMaterial);
+        setDefaultColor(newDefaultColor);
         // Sync batch toolbar with new defaults
         await fetchPrinterModels();
         await fetchSlicerPresets();
@@ -294,9 +414,27 @@ export async function saveUserSettings() {
         normalizeResultsWithCurrentOptions();
         renderResultsTable();
         recalcSummaryFromCurrentResults();
-        if (userCenterModal) userCenterModal.classList.add('hidden');
+        // Close modal after brief delay to show feedback
+        setTimeout(() => {
+            if (userCenterModal) userCenterModal.classList.add('hidden');
+            // Restore button state
+            if (userCenterSaveBtn) {
+                userCenterSaveBtn.disabled = false;
+                userCenterSaveBtn.textContent = originalBtnText;
+                userCenterSaveBtn.classList.remove('bg-green-600');
+                userCenterSaveBtn.classList.add('bg-indigo-600');
+            }
+            if (userCenterMsg) userCenterMsg.classList.add('hidden');
+        }, 1200);
         await reQuoteAllSelectedFiles(t('settings.recalcAfterSave'));
-    } catch (e) { alert(e.message); }
+    } catch (e) {
+        // Restore button state on error
+        if (userCenterSaveBtn) {
+            userCenterSaveBtn.disabled = false;
+            userCenterSaveBtn.textContent = originalBtnText;
+        }
+        alert(e.message);
+    }
 }
 
 // ── Set as defaults (admin) ──
@@ -412,7 +550,7 @@ export function initOptionsFormValidation() {
         qtyInput.addEventListener('input', () => {
             const val = parseInt(qtyInput.value, 10);
             if (isNaN(val) || val < 1) {
-                setFieldValidation(qtyInput, 'error', '数量不能小于 1');
+                setFieldValidation(qtyInput, 'error', t('quote.countMustBePositive'));
                 if (qtyError) qtyError.classList.remove('hidden');
             } else {
                 setFieldValidation(qtyInput, 'clear');
@@ -456,7 +594,7 @@ export function initOptionsFormValidation() {
             const matHint = document.getElementById('opt-material-hint');
             if (!materialSelect.value) {
                 setFieldValidation(materialSelect, 'error');
-                if (matHint) { matHint.textContent = '请选择材料'; matHint.classList.remove('hidden'); matHint.className = 'form-field-error'; }
+                if (matHint) { matHint.textContent = t('settings.selectMaterial'); matHint.classList.remove('hidden'); matHint.className = 'form-field-error'; }
             } else {
                 setFieldValidation(materialSelect, 'clear');
                 if (matHint) matHint.classList.add('hidden');
@@ -476,7 +614,7 @@ export function initPasswordFormValidation() {
     if (newPwd) {
         newPwd.addEventListener('input', () => {
             if (newPwd.value.length > 0 && newPwd.value.length < 8) {
-                setFieldValidation(newPwd, 'error', '密码至少需要 8 位');
+                setFieldValidation(newPwd, 'error', t('settings.passwordMinLength'));
             } else if (newPwd.value.length >= 8) {
                 setFieldValidation(newPwd, 'success');
             } else {
@@ -485,9 +623,9 @@ export function initPasswordFormValidation() {
             // Also re-check confirm
             if (confPwd && confPwd.value) {
                 if (confPwd.value !== newPwd.value) {
-                    setFieldValidation(confPwd, 'error', '两次密码不一致');
+                    setFieldValidation(confPwd, 'error', t('settings.passwordsMismatch'));
                 } else {
-                    setFieldValidation(confPwd, 'success', '密码匹配');
+                    setFieldValidation(confPwd, 'success', t('settings.passwordMatch'));
                 }
             }
         });
@@ -496,9 +634,9 @@ export function initPasswordFormValidation() {
     if (confPwd) {
         confPwd.addEventListener('input', () => {
             if (newPwd && confPwd.value && confPwd.value !== newPwd.value) {
-                setFieldValidation(confPwd, 'error', '两次密码不一致');
+                setFieldValidation(confPwd, 'error', t('settings.passwordsMismatch'));
             } else if (newPwd && confPwd.value && confPwd.value === newPwd.value) {
-                setFieldValidation(confPwd, 'success', '密码匹配');
+                setFieldValidation(confPwd, 'success', t('settings.passwordMatch'));
             } else {
                 setFieldValidation(confPwd, 'clear');
             }
@@ -583,500 +721,4 @@ function initOptionsModalAnimation() {
     observer.observe(modal, { attributes: true });
 }
 
-// ══════════════════════════════════════════════════════════════
-// ── Material & Color Preference Management ──
-// ══════════════════════════════════════════════════════════════
 
-/**
- * Toggle a material as favorite. Returns true if now favorited.
- */
-export function toggleFavoriteMaterial(materialName) {
-    const idx = userPreferences.favorite_materials.indexOf(materialName);
-    if (idx >= 0) {
-        userPreferences.favorite_materials.splice(idx, 1);
-    } else {
-        userPreferences.favorite_materials.push(materialName);
-    }
-    savePreferencesToStorage();
-    _syncFavoritesToBackend();
-    return idx < 0; // true = now favorited
-}
-
-/**
- * Check if a material is favorited.
- */
-export function isFavoriteMaterial(materialName) {
-    return userPreferences.favorite_materials.includes(materialName);
-}
-
-/**
- * Toggle a color (by hex) as favorite. Returns true if now favorited.
- */
-export function toggleFavoriteColor(hex) {
-    const norm = (hex || '').toLowerCase();
-    const idx = userPreferences.favorite_colors.findIndex(c => c.toLowerCase() === norm);
-    if (idx >= 0) {
-        userPreferences.favorite_colors.splice(idx, 1);
-    } else {
-        userPreferences.favorite_colors.push(hex);
-    }
-    savePreferencesToStorage();
-    _syncFavoritesToBackend();
-    return idx < 0;
-}
-
-/**
- * Check if a color is favorited.
- */
-export function isFavoriteColor(hex) {
-    const norm = (hex || '').toLowerCase();
-    return userPreferences.favorite_colors.some(c => c.toLowerCase() === norm);
-}
-
-/**
- * Record usage of a material (call after successful quote).
- */
-export function trackMaterialUsage(materialName) {
-    if (!materialName) return;
-    userPreferences.material_usage[materialName] = (userPreferences.material_usage[materialName] || 0) + 1;
-    savePreferencesToStorage();
-}
-
-/**
- * Record usage of a color (call after successful quote).
- */
-export function trackColorUsage(hex) {
-    if (!hex) return;
-    const key = hex.toLowerCase();
-    userPreferences.color_usage[key] = (userPreferences.color_usage[key] || 0) + 1;
-    savePreferencesToStorage();
-}
-
-/**
- * Get materials sorted by usage (most used first), with favorites pinned at top.
- * @returns {Array} Sorted array of { name, count, isFavorite }
- */
-export function getSortedMaterials() {
-    const favorites = new Set(userPreferences.favorite_materials);
-    const materials = MATERIAL_OPTIONS.map(m => ({
-        name: m.name,
-        count: userPreferences.material_usage[m.name] || 0,
-        isFavorite: favorites.has(m.name),
-    }));
-    // Favorites first (sorted by usage desc), then non-favorites (sorted by usage desc)
-    materials.sort((a, b) => {
-        if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
-        return b.count - a.count;
-    });
-    return materials;
-}
-
-/**
- * Get colors for a material sorted by usage, with favorites pinned.
- * @param {string} materialName
- * @returns {Array} Sorted array of { hex, name, count, isFavorite }
- */
-export function getSortedColors(materialName) {
-    const allowedColors = getColorsForMaterial(materialName);
-    const favSet = new Set(userPreferences.favorite_colors.map(c => c.toLowerCase()));
-    const colors = allowedColors.map(c => {
-        const obj = colorToObj(c);
-        if (!obj) return null;
-        const hex = obj.hex || '';
-        return {
-            hex,
-            name: obj.name || hex,
-            count: userPreferences.color_usage[hex.toLowerCase()] || 0,
-            isFavorite: favSet.has(hex.toLowerCase()),
-        };
-    }).filter(Boolean);
-    colors.sort((a, b) => {
-        if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
-        return b.count - a.count;
-    });
-    return colors;
-}
-
-/**
- * Render the favorites & quick-select section for the options modal.
- * Inserts a favorites bar above the material dropdown.
- * @param {string} containerId - ID of the container element
- */
-export function renderFavoritesPanel(containerId) {
-    const container = document.getElementById(containerId);
-    if (!container) return;
-
-    const sortedMaterials = getSortedMaterials();
-    const favMaterials = sortedMaterials.filter(m => m.isFavorite);
-    const topMaterials = sortedMaterials.slice(0, 5); // top 5 by usage
-
-    // Favorites section
-    let html = '<div class="favorites-panel mb-3">';
-    if (favMaterials.length > 0) {
-        html += '<div class="mb-2">';
-        html += '<span class="text-xs font-medium text-gray-500">' + t('preference.favorites') + '</span>';
-        html += '<div class="flex flex-wrap gap-1.5 mt-1">';
-        favMaterials.forEach(m => {
-            html += '<button type="button" class="pref-material-chip px-2 py-1 text-xs rounded-md border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors" data-material="' + escapeHtml(m.name) + '">'
-                + '★ ' + escapeHtml(m.name)
-                + '</button>';
-        });
-        html += '</div></div>';
-    }
-
-    // Quick-select: top used materials
-    if (topMaterials.length > 0 && topMaterials.some(m => m.count > 0)) {
-        html += '<div class="mb-2">';
-        html += '<span class="text-xs font-medium text-gray-500">' + t('preference.frequentlyUsed') + '</span>';
-        html += '<div class="flex flex-wrap gap-1.5 mt-1">';
-        topMaterials.forEach(m => {
-            if (m.count > 0) {
-                html += '<button type="button" class="pref-material-chip px-2 py-1 text-xs rounded-md border border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100 transition-colors" data-material="' + escapeHtml(m.name) + '">'
-                    + escapeHtml(m.name) + ' <span class="text-gray-400">(' + m.count + ')</span>'
-                    + '</button>';
-            }
-        });
-        html += '</div></div>';
-    }
-    html += '</div>';
-
-    container.innerHTML = html;
-
-    // Wire up click events for quick-select chips
-    container.querySelectorAll('.pref-material-chip').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const matName = btn.getAttribute('data-material');
-            if (matName) {
-                _quickSelectMaterial(matName);
-            }
-        });
-    });
-}
-
-/**
- * Quick-select a material: update dropdown, refresh color dropdown, and record usage.
- */
-function _quickSelectMaterial(materialName) {
-    quoteOptions.material = materialName;
-    // Update the material select
-    const optMaterial = document.getElementById('opt-material');
-    if (optMaterial) {
-        optMaterial.value = materialName;
-    }
-    // Refresh color dropdown
-    const rendered = renderColorDropdown(materialName, quoteOptions.color);
-    const optColor = document.getElementById('opt-color');
-    if (optColor) optColor.innerHTML = rendered.html;
-    quoteOptions.color = rendered.selected;
-    // Re-render favorites panel
-    renderFavoritesPanel('pref-favorites-panel');
-    // Render color quick-select for the new material
-    renderColorFavoritesPanel('pref-color-favorites-panel');
-    refreshOptionsSummary();
-}
-
-/**
- * Render color favorites & quick-select for the current material.
- * @param {string} containerId
- */
-export function renderColorFavoritesPanel(containerId) {
-    const container = document.getElementById(containerId);
-    if (!container) return;
-
-    const sortedColors = getSortedColors(quoteOptions.material);
-    const favColors = sortedColors.filter(c => c.isFavorite);
-    const topColors = sortedColors.filter(c => c.count > 0).slice(0, 6);
-
-    let html = '<div class="color-favorites-panel">';
-    if (favColors.length > 0) {
-        html += '<div class="mb-2">';
-        html += '<span class="text-xs font-medium text-gray-500">' + t('preference.colorFavorites') + '</span>';
-        html += '<div class="flex flex-wrap gap-1.5 mt-1">';
-        favColors.forEach(c => {
-            html += '<button type="button" class="pref-color-chip flex items-center gap-1 px-1.5 py-1 text-xs rounded-md border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 transition-colors" data-color-hex="' + c.hex + '">'
-                + '<span class="w-3.5 h-3.5 rounded-sm border border-gray-400 flex-shrink-0" style="background:' + c.hex + '"></span>'
-                + '<span class="text-indigo-700 font-mono text-[10px]">★ ' + c.hex + '</span>'
-                + '</button>';
-        });
-        html += '</div></div>';
-    }
-    if (topColors.length > 0) {
-        html += '<div>';
-        html += '<span class="text-xs font-medium text-gray-500">' + t('preference.frequentColors') + '</span>';
-        html += '<div class="flex flex-wrap gap-1.5 mt-1">';
-        topColors.forEach(c => {
-            html += '<button type="button" class="pref-color-chip flex items-center gap-1 px-1.5 py-1 text-xs rounded-md border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors" data-color-hex="' + c.hex + '">'
-                + '<span class="w-3.5 h-3.5 rounded-sm border border-gray-400 flex-shrink-0" style="background:' + c.hex + '"></span>'
-                + '<span class="font-mono text-[10px]">' + c.hex + ' <span class="text-gray-400">(' + c.count + ')</span></span>'
-                + '</button>';
-        });
-        html += '</div></div>';
-    }
-    html += '</div>';
-    container.innerHTML = html;
-
-    // Wire up click events for color chips
-    container.querySelectorAll('.pref-color-chip').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const hex = btn.getAttribute('data-color-hex');
-            if (hex) _quickSelectColor(hex);
-        });
-    });
-}
-
-/**
- * Quick-select a color.
- */
-function _quickSelectColor(hex) {
-    quoteOptions.color = hex;
-    // Update the hidden input if present
-    const colorVal = document.querySelector('#opt-color .row-color-value');
-    if (colorVal) colorVal.value = hex;
-    // Update the swatch display
-    const swatch = document.querySelector('#opt-color .color-dd-swatch');
-    if (swatch) swatch.style.background = hex;
-    const label = document.querySelector('#opt-color .color-dd-label');
-    if (label) label.textContent = hex;
-    refreshOptionsSummary();
-}
-
-/**
- * Sync favorites to backend (debounced).
- */
-let _syncTimer = null;
-function _syncFavoritesToBackend() {
-    if (!authToken) return;
-    clearTimeout(_syncTimer);
-    _syncTimer = setTimeout(async () => {
-        try {
-            const payload = {
-                user_preferences: {
-                    default_material: userPreferences.default_material,
-                    default_color: userPreferences.default_color,
-                    favorite_materials: userPreferences.favorite_materials,
-                    favorite_colors: userPreferences.favorite_colors,
-                    material_usage: userPreferences.material_usage,
-                    color_usage: userPreferences.color_usage,
-                },
-            };
-            await authFetch('/api/user/settings', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
-        } catch (e) {
-            console.warn('Failed to sync preferences to backend', e);
-        }
-    }, 1000);
-}
-
-/**
- * Load preferences from both localStorage and backend.
- * Call this during app initialization.
- */
-export async function loadPreferences() {
-    // Load from localStorage first (instant)
-    loadPreferencesFromStorage();
-    // Then try to load from backend
-    if (authToken) {
-        try {
-            const res = await authFetch('/api/user/settings');
-            if (res.ok) {
-                const data = await res.json();
-                if (data.user_preferences) {
-                    setUserPreferences(data.user_preferences);
-                    savePreferencesToStorage();
-                }
-            }
-        } catch (e) {
-            console.warn('Failed to load preferences from backend', e);
-        }
-    }
-}
-
-/**
- * Render usage statistics panel (for user center / settings page).
- * @param {string} containerId
- */
-export function renderUsageStats(containerId) {
-    const container = document.getElementById(containerId);
-    if (!container) return;
-
-    const matEntries = Object.entries(userPreferences.material_usage)
-        .sort((a, b) => b[1] - a[1]);
-    const colorEntries = Object.entries(userPreferences.color_usage)
-        .sort((a, b) => b[1] - a[1]);
-
-    let html = '<div class="usage-stats space-y-3">';
-
-    // Material usage stats
-    if (matEntries.length > 0) {
-        const maxCount = matEntries[0][1];
-        html += '<div>';
-        html += '<h4 class="text-xs font-semibold text-gray-600 mb-1.5">' + t('preference.materialStats') + '</h4>';
-        html += '<div class="space-y-1">';
-        matEntries.slice(0, 8).forEach(([name, count]) => {
-            const pct = maxCount > 0 ? Math.round((count / maxCount) * 100) : 0;
-            html += '<div class="flex items-center gap-2">';
-            html += '<span class="text-xs text-gray-600 w-16 truncate">' + escapeHtml(name) + '</span>';
-            html += '<div class="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden">';
-            html += '<div class="h-full bg-indigo-400 rounded-full" style="width:' + pct + '%"></div>';
-            html += '</div>';
-            html += '<span class="text-xs text-gray-400 w-8 text-right">' + count + '</span>';
-            html += '</div>';
-        });
-        html += '</div></div>';
-    }
-
-    // Color usage stats
-    if (colorEntries.length > 0) {
-        const maxCount = colorEntries[0][1];
-        html += '<div>';
-        html += '<h4 class="text-xs font-semibold text-gray-600 mb-1.5">' + t('preference.colorStats') + '</h4>';
-        html += '<div class="flex flex-wrap gap-2">';
-        colorEntries.slice(0, 12).forEach(([hex, count]) => {
-            const obj = colorToObj(hex);
-            const displayHex = obj?.hex || hex;
-            html += '<div class="flex items-center gap-1 px-1.5 py-1 rounded-md bg-gray-50 border border-gray-200">';
-            html += '<span class="w-4 h-4 rounded-sm border border-gray-400" style="background:' + displayHex + '"></span>';
-            html += '<span class="text-[10px] text-gray-500 font-mono">' + count + '×</span>';
-            html += '</div>';
-        });
-        html += '</div></div>';
-    }
-
-    if (matEntries.length === 0 && colorEntries.length === 0) {
-        html += '<p class="text-xs text-gray-400 text-center py-4">' + t('preference.noStats') + '</p>';
-    }
-
-    html += '</div>';
-    container.innerHTML = html;
-}
-
-/**
- * Add star/favorite toggle buttons to material dropdown items.
- * Call this after updateDropdowns() renders the material select.
- */
-export function enhanceMaterialDropdownWithFavorites() {
-    const optMaterial = document.getElementById('opt-material');
-    if (!optMaterial) return;
-
-    // Wrap each option with a star indicator if favorited
-    Array.from(optMaterial.options).forEach(opt => {
-        if (isFavoriteMaterial(opt.value)) {
-            opt.textContent = '★ ' + opt.textContent;
-        }
-    });
-}
-
-/**
- * Enhance the options modal with preference features.
- * Call this when the options modal is opened.
- */
-export function initPreferencesUI() {
-    renderFavoritesPanel('pref-favorites-panel');
-    renderColorFavoritesPanel('pref-color-favorites-panel');
-    enhanceMaterialDropdownWithFavorites();
-}
-
-/**
- * Render the preferences tab in user center.
- * Populates default material/color selects, favorite materials list, favorite colors, and usage stats.
- */
-export function renderPreferencesTab() {
-    // ── Default material select ──
-    const defaultMatSelect = document.getElementById('pref-default-material');
-    if (defaultMatSelect) {
-        let opts = '<option value="">-- 不指定 --</option>';
-        MATERIAL_OPTIONS.forEach(m => {
-            const sel = userPreferences.default_material === m.name ? ' selected' : '';
-            opts += '<option value="' + escapeHtml(m.name) + '"' + sel + '>' + escapeHtml(m.name) + '</option>';
-        });
-        defaultMatSelect.innerHTML = opts;
-        defaultMatSelect.onchange = () => {
-            userPreferences.default_material = defaultMatSelect.value || null;
-            savePreferencesToStorage();
-            _syncFavoritesToBackend();
-            // Refresh default color options for selected material
-            _renderDefaultColorOptions();
-        };
-    }
-
-    // ── Default color select ──
-    _renderDefaultColorOptions();
-
-    // ── Favorite materials list (checkboxes) ──
-    const favMatContainer = document.getElementById('pref-favorite-materials');
-    if (favMatContainer) {
-        const sorted = getSortedMaterials();
-        favMatContainer.innerHTML = sorted.map(m => {
-            const checked = m.isFavorite ? ' checked' : '';
-            return '<label class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer">'
-                + '<input type="checkbox" class="pref-fav-mat-cb rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" data-material="' + escapeHtml(m.name) + '"' + checked + '>'
-                + '<span class="text-xs text-gray-700">' + escapeHtml(m.name) + '</span>'
-                + (m.count > 0 ? '<span class="text-[10px] text-gray-400 ml-auto">(' + m.count + '次)</span>' : '')
-                + '</label>';
-        }).join('');
-        // Wire checkbox change
-        favMatContainer.querySelectorAll('.pref-fav-mat-cb').forEach(cb => {
-            cb.addEventListener('change', () => {
-                const name = cb.getAttribute('data-material');
-                toggleFavoriteMaterial(name);
-            });
-        });
-    }
-
-    // ── Favorite colors ──
-    const favColorContainer = document.getElementById('pref-favorite-colors');
-    if (favColorContainer) {
-        const favColors = userPreferences.favorite_colors || [];
-        if (favColors.length === 0) {
-            favColorContainer.innerHTML = '<span class="text-xs text-gray-400">暂无收藏颜色。在报价参数弹窗中点击颜色芯片可添加收藏。</span>';
-        } else {
-            favColorContainer.innerHTML = favColors.map(hex => {
-                return '<div class="flex items-center gap-1.5 px-2 py-1 rounded-md border border-indigo-200 bg-indigo-50">'
-                    + '<span class="w-4 h-4 rounded-sm border border-gray-400 flex-shrink-0" style="background:' + hex + '"></span>'
-                    + '<span class="text-xs font-mono text-indigo-700">' + hex + '</span>'
-                    + '<button type="button" class="pref-remove-fav-color text-red-400 hover:text-red-600 text-xs ml-1" data-hex="' + hex + '">×</button>'
-                    + '</div>';
-            }).join('');
-            favColorContainer.querySelectorAll('.pref-remove-fav-color').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    toggleFavoriteColor(btn.getAttribute('data-hex'));
-                    renderPreferencesTab(); // re-render
-                });
-            });
-        }
-    }
-
-    // ── Usage stats ──
-    renderUsageStats('pref-usage-stats');
-}
-
-/**
- * Helper: render default color options based on current default material.
- */
-function _renderDefaultColorOptions() {
-    const defaultColorSelect = document.getElementById('pref-default-color');
-    if (!defaultColorSelect) return;
-    const matName = userPreferences.default_material;
-    let colors = [];
-    if (matName) {
-        colors = getColorsForMaterial(matName);
-    } else {
-        // Show all unique colors
-        colors = COLOR_OPTIONS;
-    }
-    const normColors = (colors || []).map(c => colorToObj(c)).filter(Boolean);
-    let opts = '<option value="">-- 不指定 --</option>';
-    normColors.forEach(c => {
-        const sel = userPreferences.default_color === c.hex ? ' selected' : '';
-        opts += '<option value="' + c.hex + '"' + sel + '>' + (c.name || c.hex) + ' (' + c.hex + ')</option>';
-    });
-    defaultColorSelect.innerHTML = opts;
-    defaultColorSelect.onchange = () => {
-        userPreferences.default_color = defaultColorSelect.value || null;
-        savePreferencesToStorage();
-        _syncFavoritesToBackend();
-    };
-}

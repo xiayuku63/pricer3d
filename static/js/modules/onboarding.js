@@ -104,24 +104,32 @@ function buildSteps() {
                     if (dropdown) dropdown.classList.add('hidden');
                     const modal = document.getElementById('user-center-modal');
                     if (modal) modal.classList.remove('hidden');
-                    // Click the printer tab
-                    const printerTab = document.querySelector('.uc-tab-btn[data-uc-tab="printer"]');
-                    if (printerTab) printerTab.click();
+                    // Click the print-params parent tab, then printer sub-tab
+                    const parentTab = document.querySelector('.uc-tab-btn[data-uc-tab="print-params"]');
+                    if (parentTab) parentTab.click();
+                    setTimeout(() => {
+                        const printerSub = document.querySelector('.pp-sub-tab-btn[data-pp-tab="printer"]');
+                        if (printerSub) printerSub.click();
+                    }, 50);
                 },
                 waitAfter: 300,
                 // Target the printer selector inside user center
                 _realTarget: '#cfg-printer-model-main',
             }
         ),
-        s('.uc-tab-btn[data-uc-tab="materials"]',
+        s('.uc-tab-btn[data-uc-tab="print-params"]',
             'onboarding.step4_title',
             'onboarding.step4_desc',
             {
                 position: 'right',
                 action: () => {
-                    // Switch to materials tab
-                    const tab = document.querySelector('.uc-tab-btn[data-uc-tab="materials"]');
+                    // Switch to print-params tab, then materials sub-tab
+                    const tab = document.querySelector('.uc-tab-btn[data-uc-tab="print-params"]');
                     if (tab) tab.click();
+                    setTimeout(() => {
+                        const subTab = document.querySelector('.pp-sub-tab-btn[data-pp-tab="materials"]');
+                        if (subTab) subTab.click();
+                    }, 50);
                 },
                 waitAfter: 200,
             }

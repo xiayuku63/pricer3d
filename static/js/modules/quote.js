@@ -9,16 +9,16 @@ import {
     colorToObj, isColorInAllowedColors, pickAllowedColor,
     getActivePrinterCompoundId,
     getCachedPrinterModels, slicerPresets,
-    userPreferences, savePreferencesToStorage,
+
 } from './state.js';
 import { buildPlaceholderThumbnail, ensureThumbnailForFile, buildThumbnails } from './preview.js';
 import { loadQuoteHistory } from './history.js';
 import { t, lang } from './i18n.js';
 import { uploadWithProgress, showProgress, updateProgress, showProgressSuccess, showProgressError, hideProgress, showToast } from './upload.js';
 import {
-    _sortState, _paginationState,
+    _sortState, _paginationState, renderResultsTable,
 } from './quote-render.js';
-export { renderResultsTable } from './quote-render.js';
+export { renderResultsTable };
 let dom = {};
 let _openLoginModal = null;  // lazy-init to break circular dep with auth.js
 export function setOpenLoginModalRef(fn) { _openLoginModal = fn; }
@@ -986,7 +986,6 @@ async function _quoteSelectedFilesInternal(selectedFiles, useProgress) {
             mergeResultsByFilename(data.results || []);
             renderResultsTable();
             recalcSummaryFromCurrentResults();
-            _trackMaterialColorUsage();
             showProgressSuccess(`报价完成，共处理 ${(data.results || []).length} 个文件`);
             hideProgress();
             showToast(`报价完成：${(data.results || []).length} 个文件已处理`, 'success');
@@ -1003,26 +1002,11 @@ async function _quoteSelectedFilesInternal(selectedFiles, useProgress) {
         mergeResultsByFilename(data.results || []);
         renderResultsTable();
         recalcSummaryFromCurrentResults();
-        _trackMaterialColorUsage();
         setTimeout(() => loadQuoteHistory(authToken), 500);
     }
 }
 
-// ── Track material/color usage for preferences ──
-function _trackMaterialColorUsage() {
-    try {
-        const mat = quoteOptions.material;
-        const col = quoteOptions.color;
-        if (mat) {
-            userPreferences.material_usage[mat] = (userPreferences.material_usage[mat] || 0) + 1;
-        }
-        if (col) {
-            const key = col.toLowerCase();
-            userPreferences.color_usage[key] = (userPreferences.color_usage[key] || 0) + 1;
-        }
-        savePreferencesToStorage();
-    } catch (e) { /* ignore tracking errors */ }
-}
+
 
 // ── Results management ──
 export function mergeResultsByFilename(incomingResults) {

@@ -28,6 +28,7 @@ import {
     renderColorDropdown, getColorsForMaterial, colorToObj, pickAllowedColor,
     authFetch,
     getActivePrinterCompoundId,
+    setDefaultSlicerPresetId,
 } from './modules/state.js';
 
 import {
@@ -42,8 +43,6 @@ import {
     addColorToMaterial, removeColorFromMaterial, validateCurrentFormulas,
     saveUserSettings, setAsDefaults, changePassword,
     initMobileFormOptimizations,
-    loadPreferences, initPreferencesUI,
-    renderPreferencesTab,
 } from './modules/settings.js';
 import {
     initPresets, preloadPrinterSelectors, fetchPrinterModels, fetchSlicerPresets,
@@ -52,7 +51,7 @@ import {
     downloadSelectedPreset, deleteSelectedPreset,
     fetchPrinterPresets, savePrinterPreset, deletePrinterPreset,
     renderPrinterVisibilityList, restoreDefaultPrinters,
-    updatePrinterDetailPanel, exportPrinterConfig, importPrinterConfig,
+    updatePrinterDetailPanel,
 } from './modules/presets.js';
 import {
     initMembership, openMembershipModal, closeMembershipModal,
@@ -213,8 +212,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initOrientationUI(dom);
     initOnboarding();
     initMobileFormOptimizations();
-    // Load user preferences (favorites, usage stats) from localStorage + backend
-    loadPreferences();
 
     // Break circular dep: quote.js needs openLoginModal from auth.js
     setOpenLoginModalRef(openLoginModal);
@@ -264,6 +261,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const key = el.getAttribute('data-i18n');
             if (key) el.textContent = t(key);
         });
+        document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+            const ph = el.getAttribute('data-i18n-placeholder');
+            if (ph) el.placeholder = t(ph);
+        });
+        // Re-render auth UI (member badge, etc.)
+        renderAuthUI();
+        // Re-render user center if it's open
+        if (dom.userCenterModal && !dom.userCenterModal.classList.contains('hidden')) {
+            renderUserCenterUI();
+        }
     });
     _bind(dom.userMenuBtn, 'click', () => dom.userDropdown.classList.toggle('hidden'));
     _bind(dom.openAdminUsersBtn, 'click', () => { dom.userDropdown.classList.add('hidden'); window.location.href = '/admin/users'; });
@@ -272,7 +279,6 @@ document.addEventListener('DOMContentLoaded', () => {
         dom.userDropdown.classList.add('hidden');
         if (!currentUser) return;
         renderUserCenterUI();
-        renderPreferencesTab();
         if (dom.userCenterSetDefaultsBtn) dom.userCenterSetDefaultsBtn.classList.toggle('hidden', !(currentUser && currentUser.is_admin));
         if (dom.ucOldPassword) dom.ucOldPassword.value = '';
         if (dom.ucNewPassword) dom.ucNewPassword.value = '';
@@ -311,11 +317,23 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!val) {
                 // "-- 新建 / 未选择 --" → disable save
                 if (dom.genPresetSaveBtn) dom.genPresetSaveBtn.disabled = true;
+                // Sync batch slicer preset
+                const batchSel = document.getElementById('batch-slicer-preset');
+                if (batchSel) batchSel.value = '';
+                quoteOptions.slicer_preset_id = null;
+                saveSlicerPresetSelection();
+                setDefaultSlicerPresetId(null);
                 return;
             }
             await loadPresetIntoForm(val);
             // Enable save button when a preset is selected (and not system preset)
             if (dom.genPresetSaveBtn) dom.genPresetSaveBtn.disabled = false;
+            // Sync batch slicer preset
+            const batchSel = document.getElementById('batch-slicer-preset');
+            if (batchSel) batchSel.value = val;
+            quoteOptions.slicer_preset_id = Number(val);
+            saveSlicerPresetSelection();
+            setDefaultSlicerPresetId(Number(val));
         });
     }
 
@@ -348,20 +366,6 @@ document.addEventListener('DOMContentLoaded', () => {
         // Select a color item
         const item = e.target.closest('.color-dd-item');
         if (item) {
-            // Check if the star/favorite button was clicked
-            const favBtn = e.target.closest('.color-fav-toggle');
-            if (favBtn) {
-                e.stopPropagation();
-                const hex = favBtn.getAttribute('data-color-hex');
-                if (hex) {
-                    import('./modules/settings.js').then(mod => {
-                        const nowFav = mod.toggleFavoriteColor(hex);
-                        favBtn.classList.toggle('text-yellow-500', nowFav);
-                        favBtn.classList.toggle('text-gray-300', !nowFav);
-                    });
-                }
-                return;
-            }
             e.stopPropagation();
             const hex = item.getAttribute('data-color-hex');
             if (!hex) return;
@@ -456,10 +460,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 quoteOptions.slicer_preset_id = null;
                 saveSlicerPresetSelection();
                 if (paramsEl) { paramsEl.classList.add('hidden'); paramsEl.textContent = ''; }
+                // Sync gen-preset-select in user center
+                const genSel = document.getElementById('gen-preset-select');
+                if (genSel) genSel.value = '';
+                setDefaultSlicerPresetId(null);
                 return;
             }
             quoteOptions.slicer_preset_id = Number(val);
             saveSlicerPresetSelection();
+            // Sync gen-preset-select in user center
+            const genSel = document.getElementById('gen-preset-select');
+            if (genSel) genSel.value = val;
+            setDefaultSlicerPresetId(Number(val));
             // Show param summary
             try {
                 const resp = await authFetch(`/api/slicer/presets/${val}`);
@@ -485,8 +497,7 @@ document.addEventListener('DOMContentLoaded', () => {
             dom.optColor.innerHTML = rendered.html;
             dom.optQuantity.value = String(quoteOptions.quantity);
             dom.optionsModal.classList.remove('hidden');
-            // Initialize preferences UI (favorites, quick-select)
-            initPreferencesUI();
+
         });
     }
 
@@ -525,15 +536,42 @@ document.addEventListener('DOMContentLoaded', () => {
     const ppRestoreBtn = document.getElementById('printer-restore-defaults-btn');
     if (ppRestoreBtn) ppRestoreBtn.addEventListener('click', restoreDefaultPrinters);
 
-    // Printer config export/import
-    const ppExportBtn = document.getElementById('printer-config-export-btn');
-    const ppImportInput = document.getElementById('printer-config-import-input');
-    if (ppExportBtn) ppExportBtn.addEventListener('click', exportPrinterConfig);
-    if (ppImportInput) ppImportInput.addEventListener('change', (e) => {
-        const file = e.target.files && e.target.files[0];
-        if (file) importPrinterConfig(file);
-        e.target.value = ''; // reset so same file can be re-selected
-    });
+    // ── Sync user center → model page (printer, nozzle, material) ──
+    // Printer sync
+    const ucPrinterSel = document.getElementById('cfg-printer-model-main');
+    if (ucPrinterSel) {
+        ucPrinterSel.addEventListener('change', () => {
+            const batchPrinter = document.getElementById('batch-printer-model');
+            if (batchPrinter && ucPrinterSel.value) {
+                batchPrinter.value = ucPrinterSel.value;
+                batchPrinter.dispatchEvent(new Event('change'));
+            }
+        });
+    }
+    // Nozzle sync
+    const ucNozzleSel = document.getElementById('cfg-nozzle-diameter');
+    if (ucNozzleSel) {
+        ucNozzleSel.addEventListener('change', () => {
+            const batchNozzle = document.getElementById('batch-nozzle-diameter');
+            if (batchNozzle && ucNozzleSel.value) {
+                batchNozzle.value = ucNozzleSel.value;
+                batchNozzle.dispatchEvent(new Event('change'));
+            }
+        });
+    }
+    // Material sync
+    const ucMaterialSel = document.getElementById('uc-default-material');
+    if (ucMaterialSel) {
+        ucMaterialSel.addEventListener('change', () => {
+            const batchMat = document.getElementById('batch-material');
+            if (batchMat && ucMaterialSel.value) {
+                batchMat.value = ucMaterialSel.value;
+                batchMat.dispatchEvent(new Event('change'));
+            }
+            // Update quoteOptions material
+            if (ucMaterialSel.value) quoteOptions.material = ucMaterialSel.value;
+        });
+    }
 
     // User center tabs
     dom.ucTabBtns.forEach(btn => {
@@ -548,6 +586,21 @@ document.addEventListener('DOMContentLoaded', () => {
             if (dom.userCenterSaveBtn) dom.userCenterSaveBtn.classList.toggle('hidden', tabId === 'security');
             if (dom.userCenterHint) dom.userCenterHint.classList.toggle('invisible', tabId !== 'security');
             if (tabId === 'security') dom.userCenterMsg.classList.add('hidden');
+        });
+    });
+
+    // Print-params sub-tabs (材料设置 / 机型配置 / 切片配置)
+    const ppSubTabBtns = document.querySelectorAll('.pp-sub-tab-btn');
+    const ppSubPanes = document.querySelectorAll('.pp-sub-pane');
+    ppSubTabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const subTabId = btn.getAttribute('data-pp-tab');
+            ppSubTabBtns.forEach(b => { b.classList.remove('text-indigo-700', 'border-indigo-600'); b.classList.add('text-gray-500', 'border-transparent'); });
+            btn.classList.add('text-indigo-700', 'border-indigo-600');
+            btn.classList.remove('text-gray-500', 'border-transparent');
+            ppSubPanes.forEach(pane => { pane.classList.add('hidden'); });
+            const targetPane = document.getElementById(`pp-sub-${subTabId}`);
+            if (targetPane) targetPane.classList.remove('hidden');
         });
     });
 
@@ -597,7 +650,7 @@ document.addEventListener('DOMContentLoaded', () => {
         dom.formulaVarsToggleBtn.addEventListener('click', () => {
             const hidden = dom.formulaVarsPanel.classList.contains('hidden');
             dom.formulaVarsPanel.classList.toggle('hidden', !hidden);
-            dom.formulaVarsToggleBtn.textContent = hidden ? '收起变量字典' : '展开变量字典';
+            dom.formulaVarsToggleBtn.textContent = hidden ? t('settings.collapseVarDict') : t('settings.expandVarDict');
         });
     }
     if (dom.formulaResetBtn) {
@@ -926,7 +979,8 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const resp = await fetch('/api/version');
             const data = await resp.json();
-            let text = `v${data.version || '?'}`;
+            let text = data.version || '?';
+            if (!text.startsWith('v')) text = `v${text}`;
             if (data.deployed_at) {
                 const dt = data.deployed_at.replace('T', ' ').substring(0, 16);
                 text += ` · ${dt}`;
@@ -1052,7 +1106,6 @@ document.addEventListener('DOMContentLoaded', () => {
         closeMobileNav();
         if (!currentUser) return;
         renderUserCenterUI();
-        renderPreferencesTab();
         if (dom.userCenterSetDefaultsBtn) dom.userCenterSetDefaultsBtn.classList.toggle('hidden', !(currentUser && currentUser.is_admin));
         if (dom.ucOldPassword) dom.ucOldPassword.value = '';
         if (dom.ucNewPassword) dom.ucNewPassword.value = '';

@@ -906,7 +906,7 @@ export function renderResultsTable() {
                 <td class="px-2 py-1.5"><select data-field="material" class="row-edit text-[11px] border border-gray-300 rounded px-1 py-0.5">${materialOptionsHtml}</select></td>
                 <td class="px-2 py-1.5" data-field="color">${renderedRowColors.html}</td>
                 <td class="px-2 py-1.5"><input data-field="quantity" type="number" min="1" value="${quantityValue}" class="row-edit w-14 text-[11px] border border-gray-300 rounded px-1 py-0.5" /></td>
-                <td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td>
+                <td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td>
                 <td data-role="status-cell" class="px-2 py-1.5 min-w-[80px]">
                     <span class="status-fail-badge relative cursor-default text-red-600 font-medium text-[11px]">${t('common.failed')}
                         <span class="status-fail-tooltip hidden absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2 text-[11px] font-normal text-left text-white bg-gray-800 rounded-lg shadow-lg whitespace-normal break-words leading-relaxed">${escapeHtml(item.error || t('common.error'))}</span>
@@ -923,7 +923,7 @@ export function renderResultsTable() {
             detailTr.setAttribute('data-detail-row', item.filename);
             const td = document.createElement('td');
             td.setAttribute('colspan', '13');
-            td.className = 'px-3 py-2 bg-white';
+            td.className = 'px-3 py-2 bg-white overflow-hidden';
 
             const detailDiv = document.createElement('div');
             detailDiv.className = 'hidden mt-2';
@@ -966,6 +966,16 @@ export function renderResultsTable() {
             td.appendChild(detailDiv);
             detailTr.appendChild(td);
             tbody.appendChild(detailTr);
+        } else {
+            // 失败/重算中的行：加一个空占位行，保持与成功行一致的间距
+            const spacerTr = document.createElement('tr');
+            spacerTr.className = 'border-t border-gray-50';
+            spacerTr.setAttribute('data-detail-row', item.filename);
+            const spacerTd = document.createElement('td');
+            spacerTd.setAttribute('colspan', '13');
+            spacerTd.className = 'py-2 bg-white';
+            spacerTr.appendChild(spacerTd);
+            tbody.appendChild(spacerTr);
         }
     });
 

@@ -9,14 +9,58 @@ import {
     getHiddenPrinters, setHiddenPrinters, HIDDEN_PRINTERS_KEY,
 } from './state.js';
 import { openLoginModal } from './auth.js';
-import { t } from './i18n.js';
+import { t, onLangChange } from './i18n.js';
 import { reQuoteAllSelectedFiles } from './quote.js';
 
 let dom = {};
 let _printerModels = [];  // cached printer list from API
 let _selectedPresetId = null;  // currently selected preset via radio button
 
-export function initPresets(d) { dom = d; }
+export function initPresets(d) {
+    dom = d;
+    // Listen for language changes to update printer options
+    onLangChange(() => {
+        if (_printerModels.length > 0) {
+            _updatePrinterOptions();
+        }
+    });
+}
+
+// Update printer options when language changes
+function _updatePrinterOptions() {
+    const visibleModels = _printerModels.filter(p => !getHiddenPrinters().includes(p.id));
+    
+    // Update cfg-printer-model-main
+    const cfgSel = document.getElementById('cfg-printer-model-main');
+    if (cfgSel) {
+        const currentVal = cfgSel.value;
+        cfgSel.innerHTML = "<option value=\"\">" + t('printer.selectPrinter') + "</option>";
+        visibleModels.forEach(p => {
+            const opt = document.createElement("option");
+            opt.value = p.id;
+            opt.textContent = p.name;
+            cfgSel.appendChild(opt);
+        });
+        if (currentVal) cfgSel.value = currentVal;
+    }
+    
+    // Update batch-printer-model
+    const batchSel = document.getElementById('batch-printer-model');
+    if (batchSel) {
+        const currentVal = batchSel.value;
+        batchSel.innerHTML = "<option value=\"\">" + t('printer.selectPrinter') + "</option>";
+        visibleModels.forEach(p => {
+            const opt = document.createElement("option");
+            opt.value = p.id;
+            opt.textContent = p.name;
+            batchSel.appendChild(opt);
+        });
+        if (currentVal) batchSel.value = currentVal;
+    }
+    
+    // Update batch-slicer-preset
+    renderSlicerPresetsUI();
+}
 
 function setMsg(text, ok) {
     const { slicerPresetsMsg } = dom;
@@ -436,24 +480,15 @@ function _setSelectClosest(sel, targetVal) {
 
 // ── Save current form values back to the selected preset ──
 export async function saveCurrentPreset() {
-    const { genPresetSelect, genPrinterModel, genLayerHeight, genInfill, genWallCount, cfgNozzleDiameter } = dom;
+    const { genLayerHeight, genInfill, genWallCount, cfgNozzleDiameter } = dom;
     if (!authToken) { openLoginModal(); return; }
 
-    const presetId = genPresetSelect?.value;
-    if (!presetId) { setMsg(t('slicer.selectPresetToSave'), false); return; }
-
-    const selectedPreset = (slicerPresets || []).find(p => String(p.id) === presetId);
-    if (!selectedPreset) { setMsg(t('slicer.presetGone'), false); return; }
-
-    // For system preset (id=0), force save-as instead
-    if (presetId === '0') {
-        setMsg(t('slicer.systemPresetReadOnly'), false);
-        return;
-    }
-
-    const printerId = genPrinterModel?.value;
+    // Get current printer from global settings
+    const printerId = getActivePrinterCompoundId ? getActivePrinterCompoundId() : (dom.cfgPrinterModelMain?.value || '');
     if (!printerId) { setMsg(t('slicer.selectPrinterFirst'), false); return; }
-    const printer = _printerModels.find(p => p.id === printerId);
+    
+    // Find printer model - try compound ID first, then base ID
+    let printer = _printerModels.find(p => p.id === printerId || p.id === printerId.replace(/_\d{2}$/, ''));
     if (!printer) { setMsg(t('slicer.printerDataMissing'), false); return; }
 
     const layer_height = Number(genLayerHeight?.value) || 0.2;
@@ -647,14 +682,22 @@ export async function savePrinterPreset() {
 // ── Printer visibility management (localStorage) ──
 export function renderPrinterVisibilityList() {
     const container = document.getElementById('printer-visibility-list');
-    if (!container || !_printerModels.length) return;
+    if (!container || !_printerModels.length) {
+        if (container) container.innerHTML = '<tr><td colspan="3" class="px-2 py-3 text-gray-400">暂无机型</td></tr>';
+        return;
+    }
     const hidden = getHiddenPrinters();
     container.innerHTML = _printerModels.map(p => {
         const isHidden = hidden.includes(p.id);
-        return `<label class="flex items-center gap-2 py-1 px-1 hover:bg-gray-50 rounded cursor-pointer text-xs">
-            <input type="checkbox" class="pp-vis-toggle w-3 h-3 rounded" value="${p.id}" ${isHidden ? '' : 'checked'}>
-            <span class="${isHidden ? 'text-gray-300 line-through' : 'text-gray-700'}">${p.name} <span class="text-gray-400">(${p.bed_width}×${p.bed_depth}×${p.bed_height})</span></span>
-        </label>`;
+        return `<tr class="hover:bg-gray-50 cursor-pointer ${isHidden ? 'opacity-50' : ''}" data-printer-id="${p.id}">
+            <td class="px-2 py-2 text-center">
+                <input type="checkbox" class="pp-vis-toggle w-3 h-3 rounded" value="${p.id}" ${isHidden ? '' : 'checked'}>
+            </td>
+            <td class="px-2 py-2">
+                <span class="${isHidden ? 'text-gray-400 line-through' : 'text-gray-700'}">${p.name}</span>
+            </td>
+            <td class="px-2 py-2 text-gray-500 font-mono">${p.bed_width}×${p.bed_depth}×${p.bed_height}</td>
+        </tr>`;
     }).join('');
     container.querySelectorAll('.pp-vis-toggle').forEach(cb => {
         cb.addEventListener('change', () => {
@@ -669,6 +712,14 @@ export function renderPrinterVisibilityList() {
             setHiddenPrinters(hidden);
             renderPrinterVisibilityList();
             fetchPrinterModels();
+        });
+    });
+    // Click row → toggle checkbox
+    container.querySelectorAll('tr[data-printer-id]').forEach(row => {
+        row.addEventListener('click', (e) => {
+            if (e.target.tagName === 'INPUT') return;
+            const cb = row.querySelector('.pp-vis-toggle');
+            if (cb) { cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); }
         });
     });
 }

@@ -5,7 +5,7 @@ import {
     MATERIAL_OPTIONS, authFetch,
     getColorsForMaterial, pickAllowedColor,
     getActivePrinterCompoundId,
-    userPreferences, savePreferencesToStorage,
+
 } from './state.js';
 import { renderResultsTable, recalcSummaryFromCurrentResults } from './quote-render.js';
 import { ensureThumbnailForFile } from './preview.js';
@@ -110,7 +110,6 @@ async function _quoteSelectedFilesInternal(selectedFiles, useProgress) {
             mergeResultsByFilename(data.results || []);
             renderResultsTable();
             recalcSummaryFromCurrentResults();
-            _trackMaterialColorUsage();
             showProgressSuccess(`报价完成，共处理 ${(data.results || []).length} 个文件`);
             hideProgress();
             showToast(`报价完成：${(data.results || []).length} 个文件已处理`, 'success');
@@ -127,26 +126,11 @@ async function _quoteSelectedFilesInternal(selectedFiles, useProgress) {
         mergeResultsByFilename(data.results || []);
         renderResultsTable();
         recalcSummaryFromCurrentResults();
-        _trackMaterialColorUsage();
         setTimeout(() => loadQuoteHistory(authToken), 500);
     }
 }
 
-// ── Track material/color usage for preferences ──
-function _trackMaterialColorUsage() {
-    try {
-        const mat = quoteOptions.material;
-        const col = quoteOptions.color;
-        if (mat) {
-            userPreferences.material_usage[mat] = (userPreferences.material_usage[mat] || 0) + 1;
-        }
-        if (col) {
-            const key = col.toLowerCase();
-            userPreferences.color_usage[key] = (userPreferences.color_usage[key] || 0) + 1;
-        }
-        savePreferencesToStorage();
-    } catch (e) { /* ignore tracking errors */ }
-}
+
 
 // ── Results management ──
 export function mergeResultsByFilename(incomingResults) {

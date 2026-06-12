@@ -124,21 +124,21 @@ async def admin_list_users(
             .limit(safe_limit)
             .all()
         )
-    items = []
-    for row in rows:
-        items.append(
-            {
-                "id": row.id,
-                "username": row.username,
-                "email_masked": mask_email(row.email),
-                "phone_masked": mask_phone(row.phone),
-                "email_verified": bool(row.email_verified or 0),
-                "phone_verified": bool(row.phone_verified or 0),
-                "membership_level": (str(row.membership_level or "free").strip().lower() or "free"),
-                "membership_expires_at": row.membership_expires_at,
-                "created_at": row.created_at,
-            }
-        )
+        items = []
+        for row in rows:
+            items.append(
+                {
+                    "id": row.id,
+                    "username": row.username,
+                    "email_masked": mask_email(row.email),
+                    "phone_masked": mask_phone(row.phone),
+                    "email_verified": bool(row.email_verified or 0),
+                    "phone_verified": bool(row.phone_verified or 0),
+                    "membership_level": (str(row.membership_level or "free").strip().lower() or "free"),
+                    "membership_expires_at": row.membership_expires_at,
+                    "created_at": row.created_at,
+                }
+            )
     return {"total": total or 0, "limit": safe_limit, "offset": safe_offset, "items": items}
 
 

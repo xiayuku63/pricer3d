@@ -53,16 +53,6 @@ class PricingConfig(BaseModel):
     total_cost_formula: str = ""
 
 
-class UserPreferences(BaseModel):
-    default_material: Optional[str] = None
-    default_color: Optional[str] = None
-    favorite_materials: List[str] = Field(default_factory=list, max_length=50)
-    favorite_colors: List[str] = Field(default_factory=list, max_length=100)
-    formula_templates: List[dict] = Field(default_factory=list, max_length=20)
-    material_usage: dict = Field(default_factory=dict)
-    color_usage: dict = Field(default_factory=dict)
-
-
 class UserSettingsUpdate(BaseModel):
     materials: List[MaterialItem] = Field(..., min_length=1, max_length=100)
     colors: Optional[List[str]] = Field(default=None, max_length=100)
@@ -70,7 +60,8 @@ class UserSettingsUpdate(BaseModel):
     default_printer_id: Optional[str] = None
     default_nozzle: Optional[str] = None
     default_slicer_preset_id: Optional[int] = None
-    user_preferences: Optional[UserPreferences] = None
+    default_material: Optional[str] = None
+    default_color: Optional[str] = None
 
 
 async def get_user_settings(current_user=Depends(get_current_user)):
@@ -87,7 +78,8 @@ async def get_user_settings(current_user=Depends(get_current_user)):
             default_printer_id = row.default_printer_id or None
             default_nozzle = row.default_nozzle or None
             default_slicer_preset_id = int(row.default_slicer_preset_id) if row.default_slicer_preset_id is not None else None
-            user_preferences = json.loads(row.user_preferences) if row.user_preferences else {}
+            default_material = row.default_material or None
+            default_color = row.default_color or None
 
         materials = normalize_materials(raw_materials, fallback_colors=colors)
         pricing_config = merge_pricing_config(raw_pricing)
@@ -101,7 +93,8 @@ async def get_user_settings(current_user=Depends(get_current_user)):
             "default_printer_id": default_printer_id,
             "default_nozzle": default_nozzle,
             "default_slicer_preset_id": default_slicer_preset_id,
-            "user_preferences": user_preferences,
+            "default_material": default_material,
+            "default_color": default_color,
         }
     except HTTPException:
         raise
@@ -154,8 +147,8 @@ async def update_user_settings(payload: UserSettingsUpdate, request: Request, cu
         user.default_printer_id = payload.default_printer_id
         user.default_nozzle = payload.default_nozzle
         user.default_slicer_preset_id = payload.default_slicer_preset_id
-        if payload.user_preferences is not None:
-            user.user_preferences = json.dumps(payload.user_preferences.model_dump())
+        user.default_material = payload.default_material
+        user.default_color = payload.default_color
     write_audit_event(
         action="user.settings.update",
         request=request,
@@ -216,7 +209,6 @@ async def export_user_settings(current_user=Depends(get_current_user)):
             raw_materials = json.loads(row.materials) if row.materials else DEFAULT_MATERIALS
             colors = json.loads(row.colors) if row.colors else DEFAULT_COLORS
             raw_pricing = json.loads(row.pricing_config) if row.pricing_config else DEFAULT_PRICING_CONFIG
-            user_preferences = json.loads(row.user_preferences) if row.user_preferences else {}
 
         materials = normalize_materials(raw_materials, fallback_colors=colors)
         pricing_config = merge_pricing_config(raw_pricing)
@@ -230,7 +222,6 @@ async def export_user_settings(current_user=Depends(get_current_user)):
             "default_printer_id": row.default_printer_id,
             "default_nozzle": row.default_nozzle,
             "default_slicer_preset_id": row.default_slicer_preset_id,
-            "user_preferences": user_preferences,
         }
         return export_data
     except HTTPException:
@@ -247,7 +238,6 @@ class ImportSettingsRequest(BaseModel):
     default_printer_id: Optional[str] = None
     default_nozzle: Optional[str] = None
     default_slicer_preset_id: Optional[int] = None
-    user_preferences: Optional[UserPreferences] = None
 
 
 async def import_user_settings(payload: ImportSettingsRequest, request: Request, current_user=Depends(get_current_user)):
@@ -292,8 +282,6 @@ async def import_user_settings(payload: ImportSettingsRequest, request: Request,
                 user.default_nozzle = payload.default_nozzle
             if payload.default_slicer_preset_id is not None:
                 user.default_slicer_preset_id = payload.default_slicer_preset_id
-            if payload.user_preferences is not None:
-                user.user_preferences = json.dumps(payload.user_preferences.model_dump())
 
         write_audit_event(
             action="user.settings.import",
@@ -311,7 +299,7 @@ async def import_user_settings(payload: ImportSettingsRequest, request: Request,
 
 # ── Reset section to defaults ──
 class ResetSectionRequest(BaseModel):
-    section: str = Field(..., pattern="^(materials|pricing|printer|slicer|preferences|all)$")
+    section: str = Field(..., pattern="^(materials|pricing|printer|slicer|all)$")
 
 
 async def reset_user_section(payload: ResetSectionRequest, request: Request, current_user=Depends(get_current_user)):
@@ -333,13 +321,6 @@ async def reset_user_section(payload: ResetSectionRequest, request: Request, cur
                 user.default_nozzle = None
             if section in ("slicer", "all"):
                 user.default_slicer_preset_id = None
-            if section in ("preferences", "all"):
-                user.user_preferences = json.dumps({
-                    "default_material": None,
-                    "default_color": None,
-                    "favorite_materials": [],
-                    "formula_templates": [],
-                })
 
         write_audit_event(
             action="user.settings.reset",
