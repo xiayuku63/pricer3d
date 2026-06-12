@@ -1,0 +1,51 @@
+name: Deploy to Alibaba Cloud
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+env:
+  SERVER_HOST: 47.106.102.208
+  SERVER_USER: root
+  DEPLOY_PATH: /opt/pricer3d
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ env.SERVER_HOST }}
+          username: ${{ env.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          script: |
+            # Clone or pull latest code
+            if [ -d "${{ env.DEPLOY_PATH }}" ]; then
+              cd ${{ env.DEPLOY_PATH }}
+              git pull origin master
+            else
+              git clone https://github.com/xiayuku63/pricer3d.git ${{ env.DEPLOY_PATH }}
+              cd ${{ env.DEPLOY_PATH }}
+            fi
+            
+            # Build and restart Docker container
+            docker compose -f docker-compose.prod.yml down || true
+            docker compose -f docker-compose.prod.yml up -d --build
+            
+            # Wait for health check
+            sleep 5
+            
+            # Verify deployment
+            if curl -s http://localhost:5001/api/version > /dev/null 2>&1; then
+              echo "✅ Deployment successful!"
+              curl -s http://localhost:5001/api/version
+            else
+              echo "❌ Deployment failed!"
+              docker compose -f docker-compose.prod.yml logs --tail=20
+              exit 1
+            fi
