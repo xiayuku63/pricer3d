@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     wget unzip \
     logrotate \
-    libgl1-mesa-glx libxkbcommon-x11-0 libxcb-xinerama0 \
+    libgl1 libxkbcommon-x11-0 libxcb-xinerama0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install PrusaSlicer 2.9.4 from GitHub
