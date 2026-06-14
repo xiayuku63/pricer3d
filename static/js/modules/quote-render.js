@@ -4,6 +4,7 @@ import {
     quoteOptions, currentResults, thumbnailMap,
     MATERIAL_OPTIONS, formatColorLabel, escapeHtml, formatTimeHMS,
     renderColorDropdown, getCachedPrinterModels, slicerPresets,
+    getUsedBrandOptions as getBrandOptions, getMaterialsByBrand,
 } from './state.js';
 import { buildPlaceholderThumbnail } from './preview.js';
 import { t } from './i18n.js';
@@ -213,7 +214,7 @@ function _buildCostBreakdownHtml(item) {
     if (discountPercent > 0) {
         html += '<div class="mb-2 bg-white/70 rounded-lg border border-amber-200 overflow-hidden">';
         html += '<div class="flex items-center justify-between px-2.5 py-1.5 bg-amber-50/80">';
-        html += '<span class="text-[10px] font-semibold text-amber-700 flex items-center gap-1">🎫 会员折扣</span>';
+        html += '<span class="text-[10px] font-semibold text-amber-700">会员折扣</span>';
         html += '<span class="text-[11px] font-bold text-amber-600">-¥ ' + discountCny.toFixed(2) + '</span>';
         html += '</div>';
         html += '<div class="px-2.5 py-1.5">';
@@ -602,12 +603,6 @@ function _buildPrintSuggestionHtml(item) {
         html += '<li>· 也可打磨后喷漆处理</li>';
         html += '<li>· ABS胶水可用于粘接零件</li>';
         html += '</ul>';
-    } else if (item.material === 'Resin') {
-        html += '<ul class="text-[10px] text-gray-600 space-y-0.5">';
-        html += '<li>· 打印后需用95%酒精清洗3-5分钟</li>';
-        html += '<li>· UV固化10-15分钟</li>';
-        html += '<li>· 可打磨后喷涂光油增加光泽</li>';
-        html += '</ul>';
     } else {
         html += '<p class="text-[10px] text-gray-600">建议根据实际需要进行打磨、喷漆等后处理。</p>';
     }
@@ -676,15 +671,22 @@ function _buildRowDropdownsHtml(item) {
 function _buildCommonRowHtml(item, ext, selectedMaterial, selectedColor, quantityValue) {
     const previewButtonHtml = _buildPreviewHtml(item, ext);
     const { pmOptions, presetOptions } = _buildRowDropdownsHtml(item);
-    const materialOptionsHtml = MATERIAL_OPTIONS.map((m) => `<option value="${m.name}" ${m.name === selectedMaterial ? 'selected' : ''}>${m.name}</option>`).join('');
+    const brands = getBrandOptions();
+    const currentBrand = (MATERIAL_OPTIONS.find(m => m.name === selectedMaterial) || {}).brand || '';
+    const effectiveBrand = currentBrand || brands[0] || '';
+    const brandOptionsHtml = brands.map(b => `<option value="${b}" ${b === effectiveBrand ? 'selected' : ''}>${b}</option>`).join('');
+    // 按品牌过滤材料
+    const filteredMaterials = effectiveBrand ? MATERIAL_OPTIONS.filter(m => (m.brand || 'Generic') === effectiveBrand) : MATERIAL_OPTIONS;
+    const materialOptionsHtml = filteredMaterials.map((m) => `<option value="${m.name}" ${m.name === selectedMaterial ? 'selected' : ''}>${m.name}</option>`).join('');
     const renderedRowColors = renderColorDropdown(selectedMaterial, selectedColor, true);
     return {
-        previewButtonHtml, pmOptions, presetOptions, materialOptionsHtml,
+        previewButtonHtml, pmOptions, presetOptions, materialOptionsHtml, brandOptionsHtml,
         renderedRowColors,
-        cols: `<td class="px-2 py-1.5">${item.filename}</td>
+        cols: `<td class="px-2 py-1.5">${escapeHtml(item.filename)}${_buildParamBadge(item)}</td>
                 <td class="px-2 py-1.5">${previewButtonHtml}</td>
                 <td class="px-2 py-1.5"><select data-field="_printer_model" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5 max-w-[110px]">${pmOptions}</select></td>
                 <td class="px-2 py-1.5"><select data-field="_slicer_preset_id" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5 max-w-[100px]">${presetOptions}</select></td>
+                <td class="px-2 py-1.5"><select data-field="_brand" class="row-edit row-brand-select text-[11px] border border-gray-300 rounded px-1 py-0.5 w-full max-w-[110px]">${brandOptionsHtml}</select></td>
                 <td class="px-2 py-1.5"><select data-field="material" class="row-edit text-[11px] border border-gray-300 rounded px-1 py-0.5">${materialOptionsHtml}</select></td>
                 <td class="px-2 py-1.5" data-field="color">${renderedRowColors.html}</td>
                 <td class="px-2 py-1.5"><input data-field="quantity" type="number" min="1" value="${quantityValue}" class="row-edit w-14 text-[11px] border border-gray-300 rounded px-1 py-0.5" /></td>`,
@@ -694,7 +696,38 @@ function _buildCommonRowHtml(item, ext, selectedMaterial, selectedColor, quantit
 // Helper: build checklist badge HTML
 function _buildChecklistHtml(item) {
     if (!item._checklist_params || !item._checklist_source) return '';
-    return ` <span class="text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1 cursor-help" title="${(item._checklist_source.printer_model ? '打印机:' + item._checklist_source.printer_model + ' ' : '') + (item._checklist_source.nozzle ? '喷嘴:' + item._checklist_source.nozzle + 'mm | ' : '') + '层高:' + item._checklist_source.layer_height + 'mm 墙层数:' + item._checklist_source.wall_count + ' 填充:' + item._checklist_source.infill + '%'}">\u{1F4CB}\u6E05\u5355</span>`;
+    const src = item._checklist_source;
+    const tip = t('quote.usedChecklist') + '：'
+        + (src.printer_model ? t('quote.printerModel') + ':' + src.printer_model + ' ' : '')
+        + (src.nozzle ? t('quote.nozzleDiameter') + ':' + src.nozzle + 'mm | ' : '')
+        + '层高:' + src.layer_height + 'mm 墙层数:' + src.wall_count + ' 填充:' + src.infill + '%';
+    return ` <span class="text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1 cursor-help" title="${tip}">\u{1F4CB}${t('quote.badgeChecklist')}</span>`;
+}
+
+// Helper: build default params badge HTML
+function _buildDefaultBadgeHtml() {
+    return ` <span class="text-[10px] text-gray-500 bg-gray-100 border border-gray-200 rounded px-1 cursor-help" title="${t('quote.usedDefault')}">\u{1F4CB}${t('quote.badgeDefault')}</span>`;
+}
+
+// Helper: build checklist/default badge based on item._checklist_params
+function _buildParamBadge(item) {
+    let badge = '';
+    if (item._checklist_params) { badge = _buildChecklistHtml(item); }
+    else { badge = _buildDefaultBadgeHtml(); }
+    badge += _buildWarningsBadgeHtml(item);
+    return badge;
+}
+
+// Helper: build warning badge for items with ZIP import validation warnings
+function _buildWarningsBadgeHtml(item) {
+    if (!item._warnings || !item._warnings.length) return '';
+    const count = item._warnings.length;
+    const tipLines = item._warnings.map(w => {
+        const base = t('quote.paramWarning', { param: w.param, value: w.value, default: w.default_used });
+        return w.reason ? `${base} (${w.reason})` : base;
+    });
+    const tip = tipLines.join('\n');
+    return ` <span class="text-[10px] text-amber-700 bg-amber-50 border border-amber-300 rounded px-1 cursor-help" title="${escapeHtml(tip)}">\u26A0\uFE0F${t('quote.warningsSummary', { count })}</span>`;
 }
 
 
@@ -838,7 +871,12 @@ export function renderResultsTable() {
                 ? `<button type="button" data-preview-file="${item.filename}" data-preview-ext="${ext}" class="block rounded border border-gray-200 overflow-hidden hover:border-indigo-300 transition-colors"><img src="${thumbnail}" alt="静态图" class="w-32 h-20 object-cover bg-white" /></button>`
                 : `<button type="button" data-preview-file="${item.filename}" data-preview-ext="${ext}" class="text-[12px] text-indigo-600 hover:text-indigo-700 border border-indigo-200 hover:border-indigo-300 rounded px-2 py-0.5">预览</button>`;
 
-            const materialOptionsHtml = MATERIAL_OPTIONS.map((m) => `<option value="${m.name}" ${m.name === item.material ? 'selected' : ''}>${m.name}</option>`).join('');
+            const brands = getBrandOptions();
+            const currentBrand = (MATERIAL_OPTIONS.find(m => m.name === item.material) || {}).brand || '';
+            const effectiveBrand = currentBrand || brands[0] || '';
+            const brandOptionsHtml = brands.map(b => `<option value="${b}" ${b === effectiveBrand ? 'selected' : ''}>${b}</option>`).join('');
+            const filteredMaterials = effectiveBrand ? MATERIAL_OPTIONS.filter(m => (m.brand || 'Generic') === effectiveBrand) : MATERIAL_OPTIONS;
+            const materialOptionsHtml = filteredMaterials.map((m) => `<option value="${m.name}" ${m.name === item.material ? 'selected' : ''}>${m.name}</option>`).join('');
             const renderedRowColors = renderColorDropdown(item.material, item.color, true);
 
             // Per-file printer + preset dropdowns
@@ -853,10 +891,11 @@ export function renderResultsTable() {
             ].join('');
 
             tr.innerHTML = `
-                <td class="px-2 py-1.5"><div>${item.filename}</div><button type="button" data-toggle-detail="${escapeHtml(item.filename)}" class="mt-0.5 text-[10px] text-indigo-500 hover:text-indigo-700 underline flex items-center gap-0.5"><svg class="w-3 h-3 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>详情</button></td>
+                <td class="px-2 py-1.5"><div>${escapeHtml(item.filename)}${_buildParamBadge(item)}</div><button type="button" data-toggle-detail="${escapeHtml(item.filename)}" class="mt-0.5 text-[10px] text-indigo-500 hover:text-indigo-700 underline flex items-center gap-0.5"><svg class="w-3 h-3 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>详情</button></td>
                 <td class="px-2 py-1.5">${previewButtonHtml}</td>
                 <td class="px-2 py-1.5"><select data-field="_printer_model" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5 max-w-[110px]">${pmOptions}</select></td>
                 <td class="px-2 py-1.5"><select data-field="_slicer_preset_id" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5 max-w-[100px]">${presetOptions}</select></td>
+                <td class="px-2 py-1.5"><select data-field="_brand" class="row-edit row-brand-select text-[11px] border border-gray-300 rounded px-1 py-0.5 w-full max-w-[110px]">${brandOptionsHtml}</select></td>
                 <td class="px-2 py-1.5"><select data-field="material" class="row-edit text-[11px] border border-gray-300 rounded px-1 py-0.5">${materialOptionsHtml}</select></td>
                 <td class="px-2 py-1.5" data-field="color">${renderedRowColors.html}</td>
                 <td class="px-2 py-1.5"><input data-field="quantity" type="number" min="1" value="${item.quantity}" class="row-edit w-14 text-[11px] border border-gray-300 rounded px-1 py-0.5" /></td>
@@ -874,7 +913,7 @@ export function renderResultsTable() {
                     <div class="text-xs leading-tight font-medium">${recalculating ? '-' : ('¥ ' + Number(item.cost_cny || 0).toFixed(2))}</div>
                 </td>
                 <td data-role="status-cell" class="px-2 py-1.5 min-w-[80px] text-green-600 font-medium text-[11px]">${t('common.success')}</td>
-                <td class="px-2 py-1.5 space-x-1"><button type="button" data-delete-file="${item.filename}" class="text-[11px] text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 rounded px-2 py-0.5">${t('common.delete')}</button></td>
+                <td class="px-2 py-1.5 space-x-1"><button type="button" data-delete-file="${item.filename}" class="text-xs text-red-500 hover:text-red-700">${t('common.delete')}</button></td>
             `;
         } else {
             const thumbnail = thumbnailMap.get(item.filename) || buildPlaceholderThumbnail(ext);
@@ -885,7 +924,12 @@ export function renderResultsTable() {
                 : `<button type="button" data-preview-file="${item.filename}" data-preview-ext="${ext}" class="text-[12px] text-indigo-600 hover:text-indigo-700 border border-indigo-200 hover:border-indigo-300 rounded px-2 py-0.5">预览</button>`;
             const selectedMaterial = item.material || quoteOptions.material;
             const selectedColor = item.color || quoteOptions.color;
-            const materialOptionsHtml = MATERIAL_OPTIONS.map((m) => `<option value="${m.name}" ${m.name === selectedMaterial ? 'selected' : ''}>${m.name}</option>`).join('');
+            const brands3 = getBrandOptions();
+            const currentBrand3 = (MATERIAL_OPTIONS.find(m => m.name === selectedMaterial) || {}).brand || '';
+            const effectiveBrand3 = currentBrand3 || brands3[0] || '';
+            const brandOptionsHtml = brands3.map(b => `<option value="${b}" ${b === effectiveBrand3 ? 'selected' : ''}>${b}</option>`).join('');
+            const filteredMaterials3 = effectiveBrand3 ? MATERIAL_OPTIONS.filter(m => (m.brand || 'Generic') === effectiveBrand3) : MATERIAL_OPTIONS;
+            const materialOptionsHtml = filteredMaterials3.map((m) => `<option value="${m.name}" ${m.name === selectedMaterial ? 'selected' : ''}>${m.name}</option>`).join('');
             const renderedRowColors = renderColorDropdown(selectedMaterial, selectedColor, true);
             const quantityValue = item.quantity || quoteOptions.quantity || 1;
             // Per-file printer + preset
@@ -899,20 +943,21 @@ export function renderResultsTable() {
                 ...presets.map(p => `<option value="${p.id}" ${String(p.id) === String(item._slicer_preset_id || '') ? 'selected' : ''}>${p.name || '#' + p.id}</option>`)
             ].join('');
             tr.innerHTML = `
-                <td class="px-2 py-1.5">${item.filename}</td>
+                <td class="px-2 py-1.5">${escapeHtml(item.filename)}${_buildParamBadge(item)}</td>
                 <td class="px-2 py-1.5">${previewButtonHtml}</td>
                 <td class="px-2 py-1.5"><select data-field="_printer_model" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5 max-w-[110px]">${pmOptions}</select></td>
                 <td class="px-2 py-1.5"><select data-field="_slicer_preset_id" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5 max-w-[100px]">${presetOptions}</select></td>
+                <td class="px-2 py-1.5"><select data-field="_brand" class="row-edit row-brand-select text-[11px] border border-gray-300 rounded px-1 py-0.5 w-full max-w-[110px]">${brandOptionsHtml}</select></td>
                 <td class="px-2 py-1.5"><select data-field="material" class="row-edit text-[11px] border border-gray-300 rounded px-1 py-0.5">${materialOptionsHtml}</select></td>
                 <td class="px-2 py-1.5" data-field="color">${renderedRowColors.html}</td>
                 <td class="px-2 py-1.5"><input data-field="quantity" type="number" min="1" value="${quantityValue}" class="row-edit w-14 text-[11px] border border-gray-300 rounded px-1 py-0.5" /></td>
                 <td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td>
                 <td data-role="status-cell" class="px-2 py-1.5 min-w-[80px]">
                     <span class="status-fail-badge relative cursor-default text-red-600 font-medium text-[11px]">${t('common.failed')}
-                        <span class="status-fail-tooltip hidden absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2 text-[11px] font-normal text-left text-white bg-gray-800 rounded-lg shadow-lg whitespace-normal break-words leading-relaxed">${escapeHtml(item.error || t('common.error'))}</span>
+                        <span class="status-fail-tooltip hidden absolute z-50 top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-2 text-[11px] font-normal text-left text-white bg-gray-800 rounded-lg shadow-lg whitespace-normal break-words leading-relaxed">${escapeHtml(item.error || t('common.error'))}</span>
                     </span>
                 </td>
-                <td class="px-2 py-1.5 space-x-1"><button type="button" data-delete-file="${item.filename}" class="text-[11px] text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 rounded px-2 py-0.5">${t('common.delete')}</button></td>
+                <td class="px-2 py-1.5 space-x-1"><button type="button" data-delete-file="${item.filename}" class="text-xs text-red-500 hover:text-red-700">${t('common.delete')}</button></td>
             `;
         }
         tbody.appendChild(tr);
@@ -1011,7 +1056,12 @@ function renderResultsCards() {
         const presetOptions = ['<option value="">' + t('quote.presetNone') + '</option>',
             ...presets.map(p => `<option value="${p.id}" ${String(p.id) === String(item._slicer_preset_id || '') ? 'selected' : ''}>${p.name || '#' + p.id}</option>`)
         ].join('');
-        const materialOptionsHtml = MATERIAL_OPTIONS.map((m) => `<option value="${m.name}" ${m.name === (item.material || quoteOptions.material) ? 'selected' : ''}>${m.name}</option>`).join('');
+        const mobileBrands = getBrandOptions();
+        const mobileCurrentBrand = (MATERIAL_OPTIONS.find(m => m.name === (item.material || quoteOptions.material)) || {}).brand || '';
+        const mobileEffectiveBrand = mobileCurrentBrand || mobileBrands[0] || '';
+        const mobileBrandOptionsHtml = mobileBrands.map(b => `<option value="${b}" ${b === mobileEffectiveBrand ? 'selected' : ''}>${b}</option>`).join('');
+        const filteredMobileMaterials = mobileEffectiveBrand ? MATERIAL_OPTIONS.filter(m => (m.brand || 'Generic') === mobileEffectiveBrand) : MATERIAL_OPTIONS;
+        const materialOptionsHtml = filteredMobileMaterials.map((m) => `<option value="${m.name}" ${m.name === (item.material || quoteOptions.material) ? 'selected' : ''}>${m.name}</option>`).join('');
         const quantityValue = item.quantity || quoteOptions.quantity || 1;
 
         if (item.status === 'success' && !item._recalculating) {
@@ -1022,7 +1072,7 @@ function renderResultsCards() {
                 <div class="flex gap-3">
                     <div class="w-28 flex-shrink-0">${previewHtml}</div>
                     <div class="flex-1 min-w-0">
-                        <p class="text-[12px] font-medium text-gray-900 truncate" title="${escapeHtml(item.filename)}">${escapeHtml(item.filename)}</p>
+                        <p class="text-[12px] font-medium text-gray-900 truncate" title="${escapeHtml(item.filename)}">${escapeHtml(item.filename)}${_buildParamBadge(item)}</p>
                         <div class="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
                             <div><span class="text-gray-400">重量</span> <span class="font-medium">${(item.weight_g / Math.max(1, item.quantity)).toFixed(1)}g / ${item.weight_g}g</span></div>
                             <div><span class="text-gray-400">时间</span> <span class="font-medium">${formatTimeHMS(item.unit_time_h || (item.estimated_time_h / Math.max(1, item.quantity)))} / ${formatTimeHMS(item.estimated_time_h)}</span></div>
@@ -1046,6 +1096,10 @@ function renderResultsCards() {
                         <select data-field="_slicer_preset_id" class="card-edit w-full text-[10px] border border-gray-300 rounded px-1.5 py-1 bg-white">${presetOptions}</select>
                     </div>
                     <div>
+                        <label class="text-[10px] text-gray-400 block">${t('quote.brand')}</label>
+                        <select data-field="_brand" class="card-edit row-brand-select w-full text-[11px] border border-gray-300 rounded px-1.5 py-1 bg-white">${mobileBrandOptionsHtml}</select>
+                    </div>
+                    <div>
                         <label class="text-[10px] text-gray-400 block">${t('quote.material')}</label>
                         <select data-field="material" class="card-edit w-full text-[11px] border border-gray-300 rounded px-1.5 py-1 bg-white">${materialOptionsHtml}</select>
                     </div>
@@ -1061,7 +1115,7 @@ function renderResultsCards() {
                             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                             详情
                         </button>
-                        <button type="button" data-delete-file="${item.filename}" class="text-[11px] text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 rounded px-2 py-0.5">${t('common.delete')}</button>
+                        <button type="button" data-delete-file="${item.filename}" class="text-xs text-red-500 hover:text-red-700">${t('common.delete')}</button>
                     </div>
                 </div>
                 <div class="hidden mt-2" data-detail-content="${escapeHtml(item.filename)}">
@@ -1084,7 +1138,7 @@ function renderResultsCards() {
                 <div class="flex gap-3">
                     <div class="w-28 flex-shrink-0">${previewHtml}</div>
                     <div class="flex-1 min-w-0">
-                        <p class="text-[12px] font-medium text-gray-900 truncate" title="${escapeHtml(item.filename)}">${escapeHtml(item.filename)}</p>
+                        <p class="text-[12px] font-medium text-gray-900 truncate" title="${escapeHtml(item.filename)}">${escapeHtml(item.filename)}${_buildParamBadge(item)}</p>
                         <p class="mt-3 text-[12px] text-amber-600">${t('quote.recalculating')}</p>
                     </div>
                 </div>
@@ -1098,8 +1152,12 @@ function renderResultsCards() {
                 <div class="flex gap-3">
                     <div class="w-28 flex-shrink-0">${previewHtml}</div>
                     <div class="flex-1 min-w-0">
-                        <p class="text-[12px] font-medium text-gray-900 truncate" title="${escapeHtml(item.filename)}">${escapeHtml(item.filename)}</p>
+                        <p class="text-[12px] font-medium text-gray-900 truncate" title="${escapeHtml(item.filename)}">${escapeHtml(item.filename)}${_buildParamBadge(item)}</p>
                         <div class="mt-2 grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="text-[10px] text-gray-400 block">${t('quote.brand')}</label>
+                                <select data-field="_brand" class="card-edit row-brand-select w-full text-[11px] border border-gray-300 rounded px-1.5 py-1 bg-white">${mobileBrandOptionsHtml}</select>
+                            </div>
                             <div>
                                 <label class="text-[10px] text-gray-400 block">${t('quote.material')}</label>
                                 <select data-field="material" class="card-edit w-full text-[11px] border border-gray-300 rounded px-1.5 py-1 bg-white">${materialOptionsHtml}</select>
@@ -1111,19 +1169,58 @@ function renderResultsCards() {
                         </div>
                         <div class="mt-2">
                             <span class="status-fail-badge relative cursor-default text-[11px] text-red-600 font-medium">${t('common.failed')}
-                                <span class="status-fail-tooltip hidden absolute z-50 bottom-full left-0 mb-2 w-64 p-2 text-[11px] font-normal text-left text-white bg-gray-800 rounded-lg shadow-lg whitespace-normal break-words leading-relaxed">${escapeHtml(item.error || t('common.error'))}</span>
+                                <span class="status-fail-tooltip hidden absolute z-50 top-full left-0 mt-2 w-64 p-2 text-[11px] font-normal text-left text-white bg-gray-800 rounded-lg shadow-lg whitespace-normal break-words leading-relaxed">${escapeHtml(item.error || t('common.error'))}</span>
                             </span>
                         </div>
                     </div>
                 </div>
                 <div class="mt-2 flex justify-end">
-                    <button type="button" data-delete-file="${item.filename}" class="text-[11px] text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 rounded px-2 py-0.5">${t('common.delete')}</button>
+                    <button type="button" data-delete-file="${item.filename}" class="text-xs text-red-500 hover:text-red-700">${t('common.delete')}</button>
                 </div>
             `;
             container.appendChild(card);
         }
     });
 }
+
+// ── 失败原因 tooltip：鼠标悬停显示/隐藏（事件委托，只绑定一次）──
+// 使用 position:fixed + body 直接挂载，避免被表格行遮挡
+(function _setupFailTooltipDelegation() {
+    if (_setupFailTooltipDelegation._bound) return;
+    _setupFailTooltipDelegation._bound = true;
+    let _tipEl = null;
+    let _tipText = '';
+    const _createTip = () => {
+        const el = document.createElement('div');
+        el.id = 'fail-tooltip-float';
+        el.style.cssText = 'position:fixed;z-index:99999;max-width:280px;padding:8px 12px;font-size:11px;font-weight:400;line-height:1.5;text-align:left;color:#fff;background:#1f2937;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.3);white-space:normal;word-break:break-word;pointer-events:none;';
+        document.body.appendChild(el);
+        return el;
+    };
+    const showTip = (badge, e) => {
+        const src = badge.querySelector('.status-fail-tooltip');
+        if (!src) return;
+        const text = src.textContent;
+        if (!text) return;
+        if (!_tipEl) _tipEl = _createTip();
+        if (_tipText !== text) { _tipEl.textContent = text; _tipText = text; }
+        const r = badge.getBoundingClientRect();
+        _tipEl.style.display = 'block';
+        _tipEl.style.left = Math.min(r.left, window.innerWidth - 290) + 'px';
+        _tipEl.style.top = (r.bottom + 4) + 'px';
+    };
+    const hideTip = () => {
+        if (_tipEl) _tipEl.style.display = 'none';
+    };
+    document.addEventListener('mouseover', (e) => {
+        const badge = e.target.closest('.status-fail-badge');
+        if (badge) showTip(badge, e);
+    });
+    document.addEventListener('mouseout', (e) => {
+        const badge = e.target.closest('.status-fail-badge');
+        if (badge && !badge.contains(e.relatedTarget)) hideTip();
+    });
+})();
 
 // ── G-code 详情构建 ──
 function _buildGcodeDetailHtml(gcode, wrapInTd = true, item) {

@@ -2,8 +2,8 @@
 ZIP upload quote route — parse Excel checklist + STL models from .zip archive.
 
 Excel checklist columns (header row, case-insensitive):
-    filename | 打印机 | 喷嘴直径 | 层高 | 墙层数 | 填充密度
-    filename | printer | nozzle | layer_height | wall_count | infill
+    filename | 材料品牌 | 打印机 | 喷嘴直径 | 层高 | 墙层数 | 填充密度
+    filename | material_brand | printer | nozzle | layer_height | wall_count | infill
 
 Matching: compare checklist filename stem with STL filename stem (case-insensitive,
 ignoring extension). Reports full / partial / none match status.
@@ -18,8 +18,10 @@ import zipfile
 from typing import List, Optional
 
 from fastapi import Depends, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import JSONResponse
-from openpyxl import load_workbook
+from fastapi.responses import JSONResponse, StreamingResponse
+from openpyxl import load_workbook, Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
 
 from .config import (
     DEFAULT_MATERIALS,
@@ -38,6 +40,9 @@ logger = logging.getLogger(__name__)
 _EXCEL_KEY_MAP = {
     "filename": "filename",
     "文件名": "filename",
+    "材料品牌": "material_brand",
+    "material_brand": "material_brand",
+    "material brand": "material_brand",
     "打印机": "printer_model",
     "printer": "printer_model",
     "喷嘴直径": "nozzle",
@@ -52,12 +57,157 @@ _EXCEL_KEY_MAP = {
     "infill_density": "infill",
 }
 
-# Max ZIP file size (200MB to be safe for many STLs)
-MAX_ZIP_SIZE_BYTES = 200 * 1024 * 1024
+# Valid ranges for checklist parameters
+VALID_RANGES = {
+    "nozzle": ["0.2", "0.4", "0.6", "0.8"],
+    "wall_count": [2, 3, 4, 5, 6, 8],
+    "infill": [5, 10, 15, 20, 25, 30, 40, 50, 60, 80, 100],
+}
+
+# Default values for invalid parameters
+_DEFAULT_VALUES = {
+    "nozzle": "0.4",
+    "layer_height": 0.2,
+    "wall_count": 3,
+    "infill": 20,
+}
+
+# Layer height limits
+LAYER_HEIGHT_MIN = 0.04
+LAYER_HEIGHT_NOZZLE_RATIO_MAX = 0.8   # max layer_height = nozzle * 0.8
+LAYER_HEIGHT_NOZZLE_RATIO_DEFAULT = 0.4  # fallback = nozzle * 0.4
+
+# Max ZIP file size (1GB)
+MAX_ZIP_SIZE_BYTES = 1024 * 1024 * 1024
+
+
+def _validate_checklist_item(item: dict, filename_stem: str) -> List[dict]:
+    """Validate a single checklist item against known valid ranges.
+    Returns a list of warning dicts: {filename, param, value, default_used}."""
+    warnings = []
+
+    # Resolve effective nozzle for this item (checklist value or default)
+    nozzle_raw = str(item.get("nozzle", "")).strip()
+    try:
+        effective_nozzle = float(nozzle_raw) if nozzle_raw else float(_DEFAULT_VALUES["nozzle"])
+    except (ValueError, TypeError):
+        effective_nozzle = float(_DEFAULT_VALUES["nozzle"])
+
+    # Validate layer_height dynamically based on nozzle diameter
+    lh_parsed_key = "layer_height_parsed"
+    lh_raw = item.get("layer_height", "")
+    lh_val = item.get(lh_parsed_key, None)
+    if lh_val is None and lh_raw:
+        try:
+            lh_val = float(lh_raw)
+        except (ValueError, TypeError):
+            lh_val = None
+    if lh_raw and lh_val is not None:
+        lh_max = round(effective_nozzle * LAYER_HEIGHT_NOZZLE_RATIO_MAX, 2)
+        if lh_val > lh_max:
+            # Too thick — use nozzle * 0.4 as default
+            fallback = round(effective_nozzle * LAYER_HEIGHT_NOZZLE_RATIO_DEFAULT, 2)
+            warnings.append({
+                "filename": filename_stem,
+                "param": "layer_height",
+                "value": str(lh_val),
+                "default_used": str(fallback),
+                "reason": f"层高不能超过喷嘴直径的80% (喷嘴{effective_nozzle}mm, 最大{lh_max}mm)",
+            })
+            item[lh_parsed_key] = fallback
+        elif lh_val < LAYER_HEIGHT_MIN:
+            warnings.append({
+                "filename": filename_stem,
+                "param": "layer_height",
+                "value": str(lh_val),
+                "default_used": str(LAYER_HEIGHT_MIN),
+                "reason": f"层高不能小于{LAYER_HEIGHT_MIN}mm",
+            })
+            item[lh_parsed_key] = LAYER_HEIGHT_MIN
+
+    # Validate numeric/string params in VALID_RANGES
+    for param, valid_values in VALID_RANGES.items():
+        # Determine parsed value
+        parsed_key = param + "_parsed"
+        raw = item.get(param, "")
+
+        if param in ("wall_count", "infill"):
+            val = item.get(parsed_key, None)
+            if val is None and raw:
+                try:
+                    val = int(float(raw))
+                except (ValueError, TypeError):
+                    val = None
+            if raw and val is not None and val not in valid_values:
+                default = _DEFAULT_VALUES[param]
+                warnings.append({
+                    "filename": filename_stem,
+                    "param": param,
+                    "value": str(val),
+                    "default_used": str(default),
+                })
+                item[parsed_key] = default
+        elif param == "nozzle":
+            if raw and str(raw).strip() not in valid_values:
+                default = _DEFAULT_VALUES[param]
+                warnings.append({
+                    "filename": filename_stem,
+                    "param": param,
+                    "value": str(raw),
+                    "default_used": str(default),
+                })
+                item[param] = default
+
+    # Validate printer_model
+    printer_name = str(item.get("printer_model", "")).strip()
+    if printer_name:
+        from app.printers import PRINTER_MODELS
+        name_lower = printer_name.lower()
+        found = any(pm.get("name", "").lower() == name_lower for pm in PRINTER_MODELS)
+        if not found:
+            warnings.append({
+                "filename": filename_stem,
+                "param": "printer_model",
+                "value": printer_name,
+                "default_used": "系统默认",
+            })
+
+    # Validate material_brand (warn if provided but not recognized)
+    brand = str(item.get("material_brand", "")).strip()
+    if brand:
+        from .config import DEFAULT_MATERIALS
+        known_brands = {m.upper() for m in DEFAULT_MATERIALS if isinstance(m, str)}
+        # Also accept common brand names
+        known_brand_names = {
+            "GENERIC", "ESUN", "E-SUN", "HATCHBOX", "POLYMAKER", "PRUSAMENT",
+            "SUNLU", "ERYONE", "OVERTURE", "INLAND", "MAKERBOT", "FILATECH",
+            "ELEGOO", "ANYCUBIC", "FLASHFORGE", "BAMBU LAB", "QIDI", "CREALITY",
+        }
+        if brand.upper() not in known_brands and brand.upper() not in known_brand_names:
+            warnings.append({
+                "filename": filename_stem,
+                "param": "material_brand",
+                "value": brand,
+                "default_used": "Generic",
+            })
+
+    return warnings
+
+
+def _collect_all_warnings(checklist: Optional[List[dict]]) -> List[dict]:
+    """Collect all _warnings from checklist items."""
+    if not checklist:
+        return []
+    warnings = []
+    for item in checklist:
+        w = item.get("_warnings")
+        if w:
+            warnings.extend(w)
+    return warnings
 
 
 def _parse_excel_checklist(file_bytes: bytes) -> Optional[List[dict]]:
-    """Parse Excel checklist. Returns list of {filename, printer_model, nozzle, layer_height, wall_count, infill}
+    """Parse Excel checklist. Returns list of {filename, material_brand, printer_model, nozzle, layer_height, wall_count, infill}
     or None if no checklist found / parse error."""
     try:
         wb = load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
@@ -86,6 +236,7 @@ def _parse_excel_checklist(file_bytes: bytes) -> Optional[List[dict]]:
         return None
 
     items = []
+    all_warnings = []
     for row in rows[1:]:
         item = {}
         for col_idx, key in col_map.items():
@@ -120,6 +271,12 @@ def _parse_excel_checklist(file_bytes: bytes) -> Optional[List[dict]]:
                     item[num_key + "_parsed"] = int(float(val.replace("%", "")))
             except (ValueError, TypeError):
                 pass
+
+        # Validate parameters against known ranges
+        item_warnings = _validate_checklist_item(item, item.get("filename_stem", ""))
+        if item_warnings:
+            item["_warnings"] = item_warnings
+            all_warnings.extend(item_warnings)
 
         items.append(item)
 
@@ -257,6 +414,20 @@ async def zip_quote(
 
         if len(stl_files) > MAX_FILES_PER_REQUEST:
             raise HTTPException(status_code=400, detail=f"ZIP 中模型文件数量不能超过 {MAX_FILES_PER_REQUEST} 个")
+
+        # 免费用户累计模型总数限制
+        from .deps import is_member_user
+        from sqlalchemy import func as sqlfunc
+        from .models_orm import QuoteHistory
+        from .config import FREE_TOTAL_MODEL_LIMIT
+        if not is_member_user(current_user):
+            with get_db_session() as db:
+                existing_count = db.query(sqlfunc.count(QuoteHistory.id)).filter(
+                    QuoteHistory.user_id == current_user["id"],
+                    QuoteHistory.status == "success",
+                ).scalar() or 0
+            if existing_count >= FREE_TOTAL_MODEL_LIMIT:
+                raise HTTPException(status_code=400, detail=f"免费用户最多累计 {FREE_TOTAL_MODEL_LIMIT} 个模型，升级会员无限制")
 
         # Parse Excel checklist
         checklist = _parse_excel_checklist(excel_bytes) if excel_bytes else None
@@ -484,6 +655,7 @@ async def zip_quote(
                 "checklist_only_count": len(match_result["checklist_only"]),
                 "stl_only_count": len(match_result["stl_only"]),
                 "checklist_only_files": [c.get("filename", c.get("filename_stem", "")) for c in match_result["checklist_only"]],
+                "warnings": _collect_all_warnings(checklist),
             },
         }
 
@@ -538,3 +710,126 @@ async def download_zip_model(
         raise HTTPException(status_code=404, detail="File not found")
 
     return FileResponse(abs_path, filename=_os.path.basename(abs_path))
+
+
+async def download_zip_template(request: Request):
+    """Generate and return an xlsx template for ZIP import checklist."""
+
+    # ── Styles ──
+    thin_border = Border(
+        left=Side(style="thin"),
+        right=Side(style="thin"),
+        top=Side(style="thin"),
+        bottom=Side(style="thin"),
+    )
+    header_font = Font(name="Microsoft YaHei", bold=True, size=11, color="FFFFFF")
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+    sub_header_font = Font(name="Microsoft YaHei", bold=True, size=11)
+    sub_header_fill = PatternFill(start_color="D9E2F3", end_color="D9E2F3", fill_type="solid")
+    normal_font = Font(name="Microsoft YaHei", size=11)
+    note_font = Font(name="Microsoft YaHei", size=10, color="666666")
+    note_fill = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
+    center_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    left_align = Alignment(horizontal="left", vertical="center", wrap_text=True)
+
+    wb = Workbook()
+
+    # ════════════════════════════════════════════
+    # Sheet 1: 导入模板
+    # ════════════════════════════════════════════
+    ws1 = wb.active
+    ws1.title = "导入模板"
+
+    # Row 1: English headers
+    headers_en = ["filename", "material_brand", "printer", "nozzle", "layer_height", "wall_count", "infill"]
+    for col, val in enumerate(headers_en, 1):
+        cell = ws1.cell(row=1, column=col, value=val)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = center_align
+        cell.border = thin_border
+
+    # Row 2: Chinese sub-headers
+    headers_cn = ["文件名", "材料品牌", "打印机", "喷嘴直径", "层高(mm)", "墙层数", "填充密度(%)"]
+    for col, val in enumerate(headers_cn, 1):
+        cell = ws1.cell(row=2, column=col, value=val)
+        cell.font = sub_header_font
+        cell.fill = sub_header_fill
+        cell.alignment = center_align
+        cell.border = thin_border
+
+    # Row 3-5: Example data
+    examples = [
+        ["model1.stl", "eSUN", "Bambu Lab A1", 0.4, 0.2, 3, 20],
+        ["model2.stl", "", "", "", 0.16, 4, 15],
+        ["model3.stl", "Generic", "Creality K1 Max", 0.6, 0.28, 2, 10],
+    ]
+    for r, row_data in enumerate(examples, 3):
+        for col, val in enumerate(row_data, 1):
+            cell = ws1.cell(row=r, column=col, value=val if val != "" else None)
+            cell.font = normal_font
+            cell.alignment = center_align
+            cell.border = thin_border
+
+    # Note row explaining empty = default
+    note_row = 6
+    note_text = "💡 提示：空白单元格 = 使用系统默认值，填写 = 覆盖默认值。第一行（英文列名）必须保留。"
+    ws1.merge_cells(start_row=note_row, start_column=1, end_row=note_row, end_column=7)
+    note_cell = ws1.cell(row=note_row, column=1, value=note_text)
+    note_cell.font = note_font
+    note_cell.fill = note_fill
+    note_cell.alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+    for c in range(1, 8):
+        ws1.cell(row=note_row, column=c).border = thin_border
+
+    # Auto-width for sheet 1
+    col_widths_s1 = [16, 14, 20, 14, 16, 12, 16]
+    for i, w in enumerate(col_widths_s1, 1):
+        ws1.column_dimensions[get_column_letter(i)].width = w
+
+    # ════════════════════════════════════════════
+    # Sheet 2: 参数说明
+    # ════════════════════════════════════════════
+    ws2 = wb.create_sheet("参数说明")
+
+    # Headers
+    param_headers = ["参数", "英文列名", "说明", "默认值", "可选值"]
+    for col, val in enumerate(param_headers, 1):
+        cell = ws2.cell(row=1, column=col, value=val)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = center_align
+        cell.border = thin_border
+
+    # Parameter rows
+    params = [
+        ["文件名", "filename", "必填，与压缩包内模型文件名（不含扩展名）匹配", "—", "—"],
+        ["材料品牌", "material_brand", "可选，耗材品牌名称", "Generic", "eSUN, Hatchbox, Polymaker, Prusament, Sunlu 等"],
+        ["打印机", "printer", "可选，打印机型号", "使用系统默认", "Bambu Lab A1, Creality K1, Prusa MK4 等"],
+        ["喷嘴直径", "nozzle", "可选，单位 mm", "0.4", "0.2, 0.4, 0.6, 0.8"],
+        ["层高", "layer_height", "可选，单位 mm", "0.2", "0.08, 0.10, 0.12, 0.16, 0.20, 0.28, 0.32"],
+        ["墙层数", "wall_count", "可选，外壁层数", "3", "2, 3, 4, 5, 6, 8"],
+        ["填充密度", "infill", "可选，百分比", "20", "5, 10, 15, 20, 25, 30, 40, 50, 60, 80, 100"],
+    ]
+    for r, row_data in enumerate(params, 2):
+        for col, val in enumerate(row_data, 1):
+            cell = ws2.cell(row=r, column=col, value=val)
+            cell.font = normal_font
+            cell.alignment = left_align if col >= 3 else center_align
+            cell.border = thin_border
+
+    # Auto-width for sheet 2
+    col_widths_s2 = [12, 16, 40, 16, 44]
+    for i, w in enumerate(col_widths_s2, 1):
+        ws2.column_dimensions[get_column_letter(i)].width = w
+
+    # ── Save to buffer and return ──
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=zip_import_template.xlsx"},
+    )

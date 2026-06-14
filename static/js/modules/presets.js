@@ -7,6 +7,7 @@ import {
     setCachedPrinterModels,
     defaultPrinterId, defaultNozzle, defaultSlicerPresetId,
     getHiddenPrinters, setHiddenPrinters, HIDDEN_PRINTERS_KEY,
+    getEnabledPrinters, setEnabledPrinters, ENABLED_PRINTERS_KEY,
 } from './state.js';
 import { openLoginModal } from './auth.js';
 import { t, onLangChange } from './i18n.js';
@@ -28,34 +29,42 @@ export function initPresets(d) {
 
 // Update printer options when language changes
 function _updatePrinterOptions() {
-    const visibleModels = _printerModels.filter(p => !getHiddenPrinters().includes(p.id));
+    const visibleModels = _printerModels.filter(p => getEnabledPrinters().includes(p.id));
     
     // Update cfg-printer-model-main
     const cfgSel = document.getElementById('cfg-printer-model-main');
     if (cfgSel) {
         const currentVal = cfgSel.value;
-        cfgSel.innerHTML = "<option value=\"\">" + t('printer.selectPrinter') + "</option>";
+        cfgSel.innerHTML = '';
         visibleModels.forEach(p => {
             const opt = document.createElement("option");
             opt.value = p.id;
             opt.textContent = p.name;
             cfgSel.appendChild(opt);
         });
-        if (currentVal) cfgSel.value = currentVal;
+        if (currentVal && visibleModels.find(p => p.id === currentVal)) {
+            cfgSel.value = currentVal;
+        } else if (visibleModels.length) {
+            cfgSel.value = visibleModels[0].id;
+        }
     }
     
     // Update batch-printer-model
     const batchSel = document.getElementById('batch-printer-model');
     if (batchSel) {
         const currentVal = batchSel.value;
-        batchSel.innerHTML = "<option value=\"\">" + t('printer.selectPrinter') + "</option>";
+        batchSel.innerHTML = '';
         visibleModels.forEach(p => {
             const opt = document.createElement("option");
             opt.value = p.id;
             opt.textContent = p.name;
             batchSel.appendChild(opt);
         });
-        if (currentVal) batchSel.value = currentVal;
+        if (currentVal && visibleModels.find(p => p.id === currentVal)) {
+            batchSel.value = currentVal;
+        } else if (visibleModels.length) {
+            batchSel.value = visibleModels[0].id;
+        }
     }
     
     // Update batch-slicer-preset
@@ -81,9 +90,9 @@ export function renderSlicerPresetsUI() {
             && items.some(function(p) { return p.id === defaultSlicerPresetId; }))
             ? String(defaultSlicerPresetId) : "";
         genPresetSelect.innerHTML = [
-            '<option value="">' + t('slicer.noPreset') + '</option>',
             ...items.map(function(p) { return '<option value="' + p.id + '"' + (String(p.id) === genCurrentVal ? ' selected' : '') + '>' + (p.name || '#' + p.id) + '</option>'; })
         ].join('');
+        if (!genPresetSelect.value && items.length) genPresetSelect.value = String(items[0].id);
     }
 
     // Populate the model-page batch preset selector
@@ -108,53 +117,41 @@ export function renderSlicerPresetsUI() {
     if (!slicerPresetsTbody) return;
     const items = slicerPresets || [];
     _selectedPresetId = null;
-    _updatePresetActionButtons();
-
     if (!items.length) {
-        slicerPresetsTbody.innerHTML = '<tr><td colspan="5" class="px-2 py-3 text-gray-500">' + t('slicer.noPresets') + '</td></tr>';
+        slicerPresetsTbody.innerHTML = '<tr><td colspan="3" class="px-3 py-3 text-gray-400">' + t('slicer.noPresets') + '</td></tr>';
         return;
     }
-    slicerPresetsTbody.innerHTML = items.map((p) => `
-        <tr class="preset-row hover:bg-gray-50 cursor-pointer" data-preset-id="${p.id}">
-            <td class="px-2 py-2 text-center">
-                <input type="radio" name="preset-select" value="${p.id}" class="preset-radio w-3 h-3 text-indigo-600">
+    slicerPresetsTbody.innerHTML = items.map((p, idx) => `
+        <tr class="preset-row hover:bg-gray-50" data-preset-id="${p.id}">
+            <td class="px-3 py-2 text-gray-400">${idx + 1}</td>
+            <td class="px-3 py-2">${p.name || '-'}</td>
+            <td class="px-3 py-2 text-center">
+                <button type="button" class="text-xs text-red-500 hover:text-red-700 preset-delete-btn" data-preset-id="${p.id}">${t('common.delete')}</button>
             </td>
-            <td class="px-2 py-2 font-mono text-gray-400">${p.id}</td>
-            <td class="px-2 py-2">${p.name || '-'}</td>
-            <td class="px-2 py-2">${p.ext || '-'}</td>
-            <td class="px-2 py-2">${p.created_at || '-'}</td>
         </tr>
     `).join('');
 
-    // Click row → select radio
-    slicerPresetsTbody.querySelectorAll('.preset-row').forEach((row) => {
-        row.addEventListener('click', (e) => {
-            // Don't select if clicking the radio itself (already handled)
-            if (e.target.tagName === 'INPUT') return;
-            const radio = row.querySelector('.preset-radio');
-            if (radio) { radio.checked = true; _onPresetRadioChange(radio.value); }
+    // Delete button events
+    slicerPresetsTbody.querySelectorAll('.preset-delete-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const id = Number(btn.getAttribute('data-preset-id'));
+            if (id) deleteSlicerPreset(id);
         });
     });
-    // Radio change
-    slicerPresetsTbody.querySelectorAll('.preset-radio').forEach((radio) => {
-        radio.addEventListener('change', () => _onPresetRadioChange(radio.value));
+
+    // Row click → load preset
+    slicerPresetsTbody.querySelectorAll('.preset-row').forEach((row) => {
+        row.addEventListener('click', (e) => {
+            if (e.target.tagName === 'INPUT' || e.target.classList.contains('preset-delete-btn')) return;
+            const id = row.getAttribute('data-preset-id');
+            if (id) _selectedPresetId = Number(id);
+        });
     });
 }
 
 function _onPresetRadioChange(val) {
     _selectedPresetId = val ? Number(val) : null;
-    _updatePresetActionButtons();
-}
-
-function _updatePresetActionButtons() {
-    const { slicerPresetsDownloadBtn, slicerPresetsDeleteBtn } = dom;
-    const hasSelection = _selectedPresetId !== null && Number.isFinite(_selectedPresetId);
-    if (slicerPresetsDownloadBtn) slicerPresetsDownloadBtn.disabled = !hasSelection;
-    if (slicerPresetsDeleteBtn) {
-        // Also disable delete for system preset (id=0)
-        const isSystem = _selectedPresetId === 0;
-        slicerPresetsDeleteBtn.disabled = !hasSelection || isSystem;
-    }
 }
 
 export function preloadPrinterSelectors() {
@@ -172,10 +169,10 @@ export async function fetchPrinterModels() {
     _printerModels = data.items || [];
     setCachedPrinterModels(_printerModels);
 
-    // Filter out hidden printers
-    const hidden = getHiddenPrinters();
-    const visibleModels = hidden.length
-        ? _printerModels.filter(p => !hidden.includes(p.id))
+    // Filter to enabled printers only
+    const enabled = getEnabledPrinters();
+    const visibleModels = enabled.length
+        ? _printerModels.filter(p => enabled.includes(p.id))
         : _printerModels;
 
     // ── Helper: get compound id for model + nozzle ──
@@ -191,16 +188,17 @@ export async function fetchPrinterModels() {
         const model = visibleModels.find(p => p.id === modelId);
         const nozzles = (model && model.nozzles) ? model.nozzles : [0.4];
         const currentVal = sel.value;
-        sel.innerHTML = '<option value="">--</option>' + nozzles.map(n =>
-            '<option value="' + n + '" ' + (String(n) === String(currentVal) ? 'selected' : '') + '>' + n + '</option>'
+        sel.innerHTML = nozzles.map(n =>
+            '<option value="' + n + '"' + (n === defaultNozzle ? ' selected' : '') + '>' + n + ' mm</option>'
         ).join('');
+        if (!sel.value && nozzles.length) sel.value = String(nozzles[0]);
     }
 
     // ── Populate printer model tab ──
     for (const selId of ["cfg-printer-model-main"]) {
         const sel = document.getElementById(selId);
         if (!sel) continue;
-        sel.innerHTML = "<option value=\"\">" + t('printer.selectPrinter') + "</option>";
+        sel.innerHTML = '';
         visibleModels.forEach(function(p) {
             const opt = document.createElement("option");
             opt.value = p.id;
@@ -229,7 +227,7 @@ export async function fetchPrinterModels() {
     // ── Populate model-page batch printer selector ──
     const batchSel = document.getElementById("batch-printer-model");
     if (batchSel) {
-        batchSel.innerHTML = "<option value=\"\">" + t('printer.selectPrinter') + "</option>";
+        batchSel.innerHTML = '';
         visibleModels.forEach(function(p) {
             const opt = document.createElement("option");
             opt.value = p.id;
@@ -271,7 +269,7 @@ export async function fetchPrinterModels() {
     // ── Populate preset form printer selector ──
     const genSel = document.getElementById("gen-printer-model");
     if (genSel) {
-        genSel.innerHTML = "<option value=\"\">" + t('printer.selectPrinter') + "</option>";
+        genSel.innerHTML = '';
         visibleModels.forEach(p => {
             const opt = document.createElement("option");
             opt.value = p.id;
@@ -321,7 +319,11 @@ export async function fetchPrinterModels() {
                 var pdNozzle = document.getElementById('pd-nozzle');
                 if (pdNozzle) pdNozzle.textContent = dom.cfgNozzleDiameter.value + ' mm';
             }
+            // Update layer height range hint when nozzle changes
+            if (typeof updateLayerHeightRangeHint === 'function') updateLayerHeightRangeHint();
         });
+        // Initial hint update
+        if (typeof updateLayerHeightRangeHint === 'function') updateLayerHeightRangeHint();
     }
 }
 
@@ -626,7 +628,7 @@ export async function fetchPrinterPresets() {
                 <td class="px-2 py-2 text-gray-500">${p.bed_width}×${p.bed_depth}×${p.bed_height}</td>
                 <td class="px-2 py-2 text-gray-500">${p.nozzle} mm</td>
                 <td class="px-2 py-2 text-center">
-                    <button data-pp-delete="${p.id}" class="text-red-500 hover:text-red-700 text-xs">${t('common.delete')}</button>
+                    <button data-pp-delete="${p.id}" class="text-xs text-red-500 hover:text-red-700">${t('common.delete')}</button>
                 </td>
             </tr>
         `).join('');
@@ -657,13 +659,22 @@ export async function savePrinterPreset() {
     const nameEl = document.getElementById('pp-name');
     const name = (nameEl?.value || '').trim();
     if (!name) return;
+    // Gather nozzle sizes from checkboxes if available, else use defaults
+    const nozzleCheckboxes = document.querySelectorAll('.custom-pp-nozzle:checked');
+    let nozzles;
+    if (nozzleCheckboxes.length) {
+        nozzles = Array.from(nozzleCheckboxes).map(cb => parseFloat(cb.value)).filter(n => !isNaN(n));
+    } else {
+        nozzles = [0.2, 0.4, 0.6, 0.8];
+    }
+    if (!nozzles.length) nozzles = [0.4];
     const payload = {
         name,
         bed_width: Number(document.getElementById('pp-bed-x')?.value) || 256,
         bed_depth: Number(document.getElementById('pp-bed-y')?.value) || 256,
         bed_height: Number(document.getElementById('pp-bed-z')?.value) || 256,
-        nozzle: 0.4,
-        nozzles: [0.2, 0.4, 0.6, 0.8],
+        nozzle: nozzles.includes(0.4) ? 0.4 : nozzles[0],
+        nozzles,
     };
     try {
         const resp = await authFetch('/api/printer/presets', {
@@ -679,53 +690,151 @@ export async function savePrinterPreset() {
     } catch (e) { console.error(e); }
 }
 
-// ── Printer visibility management (localStorage) ──
+// ── Enabled printers management (table rows with select + delete) ──
 export function renderPrinterVisibilityList() {
-    const container = document.getElementById('printer-visibility-list');
-    if (!container || !_printerModels.length) {
-        if (container) container.innerHTML = '<tr><td colspan="3" class="px-2 py-3 text-gray-400">暂无机型</td></tr>';
+    const tbody = document.getElementById('enabled-printers-tbody');
+    if (!tbody) return;
+    if (!_printerModels.length) {
+        tbody.innerHTML = '<tr><td colspan="3" class="px-3 py-3 text-gray-400">暂无机型数据</td></tr>';
         return;
     }
-    const hidden = getHiddenPrinters();
-    container.innerHTML = _printerModels.map(p => {
-        const isHidden = hidden.includes(p.id);
-        return `<tr class="hover:bg-gray-50 cursor-pointer ${isHidden ? 'opacity-50' : ''}" data-printer-id="${p.id}">
-            <td class="px-2 py-2 text-center">
-                <input type="checkbox" class="pp-vis-toggle w-3 h-3 rounded" value="${p.id}" ${isHidden ? '' : 'checked'}>
-            </td>
-            <td class="px-2 py-2">
-                <span class="${isHidden ? 'text-gray-400 line-through' : 'text-gray-700'}">${p.name}</span>
-            </td>
-            <td class="px-2 py-2 text-gray-500 font-mono">${p.bed_width}×${p.bed_depth}×${p.bed_height}</td>
-        </tr>`;
-    }).join('');
-    container.querySelectorAll('.pp-vis-toggle').forEach(cb => {
-        cb.addEventListener('change', () => {
-            const id = cb.value;
-            const hidden = getHiddenPrinters();
-            if (cb.checked) {
-                const idx = hidden.indexOf(id);
-                if (idx >= 0) hidden.splice(idx, 1);
-            } else {
-                if (!hidden.includes(id)) hidden.push(id);
-            }
-            setHiddenPrinters(hidden);
+    const enabled = getEnabledPrinters();
+    tbody.innerHTML = '';
+    enabled.forEach((printerId, idx) => {
+        const printer = _printerModels.find(p => p.id === printerId);
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-gray-50';
+        // 机型名称（下拉选择）
+        const tdName = document.createElement('td');
+        tdName.className = 'px-3 py-2';
+        const sel = document.createElement('select');
+        sel.className = 'w-full border border-gray-300 rounded-md text-xs px-2 py-1.5 bg-white';
+        _printerModels.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = p.name;
+            if (p.id === printerId) opt.selected = true;
+            sel.appendChild(opt);
+        });
+        sel.addEventListener('change', () => {
+            const current = getEnabledPrinters();
+            current[idx] = sel.value;
+            setEnabledPrinters(current);
             renderPrinterVisibilityList();
             fetchPrinterModels();
         });
-    });
-    // Click row → toggle checkbox
-    container.querySelectorAll('tr[data-printer-id]').forEach(row => {
-        row.addEventListener('click', (e) => {
-            if (e.target.tagName === 'INPUT') return;
-            const cb = row.querySelector('.pp-vis-toggle');
-            if (cb) { cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); }
+        tdName.appendChild(sel);
+        // 打印尺寸
+        const tdSize = document.createElement('td');
+        tdSize.className = 'px-3 py-2 text-gray-500 font-mono';
+        tdSize.textContent = printer ? `${printer.bed_width}×${printer.bed_depth}×${printer.bed_height}` : '-';
+        // 删除按钮
+        const tdDel = document.createElement('td');
+        tdDel.className = 'px-3 py-2 text-center';
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'text-xs text-red-500 hover:text-red-700';
+        delBtn.textContent = t('common.delete');
+        delBtn.addEventListener('click', () => {
+            const current = getEnabledPrinters();
+            current.splice(idx, 1);
+            setEnabledPrinters(current);
+            renderPrinterVisibilityList();
+            fetchPrinterModels();
         });
+        tdDel.appendChild(delBtn);
+        tr.appendChild(tdName);
+        tr.appendChild(tdSize);
+        tr.appendChild(tdDel);
+        tbody.appendChild(tr);
     });
 }
 
+// ── Add enabled printer slot ──
+export function addEnabledPrinterSlot() {
+    const enabled = getEnabledPrinters();
+    // Find first printer not already enabled
+    const available = _printerModels.find(p => !enabled.includes(p.id));
+    if (available) {
+        enabled.push(available.id);
+        setEnabledPrinters(enabled);
+        renderPrinterVisibilityList();
+        fetchPrinterModels();
+    }
+}
+
+// ── Custom printer form management ──
+export function showCustomPrinterForm() {
+    const form = document.getElementById('custom-printer-form');
+    if (form) form.classList.remove('hidden');
+    const nameEl = document.getElementById('custom-pp-name');
+    if (nameEl) { nameEl.value = ''; nameEl.focus(); }
+}
+
+export function hideCustomPrinterForm() {
+    const form = document.getElementById('custom-printer-form');
+    if (form) form.classList.add('hidden');
+}
+
+export async function saveCustomPrinter() {
+    if (!authToken) { openLoginModal(); return; }
+    const nameEl = document.getElementById('custom-pp-name');
+    const name = (nameEl?.value || '').trim();
+    if (!name) {
+        _showCustomPpMsg('请输入打印机名称', false);
+        return;
+    }
+    // Gather selected nozzle sizes
+    const nozzleCheckboxes = document.querySelectorAll('.custom-pp-nozzle:checked');
+    const nozzles = Array.from(nozzleCheckboxes).map(cb => parseFloat(cb.value)).filter(n => !isNaN(n));
+    if (!nozzles.length) {
+        _showCustomPpMsg('请至少选择一个喷嘴尺寸', false);
+        return;
+    }
+    const payload = {
+        name,
+        bed_width: Number(document.getElementById('custom-pp-bed-x')?.value) || 256,
+        bed_depth: Number(document.getElementById('custom-pp-bed-y')?.value) || 256,
+        bed_height: Number(document.getElementById('custom-pp-bed-z')?.value) || 256,
+        nozzle: nozzles.includes(0.4) ? 0.4 : nozzles[0],
+        nozzles,
+    };
+    try {
+        const resp = await authFetch('/api/printer/presets', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+        });
+        if (resp.status === 401) { openLoginModal(); return; }
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.detail || '保存失败');
+        _showCustomPpMsg('保存成功', true);
+        // Add to enabled printers list
+        const presetId = `user_${data.preset?.id}`;
+        const enabled = getEnabledPrinters();
+        if (!enabled.includes(presetId)) {
+            enabled.push(presetId);
+            setEnabledPrinters(enabled);
+        }
+        // Refresh
+        hideCustomPrinterForm();
+        await fetchPrinterModels();
+        renderPrinterVisibilityList();
+    } catch (e) {
+        _showCustomPpMsg(e.message || '保存失败', false);
+    }
+}
+
+function _showCustomPpMsg(text, ok) {
+    const msg = document.getElementById('custom-pp-msg');
+    if (!msg) return;
+    msg.textContent = text;
+    msg.className = ok ? 'text-xs text-green-600' : 'text-xs text-red-600';
+    msg.classList.remove('hidden');
+    if (text) setTimeout(() => { msg.classList.add('hidden'); msg.textContent = ''; }, 2500);
+}
+
 export function restoreDefaultPrinters() {
-    setHiddenPrinters([]);
+    if (!confirm(t('printer.confirmRestore') || '确定恢复默认机型？自定义启用机型将丢失。')) return;
+    localStorage.removeItem(ENABLED_PRINTERS_KEY);
     renderPrinterVisibilityList();
     fetchPrinterModels();
 }
@@ -748,6 +857,22 @@ export function updatePrinterDetailPanel(printer) {
     const volL = ((printer.bed_width * printer.bed_depth * printer.bed_height) / 1000000).toFixed(1);
     if (pdVolume) pdVolume.textContent = volL + ' L';
     if (pdNozzles) pdNozzles.textContent = (printer.nozzles || []).map(n => n + ' mm').join(', ');
+}
+
+// ── Update layer height range hint based on current nozzle ──
+export function updateLayerHeightRangeHint() {
+    const hintEl = document.getElementById('layer-height-range-hint');
+    if (!hintEl) return;
+    // Get current nozzle diameter
+    const nozzleEl = document.getElementById('cfg-nozzle-diameter');
+    const nozzle = nozzleEl ? parseFloat(nozzleEl.value) : 0.4;
+    if (isNaN(nozzle) || nozzle <= 0) {
+        hintEl.textContent = '';
+        return;
+    }
+    const maxLh = (nozzle * 0.8).toFixed(2);
+    const defaultLh = (nozzle * 0.4).toFixed(2);
+    hintEl.textContent = `0.04–${maxLh}mm (喷嘴${nozzle}×0.8)`;
 }
 
 // ── Export / Import printer configuration ──

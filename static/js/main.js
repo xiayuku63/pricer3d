@@ -55,6 +55,8 @@ import {
     fetchPrinterPresets, savePrinterPreset, deletePrinterPreset,
     renderPrinterVisibilityList, restoreDefaultPrinters, addEnabledPrinterSlot,
     updatePrinterDetailPanel,
+    showCustomPrinterForm, hideCustomPrinterForm, saveCustomPrinter,
+    updateLayerHeightRangeHint,
 } from './modules/presets.js';
 import {
     initMembership, openMembershipModal, closeMembershipModal,
@@ -548,6 +550,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (ppRestoreBtn) ppRestoreBtn.addEventListener('click', restoreDefaultPrinters);
     const ppAddSlotBtn = document.getElementById('printer-add-slot-btn');
     if (ppAddSlotBtn) ppAddSlotBtn.addEventListener('click', addEnabledPrinterSlot);
+
+    // Custom printer form
+    const customPrinterBtn = document.getElementById('printer-add-custom-btn');
+    if (customPrinterBtn) customPrinterBtn.addEventListener('click', showCustomPrinterForm);
+    const customPpSaveBtn = document.getElementById('custom-pp-save-btn');
+    if (customPpSaveBtn) customPpSaveBtn.addEventListener('click', saveCustomPrinter);
+    const customPpCancelBtn = document.getElementById('custom-pp-cancel-btn');
+    if (customPpCancelBtn) customPpCancelBtn.addEventListener('click', hideCustomPrinterForm);
 
     // ── Sync user center → model page (printer, nozzle, material) ──
     // Printer sync
