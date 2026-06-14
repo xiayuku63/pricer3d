@@ -29,6 +29,7 @@ import {
     authFetch,
     getActivePrinterCompoundId,
     setDefaultSlicerPresetId,
+    getMaterialsByBrand, MATERIAL_TYPE_PRESETS, getUsedBrandOptions,
 } from './modules/state.js';
 
 import {
@@ -42,7 +43,9 @@ import {
     syncPricingFromInputs, openColorEditor, closeColorEditor,
     addColorToMaterial, removeColorFromMaterial, validateCurrentFormulas,
     saveUserSettings, setAsDefaults, changePassword,
+    restoreDefaultMaterials,
     initMobileFormOptimizations,
+    initBrandLogoUpload, updateUploadLimitHint,
 } from './modules/settings.js';
 import {
     initPresets, preloadPrinterSelectors, fetchPrinterModels, fetchSlicerPresets,
@@ -50,7 +53,7 @@ import {
     loadPresetIntoForm, saveCurrentPreset, saveAsNewPreset,
     downloadSelectedPreset, deleteSelectedPreset,
     fetchPrinterPresets, savePrinterPreset, deletePrinterPreset,
-    renderPrinterVisibilityList, restoreDefaultPrinters,
+    renderPrinterVisibilityList, restoreDefaultPrinters, addEnabledPrinterSlot,
     updatePrinterDetailPanel,
 } from './modules/presets.js';
 import {
@@ -64,6 +67,7 @@ import {
     reQuoteAllSelectedFiles, renderResultsTable, recalcSummaryFromCurrentResults,
     handleRowEditChange, refreshOptionsSummary, setOpenLoginModalRef,
     refreshBatchMaterialDropdown, refreshBatchColorDropdown, batchApplyToAll,
+    refreshBatchBrandDropdown,
     handleCardEditChange, exportCSV, exportExcel,
     initTableEnhancements,
     openMaterialCompare,
@@ -94,7 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initTheme();
     // Init i18n (language switcher)
     initI18n();
-    const MAX_FILES = 20;
+    const _getMaxFiles = () => (currentUser && currentUser.is_member) ? Infinity : 5;
     const MAX_FILE_SIZE = 100 * 1024 * 1024;
     const ALLOWED_EXTENSIONS = ['.stl', '.stp', '.step', '.obj', '.3mf', '.zip'];
 
@@ -118,6 +122,10 @@ document.addEventListener('DOMContentLoaded', () => {
         membershipMsg: $('membership-msg'), membershipRefreshBtn: $('membership-refresh-btn'),
         membershipOrdersBtn: $('membership-orders-btn'), membershipOrders: $('membership-orders'),
         membershipOrdersTbody: $('membership-orders-tbody'),
+        membershipStatusLevel: $('membership-status-level'),
+        membershipStatusExpire: $('membership-status-expire'),
+        membershipStatusBadge: $('membership-status-badge'),
+        membershipBenefitDiscount: $('membership-benefit-discount'),
 
         // Quote options
         optionsSummary: $('options-summary'), optionsModal: $('options-modal'),
@@ -212,6 +220,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initOrientationUI(dom);
     initOnboarding();
     initMobileFormOptimizations();
+    initBrandLogoUpload();
 
     // Break circular dep: quote.js needs openLoginModal from auth.js
     setOpenLoginModalRef(openLoginModal);
@@ -438,12 +447,14 @@ document.addEventListener('DOMContentLoaded', () => {
     _bind(dom.optionsBackdrop, 'click', () => dom.optionsModal.classList.add('hidden'));
 
     // Batch edit bar
+    const batchBrand = document.getElementById('batch-brand');
     const batchMaterial = document.getElementById('batch-material');
     const batchApplyBtn = document.getElementById('batch-apply-btn');
     const batchQuantity = document.getElementById('batch-quantity');
     const batchPrinterModel = document.getElementById('batch-printer-model');
     const batchSlicerPreset = document.getElementById('batch-slicer-preset');
 
+    if (batchBrand) batchBrand.addEventListener('change', refreshBatchMaterialDropdown);
     if (batchMaterial) batchMaterial.addEventListener('change', refreshBatchColorDropdown);
     if (batchApplyBtn) batchApplyBtn.addEventListener('click', batchApplyToAll);
     if (batchQuantity) {
@@ -535,6 +546,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Printer visibility
     const ppRestoreBtn = document.getElementById('printer-restore-defaults-btn');
     if (ppRestoreBtn) ppRestoreBtn.addEventListener('click', restoreDefaultPrinters);
+    const ppAddSlotBtn = document.getElementById('printer-add-slot-btn');
+    if (ppAddSlotBtn) ppAddSlotBtn.addEventListener('click', addEnabledPrinterSlot);
 
     // ── Sync user center → model page (printer, nozzle, material) ──
     // Printer sync
@@ -608,18 +621,106 @@ document.addEventListener('DOMContentLoaded', () => {
     if (dom.materialsTbody) {
         dom.materialsTbody.addEventListener('change', (e) => {
             const target = e.target;
-            if (target.tagName !== 'INPUT') return;
+            if (target.tagName !== 'INPUT' && target.tagName !== 'SELECT') return;
             const idx = target.getAttribute('data-idx');
             const field = target.getAttribute('data-field');
-            if (field === 'name') MATERIAL_OPTIONS[idx].name = target.value;
-            else if (field === 'brand') MATERIAL_OPTIONS[idx].brand = target.value;
+            if (field === 'name') {
+                MATERIAL_OPTIONS[idx].name = target.value;
+                // 材料类型变更时自动填充密度和单价
+                const preset = MATERIAL_TYPE_PRESETS[target.value];
+                if (preset) {
+                    const row = target.closest('tr');
+                    const densityInput = row.querySelector('[data-field="density"]');
+                    const priceInput = row.querySelector('[data-field="price_per_kg"]');
+                    if (densityInput) { densityInput.value = preset.density; MATERIAL_OPTIONS[idx].density = preset.density; }
+                    if (priceInput) { priceInput.value = preset.price_per_kg; MATERIAL_OPTIONS[idx].price_per_kg = preset.price_per_kg; }
+                }
+            }
+            else if (field === 'brand') {
+                MATERIAL_OPTIONS[idx].brand = target.value;
+                // 品牌变更后重建默认品牌下拉 + 刷新默认材料列表
+                const brandSel = document.getElementById('uc-default-brand');
+                const matSel = document.getElementById('uc-default-material');
+                if (brandSel) {
+                    const usedBrands = getUsedBrandOptions();
+                    const prevBrand = brandSel.value;
+                    brandSel.innerHTML = usedBrands.map(b =>
+                        '<option value="' + escapeHtml(b) + '"' + (b === prevBrand ? ' selected' : '') + '>' + escapeHtml(b) + '</option>'
+                    ).join('');
+                    if (!brandSel.value && brandSel.options.length) brandSel.value = brandSel.options[0].value;
+                    quoteOptions.brand = brandSel.value;
+                }
+                if (matSel) {
+                    const selectedBrand = brandSel ? brandSel.value : '';
+                    const prevMat = matSel.value;
+                    const materials = getMaterialsByBrand(selectedBrand);
+                    matSel.innerHTML = materials.map(m =>
+                        '<option value="' + escapeHtml(m.name) + '"' + (m.name === prevMat ? ' selected' : '') + '>' + escapeHtml(m.name) + '</option>'
+                    ).join('');
+                    if (!matSel.value && matSel.options.length) matSel.value = matSel.options[0].value;
+                    quoteOptions.material = matSel.value;
+                }
+            }
             else if (field === 'density') MATERIAL_OPTIONS[idx].density = parseFloat(target.value) || 1.0;
             else if (field === 'price_per_kg') MATERIAL_OPTIONS[idx].price_per_kg = parseFloat(target.value) || 0.0;
+        });
+        // ── Input event: real-time sync for datalist-based text inputs ──
+        dom.materialsTbody.addEventListener('input', (e) => {
+            const target = e.target;
+            if (target.tagName !== 'INPUT' || target.type === 'number') return;
+            const idx = target.getAttribute('data-idx');
+            const field = target.getAttribute('data-field');
+            if (idx == null || !field) return;
+            if (field === 'brand') {
+                MATERIAL_OPTIONS[idx].brand = target.value;
+                // Update custom badge visibility in real-time
+                const knownBrands = ['Generic','eSUN','Polymaker','Hatchbox','Prusament','Prusa','SUNLU','Creality','Overture','ColorFabb','MatterHackers','Bambu Lab','Anycubic','Elegoo','Jayo','Eryone','Voron'];
+                const cell = target.closest('td');
+                if (cell) {
+                    let badge = cell.querySelector('.custom-brand-badge');
+                    const isCustom = !knownBrands.includes(target.value.trim());
+                    if (isCustom && !badge) {
+                        badge = document.createElement('span');
+                        badge.className = 'custom-brand-badge text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded whitespace-nowrap flex-shrink-0';
+                        badge.textContent = '自定义';
+                        target.parentElement.appendChild(badge);
+                    } else if (!isCustom && badge) {
+                        badge.remove();
+                    }
+                }
+            }
+            else if (field === 'name') {
+                MATERIAL_OPTIONS[idx].name = target.value;
+                // Update custom type badge visibility in real-time
+                const presetTypes = Object.keys(MATERIAL_TYPE_PRESETS);
+                const cell = target.closest('td');
+                if (cell) {
+                    let badge = cell.querySelector('.custom-type-badge');
+                    const isCustom = !presetTypes.includes(target.value.trim());
+                    if (isCustom && !badge) {
+                        badge = document.createElement('span');
+                        badge.className = 'custom-type-badge text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded whitespace-nowrap flex-shrink-0';
+                        badge.textContent = '自定义';
+                        target.parentElement.appendChild(badge);
+                    } else if (!isCustom && badge) {
+                        badge.remove();
+                    }
+                }
+            }
         });
         dom.materialsTbody.addEventListener('click', (e) => {
             if (e.target.classList.contains('delete-material-btn')) {
                 const idx = e.target.getAttribute('data-idx');
                 MATERIAL_OPTIONS.splice(idx, 1);
+                // 删除后同步 quoteOptions
+                const remainingBrands = getUsedBrandOptions();
+                if (!remainingBrands.includes(quoteOptions.brand)) {
+                    quoteOptions.brand = remainingBrands[0] || '';
+                }
+                const remainingMaterials = getMaterialsByBrand(quoteOptions.brand);
+                if (!remainingMaterials.some(m => m.name === quoteOptions.material)) {
+                    quoteOptions.material = remainingMaterials[0]?.name || '';
+                }
                 renderUserCenterUI();
             } else if (e.target.classList.contains('edit-colors-btn')) {
                 openColorEditor(parseInt(e.target.getAttribute('data-idx')));
@@ -627,9 +728,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     if (dom.addMaterialBtn) dom.addMaterialBtn.addEventListener('click', () => {
-        MATERIAL_OPTIONS.push({ name: "NewMaterial", brand: "通用", density: 1.0, price_per_kg: 200.0, colors: [{ name: "黑色", hex: "#000000" }, { name: "白色", hex: "#ffffff" }] });
+        const defaultType = Object.keys(MATERIAL_TYPE_PRESETS)[0] || 'PLA';
+        const defaultPreset = MATERIAL_TYPE_PRESETS[defaultType] || { density: 1.24, price_per_kg: 80 };
+        MATERIAL_OPTIONS.push({ name: defaultType, brand: "Generic", density: defaultPreset.density, price_per_kg: defaultPreset.price_per_kg, colors: [{ name: "黑色", hex: "#000000" }, { name: "白色", hex: "#ffffff" }] });
         renderUserCenterUI();
     });
+    const matRestoreBtn = document.getElementById('material-restore-defaults-btn');
+    if (matRestoreBtn) matRestoreBtn.addEventListener('click', restoreDefaultMaterials);
 
     // Color editor
     const colorEditorList = document.getElementById('color-editor-list');
@@ -686,7 +791,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 renderResultsTable();
                 recalcSummaryFromCurrentResults();
                 if (selectedFilesMap.size === 0) {
-                    dom.fileNameDisplay.textContent = '未选择文件（最多20个，单文件需小于100MB）';
+                    dom.fileNameDisplay.textContent = t('quote.noFileSelected');
                     dom.fileNameDisplay.classList.remove('text-indigo-600', 'font-medium');
                 } else {
                     dom.fileNameDisplay.textContent = `当前列表共 ${selectedFilesMap.size} 个文件`;
@@ -767,7 +872,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 renderResultsTable();
                 recalcSummaryFromCurrentResults();
                 if (selectedFilesMap.size === 0) {
-                    dom.fileNameDisplay.textContent = '未选择文件（最多20个，单文件需小于100MB）';
+                    dom.fileNameDisplay.textContent = t('quote.noFileSelected');
                     dom.fileNameDisplay.classList.remove('text-indigo-600', 'font-medium');
                 } else {
                     dom.fileNameDisplay.textContent = `当前列表共 ${selectedFilesMap.size} 个文件`;
@@ -803,18 +908,89 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 导出按钮
+    // 导出按钮（登录用户可用）
     const exportCsvBtn = document.getElementById('export-csv-btn');
     const exportExcelBtn = document.getElementById('export-excel-btn');
     if (exportCsvBtn) exportCsvBtn.addEventListener('click', exportCSV);
     if (exportExcelBtn) exportExcelBtn.addEventListener('click', exportExcel);
+
+    // PDF 导出按钮
+    const exportPdfBtn = document.getElementById('export-pdf-btn');
+    if (exportPdfBtn) {
+        exportPdfBtn.addEventListener('click', handleExportPdfFromResults);
+    }
+
+    // ── PDF export from current results ──
+    async function handleExportPdfFromResults() {
+        if (!currentUser || !authToken) { openLoginModal(); return; }
+        const successItems = currentResults.filter(r => r && r.status === 'success');
+        if (successItems.length === 0) {
+            alert('没有可导出的报价结果，请先上传模型并报价');
+            return;
+        }
+        const btn = document.getElementById('export-pdf-btn');
+        const origText = btn?.textContent;
+        try {
+            if (btn) { btn.disabled = true; btn.textContent = t('common.loading') || '生成中...'; }
+            // Build items payload from current results
+            const batchNozzle = document.getElementById('batch-nozzle-diameter')?.value || '';
+            const batchLayerHeight = document.getElementById('gen-layer-height')?.value || '';
+            const batchWallCount = document.getElementById('gen-wall-count')?.value || '';
+            const batchInfill = document.getElementById('gen-infill')?.value || '';
+            const items = successItems.map(r => {
+                const rawThumb = thumbnailMap.get(r.filename) || '';
+                return {
+                filename: r.filename || '',
+                material: r.material || '',
+                color: r.color || '',
+                quantity: r.quantity || 1,
+                volume_cm3: r.volume_cm3 || 0,
+                weight_g: r.weight_g || 0,
+                estimated_time_h: r.estimated_time_h || 0,
+                cost_cny: r.cost_cny || 0,
+                printer_model: r._printer_model || quoteOptions.printer_model || '',
+                nozzle_diameter: batchNozzle,
+                layer_height: r.cost_breakdown?.gcode_summary?.core_params?.layer_height || batchLayerHeight || '',
+                wall_count: r.cost_breakdown?.gcode_summary?.core_params?.perimeters || batchWallCount || '',
+                infill_percent: r.cost_breakdown?.gcode_summary?.core_params?.fill_density || batchInfill || '',
+                brand: (MATERIAL_OPTIONS.find(m => m.name === r.material) || {}).brand || quoteOptions.brand || '',
+                created_at: new Date().toISOString(),
+                thumbnail_b64: rawThumb.includes(',') ? rawThumb.split(',')[1] : rawThumb,
+                };
+            });
+            const body = JSON.stringify({ items });
+            const resp = await authFetch('/api/quote/export-pdf-inline', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body,
+            });
+            if (resp.status === 403) {
+                alert('会员专属功能，请先升级会员');
+                return;
+            }
+            if (!resp.ok) throw new Error('导出失败');
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `quote_${new Date().toISOString().slice(0,10).replace(/-/g,'')}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            alert(e.message || '导出失败');
+        } finally {
+            if (btn) { btn.disabled = false; btn.textContent = origText; }
+        }
+    }
 
     // ── File upload (enhanced with validation, progress, preview chips) ──
     async function _handleFileSelection(newFiles) {
         if (!newFiles || newFiles.length === 0) return;
 
         // Validate files
-        const { validFiles, invalidFiles, errors } = validateFiles(newFiles, selectedFilesMap);
+        const { validFiles, invalidFiles, errors } = validateFiles(newFiles, selectedFilesMap, _getMaxFiles());
 
         // Show validation errors as toasts
         if (errors.length > 0) {
@@ -903,9 +1079,36 @@ document.addEventListener('DOMContentLoaded', () => {
                     const statusClass = ms.mode === 'all' ? 'text-green-700 bg-green-50 border-green-300'
                         : ms.mode === 'partial' ? 'text-amber-700 bg-amber-50 border-amber-300'
                         : 'text-red-700 bg-red-50 border-red-300';
-                    dom.fileNameDisplay.innerHTML = '<span class="inline-block px-2 py-0.5 rounded border text-xs ' + statusClass + '">' + escapeHtml(ms.message) + '</span>';
+                    let statusHtml = '<span class="inline-block px-2 py-0.5 rounded border text-xs ' + statusClass + '">' + escapeHtml(ms.message) + '</span>';
+                    // Distribute warnings to individual result items
+                    if (ms.warnings && ms.warnings.length > 0) {
+                        const warningsByFile = {};
+                        ms.warnings.forEach(w => {
+                            const fn = w.filename || '';
+                            if (!warningsByFile[fn]) warningsByFile[fn] = [];
+                            warningsByFile[fn].push(w);
+                        });
+                        // Attach _warnings to currentResults by matching filename stem
+                        const results = (typeof currentResults !== 'undefined') ? currentResults : (zipData.results || []);
+                        results.forEach(r => {
+                            if (!r || !r.filename) return;
+                            const stem = r.filename.replace(/\.[^.]+$/, '');
+                            if (warningsByFile[stem]) {
+                                r._warnings = warningsByFile[stem];
+                            }
+                        });
+                        // Show summary
+                        const summaryMsg = t('quote.warningsSummary', { count: ms.warnings.length });
+                        statusHtml += ' <span class="inline-block ml-1 px-2 py-0.5 rounded border text-xs text-amber-700 bg-amber-50 border-amber-300">\u26A0\uFE0F ' + escapeHtml(summaryMsg) + '</span>';
+                        showToast(summaryMsg, 'warning');
+                    }
+                    dom.fileNameDisplay.innerHTML = statusHtml;
                     dom.fileNameDisplay.classList.add('text-indigo-600', 'font-medium');
                     showToast(ms.message, ms.mode === 'all' ? 'success' : 'warning');
+                    // Re-render to show per-item warning badges
+                    if (ms.warnings && ms.warnings.length > 0) {
+                        renderResultsTable();
+                    }
                 } else {
                     dom.fileNameDisplay.textContent = 'ZIP 报价完成，共 ' + (zipData.results || []).length + ' 个文件';
                     showToast(`ZIP 处理完成，共 ${(zipData.results || []).length} 个文件`, 'success');
@@ -1015,7 +1218,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 recalcSummaryFromCurrentResults();
                 renderFilePreviewChips([]);
                 if (selectedFilesMap.size === 0) {
-                    dom.fileNameDisplay.textContent = '未选择文件（最多20个，单文件需小于100MB）';
+                    dom.fileNameDisplay.textContent = t('quote.noFileSelected');
                     dom.fileNameDisplay.classList.remove('text-indigo-600', 'font-medium');
                 } else {
                     dom.fileNameDisplay.textContent = `当前列表共 ${selectedFilesMap.size} 个文件`;

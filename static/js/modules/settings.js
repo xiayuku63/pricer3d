@@ -14,11 +14,13 @@ import {
     defaultSlicerPresetId, setDefaultSlicerPresetId,
     defaultMaterial, setDefaultMaterial,
     defaultColor, setDefaultColor,
+    defaultBrand, setDefaultBrand,
+    getBrandOptions, getMaterialsByBrand, getUsedBrandOptions, MATERIAL_TYPE_PRESETS,
 } from './state.js';
 import { t } from './i18n.js';
 import { openLoginModal } from './auth.js';
 import { renderSlicerPresetsUI, fetchSlicerPresets, fetchPrinterModels } from './presets.js';
-import { refreshOptionsSummary, normalizeResultsWithCurrentOptions, renderResultsTable, recalcSummaryFromCurrentResults, reQuoteAllSelectedFiles, refreshBatchMaterialDropdown } from './quote.js';
+import { refreshOptionsSummary, normalizeResultsWithCurrentOptions, renderResultsTable, recalcSummaryFromCurrentResults, reQuoteAllSelectedFiles, refreshBatchMaterialDropdown, refreshBatchBrandDropdown } from './quote.js';
 
 let dom = {};
 
@@ -39,12 +41,16 @@ export async function fetchUserSettings() {
             setDefaultSlicerPresetId(data.default_slicer_preset_id || null);
             setDefaultMaterial(data.default_material || null);
             setDefaultColor(data.default_color || null);
+            setDefaultBrand(data.default_brand || null);
             // Sync default preset to quote options so auto-quote uses it
             if (data.default_slicer_preset_id) {
                 quoteOptions.slicer_preset_id = data.default_slicer_preset_id;
                 saveSlicerPresetSelection();
             }
-            // Sync default material/color to quote options
+            // Sync default material/color/brand to quote options
+            if (data.default_brand) {
+                quoteOptions.brand = data.default_brand;
+            }
             if (data.default_material) {
                 quoteOptions.material = data.default_material;
             }
@@ -53,7 +59,31 @@ export async function fetchUserSettings() {
             }
         }
     } catch (e) { console.error("Failed to fetch user settings", e); }
+
+    // Fetch brand settings
+    try {
+        const brandResp = await authFetch('/api/user/brand-settings');
+        if (brandResp.ok) {
+            const brand = await brandResp.json();
+            const bn = document.getElementById('brand-name');
+            const bp = document.getElementById('brand-phone');
+            const be = document.getElementById('brand-email');
+            const ba = document.getElementById('brand-address');
+            const bnote = document.getElementById('brand-note');
+            const blp = document.getElementById('brand-logo-preview');
+            if (bn) bn.value = brand.brand_name || '';
+            if (bp) bp.value = brand.brand_phone || '';
+            if (be) be.value = brand.brand_contact_email || '';
+            if (ba) ba.value = brand.brand_address || '';
+            if (bnote) bnote.value = brand.brand_note || '';
+            if (blp && brand.brand_logo_url) {
+                blp.innerHTML = `<img src="${brand.brand_logo_url}" class="w-full h-full object-contain rounded-md" />`;
+            }
+        }
+    } catch (e) { console.error("Failed to fetch brand settings", e); }
+
     updateDropdowns();
+    updateUploadLimitHint();
 }
 
 // ── Dropdown updates ──
@@ -69,7 +99,52 @@ export function updateDropdowns() {
         quoteOptions.color = rendered.selected;
     }
     refreshOptionsSummary();
+    refreshBatchBrandDropdown();
     refreshBatchMaterialDropdown();
+    // Sync batch printer with saved default
+    const batchPrinterSel = document.getElementById('batch-printer-model');
+    if (batchPrinterSel && defaultPrinterId) {
+        const opts = Array.from(batchPrinterSel.options).map(o => o.value);
+        if (opts.includes(defaultPrinterId)) batchPrinterSel.value = defaultPrinterId;
+    }
+    // Sync batch nozzle with saved default
+    const batchNozzleSel = document.getElementById('batch-nozzle-diameter');
+    if (batchNozzleSel && defaultNozzle) {
+        const nozzleOpts = Array.from(batchNozzleSel.options).map(o => o.value);
+        if (nozzleOpts.includes(String(defaultNozzle))) batchNozzleSel.value = String(defaultNozzle);
+    }
+    // Sync batch preset with saved default
+    const batchPresetSel = document.getElementById('batch-slicer-preset');
+    if (batchPresetSel) {
+        const presetOpts = Array.from(batchPresetSel.options).map(o => o.value);
+        const presetId = String(quoteOptions.slicer_preset_id || '');
+        if (presetId && presetOpts.includes(presetId)) batchPresetSel.value = presetId;
+    }
+}
+
+// ── Restore default materials ──
+const _DEFAULT_MATERIALS = [
+    { name: "PLA", brand: "Generic", density: 1.24, price_per_kg: 80.0 },
+    { name: "PLA+", brand: "Generic", density: 1.24, price_per_kg: 90.0 },
+    { name: "PETG", brand: "Generic", density: 1.27, price_per_kg: 100.0 },
+    { name: "ABS", brand: "Generic", density: 1.04, price_per_kg: 95.0 },
+    { name: "ASA", brand: "Generic", density: 1.07, price_per_kg: 120.0 },
+    { name: "TPU", brand: "Generic", density: 1.21, price_per_kg: 160.0 },
+    { name: "PA", brand: "Generic", density: 1.14, price_per_kg: 200.0 },
+    { name: "PC", brand: "Generic", density: 1.20, price_per_kg: 180.0 },
+];
+export function restoreDefaultMaterials() {
+    if (!confirm(t('material.confirmRestore') || '确定恢复默认材料列表？自定义材料将丢失。')) return;
+    const defaultColors = [
+        { name: '白色', hex: '#ffffff' }, { name: '黑色', hex: '#000000' },
+        { name: '灰色', hex: '#808080' }, { name: '红色', hex: '#dc2626' },
+        { name: '蓝色', hex: '#2563eb' }, { name: '绿色', hex: '#16a34a' },
+        { name: '黄色', hex: '#ca8a04' }, { name: '橙色', hex: '#ea580c' },
+        { name: '紫色', hex: '#933333' }, { name: '粉色', hex: '#db2777' },
+    ];
+    setMaterialOptions(_DEFAULT_MATERIALS.map(m => ({ ...m, colors: defaultColors.map(c => ({ ...c })) })));
+    updateDropdowns();
+    renderUserCenterUI(dom);
 }
 
 export function refreshQuoteColorDropdowns() {
@@ -81,8 +156,8 @@ export function refreshQuoteColorDropdowns() {
 
 export function buildPrinterOptionsHtml(selectedId) {
     const sel = document.getElementById("cfg-printer-model-main");
-    if (!sel || sel.options.length <= 1) return '<option value="">' + t('printer.selectPrinter') + '</option>';
-    let html = '<option value="">' + t('printer.selectPrinter') + '</option>';
+    if (!sel || sel.options.length === 0) return '';
+    let html = '';
     for (const opt of sel.options) {
         if (!opt.value) continue;
         html += '<option value="' + opt.value + '"' + (opt.value === selectedId ? ' selected' : '') + '>' + opt.text + '</option>';
@@ -102,11 +177,12 @@ export function renderUserCenterUI() {
 
     if (materialsTbody) {
         const majorBrands = [
-            { value: '通用', label: t('material.genericBrand') },
-            { value: 'eSUN', label: t('material.brandESUN') },
+            { value: 'Generic', label: t('material.genericBrand') },
+            { value: 'eSUN', label: 'eSUN' },
             { value: 'Polymaker', label: 'Polymaker' },
             { value: 'Hatchbox', label: 'Hatchbox' },
             { value: 'Prusament', label: 'Prusament' },
+            { value: 'Prusa', label: 'Prusa' },
             { value: 'SUNLU', label: 'SUNLU' },
             { value: 'Creality', label: 'Creality' },
             { value: 'Overture', label: 'Overture' },
@@ -117,24 +193,52 @@ export function renderUserCenterUI() {
             { value: 'Elegoo', label: 'Elegoo' },
             { value: 'Jayo', label: 'Jayo' },
             { value: 'Eryone', label: 'Eryone' },
+            { value: 'Voron', label: 'Voron' },
             { value: 'custom', label: t('material.brandCustom') },
         ];
+
+        // Populate default brand dropdown (only brands with materials configured)
+        const defaultBrandSel = document.getElementById('uc-default-brand');
+        if (defaultBrandSel) {
+            const usedBrands = getUsedBrandOptions();
+            defaultBrandSel.innerHTML = usedBrands.map(b =>
+                `<option value="${escapeHtml(b)}" ${defaultBrand === b ? 'selected' : ''}>${escapeHtml(b)}</option>`
+            ).join('');
+            if (!defaultBrandSel.value && defaultBrandSel.options.length) defaultBrandSel.value = defaultBrandSel.options[0].value;
+        }
+
         materialsTbody.innerHTML = MATERIAL_OPTIONS.map((m, idx) => {
-            const brand = m.brand || '通用';
-            const isCustom = !majorBrands.some(b => b.value === brand);
-            const brandOptionsHtml = majorBrands.map(b => {
-                if (b.value === 'custom') return `<option value="custom" ${isCustom ? 'selected' : ''}>${b.label}</option>`;
-                return `<option value="${b.value}" ${brand === b.value ? 'selected' : ''}>${b.label}</option>`;
-            }).join('');
-            const customBrandInput = isCustom ? `<input type="text" class="w-full border-gray-400 rounded-sm text-xs px-2 py-1.5 mt-1" value="${escapeHtml(brand)}" data-idx="${idx}" data-field="brand">` : '';
+            const brand = m.brand || 'Generic';
+            const knownBrandValues = majorBrands.filter(b => b.value !== 'custom').map(b => b.value);
+            const isCustomBrand = !knownBrandValues.includes(brand);
+            
+            // 构建材料类型选项
+            const presetTypes = Object.keys(MATERIAL_TYPE_PRESETS);
+            const isInPreset = presetTypes.includes(m.name);
+            
+            const brandCustomBadge = isCustomBrand ? `<span class="custom-brand-badge text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded whitespace-nowrap flex-shrink-0" title="${t('material.brandCustom') || '自定义品牌'}">${t('material.brandCustom') || '自定义'}</span>` : '';
+            const typeCustomBadge = !isInPreset ? `<span class="custom-type-badge text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded whitespace-nowrap flex-shrink-0" title="${t('material.typeCustom') || '自定义类型'}">${t('material.typeCustom') || '自定义'}</span>` : '';
             
             return `
-            <tr>
+            <tr class="hover:bg-gray-50">
                 <td class="px-3 py-2.5">
-                    <select class="w-full border-gray-300 rounded-md text-xs px-2 py-1.5 material-brand-select min-w-[120px]" data-idx="${idx}" data-field="brand">${brandOptionsHtml}</select>
-                    <div class="custom-brand-input" data-idx="${idx}">${customBrandInput}</div>
+                    <div class="flex items-center gap-1">
+                        <input type="text" list="brand-options-${idx}" class="flex-1 w-full border-gray-300 rounded-md text-xs px-2 py-1.5 material-brand-input min-w-[100px]" value="${escapeHtml(brand)}" data-idx="${idx}" data-field="brand" placeholder="${t('material.brandPlaceholder') || '输入或选择品牌'}">
+                        ${brandCustomBadge}
+                    </div>
+                    <datalist id="brand-options-${idx}">
+                        ${majorBrands.filter(b => b.value !== 'custom').map(b => `<option value="${b.value}">${b.label}</option>`).join('')}
+                    </datalist>
                 </td>
-                <td class="px-3 py-2.5"><input type="text" class="w-full border-gray-300 rounded-md text-xs px-2 py-1.5" value="${escapeHtml(m.name)}" data-idx="${idx}" data-field="name"></td>
+                <td class="px-3 py-2.5">
+                    <div class="flex items-center gap-1">
+                        <input type="text" list="type-options-${idx}" class="flex-1 w-full border-gray-300 rounded-md text-xs px-2 py-1.5 material-type-input" value="${escapeHtml(m.name)}" data-idx="${idx}" data-field="name" placeholder="${t('material.typePlaceholder') || '输入或选择类型'}">
+                        ${typeCustomBadge}
+                    </div>
+                    <datalist id="type-options-${idx}">
+                        ${presetTypes.map(tp => `<option value="${tp}">`).join('')}
+                    </datalist>
+                </td>
                 <td class="px-3 py-2.5"><input type="number" step="0.01" class="w-full border-gray-300 rounded-md text-xs px-2 py-1.5" value="${m.density}" data-idx="${idx}" data-field="density"></td>
                 <td class="px-3 py-2.5"><input type="number" step="0.01" class="w-full border-gray-300 rounded-md text-xs px-2 py-1.5" value="${m.price_per_kg}" data-idx="${idx}" data-field="price_per_kg"></td>
                 <td class="px-3 py-2.5">
@@ -143,15 +247,96 @@ export function renderUserCenterUI() {
                         <button type="button" class="text-xs text-indigo-600 hover:text-indigo-800 edit-colors-btn ml-1" data-idx="${idx}">${t('common.edit')}</button>
                     </div>
                 </td>
-                <td class="px-3 py-2.5 text-center"><button type="button" class="text-red-500 hover:text-red-700 delete-material-btn" data-idx="${idx}">${t('common.delete')}</button></td>
+                <td class="px-3 py-2.5 text-center"><button type="button" class="text-xs text-red-500 hover:text-red-700 delete-material-btn" data-idx="${idx}">${t('common.delete')}</button></td>
             </tr>
-        `}).join('');    }
+        `}).join('');
 
-    // Populate default material dropdown
+        // ── 材料表格排序 ──
+        const thead = materialsTbody.closest('table')?.querySelector('thead');
+        if (thead) {
+            // 排序状态（模块级变量）
+            if (!renderUserCenterUI._matSort) renderUserCenterUI._matSort = { key: '', dir: 'asc' };
+            const st = renderUserCenterUI._matSort;
+            const sortArrows = thead.querySelectorAll('.sort-arrow');
+            // 更新箭头显示
+            const updateArrows = () => {
+                sortArrows.forEach(s => s.textContent = '');
+                const activeTh = thead.querySelector(`[data-sort-key="${st.key}"] .sort-arrow`);
+                if (activeTh) activeTh.textContent = st.dir === 'asc' ? ' ▲' : ' ▼';
+            };
+            updateArrows();
+            // 绑定点击
+            thead.querySelectorAll('[data-sort-key]').forEach(th => {
+                th.onclick = () => {
+                    const key = th.getAttribute('data-sort-key');
+                    if (st.key === key) { st.dir = st.dir === 'asc' ? 'desc' : 'asc'; }
+                    else { st.key = key; st.dir = 'asc'; }
+                    const getVal = (m) => {
+                        if (key === 'brand') return (m.brand || '').toLowerCase();
+                        if (key === 'name') return (m.name || '').toLowerCase();
+                        if (key === 'density') return Number(m.density) || 0;
+                        if (key === 'price') return Number(m.price_per_kg) || 0;
+                        return '';
+                    };
+                    MATERIAL_OPTIONS.sort((a, b) => {
+                        const va = getVal(a), vb = getVal(b);
+                        if (typeof va === 'number' && typeof vb === 'number') return st.dir === 'asc' ? va - vb : vb - va;
+                        return st.dir === 'asc' ? (va < vb ? -1 : va > vb ? 1 : 0) : (va > vb ? -1 : va < vb ? 1 : 0);
+                    });
+                    updateArrows();
+                    renderUserCenterUI(dom);
+                };
+            });
+        }
+    }
+
+    // Populate default brand dropdown (only brands with materials configured)
+    const defaultBrandSel = document.getElementById('uc-default-brand');
+    if (defaultBrandSel) {
+        const usedBrands = getUsedBrandOptions();
+        defaultBrandSel.innerHTML = usedBrands.map(b =>
+            `<option value="${escapeHtml(b)}" ${defaultBrand === b ? 'selected' : ''}>${escapeHtml(b)}</option>`
+        ).join('');
+        // 如果已选品牌不在列表中，重置为第一个
+        if (!defaultBrandSel.value && defaultBrandSel.options.length) {
+            defaultBrandSel.value = defaultBrandSel.options[0].value;
+        }
+        if (defaultBrandSel.value !== defaultBrand) {
+            quoteOptions.brand = defaultBrandSel.value;
+        }
+    }
+
+    // Populate default material dropdown (filtered by selected brand)
     const defaultMaterialSel = document.getElementById('uc-default-material');
-    if (defaultMaterialSel) {
-        defaultMaterialSel.innerHTML = '<option value="">' + t('settings.notSet') + '</option>' +
-            MATERIAL_OPTIONS.map(m => `<option value="${escapeHtml(m.name)}" ${defaultMaterial === m.name ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('');
+    const _refreshDefaultMaterialList = (brand) => {
+        if (!defaultMaterialSel) return;
+        const materials = getMaterialsByBrand(brand);
+        defaultMaterialSel.innerHTML = materials.map(m =>
+            `<option value="${escapeHtml(m.name)}" ${defaultMaterial === m.name ? 'selected' : ''}>${escapeHtml(m.name)}</option>`
+        ).join('');
+        // 如果已选材料不在列表中，重置为第一个
+        if (!defaultMaterialSel.value && defaultMaterialSel.options.length) {
+            defaultMaterialSel.value = defaultMaterialSel.options[0].value;
+        }
+        if (defaultMaterialSel.value !== defaultMaterial) {
+            quoteOptions.material = defaultMaterialSel.value;
+        }
+    };
+    _refreshDefaultMaterialList(defaultBrandSel ? defaultBrandSel.value : '');
+
+    // Brand → Material filtering
+    const _brandSel = document.getElementById('uc-default-brand');
+    if (_brandSel) {
+        _brandSel.addEventListener('change', () => {
+            _refreshDefaultMaterialList(_brandSel.value);
+            // Reset color dropdown
+            if (colorDropdownContainer) {
+                const matName = defaultMaterialSel.value;
+                const rendered = renderColorDropdown(matName, '');
+                colorDropdownContainer.innerHTML = rendered.html;
+                colorDropdownContainer.setAttribute('data-selected-color', rendered.selected || '');
+            }
+        });
     }
 
     // Populate default color dropdown using renderColorDropdown (色块+hex)
@@ -215,7 +400,36 @@ export function renderUserCenterUI() {
 
     loadSlicerPresetSelection();
     renderSlicerPresetsUI();
-}
+
+     // ── Brand customization: show/hide based on membership ──
+     const isMember = currentUser?.membership_level === 'member';
+     const brandForm = document.getElementById('brand-member-only');
+     const brandHint = document.getElementById('brand-upgrade-hint');
+     if (brandForm) brandForm.classList.toggle('hidden', !isMember);
+     if (brandHint) brandHint.classList.toggle('hidden', isMember);
+
+     // ── Formula read-only for free users ──
+     const formulaTextareas = document.querySelectorAll('#cfg-unit-cost-formula, #cfg-total-cost-formula');
+     formulaTextareas.forEach(ta => {
+         ta.readOnly = !isMember;
+         ta.classList.toggle('bg-gray-100', !isMember);
+         ta.classList.toggle('cursor-not-allowed', !isMember);
+     });
+     const formulaValidateBtn = document.getElementById('formula-validate-btn');
+     const formulaResetBtn = document.getElementById('formula-reset-btn');
+     if (formulaValidateBtn) formulaValidateBtn.classList.toggle('hidden', !isMember);
+     if (formulaResetBtn) formulaResetBtn.classList.toggle('hidden', !isMember);
+     let upgradeHint = document.getElementById('formula-member-hint');
+     if (!upgradeHint) {
+         upgradeHint = document.createElement('p');
+         upgradeHint.id = 'formula-member-hint';
+         upgradeHint.className = 'text-xs text-amber-600 mt-1';
+         const container = document.getElementById('formula-container');
+         if (container) container.parentNode.insertBefore(upgradeHint, container);
+     }
+     upgradeHint.textContent = isMember ? '' : (t('settings.formulaMemberOnly') || '升级会员可自定义计算公式');
+     upgradeHint.classList.toggle('hidden', isMember);
+    }
 
 // ── Sync pricing from inputs ──
 export function syncPricingFromInputs() {
@@ -369,18 +583,26 @@ export async function saveUserSettings() {
         const presetId = (genPreset && genPreset.value) ? Number(genPreset.value) : null;
         const effectivePresetId = presetId || defaultSlicerPresetId;
 
-        // Capture default material and color
+        // Capture default brand, material and color
+        const defaultBrandSel = document.getElementById("uc-default-brand");
         const defaultMaterialSel = document.getElementById("uc-default-material");
         const colorDropdownContainer = document.getElementById("uc-default-color-dropdown");
+        const newDefaultBrand = (defaultBrandSel && defaultBrandSel.value) ? defaultBrandSel.value : null;
         const newDefaultMaterial = (defaultMaterialSel && defaultMaterialSel.value) ? defaultMaterialSel.value : null;
         const newDefaultColor = colorDropdownContainer ? (colorDropdownContainer.getAttribute('data-selected-color') || null) : null;
 
+        const isMemberSave = currentUser?.membership_level === 'member';
+        const pricingToSend = isMemberSave ? PRICING_CONFIG : (() => {
+            const { unit_cost_formula, total_cost_formula, ...rest } = PRICING_CONFIG;
+            return rest;
+        })();
         const payload = {
             materials: MATERIAL_OPTIONS,
-            pricing_config: PRICING_CONFIG,
+            pricing_config: pricingToSend,
             default_printer_id: printerId || null,
             default_nozzle: nozzle || null,
             default_slicer_preset_id: effectivePresetId || null,
+            default_brand: newDefaultBrand,
             default_material: newDefaultMaterial,
             default_color: newDefaultColor,
         };
@@ -400,12 +622,39 @@ export async function saveUserSettings() {
             userCenterSaveBtn.classList.remove('bg-indigo-600');
         }
         if (userCenterMsg) { userCenterMsg.classList.remove('hidden'); }
+
+        // Save brand settings (member only)
+        if (currentUser?.membership_level === 'member') {
+            try {
+                const brandPayload = {
+                    brand_name: document.getElementById('brand-name')?.value || '',
+                    brand_phone: document.getElementById('brand-phone')?.value || '',
+                    brand_contact_email: document.getElementById('brand-email')?.value || '',
+                    brand_address: document.getElementById('brand-address')?.value || '',
+                    brand_note: document.getElementById('brand-note')?.value || '',
+                };
+                await authFetch('/api/user/brand-settings', {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(brandPayload)
+                });
+            } catch (e) { console.error("Failed to save brand settings", e); }
+        }
         // Update local defaults so subsequent page loads see them
         setDefaultPrinterId(printerId || null);
         setDefaultNozzle(nozzle || null);
         setDefaultSlicerPresetId(effectivePresetId || null);
         setDefaultMaterial(newDefaultMaterial);
         setDefaultColor(newDefaultColor);
+        setDefaultBrand(newDefaultBrand);
+        // Sync quoteOptions so batch toolbar updates immediately
+        quoteOptions.brand = newDefaultBrand || '';
+        // 确保材料在当前品牌下有效
+        const validMaterials = getMaterialsByBrand(quoteOptions.brand);
+        if (newDefaultMaterial && validMaterials.some(m => m.name === newDefaultMaterial)) {
+            quoteOptions.material = newDefaultMaterial;
+        } else if (validMaterials.length) {
+            quoteOptions.material = validMaterials[0].name;
+        }
+        quoteOptions.color = newDefaultColor || quoteOptions.color;
         // Sync batch toolbar with new defaults
         await fetchPrinterModels();
         await fetchSlicerPresets();
@@ -719,6 +968,49 @@ function initOptionsModalAnimation() {
         }
     });
     observer.observe(modal, { attributes: true });
+}
+
+// ── Logo upload handler ──
+export function initBrandLogoUpload() {
+    const uploadBtn = document.getElementById('brand-logo-upload-btn');
+    const fileInput = document.getElementById('brand-logo-input');
+    const preview = document.getElementById('brand-logo-preview');
+    if (!uploadBtn || !fileInput) return;
+    uploadBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', async () => {
+        const file = fileInput.files[0];
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024) {
+            alert(t('settings.logoTooLarge') || 'Logo 文件不能超过 2MB');
+            return;
+        }
+        const fd = new FormData();
+        fd.append('file', file);
+        try {
+            const resp = await authFetch('/api/user/brand-logo', { method: 'POST', body: fd });
+            if (resp.ok) {
+                const data = await resp.json();
+                if (preview && data.url) {
+                    preview.innerHTML = `<img src="${data.url}" class="w-full h-full object-contain rounded-md" />`;
+                }
+            }
+        } catch (e) { console.error("Logo upload failed", e); }
+        fileInput.value = '';
+    });
+}
+
+// ── Upload limit hint ──
+export function updateUploadLimitHint() {
+    const hint = document.getElementById('upload-limit-hint');
+    if (!hint) return;
+    const used = currentUser?.model_count_used;
+    const limit = currentUser?.model_count_limit;
+    if (limit != null && used != null) {
+        const remaining = Math.max(0, limit - used);
+        hint.textContent = t('quote.modelCountLimit', { used, limit, remaining }) || `免费用户：已用 ${used}/${limit} 个模型（剩余 ${remaining}）`;
+    } else {
+        hint.textContent = t('quote.memberUnlimited') || '会员：无限制';
+    }
 }
 
 
