@@ -1042,6 +1042,16 @@ document.addEventListener('DOMContentLoaded', () => {
             dom.fileNameDisplay.classList.add('text-indigo-600', 'font-medium');
             showProgress('解析 ZIP 文件...');
 
+            // ── AbortController for ZIP cancellation ──
+            let zipAbortController = new AbortController();
+            const zipCancelBtn = document.getElementById('zip-cancel-btn');
+            const zipCancelBtnText = document.getElementById('zip-cancel-btn-text');
+            if (zipCancelBtn) {
+                zipCancelBtn.classList.remove('hidden');
+                zipCancelBtnText.textContent = t('quote.cancelProcessing');
+                zipCancelBtn.onclick = () => { zipAbortController.abort(); };
+            }
+
             try {
                 const zipFormData = new FormData();
                 zipFormData.append('file', zipFiles[0]);
@@ -1059,6 +1069,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${authToken}` },
                     body: zipFormData,
+                    signal: zipAbortController.signal,
                 });
 
                 if (!resp.ok) {
@@ -1097,6 +1108,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (event.type === 'done') {
                             const { type, ...rest } = event;
                             zipData = rest;
+                        }
+                        if (event.type === 'cancelled') {
+                            // Backend confirmed cancellation — treat as user-cancelled
+                            throw new DOMException('User cancelled ZIP processing', 'AbortError');
                         }
                     }
                 }
@@ -1171,6 +1186,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 showProgressSuccess('ZIP 解析完成');
                 hideProgress();
+                if (zipCancelBtn) zipCancelBtn.classList.add('hidden');
 
                 if (modelFiles.length > 0) {
                     modelFiles.forEach(function(f) { selectedFilesMap.set(f.name, f); });
@@ -1178,10 +1194,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     await quoteSelectedFilesWithProgress(modelFiles);
                 }
             } catch (err) {
-                showProgressError(err.message || 'ZIP 解析失败');
-                hideProgress();
-                showToast(err.message || 'ZIP 解析失败', 'error');
-                dom.fileNameDisplay.textContent = 'ZIP 文件处理失败';
+                if (zipCancelBtn) zipCancelBtn.classList.add('hidden');
+                if (err.name === 'AbortError') {
+                    hideProgress();
+                    showToast(t('quote.processingCancelled'), 'warning');
+                    dom.fileNameDisplay.textContent = t('quote.processingCancelled');
+                } else {
+                    showProgressError(err.message || 'ZIP 解析失败');
+                    hideProgress();
+                    showToast(err.message || 'ZIP 解析失败', 'error');
+                    dom.fileNameDisplay.textContent = 'ZIP 文件处理失败';
+                }
             }
             return;
         }

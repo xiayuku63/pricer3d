@@ -583,6 +583,11 @@ async def zip_quote(
             results = []
 
             for _idx, (_file_type, _item) in enumerate(_files_to_process, 1):
+                # ── Cancellation detection ──
+                if await request.is_disconnected():
+                    logger.info("ZIP processing cancelled by client")
+                    yield f'data: {json.dumps({"type": "cancelled"})}\n\n'
+                    return
                 try:
                     if _file_type == "matched":
                         cl = _item["checklist"]
