@@ -158,7 +158,7 @@ def normalize_materials(raw_materials, fallback_colors: Optional[List[str]] = No
         else:
             fallback = fallback_colors or DEFAULT_COLORS
             colors = [{"name": str(f).strip(), "hex": ""} for f in fallback if str(f).strip()]
-        normalized.append({"name": name, "brand": str(m.get("brand", "通用") or "通用").strip(), "density": density, "price_per_kg": price_per_kg, "colors": colors})
+        normalized.append({"name": name, "brand": str(m.get("brand", "Generic") or "Generic").strip(), "density": density, "price_per_kg": price_per_kg, "colors": colors})
     return normalized or DEFAULT_MATERIALS
 
 

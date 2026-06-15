@@ -565,7 +565,7 @@ async def process_single_file(
         return {
             "filename": filename,
             "status": "failed",
-            "error": "文件大小必须小于 100MB"
+            "error": f"文件大小必须小于 {MAX_FILE_SIZE_BYTES // (1024*1024)}MB"
         }
 
     try:

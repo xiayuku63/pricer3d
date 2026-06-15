@@ -43,17 +43,17 @@ def _get_active_membership_plans() -> list[dict]:
             .order_by(MembershipPlan.price_cny.asc(), MembershipPlan.duration_days.asc())
             .all()
         )
-    items = []
-    for r in rows:
-        items.append(
-            {
-                "code": r.code,
-                "name": r.name,
-                "price_cny": float(r.price_cny or 0.0),
-                "currency": r.currency,
-                "duration_days": int(r.duration_days or 0),
-            }
-        )
+        items = []
+        for r in rows:
+            items.append(
+                {
+                    "code": r.code,
+                    "name": r.name,
+                    "price_cny": float(r.price_cny or 0.0),
+                    "currency": r.currency,
+                    "duration_days": int(r.duration_days or 0),
+                }
+            )
     return items
 
 
@@ -166,20 +166,20 @@ async def billing_orders(limit: int = 20, offset: int = 0, current_user=Depends(
             .limit(safe_limit)
             .all()
         )
-    items = []
-    for r in rows:
-        items.append(
-            {
-                "order_no": r.order_no,
-                "plan_code": r.plan_code,
-                "amount_cny": float(r.amount_cny or 0.0),
-                "currency": r.currency,
-                "provider": r.provider,
-                "status": r.status,
-                "created_at": r.created_at,
-                "paid_at": r.paid_at,
-            }
-        )
+        items = []
+        for r in rows:
+            items.append(
+                {
+                    "order_no": r.order_no,
+                    "plan_code": r.plan_code,
+                    "amount_cny": float(r.amount_cny or 0.0),
+                    "currency": r.currency,
+                    "provider": r.provider,
+                    "status": r.status,
+                    "created_at": r.created_at,
+                    "paid_at": r.paid_at,
+                }
+            )
     return {"items": items, "limit": safe_limit, "offset": safe_offset}
 
 

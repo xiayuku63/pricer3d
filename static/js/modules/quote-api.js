@@ -148,6 +148,7 @@ export function mergeResultsByFilename(incomingResults) {
             _slicer_preset_id: existing._slicer_preset_id !== undefined ? existing._slicer_preset_id : item._slicer_preset_id,
             _checklist_params: item._checklist_params !== undefined ? item._checklist_params : existing._checklist_params,
             _checklist_source: item._checklist_source || existing._checklist_source,
+            _warnings: item._warnings || existing._warnings,
         };
     });
 }

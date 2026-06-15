@@ -7,6 +7,7 @@
                             <h4 class="text-sm font-semibold text-gray-800" data-i18n="history.title">报价历史</h4>
                             <div class="flex items-center gap-2">
                                 <button id="history-refresh-btn" type="button" class="text-xs px-3 py-1.5 border border-gray-300 text-gray-600 rounded-md hover:bg-gray-50" data-i18n="common.refresh">刷新</button>
+                                <button id="history-clear-btn" type="button" class="text-xs px-3 py-1.5 border border-red-200 text-red-500 rounded-md hover:bg-red-50" data-i18n="history.clearAll">清理记录</button>
                                 <button id="history-close-btn" type="button" class="text-gray-500 hover:text-gray-700" data-i18n="common.close">关闭</button>
                             </div>
                         </div>
@@ -28,7 +29,7 @@
                                         </tr>
                                     </thead>
                                     <tbody id="history-tbody">
-                                        <tr><td class="px-3 py-12 text-gray-400 text-center" colspan="10">
+                                        <tr><td class="px-3 py-12 text-gray-400 text-center" colspan="11">
                                             <div class="text-6xl mb-3">📭</div>
                                             <p class="text-sm" data-i18n="history.noRecords">暂无报价历史记录</p>
                                             <p class="text-xs mt-1 text-gray-300" data-i18n="history.noRecordsSubtext">上传模型完成报价后，记录将显示在这里</p>

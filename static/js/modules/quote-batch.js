@@ -2,6 +2,7 @@
 import {
     quoteOptions, currentResults, setCurrentResults,
     MATERIAL_OPTIONS, renderColorDropdown, getActivePrinterCompoundId,
+    getBrandOptions, getMaterialsByBrand,
 } from './state.js';
 import { renderResultsTable, recalcSummaryFromCurrentResults, refreshOptionsSummary } from './quote-render.js';
 import { reQuoteAllSelectedFiles } from './quote-api.js';
@@ -10,12 +11,37 @@ import { t } from './i18n.js';
 let _dom = {};
 export function setBatchDom(d) { _dom = d; }
 
+// ── Brand dropdown ──
+export function refreshBatchBrandDropdown() {
+    const sel = document.getElementById('batch-brand');
+    if (!sel) return;
+    const brands = getBrandOptions();
+    const prev = sel.value || quoteOptions.brand || '';
+    sel.innerHTML = brands.map(b => `<option value="${b}">${b}</option>`).join('');
+    // 恢复选中：优先用上次值，其次 quoteOptions.brand
+    if (prev && brands.includes(prev)) {
+        sel.value = prev;
+    } else if (quoteOptions.brand && brands.includes(quoteOptions.brand)) {
+        sel.value = quoteOptions.brand;
+    } else if (brands.length > 0) {
+        sel.value = brands[0];
+    }
+}
+
 // ── Batch edit bar ──
 export function refreshBatchMaterialDropdown() {
+    const brandSel = document.getElementById('batch-brand');
+    const brand = brandSel ? brandSel.value : quoteOptions.brand;
     const sel = document.getElementById('batch-material');
     if (!sel) return;
-    sel.innerHTML = MATERIAL_OPTIONS.map(m => `<option value="${m.name}">${m.name}</option>`).join('');
-    sel.value = quoteOptions.material;
+    const materials = getMaterialsByBrand(brand);
+    sel.innerHTML = materials.map(m => `<option value="${m.name}">${m.name}</option>`).join('');
+    // 恢复选中的材料（如果在当前品牌下存在）
+    if (materials.find(m => m.name === quoteOptions.material)) {
+        sel.value = quoteOptions.material;
+    } else if (materials.length > 0) {
+        sel.value = materials[0].name;
+    }
     refreshBatchColorDropdown();
 }
 
@@ -35,6 +61,7 @@ export async function batchApplyToAll() {
     const materialSelect = document.getElementById('batch-material');
     const colorContainer = document.getElementById('batch-color-dropdown');
     const quantityInput = document.getElementById('batch-quantity');
+    const brandSelect = document.getElementById('batch-brand');
     const msgEl = document.getElementById('batch-msg');
     if (!materialSelect || !colorContainer || !quantityInput) return;
 
@@ -42,6 +69,7 @@ export async function batchApplyToAll() {
     const colorInput = colorContainer.querySelector('.row-color-value');
     const color = colorInput ? colorInput.value : '';
     const quantity = Number.parseInt(quantityInput.value, 10);
+    const brand = brandSelect ? brandSelect.value : '';
 
     if (!Number.isFinite(quantity) || quantity < 1) {
         if (errorMsg) { errorMsg.textContent = t('quote.countMustBePositive'); errorContainer.classList.remove('hidden'); }
@@ -65,6 +93,7 @@ export async function batchApplyToAll() {
     }));
 
     // 2) 更新报价选项
+    quoteOptions.brand = brand;
     quoteOptions.material = material;
     quoteOptions.color = color;
     quoteOptions.quantity = quantity;
@@ -78,7 +107,7 @@ export async function batchApplyToAll() {
     if (msgEl) { msgEl.textContent = '重算中...'; msgEl.classList.remove('hidden'); }
     try {
         await reQuoteAllSelectedFiles('批量设置');
-        if (msgEl) { msgEl.textContent = `已应用：${material} / ${color} / ×${quantity}`; }
+        if (msgEl) { msgEl.textContent = `已应用：${brand ? brand + ' / ' : ''}${material} / ${color} / ×${quantity}`; }
     } catch (err) {
         if (msgEl) { msgEl.textContent = '部分重算失败'; }
     }

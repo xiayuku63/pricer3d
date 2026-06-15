@@ -60,6 +60,89 @@ PRINTER_MODELS = [
         "profile": "profiles/prusa/printers/bambu_x1e.ini",
     },
 
+    # ── Bambu Lab P2S (256×256×256mm CoreXY enclosed 2nd-Gen) ──
+    {
+        "id": "bambu_p2s",
+        "name": "Bambu Lab P2S",
+        "bed_width": 256, "bed_depth": 256, "bed_height": 256,
+        "nozzle": 0.4, "nozzles": [0.2, 0.4, 0.6, 0.8],
+        "icon": "🖨️",
+        "profile": "profiles/prusa/printers/bambu_p1s.ini",
+    },
+    # ── Bambu Lab H2D (350×320×325mm CoreXY dual-nozzle enclosed) ──
+    {
+        "id": "bambu_h2d",
+        "name": "Bambu Lab H2D",
+        "bed_width": 350, "bed_depth": 320, "bed_height": 325,
+        "nozzle": 0.4, "nozzles": [0.2, 0.4, 0.6, 0.8],
+        "icon": "🖨️",
+        "profile": "profiles/prusa/printers/bambu_x1c.ini",
+    },
+    # ── Bambu Lab H2D Pro (350×320×325mm CoreXY dual-nozzle enclosed) ──
+    {
+        "id": "bambu_h2d_pro",
+        "name": "Bambu Lab H2D Pro",
+        "bed_width": 350, "bed_depth": 320, "bed_height": 325,
+        "nozzle": 0.4, "nozzles": [0.2, 0.4, 0.6, 0.8],
+        "icon": "🖨️",
+        "profile": "profiles/prusa/printers/bambu_x1c.ini",
+    },
+    # ── Bambu Lab X2D (256×256×260mm CoreXY dual-nozzle enclosed) ──
+    {
+        "id": "bambu_x2d",
+        "name": "Bambu Lab X2D",
+        "bed_width": 256, "bed_depth": 256, "bed_height": 260,
+        "nozzle": 0.4, "nozzles": [0.2, 0.4, 0.6, 0.8],
+        "icon": "🖨️",
+        "profile": "profiles/prusa/printers/bambu_x1c.ini",
+    },
+
+    # ── Creality K1 (220×220×250mm CoreXY enclosed) ──
+    {
+        "id": "creality_k1",
+        "name": "Creality K1",
+        "bed_width": 220, "bed_depth": 220, "bed_height": 250,
+        "nozzle": 0.4, "nozzles": [0.4, 0.6, 0.8],
+        "icon": "🖨️",
+        "profile": "profiles/prusa/printers/bambu_a1.ini",
+    },
+    # ── Creality K1C (220×220×250mm CoreXY enclosed, all-metal hotend) ──
+    {
+        "id": "creality_k1c",
+        "name": "Creality K1C",
+        "bed_width": 220, "bed_depth": 220, "bed_height": 250,
+        "nozzle": 0.4, "nozzles": [0.4, 0.6, 0.8],
+        "icon": "🖨️",
+        "profile": "profiles/prusa/printers/bambu_a1.ini",
+    },
+    # ── Creality K1 Max (300×300×300mm CoreXY enclosed) ──
+    {
+        "id": "creality_k1_max",
+        "name": "Creality K1 Max",
+        "bed_width": 300, "bed_depth": 300, "bed_height": 300,
+        "nozzle": 0.4, "nozzles": [0.4, 0.6, 0.8],
+        "icon": "🖨️",
+        "profile": "profiles/prusa/printers/bambu_a1.ini",
+    },
+    # ── Creality K1 SE (220×220×250mm CoreXY enclosed, budget) ──
+    {
+        "id": "creality_k1_se",
+        "name": "Creality K1 SE",
+        "bed_width": 220, "bed_depth": 220, "bed_height": 250,
+        "nozzle": 0.4, "nozzles": [0.4, 0.6, 0.8],
+        "icon": "🖨️",
+        "profile": "profiles/prusa/printers/bambu_a1.ini",
+    },
+    # ── Creality K2 Plus (350×350×350mm CoreXY enclosed, CFS multi-color) ──
+    {
+        "id": "creality_k2_plus",
+        "name": "Creality K2 Plus",
+        "bed_width": 350, "bed_depth": 350, "bed_height": 350,
+        "nozzle": 0.4, "nozzles": [0.4, 0.6, 0.8],
+        "icon": "🖨️",
+        "profile": "profiles/prusa/printers/bambu_a1.ini",
+    },
+
     # ── Voron V2 (250×250×250mm CoreXY) ──
     {
         "id": "voron_v2_250",

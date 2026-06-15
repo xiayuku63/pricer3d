@@ -43,6 +43,14 @@ class User(Base):
     default_slicer_preset_id = Column(Integer)
     default_material = Column(String)
     default_color = Column(String)
+    default_brand = Column(String)
+    # 品牌定制字段
+    brand_name = Column(String)           # 公司/品牌名称
+    brand_logo_url = Column(String)       # Logo 文件 URL
+    brand_phone = Column(String)          # 联系电话
+    brand_contact_email = Column(String)  # 报价联系邮箱（区别于账户邮箱）
+    brand_address = Column(String)        # 公司地址
+    brand_note = Column(Text)             # 默认报价备注/条款
 
 
 class PrinterPreset(Base):

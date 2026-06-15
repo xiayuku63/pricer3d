@@ -16,6 +16,7 @@ export function setCaptchaUrl(v) { currentCaptchaUrl = v; }
 
 // ── Quote options ──
 export const quoteOptions = {
+    brand: "",
     material: "PLA",
     color: "",
     quantity: 1,
@@ -30,11 +31,13 @@ export let defaultNozzle = null;       // e.g. "0.4"
 export let defaultSlicerPresetId = null;  // e.g. 3
 export let defaultMaterial = null;     // e.g. "PLA"
 export let defaultColor = null;        // e.g. "#000000"
+export let defaultBrand = null;        // e.g. "Bambu Lab"
 export function setDefaultPrinterId(v) { defaultPrinterId = v; }
 export function setDefaultNozzle(v) { defaultNozzle = v; }
 export function setDefaultSlicerPresetId(v) { defaultSlicerPresetId = v; }
 export function setDefaultMaterial(v) { defaultMaterial = v; }
 export function setDefaultColor(v) { defaultColor = v; }
+export function setDefaultBrand(v) { defaultBrand = v; }
 
 // ── Collections ──
 export const selectedFilesMap = new Map();
@@ -61,10 +64,74 @@ const DEFAULT_COLORS = [
 ];
 
 export let MATERIAL_OPTIONS = [
-    { name: "PLA", brand: "通用", density: 1.24, price_per_kg: 200.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
-    { name: "ABS", brand: "通用", density: 1.04, price_per_kg: 250.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
-    { name: "Resin", brand: "通用", density: 1.11, price_per_kg: 800.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
+    { name: "PLA", brand: "Generic", density: 1.24, price_per_kg: 80.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
+    { name: "PLA+", brand: "Generic", density: 1.24, price_per_kg: 90.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
+    { name: "PETG", brand: "Generic", density: 1.27, price_per_kg: 100.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
+    { name: "ABS", brand: "Generic", density: 1.04, price_per_kg: 95.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
+    { name: "ASA", brand: "Generic", density: 1.07, price_per_kg: 120.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
+    { name: "TPU", brand: "Generic", density: 1.21, price_per_kg: 160.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
+    { name: "PA", brand: "Generic", density: 1.14, price_per_kg: 200.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
+    { name: "PC", brand: "Generic", density: 1.20, price_per_kg: 180.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
 ];
+
+/** 材料类型预设（密度 + 参考单价） */
+export const MATERIAL_TYPE_PRESETS = {
+    'PLA':    { density: 1.24, price_per_kg: 80 },
+    'PLA+':   { density: 1.24, price_per_kg: 90 },
+    'PETG':   { density: 1.27, price_per_kg: 100 },
+    'ABS':    { density: 1.04, price_per_kg: 95 },
+    'ASA':    { density: 1.07, price_per_kg: 120 },
+    'TPU':    { density: 1.21, price_per_kg: 160 },
+    'PA':     { density: 1.14, price_per_kg: 200 },
+    'PC':     { density: 1.20, price_per_kg: 180 },
+    'PVA':    { density: 1.23, price_per_kg: 300 },
+    'PEEK':   { density: 1.31, price_per_kg: 800 },
+    'PP':     { density: 0.91, price_per_kg: 120 },
+    'PET-CF': { density: 1.30, price_per_kg: 280 },
+    'PA-CF':  { density: 1.15, price_per_kg: 350 },
+    'PLA-CF': { density: 1.30, price_per_kg: 150 },
+    'ASA-CF': { density: 1.15, price_per_kg: 260 },
+};
+
+/** 获取所有支持的品牌列表 */
+const MAJOR_BRANDS = [
+    'Generic', 'eSUN', 'Polymaker', 'Hatchbox', 'Prusament', 'Prusa',
+    'SUNLU', 'Creality', 'Overture', 'ColorFabb', 'MatterHackers',
+    'Bambu Lab', 'Anycubic', 'Elegoo', 'Jayo', 'Eryone', 'Voron',
+];
+
+/** 获取品牌列表（MATERIAL_OPTIONS 中已有的品牌 + MAJOR_BRANDS） */
+export function getBrandOptions() {
+    const seen = new Set();
+    const brands = [];
+    // 优先列出 MATERIAL_OPTIONS 中已使用的品牌
+    for (const m of MATERIAL_OPTIONS) {
+        const b = (m.brand || 'Generic').trim();
+        if (b && !seen.has(b)) { seen.add(b); brands.push(b); }
+    }
+    // 再补充 MAJOR_BRANDS 中未使用的
+    for (const b of MAJOR_BRANDS) {
+        if (!seen.has(b)) { seen.add(b); brands.push(b); }
+    }
+    return brands;
+}
+
+/** 获取默认品牌选项（仅 MATERIAL_OPTIONS 中已有的品牌） */
+export function getUsedBrandOptions() {
+    const seen = new Set();
+    const brands = [];
+    for (const m of MATERIAL_OPTIONS) {
+        const b = (m.brand || 'Generic').trim();
+        if (b && !seen.has(b)) { seen.add(b); brands.push(b); }
+    }
+    return brands;
+}
+
+/** 按品牌筛选材料；brand 为空时返回全部 */
+export function getMaterialsByBrand(brand) {
+    if (!brand) return MATERIAL_OPTIONS;
+    return MATERIAL_OPTIONS.filter(m => (m.brand || 'Generic').trim() === brand);
+}
 export let COLOR_OPTIONS = DEFAULT_COLORS.map(c => ({...c}));
 
 export let PRICING_CONFIG = {
@@ -341,12 +408,26 @@ let _cachedPrinterModels = [];
 export function setCachedPrinterModels(v) { _cachedPrinterModels = v || []; }
 export function getCachedPrinterModels() {
     if (!_cachedPrinterModels.length) return [];
-    const hidden = getHiddenPrinters();
-    if (!hidden.length) return _cachedPrinterModels;
-    return _cachedPrinterModels.filter(function(p) { return !hidden.includes(p.id); });
+    const enabled = getEnabledPrinters();
+    if (!enabled.length) return _cachedPrinterModels;
+    return _cachedPrinterModels.filter(function(p) { return enabled.includes(p.id); });
 }
 
-// ── Hidden printers (user-disabled printer models) ──
+// ── Enabled printers (user-selected printer models) ──
+export const ENABLED_PRINTERS_KEY = 'pricer3d_enabled_printers_v1';
+const DEFAULT_ENABLED_PRINTERS = ['bambu_a1', 'bambu_a1_mini', 'bambu_p1s', 'bambu_x1c'];
+export function getEnabledPrinters() {
+    try {
+        const saved = localStorage.getItem(ENABLED_PRINTERS_KEY);
+        if (saved) return JSON.parse(saved);
+        return DEFAULT_ENABLED_PRINTERS;
+    } catch (e) { return DEFAULT_ENABLED_PRINTERS; }
+}
+export function setEnabledPrinters(ids) {
+    localStorage.setItem(ENABLED_PRINTERS_KEY, JSON.stringify(ids));
+}
+
+// ── Hidden printers (legacy, kept for migration) ──
 export const HIDDEN_PRINTERS_KEY = 'pricer3d_hidden_printers_v1';
 export function getHiddenPrinters() {
     try { return JSON.parse(localStorage.getItem(HIDDEN_PRINTERS_KEY) || '[]'); }

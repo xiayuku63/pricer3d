@@ -9,6 +9,7 @@ import {
     colorToObj, isColorInAllowedColors, pickAllowedColor,
     getActivePrinterCompoundId,
     getCachedPrinterModels, slicerPresets,
+    getUsedBrandOptions as getBrandOptions, getMaterialsByBrand,
 
 } from './state.js';
 import { buildPlaceholderThumbnail, ensureThumbnailForFile, buildThumbnails } from './preview.js';
@@ -146,20 +147,6 @@ const MATERIAL_INFO = {
         uses: ['功能原型', '机械零件', '电子设备外壳', '汽车配件', '耐热零件'],
         tips: '建议层高0.15-0.25mm，填充率20-50%。热床温度100-110°C，打印仓温度50°C+。建议使用ABS胶水或Kapton胶带防止翘边。',
         warnings: ['打印时务必保持通风', '翘边严重时考虑使用Brim或Raft'],
-    },
-    'Resin': {
-        desc: '光敏树脂（Resin）通过UV光固化成型，属于SLA/DLP/LCD打印技术，精度极高。',
-        tags: [
-            { label: '高精度', color: 'indigo', icon: '🔬' },
-            { label: '光滑表面', color: 'cyan', icon: '✨' },
-            { label: '细节王', color: 'violet', icon: '🎭' },
-        ],
-        properties: { heatResist: 50, strength: 2, flexibility: 1, detail: 5, cost: 2 },
-        pros: ['精度极高（0.01-0.05mm层高)', '表面光滑，几乎无层纹', '细节还原度极高', '可选多种特殊性能树脂'],
-        cons: ['材料成本较高', '打印后需要UV后固化', '未固化树脂有毒，需手套操作', '模型较脆，不适合高应力零件'],
-        uses: ['珠宝首饰原型', '牙科模型', '手办细节件', '微型建筑模型', '精密零件'],
-        tips: '建议层高0.025-0.05mm。打印后需用酒精清洗并UV固化。建议佩戴手套操作未固化树脂。',
-        warnings: ['未固化树脂有毒，操作时务必佩戴丁腈手套', '废弃树脂不可倒入下水道，需固化后丢弃'],
     },
     'PETG': {
         desc: 'PETG（聚对苯二甲酸乙二醇酯-1,4-环己烷二甲醇酯）兼具PLA的易打印性和ABS的耐用性，是实用型零件的理想选择。',
@@ -847,12 +834,6 @@ function _buildPrintSuggestionHtml(item) {
         html += '<li>· 也可打磨后喷漆处理</li>';
         html += '<li>· ABS胶水可用于粘接零件</li>';
         html += '</ul>';
-    } else if (item.material === 'Resin') {
-        html += '<ul class="text-[10px] text-gray-600 space-y-0.5">';
-        html += '<li>· 打印后需用95%酒精清洗3-5分钟</li>';
-        html += '<li>· UV固化10-15分钟</li>';
-        html += '<li>· 可打磨后喷涂光油增加光泽</li>';
-        html += '</ul>';
     } else {
         html += '<p class="text-[10px] text-gray-600">建议根据实际需要进行打磨、喷漆等后处理。</p>';
     }
@@ -1024,6 +1005,7 @@ export function mergeResultsByFilename(incomingResults) {
             _slicer_preset_id: existing._slicer_preset_id !== undefined ? existing._slicer_preset_id : item._slicer_preset_id,
             _checklist_params: item._checklist_params !== undefined ? item._checklist_params : existing._checklist_params,
             _checklist_source: item._checklist_source || existing._checklist_source,
+            _warnings: item._warnings || existing._warnings,
         };
     });
 }
@@ -1219,24 +1201,43 @@ async function _handleCardEdit(card, filename, signal) {
 }
 
 // ── 导出功能 ──
+function _cleanPrinter(name) {
+    // Strip nozzle suffix and format: "bambu_a1_04" -> "Bambu A1"
+    return (name || '').replace(/_\d{2}$/, '')
+        .replace(/_/g, ' ')
+        .replace(/\b\w+/g, w => {
+            // Model numbers like A1, P1S, K1, X1C, MK4 -> uppercase
+            if (/^[A-Za-z]{1,2}\d+[A-Za-z]*$/.test(w)) return w.toUpperCase();
+            return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+        });
+}
+
 export function exportCSV() {
     if (!currentResults.length) return;
-    const headers = ['文件名', '打印机', '材料', '颜色', '数量', '体积(cm³)', '表面积(cm²)', '尺寸', '重量(g)', '打印时间(h)', '单价(CNY)', '总价(CNY)', '状态'];
-    const rows = currentResults.map(item => [
-        item.filename,
-        item._printer_model || '',
-        item.material || '',
-        item.color || '',
-        item.quantity || 1,
-        item.volume_cm3 || '',
-        item.surface_area_cm2 || '',
-        item.dimensions || '',
-        item.weight_g || '',
-        item.estimated_time_h || '',
-        item.unit_cost_cny || '',
-        item.cost_cny || '',
-        item.status === 'success' ? '成功' : (item.error || '失败'),
-    ]);
+    const headers = ['文件名', '材料品牌', '打印机', '材料', '颜色', '数量', '层高(mm)', '填充率(%)', '体积(cm³)', '重量(g)', '打印时间(h)', '单价(CNY)', '总价(CNY)', '状态'];
+    const rows = currentResults.map(item => {
+        const brand = (MATERIAL_OPTIONS.find(m => m.name === item.material) || {}).brand || '';
+        const printer = _cleanPrinter(item._printer_model || '');
+        const bd = item.cost_breakdown || {};
+        const gcode = bd.gcode_summary || {};
+        const cp = gcode.core_params || {};
+        return [
+            item.filename,
+            brand,
+            printer,
+            item.material || '',
+            item.color || '',
+            item.quantity || 1,
+            cp.layer_height || '',
+            cp.fill_density || '',
+            item.volume_cm3 || '',
+            item.weight_g || '',
+            item.estimated_time_h || '',
+            item.unit_cost_cny || '',
+            item.cost_cny || '',
+            item.status === 'success' ? '成功' : (item.error || '失败'),
+        ];
+    });
     const csvContent = [headers, ...rows].map(row =>
         row.map(cell => '"' + String(cell).replace(/"/g, '""') + '"').join(',')
     ).join('\n');
@@ -1253,39 +1254,83 @@ export function exportCSV() {
 
 export function exportExcel() {
     if (!currentResults.length) return;
-    const headers = ['文件名', '打印机', '材料', '颜色', '数量', '体积(cm³)', '表面积(cm²)', '尺寸', '重量(g)', '打印时间(h)', '单价(CNY)', '总价(CNY)', '状态'];
-    const rows = currentResults.map(item => [
-        item.filename,
-        item._printer_model || '',
-        item.material || '',
-        item.color || '',
-        item.quantity || 1,
-        item.volume_cm3 || '',
-        item.surface_area_cm2 || '',
-        item.dimensions || '',
-        item.weight_g || '',
-        item.estimated_time_h || '',
-        item.unit_cost_cny || '',
-        item.cost_cny || '',
-        item.status === 'success' ? '成功' : (item.error || '失败'),
-    ]);
+    const headers = ['文件名', '材料品牌', '打印机', '材料', '颜色', '数量', '层高(mm)', '填充率(%)', '体积(cm³)', '重量(g)', '打印时间(h)', '单价(CNY)', '总价(CNY)', '状态'];
+    const rows = currentResults.map(item => {
+        const brand = (MATERIAL_OPTIONS.find(m => m.name === item.material) || {}).brand || '';
+        const printer = _cleanPrinter(item._printer_model || '');
+        const bd = item.cost_breakdown || {};
+        const gcode = bd.gcode_summary || {};
+        const cp = gcode.core_params || {};
+        return [
+            item.filename,
+            brand,
+            printer,
+            item.material || '',
+            item.color || '',
+            item.quantity || 1,
+            cp.layer_height || '',
+            cp.fill_density || '',
+            item.volume_cm3 || '',
+            item.weight_g || '',
+            item.estimated_time_h || '',
+            item.unit_cost_cny || '',
+            item.cost_cny || '',
+            item.status === 'success' ? '成功' : (item.error || '失败'),
+        ];
+    });
 
-    // 构建简单的 XML Spreadsheet (Excel 2003 XML) 无需第三方库
+    // Build styles for color cells
+    const colorColIdx = 4; // 0-based index of '颜色' column
+    let styles = {};
+    let styleCounter = 0;
+    rows.forEach(row => {
+        const hex = String(row[colorColIdx] || '').trim();
+        if (hex && /^#?[0-9a-fA-F]{6}$/.test(hex)) {
+            const clean = hex.startsWith('#') ? hex : '#' + hex;
+            if (!styles[clean]) {
+                const sid = 'color' + (++styleCounter);
+                styles[clean] = sid;
+            }
+        }
+    });
+
+    // 构建 XML Spreadsheet (Excel 2003 XML)
     let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
     xml += '<?mso-application progid="Excel.Sheet"?>\n';
     xml += '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"\n';
     xml += ' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">\n';
+
+    // Styles section
+    xml += '<Styles>\n';
+    xml += '<Style ss:ID="header"><Font ss:Bold="1" ss:Size="11" ss:Color="#ffffff"/><Interior ss:Color="#1e293b" ss:Pattern="Solid"/></Style>\n';
+    Object.entries(styles).forEach(([hex, sid]) => {
+        const c = hex.replace('#', '').toUpperCase();
+        xml += `<Style ss:ID="${sid}"><Interior ss:Color="#${c}" ss:Pattern="Solid"/><Font ss:Size="9"/></Style>\n`;
+    });
+    xml += '</Styles>\n';
+
     xml += '<Worksheet ss:Name="报价结果"><Table>\n';
     // Header row
     xml += '<Row>';
-    headers.forEach(h => { xml += `<Cell><Data ss:Type="String">${h}</Data></Cell>`; });
+    headers.forEach(h => { xml += `<Cell ss:StyleID="header"><Data ss:Type="String">${h}</Data></Cell>`; });
     xml += '</Row>\n';
     // Data rows
     rows.forEach(row => {
         xml += '<Row>';
-        row.forEach(cell => {
+        row.forEach((cell, ci) => {
             const type = (typeof cell === 'number' || (typeof cell === 'string' && /^[\d.]+$/.test(cell) && cell !== '')) ? 'Number' : 'String';
-            xml += `<Cell><Data ss:Type="${type}">${escapeHtml(String(cell))}</Data></Cell>`;
+            if (ci === colorColIdx) {
+                const hex = String(cell || '').trim();
+                const clean = hex.startsWith('#') ? hex : (hex ? '#' + hex : '');
+                const sid = styles[clean];
+                if (sid) {
+                    xml += `<Cell ss:StyleID="${sid}"><Data ss:Type="String">${escapeHtml(String(cell))}</Data></Cell>`;
+                } else {
+                    xml += `<Cell><Data ss:Type="${type}">${escapeHtml(String(cell))}</Data></Cell>`;
+                }
+            } else {
+                xml += `<Cell><Data ss:Type="${type}">${escapeHtml(String(cell))}</Data></Cell>`;
+            }
         });
         xml += '</Row>\n';
     });
@@ -1302,11 +1347,33 @@ export function exportExcel() {
 
 // ── G-code 详情构建 ──
 // ── Batch edit bar ──
+export function refreshBatchBrandDropdown() {
+    const sel = document.getElementById('batch-brand');
+    if (!sel) return;
+    const brands = getBrandOptions();
+    const prev = sel.value || quoteOptions.brand || '';
+    sel.innerHTML = brands.map(b => `<option value="${b}">${b}</option>`).join('');
+    if (prev && brands.includes(prev)) {
+        sel.value = prev;
+    } else if (quoteOptions.brand && brands.includes(quoteOptions.brand)) {
+        sel.value = quoteOptions.brand;
+    } else if (brands.length > 0) {
+        sel.value = brands[0];
+    }
+}
+
 export function refreshBatchMaterialDropdown() {
+    const brandSel = document.getElementById('batch-brand');
+    const brand = brandSel ? brandSel.value : quoteOptions.brand;
     const sel = document.getElementById('batch-material');
     if (!sel) return;
-    sel.innerHTML = MATERIAL_OPTIONS.map(m => `<option value="${m.name}">${m.name}</option>`).join('');
-    sel.value = quoteOptions.material;
+    const materials = getMaterialsByBrand(brand);
+    sel.innerHTML = materials.map(m => `<option value="${m.name}">${m.name}</option>`).join('');
+    if (materials.find(m => m.name === quoteOptions.material)) {
+        sel.value = quoteOptions.material;
+    } else if (materials.length > 0) {
+        sel.value = materials[0].name;
+    }
     refreshBatchColorDropdown();
 }
 
@@ -1326,6 +1393,7 @@ export async function batchApplyToAll() {
     const materialSelect = document.getElementById('batch-material');
     const colorContainer = document.getElementById('batch-color-dropdown');
     const quantityInput = document.getElementById('batch-quantity');
+    const brandSelect = document.getElementById('batch-brand');
     const msgEl = document.getElementById('batch-msg');
     if (!materialSelect || !colorContainer || !quantityInput) return;
 
@@ -1333,6 +1401,7 @@ export async function batchApplyToAll() {
     const colorInput = colorContainer.querySelector('.row-color-value');
     const color = colorInput ? colorInput.value : '';
     const quantity = Number.parseInt(quantityInput.value, 10);
+    const brand = brandSelect ? brandSelect.value : '';
 
     if (!Number.isFinite(quantity) || quantity < 1) {
         if (errorMsg) { errorMsg.textContent = t('quote.countMustBePositive'); errorContainer.classList.remove('hidden'); }
@@ -1356,6 +1425,7 @@ export async function batchApplyToAll() {
     }));
 
     // 2) 更新报价选项
+    quoteOptions.brand = brand;
     quoteOptions.material = material;
     quoteOptions.color = color;
     quoteOptions.quantity = quantity;
@@ -1408,6 +1478,33 @@ async function _handleRowEdit(event, signal) {
     const filename = row.getAttribute('data-row-file');
     const file = selectedFilesMap.get(filename);
     if (!file) return;
+
+    // ── Brand → Material 联动 ──
+    const brandSelect = row.querySelector('[data-field="_brand"]');
+    if (target === brandSelect && brandSelect) {
+        const brand = brandSelect.value;
+        const materials = getMaterialsByBrand(brand);
+        const materialSelect = row.querySelector('[data-field="material"]');
+        if (materialSelect) {
+            const prevMaterial = materialSelect.value;
+            materialSelect.innerHTML = materials.map(m => `<option value="${m.name}">${m.name}</option>`).join('');
+            if (materials.find(m => m.name === prevMaterial)) {
+                materialSelect.value = prevMaterial;
+            } else if (materials.length > 0) {
+                materialSelect.value = materials[0].name;
+            }
+            // Update color dropdown for new material
+            const colorCell = row.querySelector('[data-field="color"]');
+            const newMaterial = materialSelect.value;
+            const currentColorInput = colorCell ? colorCell.querySelector('.row-color-value') : null;
+            const currentColor = currentColorInput ? currentColorInput.value : '';
+            const rendered = renderColorDropdown(newMaterial, currentColor, true);
+            if (colorCell) colorCell.innerHTML = rendered.html;
+        }
+        // If only brand changed (not material), still need to re-quote
+        if (!materialSelect || !materialSelect.classList.contains('row-edit')) return;
+    }
+
     const materialSelect = row.querySelector('[data-field="material"]');
     const colorCell = row.querySelector('[data-field="color"]');
     const colorValueInput = colorCell ? colorCell.querySelector('.row-color-value') : null;

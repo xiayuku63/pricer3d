@@ -60,6 +60,7 @@ def init_db() -> None:
         _safe_add_column(conn, "users", "default_slicer_preset_id", "INTEGER")
         _safe_add_column(conn, "users", "default_material", "TEXT")
         _safe_add_column(conn, "users", "default_color", "TEXT")
+        _safe_add_column(conn, "users", "default_brand", "TEXT")
         conn.commit()
 
     # Step 3: Seed membership plans if empty

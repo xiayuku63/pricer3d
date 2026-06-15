@@ -57,6 +57,7 @@ import {
     updatePrinterDetailPanel,
     showCustomPrinterForm, hideCustomPrinterForm, saveCustomPrinter,
     updateLayerHeightRangeHint,
+    updateLayerHeightDropdown,
 } from './modules/presets.js';
 import {
     initMembership, openMembershipModal, closeMembershipModal,
@@ -1054,9 +1055,53 @@ document.addEventListener('DOMContentLoaded', () => {
                 const zipPresetId = (zipPresetEl && zipPresetEl.value) ? Number(zipPresetEl.value) : null;
                 if (zipPresetId) zipFormData.append('slicer_preset_id', String(zipPresetId));
 
-                const zipResult = await uploadWithProgress('/api/quote/zip', zipFormData, authToken);
-                if (!zipResult.ok) throw new Error(zipResult.error || 'ZIP 上传失败');
-                const zipData = zipResult.data;
+                const resp = await fetch('/api/quote/zip', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${authToken}` },
+                    body: zipFormData,
+                });
+
+                if (!resp.ok) {
+                    let errMsg = 'ZIP 上传失败';
+                    try {
+                        const errData = await resp.json();
+                        errMsg = errData.detail || errMsg;
+                    } catch (_) {}
+                    throw new Error(errMsg);
+                }
+
+                // Stream SSE events for real-time progress
+                const reader = resp.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let zipData = null;
+
+                while (true) {
+                    const {value, done} = await reader.read();
+                    if (done) break;
+                    buffer += decoder.decode(value, {stream: true});
+                    while (buffer.includes('\n\n')) {
+                        const idx = buffer.indexOf('\n\n');
+                        const line = buffer.substring(0, idx).replace('data: ', '');
+                        buffer = buffer.substring(idx + 2);
+                        let event;
+                        try { event = JSON.parse(line); } catch (_) { continue; }
+                        if (event.type === 'progress') {
+                            const pct = Math.round((event.current / event.total) * 100);
+                            updateProgress(pct, event.filename || '');
+                            const labelEl = document.getElementById('upload-progress-label');
+                            if (labelEl) labelEl.textContent = t('quote.zipProgress', { current: event.current, total: event.total });
+                            const detailEl = document.getElementById('upload-progress-detail');
+                            if (detailEl) detailEl.textContent = event.filename || '';
+                        }
+                        if (event.type === 'done') {
+                            const { type, ...rest } = event;
+                            zipData = rest;
+                        }
+                    }
+                }
+
+                if (!zipData) throw new Error('ZIP 处理失败：未收到完成事件');
 
                 mergeResultsByFilename(zipData.results || []);
                 renderResultsTable();

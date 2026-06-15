@@ -31,6 +31,7 @@ from .config import (
     DEFAULT_MATERIALS,
     DEFAULT_COLORS,
     DEFAULT_PRICING_CONFIG,
+    FREE_TOTAL_MODEL_LIMIT,
 )
 from .models import RegisterRequest, LoginRequest, VerifySendRequest, VerifyConfirmRequest, RegisterCheckRequest
 from pydantic import BaseModel, Field
@@ -404,6 +405,19 @@ async def auth_me(current_user=Depends(get_current_user)):
     logger = logging.getLogger(__name__)
     try:
         level, expires_ts = get_membership_effective(current_user)
+        # 免费用户：查询已用模型数
+        model_count_used = None
+        model_count_limit = None
+        if level != "member":
+            from .db import get_db_session
+            from .models_orm import QuoteHistory
+            from sqlalchemy import func as sqlfunc
+            with get_db_session() as db:
+                model_count_used = db.query(sqlfunc.count(QuoteHistory.id)).filter(
+                    QuoteHistory.user_id == current_user["id"],
+                    QuoteHistory.status == "success",
+                ).scalar() or 0
+            model_count_limit = FREE_TOTAL_MODEL_LIMIT
         return {
             "id": current_user["id"],
             "username": current_user["username"],
@@ -416,6 +430,8 @@ async def auth_me(current_user=Depends(get_current_user)):
             "membership_level": level,
             "membership_expires_at": expires_ts,
             "is_member": level == "member",
+            "model_count_used": model_count_used,
+            "model_count_limit": model_count_limit,
         }
     except Exception as e:
         logger.error(f"获取用户信息失败: {str(e)}", exc_info=True)

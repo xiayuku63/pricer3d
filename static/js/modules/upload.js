@@ -8,8 +8,8 @@ import { t } from './i18n.js';
 
 // ── Constants ──
 const ALLOWED_EXTENSIONS = ['.stl', '.stp', '.step', '.obj', '.3mf', '.zip'];
-const MAX_FILES = 20;
-const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+const MAX_ZIP_SIZE = 1024 * 1024 * 1024; // 1GB
 const EXT_ICONS = {
     stl: '🧊', stp: '📐', step: '📐', obj: '📦', '3mf': '🖨️', zip: '📁',
 };
@@ -102,16 +102,16 @@ export function hideProgress() {
 // ═══════════════════════════════════════════════
 //  File Validation
 // ═══════════════════════════════════════════════
-export function validateFiles(files, existingMap) {
+export function validateFiles(files, existingMap, maxFiles) {
     const errors = [];
     const combined = new Map(existingMap || selectedFilesMap);
     const newFiles = Array.from(files);
 
     // Check file count
-    if (combined.size + newFiles.length > MAX_FILES) {
+    if (maxFiles !== Infinity && combined.size + newFiles.length > maxFiles) {
         errors.push({
             type: 'count',
-            message: `文件数量超限：当前已有 ${combined.size} 个文件，新增 ${newFiles.length} 个，最多支持 ${MAX_FILES} 个`,
+            message: `文件数量超限：当前已有 ${combined.size} 个文件，新增 ${newFiles.length} 个，最多支持 ${maxFiles} 个`,
         });
     }
 
@@ -124,8 +124,10 @@ export function validateFiles(files, existingMap) {
             invalidFiles.push({ file, reason: `不支持的格式 "${ext}"，仅支持 ${ALLOWED_EXTENSIONS.join(', ')}` });
             continue;
         }
-        if (file.size >= MAX_FILE_SIZE) {
-            invalidFiles.push({ file, reason: `文件过大（${formatFileSize(file.size)}），单文件需小于 ${formatFileSize(MAX_FILE_SIZE)}` });
+        const isZip = ext === '.zip';
+        const sizeLimit = isZip ? MAX_ZIP_SIZE : MAX_FILE_SIZE;
+        if (file.size >= sizeLimit) {
+            invalidFiles.push({ file, reason: `文件过大（${formatFileSize(file.size)}），${isZip ? 'ZIP 文件' : '单文件'}需小于 ${formatFileSize(sizeLimit)}` });
             continue;
         }
         if (file.size === 0) {
@@ -154,7 +156,8 @@ export function validateFiles(files, existingMap) {
 export function formatFileSize(bytes) {
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
 }
 
 // ═══════════════════════════════════════════════
@@ -258,7 +261,7 @@ export function setupEnhancedDragDrop(fileInput, onFilesDropped) {
 
     // Also allow clicking the drop zone to open file picker
     _dropZone.addEventListener('click', (e) => {
-        if (e.target.closest('label') || e.target.closest('input')) return;
+        if (e.target.closest('label') || e.target.closest('input') || e.target.closest('a')) return;
         fileInput.click();
     });
 }

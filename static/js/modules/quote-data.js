@@ -28,20 +28,6 @@ export const MATERIAL_INFO = {
         tips: '建议层高0.15-0.25mm，填充率20-50%。热床温度100-110°C，打印仓温度50°C+。建议使用ABS胶水或Kapton胶带防止翘边。',
         warnings: ['打印时务必保持通风', '翘边严重时考虑使用Brim或Raft'],
     },
-    'Resin': {
-        desc: '光敏树脂（Resin）通过UV光固化成型，属于SLA/DLP/LCD打印技术，精度极高。',
-        tags: [
-            { label: '高精度', color: 'indigo', icon: '🔬' },
-            { label: '光滑表面', color: 'cyan', icon: '✨' },
-            { label: '细节王', color: 'violet', icon: '🎭' },
-        ],
-        properties: { heatResist: 50, strength: 2, flexibility: 1, detail: 5, cost: 2 },
-        pros: ['精度极高（0.01-0.05mm层高)', '表面光滑，几乎无层纹', '细节还原度极高', '可选多种特殊性能树脂'],
-        cons: ['材料成本较高', '打印后需要UV后固化', '未固化树脂有毒，需手套操作', '模型较脆，不适合高应力零件'],
-        uses: ['珠宝首饰原型', '牙科模型', '手办细节件', '微型建筑模型', '精密零件'],
-        tips: '建议层高0.025-0.05mm。打印后需用酒精清洗并UV固化。建议佩戴手套操作未固化树脂。',
-        warnings: ['未固化树脂有毒，操作时务必佩戴丁腈手套', '废弃树脂不可倒入下水道，需固化后丢弃'],
-    },
     'PETG': {
         desc: 'PETG（聚对苯二甲酸乙二醇酯-1,4-环己烷二甲醇酯）兼具PLA的易打印性和ABS的耐用性，是实用型零件的理想选择。',
         tags: [

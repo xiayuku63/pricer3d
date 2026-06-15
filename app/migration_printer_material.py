@@ -93,7 +93,7 @@ def migrate(db_path: str = "data/app.db"):
         ("Polymaker", "https://polymaker.com", 3),
         ("Sunlu", "https://www.sunlu.com", 4),
         ("Creality", "https://www.creality.com", 5),
-        ("通用", None, 99),
+        ("Generic", None, 99),
     ]
     for name, website, order in brands:
         cursor.execute(

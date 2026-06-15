@@ -1,9 +1,9 @@
 """
 ZIP upload quote route — parse Excel checklist + STL models from .zip archive.
 
-Excel checklist columns (header row, case-insensitive):
-    filename | 材料品牌 | 打印机 | 喷嘴直径 | 层高 | 墙层数 | 填充密度
-    filename | material_brand | printer | nozzle | layer_height | wall_count | infill
+Excel checklist columns (header row, fuzzy-matched, case-insensitive):
+    filename | material_brand | material_type | color | quantity | printer | nozzle | layer_height | wall_count | infill
+    文件名   | 材料品牌       | 材料          | 颜色  | 数量     | 打印机  | 喷嘴直径 | 层高         | 墙层数     | 填充密度
 
 Matching: compare checklist filename stem with STL filename stem (case-insensitive,
 ignoring extension). Reports full / partial / none match status.
@@ -36,26 +36,67 @@ from .audit import write_audit_event
 
 logger = logging.getLogger(__name__)
 
-# Excel column name mapping (CN → EN canonical key)
-_EXCEL_KEY_MAP = {
-    "filename": "filename",
-    "文件名": "filename",
-    "材料品牌": "material_brand",
-    "material_brand": "material_brand",
-    "material brand": "material_brand",
-    "打印机": "printer_model",
-    "printer": "printer_model",
-    "喷嘴直径": "nozzle",
-    "nozzle": "nozzle",
-    "层高": "layer_height",
-    "layer_height": "layer_height",
-    "墙层数": "wall_count",
-    "perimeters": "wall_count",
-    "wall_count": "wall_count",
-    "填充密度": "infill",
-    "infill": "infill",
-    "infill_density": "infill",
+# Fuzzy header patterns: canonical_key → list of matching patterns
+HEADER_PATTERNS = {
+    'filename': ['filename', '文件名', '文件', '名称', '模型名', 'model', 'name', 'stl'],
+    'printer_model': ['printer', '打印机', '机型', '打印机型号', 'printer_model'],
+    'nozzle': ['nozzle', '喷嘴', '喷嘴直径', '口径'],
+    'layer_height': ['layer_height', '层高', 'layer height', '层厚', '层高mm'],
+    'wall_count': ['wall_count', 'wall', '墙层数', '壁数', '外墙', 'perimeters', 'perimeter', '墙数'],
+    'infill': ['infill', 'infill_density', '填充', '填充率', '填充密度', 'density', 'infill%'],
+    'material_brand': ['material_brand', '材料品牌', '品牌', 'brand', '材料牌号'],
+    'material_type': ['material', '材料', 'material_type', '材料类型', '材质'],
+    'color': ['color', '颜色', 'colour', '色彩'],
+    'quantity': ['quantity', 'qty', '数量', '数目', '件数', 'count', '个数'],
 }
+
+
+def _match_headers(headers: list) -> dict:
+    """Fuzzy-match header strings to canonical keys.
+
+    Returns {canonical_key: col_index} for matched columns.
+    Matching priority: exact > contains-pattern > pattern-contains-header.
+    """
+    result = {}
+    used_keys = set()
+
+    for idx, raw in enumerate(headers):
+        h = str(raw).strip().lower()
+        if not h:
+            continue
+
+        # Pass 1: exact match
+        matched_key = None
+        for key, patterns in HEADER_PATTERNS.items():
+            if key in used_keys:
+                continue
+            if h in patterns:
+                matched_key = key
+                break
+
+        # Pass 2: pattern contained in header text
+        if not matched_key:
+            for key, patterns in HEADER_PATTERNS.items():
+                if key in used_keys:
+                    continue
+                if any(p in h for p in patterns):
+                    matched_key = key
+                    break
+
+        # Pass 3: header text contained in any pattern
+        if not matched_key:
+            for key, patterns in HEADER_PATTERNS.items():
+                if key in used_keys:
+                    continue
+                if any(h in p for p in patterns):
+                    matched_key = key
+                    break
+
+        if matched_key:
+            result[matched_key] = idx
+            used_keys.add(matched_key)
+
+    return result
 
 # Valid ranges for checklist parameters
 VALID_RANGES = {
@@ -72,10 +113,13 @@ _DEFAULT_VALUES = {
     "infill": 20,
 }
 
-# Layer height limits
-LAYER_HEIGHT_MIN = 0.04
-LAYER_HEIGHT_NOZZLE_RATIO_MAX = 0.8   # max layer_height = nozzle * 0.8
-LAYER_HEIGHT_NOZZLE_RATIO_DEFAULT = 0.4  # fallback = nozzle * 0.4
+# Layer height valid values per nozzle diameter
+LAYER_HEIGHT_BY_NOZZLE = {
+    '0.2': {'min': 0.06, 'max': 0.14, 'valid': [0.06, 0.08, 0.10, 0.12, 0.14], 'default': 0.10},
+    '0.4': {'min': 0.08, 'max': 0.28, 'valid': [0.08, 0.12, 0.16, 0.20, 0.24, 0.28], 'default': 0.20},
+    '0.6': {'min': 0.18, 'max': 0.42, 'valid': [0.18, 0.24, 0.30, 0.36, 0.42], 'default': 0.30},
+    '0.8': {'min': 0.24, 'max': 0.56, 'valid': [0.24, 0.32, 0.40, 0.48, 0.56], 'default': 0.40},
+}
 
 # Max ZIP file size (1GB)
 MAX_ZIP_SIZE_BYTES = 1024 * 1024 * 1024
@@ -88,12 +132,10 @@ def _validate_checklist_item(item: dict, filename_stem: str) -> List[dict]:
 
     # Resolve effective nozzle for this item (checklist value or default)
     nozzle_raw = str(item.get("nozzle", "")).strip()
-    try:
-        effective_nozzle = float(nozzle_raw) if nozzle_raw else float(_DEFAULT_VALUES["nozzle"])
-    except (ValueError, TypeError):
-        effective_nozzle = float(_DEFAULT_VALUES["nozzle"])
+    nozzle_key = nozzle_raw if nozzle_raw in LAYER_HEIGHT_BY_NOZZLE else _DEFAULT_VALUES["nozzle"]
+    nozzle_settings = LAYER_HEIGHT_BY_NOZZLE.get(nozzle_key, LAYER_HEIGHT_BY_NOZZLE[_DEFAULT_VALUES["nozzle"]])
 
-    # Validate layer_height dynamically based on nozzle diameter
+    # Validate layer_height against per-nozzle valid values
     lh_parsed_key = "layer_height_parsed"
     lh_raw = item.get("layer_height", "")
     lh_val = item.get(lh_parsed_key, None)
@@ -103,27 +145,18 @@ def _validate_checklist_item(item: dict, filename_stem: str) -> List[dict]:
         except (ValueError, TypeError):
             lh_val = None
     if lh_raw and lh_val is not None:
-        lh_max = round(effective_nozzle * LAYER_HEIGHT_NOZZLE_RATIO_MAX, 2)
-        if lh_val > lh_max:
-            # Too thick — use nozzle * 0.4 as default
-            fallback = round(effective_nozzle * LAYER_HEIGHT_NOZZLE_RATIO_DEFAULT, 2)
+        valid_heights = nozzle_settings["valid"]
+        if lh_val not in valid_heights:
+            # Find closest valid value
+            closest = min(valid_heights, key=lambda v: abs(v - lh_val))
             warnings.append({
                 "filename": filename_stem,
                 "param": "layer_height",
                 "value": str(lh_val),
-                "default_used": str(fallback),
-                "reason": f"层高不能超过喷嘴直径的80% (喷嘴{effective_nozzle}mm, 最大{lh_max}mm)",
+                "default_used": str(closest),
+                "reason": f"层高{lh_val}mm不是喷嘴{nozzle_key}mm的有效值，已调整为最近的{closest}mm",
             })
-            item[lh_parsed_key] = fallback
-        elif lh_val < LAYER_HEIGHT_MIN:
-            warnings.append({
-                "filename": filename_stem,
-                "param": "layer_height",
-                "value": str(lh_val),
-                "default_used": str(LAYER_HEIGHT_MIN),
-                "reason": f"层高不能小于{LAYER_HEIGHT_MIN}mm",
-            })
-            item[lh_parsed_key] = LAYER_HEIGHT_MIN
+            item[lh_parsed_key] = closest
 
     # Validate numeric/string params in VALID_RANGES
     for param, valid_values in VALID_RANGES.items():
@@ -207,7 +240,7 @@ def _collect_all_warnings(checklist: Optional[List[dict]]) -> List[dict]:
 
 
 def _parse_excel_checklist(file_bytes: bytes) -> Optional[List[dict]]:
-    """Parse Excel checklist. Returns list of {filename, material_brand, printer_model, nozzle, layer_height, wall_count, infill}
+    """Parse Excel checklist. Returns list of {filename, material_brand, material_type, printer_model, nozzle, layer_height, wall_count, infill}
     or None if no checklist found / parse error."""
     try:
         wb = load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
@@ -223,23 +256,26 @@ def _parse_excel_checklist(file_bytes: bytes) -> Optional[List[dict]]:
     if len(rows) < 2:
         return None
 
-    # Parse header
-    header = [str(c).strip().lower() if c else "" for c in rows[0]]
+    # Find the header row — scan rows until we find one with a 'filename'-mapped column
+    header_row_idx = None
     col_map = {}
-    for idx, h in enumerate(header):
-        canonical = _EXCEL_KEY_MAP.get(h)
-        if canonical:
-            col_map[idx] = canonical
+    for row_idx, row in enumerate(rows):
+        header = [str(c).strip().lower() if c else "" for c in row]
+        test_map = _match_headers(header)
+        if "filename" in test_map:
+            header_row_idx = row_idx
+            col_map = test_map
+            break
 
-    if "filename" not in col_map.values():
+    if header_row_idx is None:
         logger.warning("Excel has no 'filename' column — not a valid checklist")
         return None
 
     items = []
     all_warnings = []
-    for row in rows[1:]:
+    for row in rows[header_row_idx + 1:]:
         item = {}
-        for col_idx, key in col_map.items():
+        for key, col_idx in col_map.items():
             val = row[col_idx] if col_idx < len(row) else None
             if val is not None:
                 item[key] = str(val).strip()
@@ -250,8 +286,10 @@ def _parse_excel_checklist(file_bytes: bytes) -> Optional[List[dict]]:
         if not item.get("filename"):
             continue
 
-        # Normalize filename — strip extension if present
+        # Normalize filename — strip extension and any subfolder path
         fn = item["filename"]
+        # Strip subfolder path (e.g. "DB4打印件/model.stl" → "model.stl")
+        fn = os.path.basename(fn)
         dot_pos = fn.rfind(".")
         if dot_pos > 0:
             fn = fn[:dot_pos]
@@ -269,6 +307,16 @@ def _parse_excel_checklist(file_bytes: bytes) -> Optional[List[dict]]:
                     item[num_key + "_parsed"] = int(float(val))
                 else:
                     item[num_key + "_parsed"] = int(float(val.replace("%", "")))
+            except (ValueError, TypeError):
+                pass
+
+        # Parse quantity (positive integer)
+        qty_raw = item.get("quantity", "")
+        if qty_raw:
+            try:
+                qty_val = int(float(qty_raw))
+                if qty_val > 0:
+                    item["quantity_parsed"] = qty_val
             except (ValueError, TypeError):
                 pass
 
@@ -417,6 +465,7 @@ async def zip_quote(
 
         # 免费用户累计模型总数限制
         from .deps import is_member_user
+        from .db import get_db_session
         from sqlalchemy import func as sqlfunc
         from .models_orm import QuoteHistory
         from .config import FREE_TOTAL_MODEL_LIMIT
@@ -431,6 +480,18 @@ async def zip_quote(
 
         # Parse Excel checklist
         checklist = _parse_excel_checklist(excel_bytes) if excel_bytes else None
+
+        # Pre-save all model files to disk so thumbnails work even if slicing fails
+        from app.utils import _user_base_dir
+        _user_folder = f"user_{current_user['id']}_{current_user['username']}"
+        _zip_job_id = uuid.uuid4().hex[:8]
+        _zip_uploads_dir = os.path.join(_user_base_dir(), _user_folder, "uploads", _zip_job_id)
+        os.makedirs(_zip_uploads_dir, exist_ok=True)
+        for _sf in stl_files:
+            _saved = os.path.join(_zip_uploads_dir, _sf["filename"])
+            with open(_saved, "wb") as _f:
+                _f.write(_sf["file_bytes"])
+            _sf["_pre_saved_path"] = _saved
 
         # Match checklist to models
         if checklist:
@@ -448,11 +509,11 @@ async def zip_quote(
         from .models_orm import User as UserORM
         with get_db_session() as db:
             u = db.query(UserORM).filter(UserORM.id == current_user["id"]).first()
-        user_materials = json.loads(u.materials) if u and u.materials else DEFAULT_MATERIALS
-        pricing_config = json.loads(u.pricing_config) if u and u.pricing_config else DEFAULT_PRICING_CONFIG
-        default_printer_id = u.default_printer_id if u else None
-        default_nozzle = u.default_nozzle if u else None
-        default_slicer_preset_id = u.default_slicer_preset_id if u else None
+            user_materials = json.loads(u.materials) if u and u.materials else DEFAULT_MATERIALS
+            pricing_config = json.loads(u.pricing_config) if u and u.pricing_config else DEFAULT_PRICING_CONFIG
+            default_printer_id = u.default_printer_id if u else None
+            default_nozzle = u.default_nozzle if u else None
+            default_slicer_preset_id = u.default_slicer_preset_id if u else None
 
         # Build match status message
         total_stl = len(stl_files)
@@ -466,11 +527,7 @@ async def zip_quote(
             else:
                 match_msg = "ℹ️ 未包含 Excel 清单，使用默认参数"
 
-        # Now process matched + stl_only files via slicing
-        # For matched files: use checklist parameters
-        # For stl_only files: use default parameters
-        results = []
-
+        # Now process matched + stl_only files via SSE streaming
         from calculator.cost import process_single_file
         from .slicer_presets import get_slicer_preset_by_id
 
@@ -496,88 +553,7 @@ async def zip_quote(
                     return pid
             return None
 
-        # Process matched files with checklist params
-        for m in match_result["matched"]:
-            cl = m["checklist"]
-            stl = m["stl"]
-
-            # Build per-file options from checklist
-            lh = cl.get("layer_height_parsed", 0.2)
-            if isinstance(lh, str):
-                try:
-                    lh = float(lh)
-                except (ValueError, TypeError):
-                    lh = 0.2
-            wc = cl.get("wall_count_parsed", 3)
-            if isinstance(wc, str):
-                try:
-                    wc = int(float(wc))
-                except (ValueError, TypeError):
-                    wc = 3
-            inf = cl.get("infill_parsed", 20)
-            if isinstance(inf, str):
-                try:
-                    inf = int(float(inf))
-                except (ValueError, TypeError):
-                    inf = 20
-
-            # Resolve per-file printer from checklist
-            cl_printer = str(cl.get("printer_model", "")).strip()
-            cl_nozzle = str(cl.get("nozzle", "")).strip()
-            compound_id = _lookup_printer(cl_printer, cl_nozzle)
-
-            # Build per-file pricing_config with resolved printer
-            file_pricing = dict(pricing_config)
-            if compound_id:
-                file_pricing["printer_model"] = compound_id
-
-            # Create a fake UploadFile for process_single_file
-            fake_file = UploadFile(
-                filename=stl["filename"],
-                file=io.BytesIO(stl["file_bytes"]),
-            )
-
-            try:
-                result = await process_single_file(
-                    fake_file,
-                    material=material,
-                    layer_height=lh,
-                    infill=inf,
-                    quantity=quantity,
-                    color=color,
-                    user_materials=user_materials,
-                    pricing_config=file_pricing,
-                    slicer_preset=None,
-                    perimeters=wc,
-                    current_user=current_user,
-                    auto_orient=False,
-                )
-                # Mark as checklist-driven
-                result["_checklist_params"] = True
-                result["_checklist_source"] = {
-                    "layer_height": lh,
-                    "wall_count": wc,
-                    "infill": inf,
-                    "printer_model": compound_id or cl_printer or "",
-                    "nozzle": cl_nozzle or "",
-                }
-                # Copy to non-underscore key for JSON serialization
-                if result.get("_saved_path"):
-                    result["checklist_file_path"] = result["_saved_path"]
-            except Exception as e:
-                result = {
-                    "filename": stl["filename"],
-                    "status": "failed",
-                    "error": str(e),
-                    "cost_cny": 0,
-                    "weight_g": 0,
-                    "estimated_time_h": 0,
-                }
-
-            results.append(result)
-
-        # Process stl_only with user defaults
-        # Resolve printer: request param > DB default
+        # Resolve printer for stl_only files: request param > DB default
         _default_compound_id = None
         _default_preset = None
         if printer_model:
@@ -590,94 +566,203 @@ async def zip_quote(
             resolved = resolve_printer(default_printer_id, nz)
             if resolved:
                 _default_compound_id = resolved.get("_compound_id") or default_printer_id
-        # Resolve preset: request param > DB default
         _effective_preset_id = slicer_preset_id if slicer_preset_id is not None else default_slicer_preset_id
         if _effective_preset_id:
             _default_preset = get_slicer_preset_by_id(int(current_user["id"]), _effective_preset_id)
 
+        # Build flat list of files to process
+        _files_to_process = []
+        for m in match_result["matched"]:
+            _files_to_process.append(("matched", m))
         for stl in match_result["stl_only"]:
-            fake_file = UploadFile(
-                filename=stl["filename"],
-                file=io.BytesIO(stl["file_bytes"]),
+            _files_to_process.append(("stl_only", stl))
+        _total_files = len(_files_to_process)
+
+        async def _generate():
+            """Generator that processes each file and yields SSE progress events."""
+            results = []
+
+            for _idx, (_file_type, _item) in enumerate(_files_to_process, 1):
+                try:
+                    if _file_type == "matched":
+                        cl = _item["checklist"]
+                        stl = _item["stl"]
+
+                        # Build per-file options from checklist
+                        lh = cl.get("layer_height_parsed", 0.2)
+                        if isinstance(lh, str):
+                            try:
+                                lh = float(lh)
+                            except (ValueError, TypeError):
+                                lh = 0.2
+                        wc = cl.get("wall_count_parsed", 3)
+                        if isinstance(wc, str):
+                            try:
+                                wc = int(float(wc))
+                            except (ValueError, TypeError):
+                                wc = 3
+                        inf = cl.get("infill_parsed", 20)
+                        if isinstance(inf, str):
+                            try:
+                                inf = int(float(inf))
+                            except (ValueError, TypeError):
+                                inf = 20
+
+                        # Use checklist quantity/color if present, else form defaults
+                        cl_qty = cl.get("quantity_parsed", quantity)
+                        cl_color = cl.get("color", "").strip() or color
+                        cl_printer = str(cl.get("printer_model", "")).strip()
+                        cl_nozzle = str(cl.get("nozzle", "")).strip()
+                        compound_id = _lookup_printer(cl_printer, cl_nozzle)
+
+                        file_pricing = dict(pricing_config)
+                        if compound_id:
+                            file_pricing["printer_model"] = compound_id
+
+                        fake_file = UploadFile(
+                            filename=stl["filename"],
+                            file=io.BytesIO(stl["file_bytes"]),
+                        )
+
+                        result = await process_single_file(
+                            fake_file,
+                            material=material,
+                            layer_height=lh,
+                            infill=inf,
+                            quantity=cl_qty,
+                            color=cl_color,
+                            user_materials=user_materials,
+                            pricing_config=file_pricing,
+                            slicer_preset=None,
+                            perimeters=wc,
+                            current_user=current_user,
+                            auto_orient=False,
+                        )
+                        result["_checklist_params"] = True
+                        result["_checklist_source"] = {
+                            "layer_height": lh,
+                            "wall_count": wc,
+                            "infill": inf,
+                            "printer_model": compound_id or cl_printer or "",
+                            "nozzle": cl_nozzle or "",
+                            "material_type": cl.get("material_type", ""),
+                            "material_brand": cl.get("material_brand", ""),
+                            "color": cl_color,
+                            "quantity": cl_qty,
+                        }
+                        if result.get("_saved_path"):
+                            result["checklist_file_path"] = result["_saved_path"]
+
+                        filename = stl["filename"]
+                        pre_saved = stl.get("_pre_saved_path")
+
+                    else:  # stl_only
+                        stl = _item
+                        fake_file = UploadFile(
+                            filename=stl["filename"],
+                            file=io.BytesIO(stl["file_bytes"]),
+                        )
+                        file_pricing = dict(pricing_config)
+                        if _default_compound_id:
+                            file_pricing["printer_model"] = _default_compound_id
+
+                        result = await process_single_file(
+                            fake_file,
+                            material=material,
+                            layer_height=0.2,
+                            infill=20,
+                            quantity=quantity,
+                            color=color,
+                            user_materials=user_materials,
+                            pricing_config=file_pricing,
+                            slicer_preset=_default_preset,
+                            perimeters=3,
+                            current_user=current_user,
+                            auto_orient=False,
+                        )
+                        result["_checklist_params"] = False
+                        if result.get("_saved_path"):
+                            result["checklist_file_path"] = result["_saved_path"]
+
+                        filename = stl["filename"]
+                        pre_saved = stl.get("_pre_saved_path")
+
+                    # Always include file path for thumbnail generation
+                    if not result.get("checklist_file_path") and pre_saved:
+                        result["checklist_file_path"] = pre_saved
+
+                    results.append(result)
+
+                    status = "success" if result.get("status") == "success" else "failed"
+                    yield f'data: {json.dumps({"type": "progress", "current": _idx, "total": _total_files, "filename": filename, "status": status})}\n\n'
+
+                except Exception as e:
+                    filename = "unknown"
+                    pre_saved = None
+                    if isinstance(_item, dict):
+                        if _file_type == "matched":
+                            filename = _item.get("stl", {}).get("filename", "unknown")
+                            pre_saved = _item.get("stl", {}).get("_pre_saved_path")
+                        else:
+                            filename = _item.get("filename", "unknown")
+                            pre_saved = _item.get("_pre_saved_path")
+                    result = {
+                        "filename": filename,
+                        "status": "failed",
+                        "error": str(e),
+                        "cost_cny": 0,
+                        "weight_g": 0,
+                        "estimated_time_h": 0,
+                    }
+                    if pre_saved:
+                        result["checklist_file_path"] = pre_saved
+                    results.append(result)
+                    yield f'data: {json.dumps({"type": "progress", "current": _idx, "total": _total_files, "filename": filename, "status": "failed"})}\n\n'
+
+            # Build final payload
+            success_items = [r for r in results if r.get("status") == "success"]
+            failed_items = [r for r in results if r.get("status") == "failed"]
+
+            payload = {
+                "total_files": len(results),
+                "success_count": len(success_items),
+                "failed_count": len(failed_items),
+                "summary_total_cost_cny": round(sum(r.get("cost_cny", 0) for r in success_items), 2),
+                "summary_total_weight_g": round(sum(r.get("weight_g", 0) for r in success_items), 2),
+                "summary_total_time_h": round(sum(r.get("estimated_time_h", 0) for r in success_items), 2),
+                "results": results,
+                "match_status": {
+                    "mode": match_result["match_mode"],
+                    "message": match_msg,
+                    "matched_count": len(match_result["matched"]),
+                    "checklist_only_count": len(match_result["checklist_only"]),
+                    "stl_only_count": len(match_result["stl_only"]),
+                    "checklist_only_files": [c.get("filename", c.get("filename_stem", "")) for c in match_result["checklist_only"]],
+                    "warnings": _collect_all_warnings(checklist),
+                },
+            }
+
+            # Save quote history
+            from .routes_quote import _save_quote_history
+            _save_quote_history(int(current_user["id"]), results)
+
+            write_audit_event(
+                action="quote.zip_upload",
+                request=request,
+                user=current_user,
+                detail={
+                    "files": len(results),
+                    "success": len(success_items),
+                    "failed": len(failed_items),
+                    "match_mode": match_result["match_mode"],
+                    "material": material,
+                    "quantity": quantity,
+                },
             )
-            # Build per-file pricing_config with user's default printer
-            file_pricing = dict(pricing_config)
-            if _default_compound_id:
-                file_pricing["printer_model"] = _default_compound_id
-            try:
-                result = await process_single_file(
-                    fake_file,
-                    material=material,
-                    layer_height=0.2,
-                    infill=20,
-                    quantity=quantity,
-                    color=color,
-                    user_materials=user_materials,
-                    pricing_config=file_pricing,
-                    slicer_preset=_default_preset,
-                    perimeters=3,
-                    current_user=current_user,
-                    auto_orient=False,
-                )
-                result["_checklist_params"] = False
-                if result.get("_saved_path"):
-                    result["checklist_file_path"] = result["_saved_path"]
-            except Exception as e:
-                result = {
-                    "filename": stl["filename"],
-                    "status": "failed",
-                    "error": str(e),
-                    "cost_cny": 0,
-                    "weight_g": 0,
-                    "estimated_time_h": 0,
-                }
 
-            results.append(result)
+            yield f'data: {json.dumps({"type": "done", **payload})}\n\n'
 
-        # Build response
-        _has_saved = any(r.get("_saved_path") for r in results)
-        logger.info(f"ZIP results has _saved_path: {_has_saved}")
-        success_items = [r for r in results if r.get("status") == "success"]
-        failed_items = [r for r in results if r.get("status") == "failed"]
-
-        payload = {
-            "total_files": len(results),
-            "success_count": len(success_items),
-            "failed_count": len(failed_items),
-            "summary_total_cost_cny": round(sum(r.get("cost_cny", 0) for r in success_items), 2),
-            "summary_total_weight_g": round(sum(r.get("weight_g", 0) for r in success_items), 2),
-            "summary_total_time_h": round(sum(r.get("estimated_time_h", 0) for r in success_items), 2),
-            "results": results,
-            "match_status": {
-                "mode": match_result["match_mode"],
-                "message": match_msg,
-                "matched_count": len(match_result["matched"]),
-                "checklist_only_count": len(match_result["checklist_only"]),
-                "stl_only_count": len(match_result["stl_only"]),
-                "checklist_only_files": [c.get("filename", c.get("filename_stem", "")) for c in match_result["checklist_only"]],
-                "warnings": _collect_all_warnings(checklist),
-            },
-        }
-
-        # Save quote history
-        from .routes_quote import _save_quote_history
-        _save_quote_history(int(current_user["id"]), results)
-
-        write_audit_event(
-            action="quote.zip_upload",
-            request=request,
-            user=current_user,
-            detail={
-                "files": len(results),
-                "success": len(success_items),
-                "failed": len(failed_items),
-                "match_mode": match_result["match_mode"],
-                "material": material,
-                "quantity": quantity,
-            },
-        )
-
-        return payload
+        return StreamingResponse(_generate(), media_type="text/event-stream")
 
     except HTTPException:
         raise
@@ -713,7 +798,43 @@ async def download_zip_model(
 
 
 async def download_zip_template(request: Request):
-    """Generate and return an xlsx template for ZIP import checklist."""
+    """Generate and return an xlsx template for ZIP import checklist.
+
+    If user is authenticated, uses their configured material brands in the template.
+    Otherwise uses hardcoded defaults.
+    """
+
+    # ── Resolve user brands (optional auth) ──
+    user_brands = None
+    authorization = request.headers.get("authorization")
+    if authorization:
+        try:
+            from jose import jwt as jose_jwt
+            from .config import JWT_SECRET_KEY, JWT_ALGORITHM
+            from .db import get_db_session
+            from .models_orm import User as _UserORM
+
+            token = authorization.replace("Bearer ", "")
+            payload = jose_jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+            user_id = int(payload.get("sub", "0"))
+            if user_id > 0:
+                with get_db_session() as db:
+                    u = db.query(_UserORM.materials).filter(_UserORM.id == user_id).first()
+                if u and u.materials:
+                    materials = json.loads(u.materials)
+                    brands = sorted({
+                        m.get("brand", "Generic")
+                        for m in materials
+                        if isinstance(m, dict) and m.get("brand")
+                    })
+                    if brands:
+                        user_brands = brands
+        except Exception:
+            pass  # fall back to defaults
+
+    # Default brands if not authenticated or no user materials
+    if not user_brands:
+        user_brands = ["eSUN", "Generic", "Hatchbox", "Polymaker", "Sunlu"]
 
     # ── Styles ──
     thin_border = Border(
@@ -741,7 +862,7 @@ async def download_zip_template(request: Request):
     ws1.title = "导入模板"
 
     # Row 1: English headers
-    headers_en = ["filename", "material_brand", "printer", "nozzle", "layer_height", "wall_count", "infill"]
+    headers_en = ["filename", "material_brand", "material_type", "color", "quantity", "printer", "nozzle", "layer_height", "wall_count", "infill"]
     for col, val in enumerate(headers_en, 1):
         cell = ws1.cell(row=1, column=col, value=val)
         cell.font = header_font
@@ -750,7 +871,7 @@ async def download_zip_template(request: Request):
         cell.border = thin_border
 
     # Row 2: Chinese sub-headers
-    headers_cn = ["文件名", "材料品牌", "打印机", "喷嘴直径", "层高(mm)", "墙层数", "填充密度(%)"]
+    headers_cn = ["文件名", "材料品牌", "材料", "颜色", "数量", "打印机", "喷嘴直径", "层高(mm)", "墙层数", "填充密度(%)"]
     for col, val in enumerate(headers_cn, 1):
         cell = ws1.cell(row=2, column=col, value=val)
         cell.font = sub_header_font
@@ -758,11 +879,17 @@ async def download_zip_template(request: Request):
         cell.alignment = center_align
         cell.border = thin_border
 
+    # Build brand display strings from user's brands
+    brand_examples = user_brands[:3] if len(user_brands) >= 3 else user_brands
+    # Pad to at least 3 for the example rows
+    while len(brand_examples) < 3:
+        brand_examples.append("Generic")
+
     # Row 3-5: Example data
     examples = [
-        ["model1.stl", "eSUN", "Bambu Lab A1", 0.4, 0.2, 3, 20],
-        ["model2.stl", "", "", "", 0.16, 4, 15],
-        ["model3.stl", "Generic", "Creality K1 Max", 0.6, 0.28, 2, 10],
+        ["model1.stl", brand_examples[0], "PLA", "白色", 1, "Bambu Lab A1", 0.4, 0.2, 3, 20],
+        ["model2.stl", "", "", "", "", "", 0.16, 4, 15],
+        ["model3.stl", brand_examples[2] if len(brand_examples) > 2 else "Generic", "PETG", "黑色", 2, "Creality K1 Max", 0.6, 0.28, 2, 10],
     ]
     for r, row_data in enumerate(examples, 3):
         for col, val in enumerate(row_data, 1):
@@ -774,16 +901,16 @@ async def download_zip_template(request: Request):
     # Note row explaining empty = default
     note_row = 6
     note_text = "💡 提示：空白单元格 = 使用系统默认值，填写 = 覆盖默认值。第一行（英文列名）必须保留。"
-    ws1.merge_cells(start_row=note_row, start_column=1, end_row=note_row, end_column=7)
+    ws1.merge_cells(start_row=note_row, start_column=1, end_row=note_row, end_column=10)
     note_cell = ws1.cell(row=note_row, column=1, value=note_text)
     note_cell.font = note_font
     note_cell.fill = note_fill
     note_cell.alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
-    for c in range(1, 8):
+    for c in range(1, 11):
         ws1.cell(row=note_row, column=c).border = thin_border
 
     # Auto-width for sheet 1
-    col_widths_s1 = [16, 14, 20, 14, 16, 12, 16]
+    col_widths_s1 = [16, 14, 12, 10, 10, 20, 14, 16, 12, 16]
     for i, w in enumerate(col_widths_s1, 1):
         ws1.column_dimensions[get_column_letter(i)].width = w
 
@@ -801,10 +928,16 @@ async def download_zip_template(request: Request):
         cell.alignment = center_align
         cell.border = thin_border
 
+    # Build brand list string for parameter description
+    brands_display = ", ".join(user_brands)
+
     # Parameter rows
     params = [
         ["文件名", "filename", "必填，与压缩包内模型文件名（不含扩展名）匹配", "—", "—"],
-        ["材料品牌", "material_brand", "可选，耗材品牌名称", "Generic", "eSUN, Hatchbox, Polymaker, Prusament, Sunlu 等"],
+        ["材料品牌", "material_brand", "可选，耗材品牌名称", "Generic", brands_display],
+        ["材料", "material_type", "可选，材料类型（如 PETG, PLA, ABS）", "—", "PETG, PLA, PLA+, ABS, ASA, TPU, PA, PC"],
+        ["颜色", "color", "可选，模型颜色", "使用表单默认", "白色, 黑色, 红色, 蓝色, 绿色 等"],
+        ["数量", "quantity", "可选，正整数", "使用表单默认", "1, 2, 3, ..."],
         ["打印机", "printer", "可选，打印机型号", "使用系统默认", "Bambu Lab A1, Creality K1, Prusa MK4 等"],
         ["喷嘴直径", "nozzle", "可选，单位 mm", "0.4", "0.2, 0.4, 0.6, 0.8"],
         ["层高", "layer_height", "可选，单位 mm", "0.2", "0.08, 0.10, 0.12, 0.16, 0.20, 0.28, 0.32"],

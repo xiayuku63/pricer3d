@@ -4,13 +4,14 @@ import asyncio
 import concurrent.futures
 import json
 import logging
+from datetime import datetime
 from typing import List, Optional
 
 from fastapi import Depends, FastAPI, UploadFile, File, Form, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from .config import DEFAULT_MATERIALS, DEFAULT_PRICING_CONFIG, MAX_FILES_PER_REQUEST, QUOTE_CONCURRENCY
+from .config import DEFAULT_MATERIALS, DEFAULT_PRICING_CONFIG, MAX_FILES_PER_REQUEST, QUOTE_CONCURRENCY, FREE_TOTAL_MODEL_LIMIT
 from .db import get_db_session
 from .models_orm import User, QuoteHistory
 from .deps import get_current_user, get_membership_effective
@@ -60,6 +61,17 @@ async def get_quote(
             raise HTTPException(status_code=400, detail="请至少上传一个模型文件")
         if len(files) > MAX_FILES_PER_REQUEST:
             raise HTTPException(status_code=400, detail=f"单次上传文件数量不能超过 {MAX_FILES_PER_REQUEST} 个")
+        # 免费用户累计模型总数限制（不限制单次数量）
+        from .deps import is_member_user
+        from sqlalchemy import func as sqlfunc
+        if not is_member_user(current_user):
+            with get_db_session() as db:
+                existing_count = db.query(sqlfunc.count(QuoteHistory.id)).filter(
+                    QuoteHistory.user_id == current_user["id"],
+                    QuoteHistory.status == "success",
+                ).scalar() or 0
+            if existing_count >= FREE_TOTAL_MODEL_LIMIT:
+                raise HTTPException(status_code=400, detail=f"免费用户最多累计 {FREE_TOTAL_MODEL_LIMIT} 个模型，升级会员无限制")
 
         with get_db_session() as db:
             row = db.query(User.materials, User.pricing_config).filter(User.id == current_user["id"]).first()
@@ -285,10 +297,32 @@ async def delete_quote_history(id: int, request: Request, current_user=Depends(g
         raise HTTPException(status_code=500, detail=f"删除失败: {str(e)}")
 
 
+async def clear_quote_history(request: Request, current_user=Depends(get_current_user)):
+    """Delete all quote history records for the current user."""
+    uid = int(current_user["id"])
+    try:
+        with get_db_session() as db:
+            count = db.query(QuoteHistory).filter(QuoteHistory.user_id == uid).delete()
+        logger.info(f"用户 {uid} 清理全部报价记录，共删除 {count} 条")
+        write_audit_event(
+            action="quote.history.clear",
+            request=request,
+            user=current_user,
+            detail={"deleted_count": count},
+        )
+        return {"status": "ok", "deleted": count}
+    except Exception as e:
+        logger.error(f"清理报价记录失败: user_id={uid} error={str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"清理失败: {str(e)}")
+
+
 async def quote_history(limit: int = 20, offset: int = 0, current_user=Depends(get_current_user)):
     """Get quote history for current user."""
     safe_limit = max(1, min(int(limit), 100))
     safe_offset = max(0, int(offset))
+    from .deps import is_member_user
+    if not is_member_user(current_user):
+        safe_limit = min(safe_limit, 10)
     uid = int(current_user["id"])
     with get_db_session() as db:
         total = db.query(QuoteHistory).filter(QuoteHistory.user_id == uid).count()
@@ -300,23 +334,23 @@ async def quote_history(limit: int = 20, offset: int = 0, current_user=Depends(g
             .limit(safe_limit)
             .all()
         )
-    items = []
-    for r in rows:
-        items.append({
-            "id": r.id,
-            "filename": r.filename,
-            "material": r.material,
-            "color": r.color,
-            "quantity": r.quantity,
-            "volume_cm3": round(float(r.volume_cm3 or 0), 2),
-            "weight_g": round(float(r.weight_g or 0), 2),
-            "estimated_time_h": round(float(r.estimated_time_h or 0), 2),
-            "cost_cny": round(float(r.cost_cny or 0), 2),
-            "dimensions": r.dimensions,
-            "status": r.status,
-            "error_msg": r.error_msg,
-            "created_at": r.created_at,
-        })
+        items = []
+        for r in rows:
+            items.append({
+                "id": r.id,
+                "filename": r.filename,
+                "material": r.material,
+                "color": r.color,
+                "quantity": r.quantity,
+                "volume_cm3": round(float(r.volume_cm3 or 0), 2),
+                "weight_g": round(float(r.weight_g or 0), 2),
+                "estimated_time_h": round(float(r.estimated_time_h or 0), 2),
+                "cost_cny": round(float(r.cost_cny or 0), 2),
+                "dimensions": r.dimensions,
+                "status": r.status,
+                "error_msg": r.error_msg,
+                "created_at": r.created_at,
+            })
     return {"items": items, "total": total, "limit": safe_limit, "offset": safe_offset}
 
 
@@ -378,6 +412,9 @@ async def export_quote_history(
     import io
     from datetime import datetime
     from fastapi.responses import StreamingResponse
+    from .deps import is_member_user
+    if not is_member_user(current_user):
+        raise HTTPException(status_code=403, detail="导出功能仅限会员使用")
 
     fmt = (format or "csv").strip().lower()
     if fmt not in ("csv", "xlsx"):
@@ -471,3 +508,214 @@ async def export_quote_history(
     except Exception as e:
         logger.error(f"导出报价历史失败: user_id={uid} error={str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"导出失败: {str(e)}")
+
+
+# ── PDF Quote Export ──
+
+
+async def export_quote_pdf(
+    request: Request,
+    ids: str = "",
+    current_user=Depends(get_current_user),
+):
+    """Export selected quote history items as a branded PDF quote.
+
+    GET /api/quote/export-pdf?ids=1,2,3
+    - Requires auth and active membership
+    - Accepts comma-separated quote history IDs
+    - Validates all IDs belong to current user
+    - Generates PDF with brand settings
+    """
+    from fastapi.responses import Response
+    from .deps import is_member_user
+    from .pdf_quote import generate_pdf_quote
+    from .config import MEMBER_DISCOUNT_PERCENT
+
+    if not is_member_user(current_user):
+        raise HTTPException(status_code=403, detail="PDF报价单导出功能仅限会员使用")
+
+    uid = int(current_user["id"])
+
+    # Parse IDs
+    if not ids or not ids.strip():
+        raise HTTPException(status_code=400, detail="请提供报价记录ID (ids参数)")
+
+    try:
+        id_list = [int(x.strip()) for x in ids.split(",") if x.strip()]
+    except ValueError:
+        raise HTTPException(status_code=400, detail="ids参数格式不正确，应为逗号分隔的数字")
+
+    if not id_list:
+        raise HTTPException(status_code=400, detail="请至少提供一个报价记录ID")
+
+    if len(id_list) > 100:
+        raise HTTPException(status_code=400, detail="单次最多导出100条记录")
+
+    try:
+        with get_db_session() as db:
+            # Fetch brand settings
+            user_row = db.query(User).filter(User.id == uid).first()
+            brand_name = user_row.brand_name if user_row else ""
+            brand_logo_url = user_row.brand_logo_url if user_row else ""
+            brand_phone = user_row.brand_phone if user_row else ""
+            brand_contact_email = user_row.brand_contact_email if user_row else ""
+            brand_address = user_row.brand_address if user_row else ""
+            brand_note = user_row.brand_note if user_row else ""
+
+            # Fetch quote history items
+            rows = (
+                db.query(QuoteHistory)
+                .filter(
+                    QuoteHistory.id.in_(id_list),
+                    QuoteHistory.user_id == uid,
+                )
+                .order_by(QuoteHistory.id.asc())
+                .all()
+            )
+
+        if not rows:
+            raise HTTPException(status_code=404, detail="未找到指定的报价记录")
+
+        # Build items list
+        items = []
+        for r in rows:
+            items.append({
+                "filename": r.filename or "",
+                "material": r.material or "",
+                "color": r.color or "",
+                "quantity": int(r.quantity or 1),
+                "volume_cm3": round(float(r.volume_cm3 or 0), 2),
+                "weight_g": round(float(r.weight_g or 0), 2),
+                "estimated_time_h": round(float(r.estimated_time_h or 0), 2),
+                "cost_cny": round(float(r.cost_cny or 0), 2),
+            })
+
+        # Determine member discount
+        membership_level, _ = get_membership_effective(current_user)
+        discount_pct = 0.0
+        if membership_level == "member":
+            discount_pct = float(MEMBER_DISCOUNT_PERCENT or 0.0)
+            discount_pct = max(0.0, min(90.0, discount_pct))
+
+        # Generate PDF
+        pdf_bytes = generate_pdf_quote(
+            items=items,
+            brand_name=brand_name or "",
+            brand_logo_url=brand_logo_url or "",
+            brand_phone=brand_phone or "",
+            brand_contact_email=brand_contact_email or "",
+            brand_address=brand_address or "",
+            brand_note=brand_note or "",
+            member_discount_percent=discount_pct,
+        )
+
+        # Build filename
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        filename = f"quote_{timestamp}.pdf"
+
+        logger.info(f"用户 {uid} 导出PDF报价单，包含 {len(items)} 个项目")
+
+        write_audit_event(
+            action="quote.export_pdf",
+            request=request,
+            user=current_user,
+            detail={"ids": id_list, "count": len(items)},
+        )
+
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Length": str(len(pdf_bytes)),
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"导出PDF报价单失败: user_id={uid} error={str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"PDF导出失败: {str(e)}")
+
+
+class PdfInlineItem(BaseModel):
+    filename: str = ""
+    material: str = ""
+    color: str = ""
+    quantity: int = 1
+    volume_cm3: float = 0
+    weight_g: float = 0
+    estimated_time_h: float = 0
+    cost_cny: float = 0
+    created_at: str = ""
+    status: str = "success"
+    # Additional model parameters
+    printer_model: str = ""
+    nozzle_diameter: str = ""
+    layer_height: float = 0
+    wall_count: int = 0
+    infill_percent: int = 0
+    brand: str = ""
+    thumbnail_b64: str = ""
+
+class PdfInlineRequest(BaseModel):
+    items: List[PdfInlineItem]
+
+
+async def export_pdf_inline(
+    payload: PdfInlineRequest,
+    request: Request,
+    current_user=Depends(get_current_user),
+):
+    """POST /api/quote/export-pdf-inline — 从当前页面结果直接生成PDF（不查DB）"""
+    from fastapi.responses import Response
+    from .pdf_quote import generate_pdf_quote
+    from .deps import is_member_user, get_membership_effective
+    from .config import MEMBER_DISCOUNT_PERCENT
+
+    if not is_member_user(current_user):
+        raise HTTPException(status_code=403, detail="会员专属功能")
+
+    if not payload.items:
+        raise HTTPException(status_code=400, detail="没有可导出的项目")
+
+    # Fetch brand settings
+    uid = int(current_user["id"])
+    brand_name = brand_logo_url = brand_phone = brand_contact_email = brand_address = brand_note = ""
+    with get_db_session() as db:
+        user = db.query(User).filter(User.id == uid).first()
+        if user:
+            brand_name = user.brand_name or ""
+            brand_logo_url = user.brand_logo_url or ""
+            brand_phone = user.brand_phone or ""
+            brand_contact_email = user.brand_contact_email or ""
+            brand_address = user.brand_address or ""
+            brand_note = user.brand_note or ""
+
+    level, _ = get_membership_effective(current_user)
+    discount_pct = float(MEMBER_DISCOUNT_PERCENT or 0.0) if level == "member" else 0.0
+    discount_pct = max(0.0, min(90.0, discount_pct))
+
+    items = [item.model_dump() for item in payload.items]
+    pdf_bytes = generate_pdf_quote(
+        items=items,
+        brand_name=brand_name,
+        brand_logo_url=brand_logo_url,
+        brand_phone=brand_phone,
+        brand_contact_email=brand_contact_email,
+        brand_address=brand_address,
+        brand_note=brand_note,
+        member_discount_percent=discount_pct,
+    )
+
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    filename = f"quote_{timestamp}.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Length": str(len(pdf_bytes)),
+        },
+    )

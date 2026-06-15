@@ -859,6 +859,34 @@ export function updatePrinterDetailPanel(printer) {
     if (pdNozzles) pdNozzles.textContent = (printer.nozzles || []).map(n => n + ' mm').join(', ');
 }
 
+// ── Per-nozzle valid layer heights ──
+const LAYER_HEIGHT_BY_NOZZLE = {
+    '0.2': { min: 0.06, max: 0.14, valid: [0.06, 0.08, 0.10, 0.12, 0.14], defaultVal: 0.10 },
+    '0.4': { min: 0.08, max: 0.28, valid: [0.08, 0.12, 0.16, 0.20, 0.24, 0.28], defaultVal: 0.20 },
+    '0.6': { min: 0.18, max: 0.42, valid: [0.18, 0.24, 0.30, 0.36, 0.42], defaultVal: 0.30 },
+    '0.8': { min: 0.24, max: 0.56, valid: [0.24, 0.32, 0.40, 0.48, 0.56], defaultVal: 0.40 },
+};
+
+// ── Update layer height dropdown options based on current nozzle ──
+export function updateLayerHeightDropdown() {
+    const nozzleEl = document.getElementById('cfg-nozzle-diameter');
+    const nozzle = nozzleEl ? nozzleEl.value : '0.4';
+    const settings = LAYER_HEIGHT_BY_NOZZLE[nozzle] || LAYER_HEIGHT_BY_NOZZLE['0.4'];
+    const sel = document.getElementById('gen-layer-height');
+    if (!sel) return;
+    const currentVal = sel.value;
+    sel.innerHTML = settings.valid.map(v => {
+        const label = v === settings.defaultVal ? `${v.toFixed(2)} 标准` : v.toFixed(2);
+        return `<option value="${v.toFixed(2)}">${label}</option>`;
+    }).join('');
+    // Try to keep the current selection, or use the nozzle default
+    if (settings.valid.includes(parseFloat(currentVal))) {
+        sel.value = parseFloat(currentVal).toFixed(2);
+    } else {
+        sel.value = settings.defaultVal.toFixed(2);
+    }
+}
+
 // ── Update layer height range hint based on current nozzle ──
 export function updateLayerHeightRangeHint() {
     const hintEl = document.getElementById('layer-height-range-hint');
@@ -870,9 +898,15 @@ export function updateLayerHeightRangeHint() {
         hintEl.textContent = '';
         return;
     }
-    const maxLh = (nozzle * 0.8).toFixed(2);
-    const defaultLh = (nozzle * 0.4).toFixed(2);
-    hintEl.textContent = `0.04–${maxLh}mm (喷嘴${nozzle}×0.8)`;
+    const key = nozzle.toFixed(1);
+    const settings = LAYER_HEIGHT_BY_NOZZLE[key];
+    if (settings) {
+        hintEl.textContent = `有效值: ${settings.valid.map(v => v.toFixed(2)).join(', ')}mm`;
+    } else {
+        hintEl.textContent = '';
+    }
+    // Also update the layer height dropdown options
+    updateLayerHeightDropdown();
 }
 
 // ── Export / Import printer configuration ──

@@ -2,6 +2,8 @@
 
 import json
 import logging
+import os
+import uuid
 from typing import List, Optional
 
 from fastapi import Request, Depends, HTTPException
@@ -10,7 +12,7 @@ from pydantic import BaseModel, Field
 from .config import DEFAULT_MATERIALS, DEFAULT_COLORS, DEFAULT_PRICING_CONFIG
 from .db import get_db_session
 from .models_orm import User
-from .deps import get_current_user
+from .deps import get_current_user, is_member_user
 from .utils import normalize_materials
 from .audit import write_audit_event
 from .database import merge_pricing_config
@@ -26,7 +28,7 @@ class ColorItem(BaseModel):
 
 class MaterialItem(BaseModel):
     name: str = Field(..., min_length=1, max_length=40)
-    brand: Optional[str] = Field(default="通用", max_length=40)
+    brand: Optional[str] = Field(default="Generic", max_length=40)
     density: float = Field(..., gt=0, le=10)
     price_per_kg: float = Field(..., ge=0, le=100000)
     colors: List = Field(default_factory=list, max_length=30)  # List[ColorItem|str]
@@ -62,6 +64,7 @@ class UserSettingsUpdate(BaseModel):
     default_slicer_preset_id: Optional[int] = None
     default_material: Optional[str] = None
     default_color: Optional[str] = None
+    default_brand: Optional[str] = None
 
 
 async def get_user_settings(current_user=Depends(get_current_user)):
@@ -80,6 +83,7 @@ async def get_user_settings(current_user=Depends(get_current_user)):
             default_slicer_preset_id = int(row.default_slicer_preset_id) if row.default_slicer_preset_id is not None else None
             default_material = row.default_material or None
             default_color = row.default_color or None
+            default_brand = row.default_brand or None
 
         materials = normalize_materials(raw_materials, fallback_colors=colors)
         pricing_config = merge_pricing_config(raw_pricing)
@@ -95,6 +99,7 @@ async def get_user_settings(current_user=Depends(get_current_user)):
             "default_slicer_preset_id": default_slicer_preset_id,
             "default_material": default_material,
             "default_color": default_color,
+            "default_brand": default_brand,
         }
     except HTTPException:
         raise
@@ -149,6 +154,7 @@ async def update_user_settings(payload: UserSettingsUpdate, request: Request, cu
         user.default_slicer_preset_id = payload.default_slicer_preset_id
         user.default_material = payload.default_material
         user.default_color = payload.default_color
+        user.default_brand = payload.default_brand
     write_audit_event(
         action="user.settings.update",
         request=request,
@@ -334,3 +340,159 @@ async def reset_user_section(payload: ResetSectionRequest, request: Request, cur
     except Exception as e:
         logger.error(f"重置用户配置失败: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"重置失败: {str(e)}")
+
+
+# ── 品牌定制 ──
+
+class BrandSettingsResponse(BaseModel):
+    brand_name: Optional[str] = None
+    brand_logo_url: Optional[str] = None
+    brand_phone: Optional[str] = None
+    brand_contact_email: Optional[str] = None
+    brand_address: Optional[str] = None
+    brand_note: Optional[str] = None
+
+
+class BrandSettingsUpdate(BaseModel):
+    brand_name: Optional[str] = Field(default=None, max_length=100)
+    brand_logo_url: Optional[str] = Field(default=None, max_length=500)
+    brand_phone: Optional[str] = Field(default=None, max_length=20)
+    brand_contact_email: Optional[str] = Field(default=None, max_length=200)
+    brand_address: Optional[str] = Field(default=None, max_length=300)
+    brand_note: Optional[str] = Field(default=None, max_length=1000)
+
+
+async def get_brand_settings(current_user=Depends(get_current_user)):
+    """获取当前用户的品牌定制设置"""
+    try:
+        with get_db_session() as db:
+            row = db.query(User).filter(User.id == current_user["id"]).first()
+            if not row:
+                raise HTTPException(status_code=404, detail="用户不存在")
+            return {
+                "brand_name": row.brand_name or "",
+                "brand_logo_url": row.brand_logo_url or "",
+                "brand_phone": row.brand_phone or "",
+                "brand_contact_email": row.brand_contact_email or "",
+                "brand_address": row.brand_address or "",
+                "brand_note": row.brand_note or "",
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"获取品牌设置失败: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"获取品牌设置失败 ({str(e)})")
+
+
+async def update_brand_settings(payload: BrandSettingsUpdate, request: Request, current_user=Depends(get_current_user)):
+    """更新品牌定制设置（仅会员可用）"""
+    if not is_member_user(current_user):
+        raise HTTPException(status_code=403, detail="品牌定制功能仅限会员使用，请先升级会员")
+    try:
+        with get_db_session() as db:
+            user = db.query(User).filter(User.id == current_user["id"]).first()
+            if not user:
+                raise HTTPException(status_code=404, detail="用户不存在")
+            if payload.brand_name is not None:
+                user.brand_name = payload.brand_name
+            if payload.brand_logo_url is not None:
+                user.brand_logo_url = payload.brand_logo_url
+            if payload.brand_phone is not None:
+                user.brand_phone = payload.brand_phone
+            if payload.brand_contact_email is not None:
+                user.brand_contact_email = payload.brand_contact_email
+            if payload.brand_address is not None:
+                user.brand_address = payload.brand_address
+            if payload.brand_note is not None:
+                user.brand_note = payload.brand_note
+        write_audit_event(
+            action="user.brand.update",
+            request=request,
+            user=current_user,
+            detail={"fields_updated": [k for k, v in payload.model_dump(exclude_none=True).items()]},
+        )
+        return {"status": "success"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"更新品牌设置失败: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"更新品牌设置失败 ({str(e)})")
+
+
+# 允许的 Logo 图片类型
+_ALLOWED_LOGO_TYPES = {"image/png", "image/jpeg", "image/svg+xml"}
+_MAX_LOGO_SIZE_BYTES = 2 * 1024 * 1024  # 2MB
+
+
+async def upload_brand_logo(request: Request, current_user=Depends(get_current_user)):
+    """上传品牌 Logo 图片（仅会员可用）"""
+    if not is_member_user(current_user):
+        raise HTTPException(status_code=403, detail="品牌定制功能仅限会员使用，请先升级会员")
+
+    # 从 request 中获取上传文件
+    form = await request.form()
+    file = form.get("file")
+    if not file or not hasattr(file, "filename") or not file.filename:
+        raise HTTPException(status_code=400, detail="请上传 Logo 图片文件")
+
+    # 校验文件类型
+    content_type = getattr(file, "content_type", "") or ""
+    if content_type not in _ALLOWED_LOGO_TYPES:
+        raise HTTPException(status_code=400, detail="仅支持 PNG、JPEG、SVG 格式的图片")
+
+    # 读取文件内容并校验大小
+    content = await file.read()
+    if len(content) > _MAX_LOGO_SIZE_BYTES:
+        raise HTTPException(status_code=400, detail="Logo 文件大小不能超过 2MB")
+
+    # 生成唯一文件名：user_{id}_{uuid}.{ext}
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in (".png", ".jpg", ".jpeg", ".svg"):
+        ext = ".png"
+    unique_name = f"user_{current_user['id']}_{uuid.uuid4().hex[:8]}{ext}"
+
+    # 保存到 static/uploads/logos/
+    logos_dir = os.path.join("static", "uploads", "logos")
+    os.makedirs(logos_dir, exist_ok=True)
+    file_path = os.path.join(logos_dir, unique_name)
+    with open(file_path, "wb") as f:
+        f.write(content)
+
+    url = f"/static/uploads/logos/{unique_name}"
+
+    # 更新用户的 brand_logo_url
+    with get_db_session() as db:
+        user = db.query(User).filter(User.id == current_user["id"]).first()
+        if user:
+            user.brand_logo_url = url
+
+    write_audit_event(
+        action="user.brand.logo_upload",
+        request=request,
+        user=current_user,
+        detail={"filename": unique_name, "size": len(content)},
+    )
+    return {"url": url}
+
+
+async def delete_brand_logo(request: Request, current_user=Depends(get_current_user)):
+    """删除品牌 Logo（仅会员可用）"""
+    if not is_member_user(current_user):
+        raise HTTPException(status_code=403, detail="品牌定制功能仅限会员使用，请先升级会员")
+    try:
+        with get_db_session() as db:
+            user = db.query(User).filter(User.id == current_user["id"]).first()
+            if not user:
+                raise HTTPException(status_code=404, detail="用户不存在")
+            user.brand_logo_url = ""
+        write_audit_event(
+            action="user.brand.logo_delete",
+            request=request,
+            user=current_user,
+        )
+        return {"status": "success"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"删除品牌Logo失败: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"删除Logo失败 ({str(e)})")

@@ -77,6 +77,7 @@ def create_app() -> FastAPI:
     from .routes_user import (
         get_user_settings, update_user_settings, change_password,
         export_user_settings, import_user_settings, reset_user_section,
+        get_brand_settings, update_brand_settings, upload_brand_logo, delete_brand_logo,
     )
     from .routes_slicer import (
         api_list_slicer_presets, api_get_slicer_preset, api_generate_slicer_preset, api_upsert_slicer_preset,
@@ -94,8 +95,8 @@ def create_app() -> FastAPI:
     from .routes_billing import (
         billing_plans, billing_checkout, billing_orders, billing_mock_complete, billing_webhook,
     )
-    from .routes_quote import get_quote, validate_formula, quote_history, delete_quote_history, export_quote_history
-    from .routes_zip_quote import zip_quote, download_zip_model
+    from .routes_quote import get_quote, validate_formula, quote_history, delete_quote_history, clear_quote_history, export_quote_history, export_quote_pdf, export_pdf_inline
+    from .routes_zip_quote import zip_quote, download_zip_model, download_zip_template
     from .routes_orientation import optimize_orientation, list_stable_faces, list_coplanar_clusters, train_sample
     from .routes_pages import (
         index, register_page, legal_terms, legal_privacy, admin_users_page,
@@ -128,6 +129,12 @@ def create_app() -> FastAPI:
     app.post("/api/user/settings/import")(import_user_settings)
     app.post("/api/user/settings/reset")(reset_user_section)
 
+    # brand customization
+    app.get("/api/user/brand-settings")(get_brand_settings)
+    app.put("/api/user/brand-settings")(update_brand_settings)
+    app.post("/api/user/brand-logo")(upload_brand_logo)
+    app.delete("/api/user/brand-logo")(delete_brand_logo)
+
     # slicer
     app.get("/api/slicer/presets")(api_list_slicer_presets)
     app.get("/api/slicer/presets/{preset_id}")(api_get_slicer_preset)
@@ -157,7 +164,7 @@ def create_app() -> FastAPI:
     app.post("/api/admin/maintenance/backup/cleanup")(admin_backup_cleanup)
 
     # billing
-    app.get("/api/billing/plans", response_model=PaginatedData[MembershipPlan])(billing_plans)
+    app.get("/api/billing/plans")(billing_plans)
     app.post("/api/billing/checkout", response_model=dict)(billing_checkout)
     app.get("/api/billing/orders", response_model=PaginatedData[BillingOrder])(billing_orders)
     app.post("/api/billing/mock/complete")(billing_mock_complete)
@@ -167,12 +174,16 @@ def create_app() -> FastAPI:
     app.post("/api/quote", response_model=QuoteResponse)(get_quote)
     app.get("/api/quote/history", response_model=PaginatedData[QuoteHistoryItem])(quote_history)
     app.delete("/api/quote/history/{id}")(delete_quote_history)
+    app.delete("/api/quote/history")(clear_quote_history)
     app.get("/api/quote/export")(export_quote_history)
+    app.get("/api/quote/export-pdf")(export_quote_pdf)
+    app.post("/api/quote/export-pdf-inline")(export_pdf_inline)
     app.post("/api/formula/validate", response_model=dict)(validate_formula)
 
     # zip quote
     app.post("/api/quote/zip")(zip_quote)
     app.get("/api/quote/zip/file")(download_zip_model)
+    app.get("/api/quote/zip/template")(download_zip_template)
 
     # preview
     from .routes_preview import router as preview_router

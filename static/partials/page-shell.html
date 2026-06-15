@@ -122,7 +122,7 @@
                         </dl>
 
                         <!-- 批量设置工具栏 -->
-                        <div id="batch-edit-bar" class="mt-4 flex items-center gap-3 p-3 bg-indigo-50 border border-indigo-200 rounded-lg flex-wrap">
+                        <div id="batch-edit-bar" class="mt-4 flex items-center gap-3 p-3 bg-indigo-50 border border-indigo-200 rounded-lg flex-wrap relative z-20">
                             <span class="text-xs font-medium text-indigo-700 whitespace-nowrap" data-i18n="quote.batchSettings">批量设置：</span>
                             <div class="flex items-center gap-1.5">
                                 <label class="text-[11px] text-gray-600" data-i18n="quote.printerModel">打印机</label>
@@ -130,8 +130,7 @@
                             </div>
                             <div class="flex items-center gap-1.5">
                                 <label class="text-[11px] text-gray-600" data-i18n="quote.nozzleDiameter">喷嘴</label>
-                                <select id="batch-nozzle-diameter" class="text-[11px] border border-gray-300 rounded px-2 py-1 bg-white w-[60px]">
-                                    <option value="">--</option>
+                                <select id="batch-nozzle-diameter" class="text-[11px] border border-gray-300 rounded px-2 py-1 bg-white w-[72px]">
                                     <option value="0.2">0.2</option><option value="0.4" selected>0.4</option><option value="0.6">0.6</option><option value="0.8">0.8</option>
                                 </select>
                             </div>
@@ -141,6 +140,11 @@
                                     <option value="">不使用预设</option>
                                 </select>
                                 <span id="batch-preset-params" class="text-[10px] text-gray-400 hidden"></span>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <label class="text-[11px] text-gray-600" data-i18n="quote.brand">品牌</label>
+                                <select id="batch-brand" class="text-[11px] border border-gray-300 rounded px-2 py-1 bg-white max-w-[120px]">
+                                </select>
                             </div>
                             <div class="flex items-center gap-1.5">
                                 <label class="text-[11px] text-gray-600" data-i18n="quote.material">材料</label>
@@ -159,7 +163,7 @@
                         </div>
 
                         <!-- 导出按钮组 -->
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-2 mt-3">
                             <button id="export-csv-btn" type="button" class="text-xs px-2 py-1.5 border border-gray-300 text-gray-600 rounded-md hover:bg-gray-50 flex items-center gap-1">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                                 <span data-i18n="quote.exportCSV">导出 CSV</span>
@@ -167,6 +171,10 @@
                             <button id="export-excel-btn" type="button" class="text-xs px-2 py-1.5 border border-gray-300 text-gray-600 rounded-md hover:bg-gray-50 flex items-center gap-1">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                                 <span data-i18n="quote.exportExcel">导出 Excel</span>
+                            </button>
+                            <button id="export-pdf-btn" type="button" class="text-xs px-2 py-1.5 border border-amber-300 text-amber-700 bg-amber-50 rounded-md hover:bg-amber-100 flex items-center gap-1">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                                <span data-i18n="quote.exportPdf">导出 PDF</span>
                             </button>
                         </div>
 
@@ -179,6 +187,7 @@
                                         <th class="px-2 py-1.5 whitespace-nowrap" data-i18n="common.preview">预览</th>
                                         <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="printer_model" data-i18n="quote.printerModel">打印机 <span class="sort-arrow text-gray-400 text-[9px]"></span></th>
                                         <th class="px-2 py-1.5 whitespace-nowrap" data-i18n="quote.preset">预设</th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="brand" data-i18n="quote.brand">品牌 <span class="sort-arrow text-gray-400 text-[9px]"></span></th>
                                         <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="material" data-i18n="quote.material">材料 <span class="sort-arrow text-gray-400 text-[9px]"></span></th>
                                         <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="color" data-i18n="quote.color">颜色 <span class="sort-arrow text-gray-400 text-[9px]"></span></th>
                                         <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="quantity" data-i18n="quote.quantity">数量 <span class="sort-arrow text-gray-400 text-[9px]"></span></th>
@@ -186,13 +195,13 @@
                                         <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="weight" data-i18n="quote.weight">重量（单件/总） <span class="sort-arrow text-gray-400 text-[9px]"></span></th>
                                         <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="time" data-i18n="quote.time">时间（单件/总） <span class="sort-arrow text-gray-400 text-[9px]"></span></th>
                                         <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="price" data-i18n="quote.price">价格（单价/总价） <span class="sort-arrow text-gray-400 text-[9px]"></span></th>
-                                        <th class="px-2 py-1.5 min-w-[160px] max-w-[260px] cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="status" data-i18n="quote.status">状态/错误 <span class="sort-arrow text-gray-400 text-[9px]"></span></th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="status" data-i18n="quote.status">状态 <span class="sort-arrow text-gray-400 text-[9px]"></span></th>
                                         <th class="px-2 py-1.5 whitespace-nowrap" data-i18n="quote.actions">操作</th>
                                     </tr>
                                 </thead>
                                 <tbody id="batch-results-body" class="bg-white">
                                     <tr class="border-t border-gray-100">
-                                        <td class="px-2 py-2 text-gray-500" colspan="12" data-i18n="quote.noDataUpload">暂无数据，请在表格底部上传并自动报价</td>
+                                        <td class="px-2 py-2 text-gray-500" colspan="14" data-i18n="quote.noDataUpload">暂无数据，请在表格底部上传并自动报价</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -240,8 +249,9 @@
                                                 <input id="file-upload" name="files" type="file" class="sr-only" accept=".stl,.stp,.step,.obj,.3mf,.zip" multiple required>
                                             </label>
                                         </div>
-                                        <p id="file-name" class="text-xs text-gray-500 mt-2" data-i18n="quote.noFileSelected">未选择文件（最多20个，单文件需小于100MB）</p>
-                                        <div class="text-sm font-medium text-gray-700 mt-2" data-i18n="quote.uploadModels">上传 3D 模型（stl/stp/step/obj/3mf，最多20个，单文件&lt;100MB）</div>
+                                        <p id="file-name" class="text-xs text-gray-500 mt-2" data-i18n="quote.noFileSelected">未选择文件（单文件<10MB，ZIP<1GB）</p>
+                                        <p id="upload-limit-hint" class="text-[10px] text-gray-400 mt-1"></p>
+                                        <div class="text-sm font-medium text-gray-700 mt-2" data-i18n="quote.uploadModels">上传 3D 模型（stl/stp/step/obj/3mf 单文件<10MB，ZIP<1GB）</div>
 
                                         <!-- 上传进度条 -->
                                         <div id="upload-progress-container" class="hidden mt-3 w-full max-w-md mx-auto">
@@ -255,6 +265,11 @@
                                             <div id="upload-progress-detail" class="text-[10px] text-gray-400 mt-1"></div>
                                         </div>
                                     </div>
+                                </div>
+
+                                <!-- ZIP导入模板下载（放在 drop-zone 外部，避免点击触发文件上传） -->
+                                <div class="mt-2 text-center">
+                                    <a href="/api/quote/zip/template" target="_blank" rel="noopener" class="text-xs text-gray-400 hover:text-indigo-500 underline transition-colors" data-i18n="quote.downloadTemplate">下载导入模板</a>
                                 </div>
 
                                 <!-- 文件预览缩略图区域 -->

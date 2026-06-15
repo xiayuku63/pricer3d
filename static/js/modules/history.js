@@ -1,5 +1,5 @@
 // ── Quote history modal ──
-import { escapeHtml, formatTimeHMS, quoteOptions } from './state.js';
+import { escapeHtml, formatTimeHMS, quoteOptions, authToken } from './state.js';
 import { t } from './i18n.js';
 
 let historyTbody, quoteHistoryModal, quoteHistoryBackdrop;
@@ -11,11 +11,7 @@ let currentPage = 1;
 let totalRecords = 0;
 
 function getToken() {
-    try {
-        const raw = localStorage.getItem('pricer3d_session');
-        if (raw) return JSON.parse(raw).token || '';
-    } catch (e) {}
-    return '';
+    return authToken || '';
 }
 
 function getTotalPages() {
@@ -35,6 +31,26 @@ export function initQuoteHistory() {
         historyRefreshBtn.addEventListener('click', () => {
             currentPage = 1;
             loadQuoteHistory(getToken());
+        });
+    }
+
+    const historyClearBtn = document.getElementById('history-clear-btn');
+    if (historyClearBtn) {
+        historyClearBtn.addEventListener('click', async () => {
+            if (!confirm(t('history.confirmClear') || '确定清理全部报价历史记录？此操作不可恢复。')) return;
+            try {
+                const resp = await fetch('/api/quote/history', {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${getToken()}` },
+                });
+                if (!resp.ok) throw new Error('清理失败');
+                // Reset state and reload — don't depend on response being JSON
+                currentPage = 1;
+                totalRecords = 0;
+                await loadQuoteHistory(getToken());
+            } catch (e) {
+                alert(e.message || '清理失败');
+            }
         });
     }
 
@@ -249,7 +265,7 @@ export async function loadQuoteHistory(token) {
         }
 
         historyTbody.innerHTML = data.items.map(item => {
-            const ts = item.created_at ? new Date(item.created_at + 'Z').toLocaleString('zh-CN') : '-';
+            const ts = item.created_at ? new Date(item.created_at).toLocaleString('zh-CN') : '-';
             const statusBadge = item.status === 'success'
                 ? '<span class="text-green-600 font-medium">' + t('history.success') + '</span>'
                 : `<span class="text-red-500 font-medium" title="${escapeHtml(item.error_msg || '')}">` + t('history.failed') + '</span>';
@@ -258,7 +274,7 @@ export async function loadQuoteHistory(token) {
             const reQuoteBtn = `<button data-action="requote" data-material="${escapeHtml(item.material || '')}" data-color="${escapeHtml(item.color || '')}" data-quantity="${item.quantity || 1}" class="text-indigo-600 hover:text-indigo-800 hover:underline text-[11px] px-1" title="${t('history.requote')}">${t('history.requote')}</button>`;
 
             // Delete button
-            const deleteBtn = `<button data-action="delete" data-id="${item.id}" class="text-red-400 hover:text-red-600 hover:underline text-[11px] px-1" title="${t('common.delete')}">${t('common.delete')}</button>`;
+            const deleteBtn = `<button data-action="delete" data-id="${item.id}" class="text-xs text-red-500 hover:text-red-700" title="${t('common.delete')}">${t('common.delete')}</button>`;
 
             return `<tr class="border-t border-gray-100 hover:bg-gray-50">
                 <td class="px-3 py-2 text-gray-500">${ts}</td>

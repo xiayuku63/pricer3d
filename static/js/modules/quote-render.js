@@ -693,7 +693,7 @@ function _buildCommonRowHtml(item, ext, selectedMaterial, selectedColor, quantit
     };
 }
 
-// Helper: build checklist badge HTML
+// Helper: build checklist badge HTML (full checklist with print params)
 function _buildChecklistHtml(item) {
     if (!item._checklist_params || !item._checklist_source) return '';
     const src = item._checklist_source;
@@ -701,19 +701,43 @@ function _buildChecklistHtml(item) {
         + (src.printer_model ? t('quote.printerModel') + ':' + src.printer_model + ' ' : '')
         + (src.nozzle ? t('quote.nozzleDiameter') + ':' + src.nozzle + 'mm | ' : '')
         + '层高:' + src.layer_height + 'mm 墙层数:' + src.wall_count + ' 填充:' + src.infill + '%';
-    return ` <span class="text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1 cursor-help" title="${tip}">\u{1F4CB}${t('quote.badgeChecklist')}</span>`;
+    return ` <span class="inline-block whitespace-nowrap text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1 cursor-help" title="${tip}">\u{1F4CB}${t('quote.badgeChecklist')}</span>`;
+}
+
+// Helper: build BOM data badge HTML (checklist with basic data only, no print params)
+function _buildBomDataBadgeHtml(item) {
+    const src = item._checklist_source || {};
+    const parts = [];
+    if (src.material) parts.push(t('quote.material') + ':' + src.material);
+    if (src.color) parts.push(t('quote.color') + ':' + src.color);
+    if (src.quantity) parts.push(t('quote.quantity') + ':' + src.quantity);
+    const tip = t('quote.usedBomData') + (parts.length ? '：' + parts.join(' | ') : '');
+    return ` <span class="inline-block whitespace-nowrap text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1 cursor-help" title="${tip}">\u{1F4CB}${t('quote.badgeBomData')}</span>`;
 }
 
 // Helper: build default params badge HTML
 function _buildDefaultBadgeHtml() {
-    return ` <span class="text-[10px] text-gray-500 bg-gray-100 border border-gray-200 rounded px-1 cursor-help" title="${t('quote.usedDefault')}">\u{1F4CB}${t('quote.badgeDefault')}</span>`;
+    return ` <span class="inline-block whitespace-nowrap text-[10px] text-gray-500 bg-gray-100 border border-gray-200 rounded px-1 cursor-help" title="${t('quote.usedDefault')}">\u{1F4CB}${t('quote.badgeDefault')}</span>`;
 }
 
-// Helper: build checklist/default badge based on item._checklist_params
+// Helper: build checklist/default/BOM badge based on item data
 function _buildParamBadge(item) {
     let badge = '';
-    if (item._checklist_params) { badge = _buildChecklistHtml(item); }
-    else { badge = _buildDefaultBadgeHtml(); }
+    if (item._checklist_params) {
+        const src = item._checklist_source || {};
+        // Check if any printing params were actually specified in checklist
+        const hasPrintParams = src.layer_height || src.wall_count || src.infill || src.printer_model || src.nozzle;
+        if (hasPrintParams) {
+            // Full checklist with print params
+            badge = _buildChecklistHtml(item);
+        } else {
+            // BOM data only (material, color, quantity) - no print params
+            badge = _buildBomDataBadgeHtml(item);
+        }
+    } else {
+        // No checklist - default
+        badge = _buildDefaultBadgeHtml();
+    }
     badge += _buildWarningsBadgeHtml(item);
     return badge;
 }
@@ -912,7 +936,7 @@ export function renderResultsTable() {
                     <div class="text-[10px] leading-tight">${recalculating ? '-' : ('¥ ' + Number(item.unit_cost_cny || 0).toFixed(2))}</div>
                     <div class="text-xs leading-tight font-medium">${recalculating ? '-' : ('¥ ' + Number(item.cost_cny || 0).toFixed(2))}</div>
                 </td>
-                <td data-role="status-cell" class="px-2 py-1.5 min-w-[80px] text-green-600 font-medium text-[11px]">${t('common.success')}</td>
+                <td data-role="status-cell" class="px-2 py-1.5 whitespace-nowrap text-green-600 font-medium text-[11px]"><span class="inline-block w-2 h-2 rounded-full bg-green-500 mr-1 align-middle"></span>${t('common.success')}</td>
                 <td class="px-2 py-1.5 space-x-1"><button type="button" data-delete-file="${item.filename}" class="text-xs text-red-500 hover:text-red-700">${t('common.delete')}</button></td>
             `;
         } else {
@@ -952,8 +976,8 @@ export function renderResultsTable() {
                 <td class="px-2 py-1.5" data-field="color">${renderedRowColors.html}</td>
                 <td class="px-2 py-1.5"><input data-field="quantity" type="number" min="1" value="${quantityValue}" class="row-edit w-14 text-[11px] border border-gray-300 rounded px-1 py-0.5" /></td>
                 <td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td>
-                <td data-role="status-cell" class="px-2 py-1.5 min-w-[80px]">
-                    <span class="status-fail-badge relative cursor-default text-red-600 font-medium text-[11px]">${t('common.failed')}
+                <td data-role="status-cell" class="px-2 py-1.5 whitespace-nowrap">
+                    <span class="status-fail-badge relative cursor-default text-red-600 font-medium text-[11px]"><span class="inline-block w-2 h-2 rounded-full bg-red-500 mr-1 align-middle"></span>${t('common.failed')}
                         <span class="status-fail-tooltip hidden absolute z-50 top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-2 text-[11px] font-normal text-left text-white bg-gray-800 rounded-lg shadow-lg whitespace-normal break-words leading-relaxed">${escapeHtml(item.error || t('common.error'))}</span>
                     </span>
                 </td>

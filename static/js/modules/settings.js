@@ -78,6 +78,11 @@ export async function fetchUserSettings() {
             if (bnote) bnote.value = brand.brand_note || '';
             if (blp && brand.brand_logo_url) {
                 blp.innerHTML = `<img src="${brand.brand_logo_url}" class="w-full h-full object-contain rounded-md" />`;
+                const delBtn = document.getElementById('brand-logo-delete-btn');
+                if (delBtn) delBtn.classList.remove('hidden');
+            } else {
+                const delBtn = document.getElementById('brand-logo-delete-btn');
+                if (delBtn) delBtn.classList.add('hidden');
             }
         }
     } catch (e) { console.error("Failed to fetch brand settings", e); }
@@ -992,11 +997,29 @@ export function initBrandLogoUpload() {
                 const data = await resp.json();
                 if (preview && data.url) {
                     preview.innerHTML = `<img src="${data.url}" class="w-full h-full object-contain rounded-md" />`;
+                    const delBtn = document.getElementById('brand-logo-delete-btn');
+                    if (delBtn) delBtn.classList.remove('hidden');
                 }
             }
         } catch (e) { console.error("Logo upload failed", e); }
         fileInput.value = '';
     });
+
+    // ── Delete logo handler ──
+    const deleteBtn = document.getElementById('brand-logo-delete-btn');
+    if (deleteBtn && preview) {
+        deleteBtn.addEventListener('click', async () => {
+            const confirmed = confirm(t('settings.confirmDeleteLogo') || '确定要删除Logo吗？');
+            if (!confirmed) return;
+            try {
+                const resp = await authFetch('/api/user/brand-logo', { method: 'DELETE' });
+                if (resp.ok) {
+                    preview.innerHTML = '无';
+                    deleteBtn.classList.add('hidden');
+                }
+            } catch (e) { console.error("Logo delete failed", e); }
+        });
+    }
 }
 
 // ── Upload limit hint ──
