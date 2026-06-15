@@ -174,7 +174,8 @@ export default {
   'quote.zipProgress': 'Processing {current}/{total} files...',
   'quote.paramWarningsTitle': 'Some parameters used default values',
   'quote.brandOverride': 'BOM specified brand: {brand}',
-  'quote.cancelProcessing': 'Cancel',
+  'quote.cancelProcessing': 'Cancel Processing',
+  'quote.cancelled': 'Processing cancelled',
   'quote.processingCancelled': 'Processing cancelled',
 
   // ── Slicer ──

@@ -586,7 +586,7 @@ async def zip_quote(
                 # ── Cancellation detection ──
                 if await request.is_disconnected():
                     logger.info("ZIP processing cancelled by client")
-                    yield f'data: {json.dumps({"type": "cancelled"})}\n\n'
+                    yield f'data: {json.dumps({"type": "cancelled", "processed": _idx})}\n\n'
                     return
                 try:
                     if _file_type == "matched":

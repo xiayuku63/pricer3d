@@ -176,6 +176,7 @@ export default {
   'quote.paramWarningsTitle': '部分参数使用了默认值',
   'quote.brandOverride': 'BOM指定品牌: {brand}',
   'quote.cancelProcessing': '取消处理',
+  'quote.cancelled': '处理已取消',
   'quote.processingCancelled': '处理已取消',
 
   // ── Slicer / 切片 ──
