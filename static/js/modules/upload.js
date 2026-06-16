@@ -8,7 +8,7 @@ import { t } from './i18n.js';
 
 // ── Constants ──
 const ALLOWED_EXTENSIONS = ['.stl', '.stp', '.step', '.obj', '.3mf', '.zip'];
-const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 const MAX_ZIP_SIZE = 1024 * 1024 * 1024; // 1GB
 const EXT_ICONS = {
     stl: '🧊', stp: '📐', step: '📐', obj: '📦', '3mf': '🖨️', zip: '📁',

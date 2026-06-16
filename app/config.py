@@ -76,7 +76,7 @@ ADMIN_USERNAMES = _settings.parsed_admin_usernames
 # ── Pure constants (non-env-var) ──
 SUPPORTED_EXTENSIONS = {".stl", ".stp", ".step", ".obj", ".3mf"}
 MAX_FILES_PER_REQUEST = 100
-MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024
+MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024
 MAX_ZIP_SIZE_BYTES = 1024 * 1024 * 1024
 # 免费用户累计模型总数限制（不限制单次数量，会员无限制）
 FREE_TOTAL_MODEL_LIMIT = 10
