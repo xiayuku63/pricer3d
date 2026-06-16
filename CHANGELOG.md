@@ -5,6 +5,69 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [v0.36.1] - 2026-06-16
+
+### Changed
+- ZIP 材料从清单自动读取
+- 缩略图颜色从清单源获取
+
+## [v0.36.0] - 2026-06-15
+
+### Added
+- ZIP 上传处理中新增取消按钮
+- ZIP 取消按钮 i18n 键值及后端 processed 字段
+
+## [v0.35.0] - 2026-06-15
+
+### Added
+- 删除品牌 Logo 按钮
+
+## [v0.24.2] - 2026-06-13
+
+### Added
+- i18n 语言包系统 — 完整多语言支持
+- 深色模式支持
+- 用户中心重构
+
+### Changed
+- 材料设置优化
+
+## [v0.21.2] - 2026-06-07
+
+### Fixed
+- 超尺寸模型保留几何信息，仅标记失败不计价
+
+## [v0.21.1] - 2026-06-07
+
+### Changed
+- 切片参数卡片风格统一
+- 大模型 hover 时展示失败原因
+
+### Fixed
+- 尺寸校验改用内置 PRINTER_MODELS 查询
+
+## [v0.20.0] - 2026-06-06
+
+### Added
+- 切片参数集成
+- 报价页面材料选择器
+
+## [v0.19.0] - 2026-06-06
+
+### Added
+- 打印机参数管理
+- 材料分类系统（品牌/类型/材料三级管理）
+- 品牌/类型 datalist 输入 + 自定义徽章指示器
+- 自定义打印机型号 + 动态层高校验
+- 前端显示打印机速度参数（只读，硬件绑定）
+- 前端重构 + 后端速度参数集成 + 尺寸校验
+- 状态简化 + gcode 详情折叠
+
+### Changed
+- CI/CD GitHub Actions 自动部署工作流
+- README 完整项目文档
+- PrusaSlicer 尝试从 2.7.2 升级至 2.9.3（后 revert 回 2.7.2）
+
 ## [v0.18.0] - 2026-06-06
 
 ### Fixed

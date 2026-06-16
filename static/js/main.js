@@ -1140,7 +1140,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
                 if (zipModelFiles.length > 0) {
-                    await buildThumbnails(zipModelFiles);
+                    // Build per-file color map from BOM checklist source
+                    const colorByFilename = {};
+                    const mergedForColor = (typeof currentResults !== 'undefined') ? currentResults : (zipData.results || []);
+                    mergedForColor.forEach(r => {
+                        if (r && r.filename && r._checklist_source && r._checklist_source.color) {
+                            colorByFilename[r.filename] = r._checklist_source.color;
+                        }
+                    });
+                    await buildThumbnails(zipModelFiles, colorByFilename);
                     renderResultsTable();
                 }
 

@@ -613,9 +613,10 @@ async def zip_quote(
                             except (ValueError, TypeError):
                                 inf = 20
 
-                        # Use checklist quantity/color if present, else form defaults
+                        # Use checklist quantity/color/material if present, else form defaults
                         cl_qty = cl.get("quantity_parsed", quantity)
                         cl_color = cl.get("color", "").strip() or color
+                        cl_material = cl.get("material_type", "").strip() or material
                         cl_printer = str(cl.get("printer_model", "")).strip()
                         cl_nozzle = str(cl.get("nozzle", "")).strip()
                         compound_id = _lookup_printer(cl_printer, cl_nozzle)
@@ -631,7 +632,7 @@ async def zip_quote(
 
                         result = await process_single_file(
                             fake_file,
-                            material=material,
+                            material=cl_material,
                             layer_height=lh,
                             infill=inf,
                             quantity=cl_qty,
