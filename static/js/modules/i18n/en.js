@@ -180,6 +180,23 @@ export default {
   'quote.cancelled': 'Processing cancelled',
   'quote.processingCancelled': 'Processing cancelled',
 
+  // ── ZIP Preview ──
+  'zipPreview.title': 'ZIP File Preview',
+  'zipPreview.parsing': 'Parsing checklist and models from ZIP...',
+  'zipPreview.slicing': 'Starting slicing...',
+  'zipPreview.oneZipOnly': 'Only one ZIP file at a time',
+  'zipPreview.cancelled': 'ZIP slicing cancelled',
+  'zipPreview.matched': 'Matched',
+  'zipPreview.bomOnly': 'BOM Only',
+  'zipPreview.modelOnly': 'No Checklist',
+  'zipPreview.matchedTitle': 'Matched',
+  'zipPreview.bomOnlyTitle': 'In checklist but no corresponding model',
+  'zipPreview.modelOnlyTitle': 'Models not in checklist (will use default parameters)',
+  'zipPreview.reason': 'Reason',
+  'zipPreview.confirmSlice': 'Confirm Slice',
+  'zipPreview.bomOnlyReason': 'In checklist but no corresponding model',
+  'zipPreview.modelOnlyReason': 'Model not in checklist, will use default parameters',
+
   // ── Slicer ──
   'slicer.title': 'Slicer Config',
   'slicer.currentPreset': 'Current Preset',

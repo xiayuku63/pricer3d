@@ -20,6 +20,7 @@ async def index():
         "head", "page-shell", "login-modal", "membership-modal",
         "options-modal", "user-center-modal", "quote-history-modal",
         "preview-modal", "orient-modal", "color-editor-modal",
+        "zip-preview-modal",
         "scripts", "closing",
     ]
     parts = []

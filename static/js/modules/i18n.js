@@ -63,7 +63,11 @@ export async function setLang(l) {
   // 更新 DOM 中 data-i18n 元素
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
-    if (key) el.textContent = t(key);
+    if (key) {
+      const sortArrow = el.querySelector('.sort-arrow');
+      el.textContent = t(key);
+      if (sortArrow) el.appendChild(sortArrow);
+    }
   });
   // 更新 placeholder
   document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {

@@ -96,7 +96,7 @@ def create_app() -> FastAPI:
         billing_plans, billing_checkout, billing_orders, billing_mock_complete, billing_webhook,
     )
     from .routes_quote import get_quote, validate_formula, quote_history, delete_quote_history, clear_quote_history, export_quote_history, export_quote_pdf, export_pdf_inline
-    from .routes_zip_quote import zip_quote, download_zip_model, download_zip_template
+    from .routes_zip_quote import zip_quote, zip_preview, download_zip_model, download_zip_template
     from .routes_orientation import optimize_orientation, list_stable_faces, list_coplanar_clusters, train_sample
     from .routes_pages import (
         index, register_page, legal_terms, legal_privacy, admin_users_page,
@@ -181,6 +181,7 @@ def create_app() -> FastAPI:
     app.post("/api/formula/validate", response_model=dict)(validate_formula)
 
     # zip quote
+    app.post("/api/quote/zip/preview")(zip_preview)
     app.post("/api/quote/zip")(zip_quote)
     app.get("/api/quote/zip/file")(download_zip_model)
     app.get("/api/quote/zip/template")(download_zip_template)

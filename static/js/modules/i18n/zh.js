@@ -181,6 +181,23 @@ export default {
   'quote.cancelled': '处理已取消',
   'quote.processingCancelled': '处理已取消',
 
+  // ── ZIP Preview / ZIP预览 ──
+  'zipPreview.title': 'ZIP 文件预览',
+  'zipPreview.parsing': '正在解析 ZIP 文件中的清单与模型...',
+  'zipPreview.slicing': '开始切片...',
+  'zipPreview.oneZipOnly': '一次只能上传一个 ZIP 文件',
+  'zipPreview.cancelled': '已取消 ZIP 切片',
+  'zipPreview.matched': '已匹配',
+  'zipPreview.bomOnly': '清单多余',
+  'zipPreview.modelOnly': '无清单',
+  'zipPreview.matchedTitle': '已匹配',
+  'zipPreview.bomOnlyTitle': '清单中有但无对应模型',
+  'zipPreview.modelOnlyTitle': '模型不在清单中（将使用默认参数）',
+  'zipPreview.reason': '原因',
+  'zipPreview.confirmSlice': '确认切片',
+  'zipPreview.bomOnlyReason': '清单中有但无对应模型',
+  'zipPreview.modelOnlyReason': '模型不在清单中，将使用默认参数',
+
   // ── Slicer / 切片 ──
   'slicer.title': '切片配置',
   'slicer.currentPreset': '当前预设',

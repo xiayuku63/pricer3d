@@ -86,10 +86,11 @@ function _hideError() {
 
 /**
  * Process ZIP file upload with SSE streaming progress.
+ * Two-step flow: preview first, then confirm to slice.
  */
 async function _handleZipUpload(zipFiles, modelFiles, validFiles) {
     if (zipFiles.length > 1 && modelFiles.length === 0) {
-        showToast('一次只能上传一个 ZIP 文件', 'error');
+        showToast(t('zipPreview.oneZipOnly') || '一次只能上传一个 ZIP 文件', 'error');
         return;
     }
 
@@ -101,42 +102,77 @@ async function _handleZipUpload(zipFiles, modelFiles, validFiles) {
         return;
     }
 
-    dom.fileNameDisplay.textContent = '正在解析 ZIP 文件中的清单与模型...';
+    dom.fileNameDisplay.textContent = t('zipPreview.parsing') || '正在解析 ZIP 文件中的清单与模型...';
     dom.fileNameDisplay.classList.add('text-indigo-600', 'font-medium');
-    showProgress('解析 ZIP 文件...');
-
-    // ── AbortController for ZIP cancellation ──
-    let zipAbortController = new AbortController();
-    const zipCancelBtn = document.getElementById('zip-cancel-btn');
-    const zipCancelBtnText = document.getElementById('zip-cancel-btn-text');
-    if (zipCancelBtn) {
-        zipCancelBtn.classList.remove('hidden');
-        zipCancelBtnText.textContent = t('quote.cancelProcessing');
-        zipCancelBtn.onclick = () => { zipAbortController.abort(); };
-    }
+    showProgress(t('zipPreview.parsing') || '解析 ZIP 文件...');
 
     try {
-        const zipFormData = new FormData();
-        zipFormData.append('file', zipFiles[0]);
-        zipFormData.append('material', quoteOptions.material);
-        zipFormData.append('color', quoteOptions.color);
-        zipFormData.append('quantity', String(quoteOptions.quantity));
+        // ── Step 1: Call preview endpoint ──
+        const previewFormData = new FormData();
+        previewFormData.append('file', zipFiles[0]);
+
+        const previewResp = await fetch('/api/quote/zip/preview', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${authToken}` },
+            body: previewFormData,
+        });
+
+        if (!previewResp.ok) {
+            let errMsg = 'ZIP 上传失败';
+            try {
+                const errData = await previewResp.json();
+                errMsg = errData.detail || errMsg;
+            } catch (_) {}
+            throw new Error(errMsg);
+        }
+
+        const previewData = await previewResp.json();
+        hideProgress();
+
+        // ── Step 2: Show preview modal and wait for user confirmation ──
+        const confirmed = await _showZipPreviewModal(previewData);
+        if (!confirmed) {
+            hideProgress();
+            dom.fileNameDisplay.textContent = t('zipPreview.cancelled') || '已取消 ZIP 切片';
+            dom.fileNameDisplay.classList.remove('text-indigo-600', 'font-medium');
+            showToast(t('zipPreview.cancelled') || '已取消', 'info');
+            return;
+        }
+
+        // ── Step 3: Confirm → call slice endpoint with session_id ──
+        showProgress(t('zipPreview.slicing') || '开始切片...');
+
+        // AbortController for cancellation
+        let zipAbortController = new AbortController();
+        const zipCancelBtn = document.getElementById('zip-cancel-btn');
+        const zipCancelBtnText = document.getElementById('zip-cancel-btn-text');
+        if (zipCancelBtn) {
+            zipCancelBtn.classList.remove('hidden');
+            zipCancelBtnText.textContent = t('quote.cancelProcessing');
+            zipCancelBtn.onclick = () => { zipAbortController.abort(); };
+        }
+
+        const sliceFormData = new FormData();
+        sliceFormData.append('session_id', previewData.session_id);
+        sliceFormData.append('material', quoteOptions.material);
+        sliceFormData.append('color', quoteOptions.color);
+        sliceFormData.append('quantity', String(quoteOptions.quantity));
 
         const zipPrinterModel = getActivePrinterCompoundId();
-        if (zipPrinterModel) zipFormData.append('printer_model', zipPrinterModel);
+        if (zipPrinterModel) sliceFormData.append('printer_model', zipPrinterModel);
         const zipPresetEl = document.getElementById('batch-slicer-preset');
         const zipPresetId = (zipPresetEl && zipPresetEl.value) ? Number(zipPresetEl.value) : null;
-        if (zipPresetId) zipFormData.append('slicer_preset_id', String(zipPresetId));
+        if (zipPresetId) sliceFormData.append('slicer_preset_id', String(zipPresetId));
 
         const resp = await fetch('/api/quote/zip', {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${authToken}` },
-            body: zipFormData,
+            body: sliceFormData,
             signal: zipAbortController.signal,
         });
 
         if (!resp.ok) {
-            let errMsg = 'ZIP 上传失败';
+            let errMsg = 'ZIP 切片失败';
             try {
                 const errData = await resp.json();
                 errMsg = errData.detail || errMsg;
@@ -233,6 +269,7 @@ async function _handleZipUpload(zipFiles, modelFiles, validFiles) {
             await quoteSelectedFilesWithProgress(modelFiles);
         }
     } catch (err) {
+        const zipCancelBtn = document.getElementById('zip-cancel-btn');
         if (zipCancelBtn) zipCancelBtn.classList.add('hidden');
         if (err.name === 'AbortError') {
             hideProgress();
@@ -245,6 +282,127 @@ async function _handleZipUpload(zipFiles, modelFiles, validFiles) {
             dom.fileNameDisplay.textContent = 'ZIP 文件处理失败';
         }
     }
+}
+
+/**
+ * Show the ZIP preview modal with match results.
+ * Returns a Promise that resolves to true (confirmed) or false (cancelled).
+ */
+function _showZipPreviewModal(previewData) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('zip-preview-modal');
+        const panel = document.getElementById('zip-preview-panel');
+        const closeBtn = document.getElementById('zip-preview-close-btn');
+        const cancelBtn = document.getElementById('zip-preview-cancel-btn');
+        const confirmBtn = document.getElementById('zip-preview-confirm-btn');
+        const backdrop = document.getElementById('zip-preview-backdrop');
+
+        if (!modal || !panel) {
+            // Fallback: if modal not found, auto-confirm
+            resolve(true);
+            return;
+        }
+
+        // Populate summary
+        const summaryEl = document.getElementById('zip-preview-summary');
+        const ms = previewData.match_summary || {};
+        const summaryParts = [];
+        if (ms.matched > 0) {
+            summaryParts.push(`<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-100 text-green-800 text-xs font-medium">✓ ${ms.matched} ${t('zipPreview.matched') || '已匹配'}</span>`);
+        }
+        if (ms.bom_only > 0) {
+            summaryParts.push(`<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-100 text-red-800 text-xs font-medium">⚠ ${ms.bom_only} ${t('zipPreview.bomOnly') || '清单多余'}</span>`);
+        }
+        if (ms.model_only > 0) {
+            summaryParts.push(`<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-medium">ℹ ${ms.model_only} ${t('zipPreview.modelOnly') || '无清单'}</span>`);
+        }
+        summaryEl.innerHTML = summaryParts.join('');
+
+        // Populate matched table
+        const matchedSection = document.getElementById('zip-preview-matched');
+        const matchedBody = document.getElementById('zip-preview-matched-body');
+        const matchedCount = document.getElementById('zip-preview-matched-count');
+        if (previewData.matched && previewData.matched.length > 0) {
+            matchedSection.classList.remove('hidden');
+            matchedCount.textContent = `(${previewData.matched.length})`;
+            matchedBody.innerHTML = previewData.matched.map(m => {
+                const cl = m.checklist || {};
+                return `<tr>
+                    <td class="px-3 py-1.5 text-gray-800">${escapeHtml(m.filename)}</td>
+                    <td class="px-3 py-1.5 text-gray-600">${escapeHtml(cl.material_type || '-')}</td>
+                    <td class="px-3 py-1.5 text-gray-600">${escapeHtml(cl.color || '-')}</td>
+                    <td class="px-3 py-1.5 text-gray-600">${cl.quantity || '-'}</td>
+                </tr>`;
+            }).join('');
+        } else {
+            matchedSection.classList.add('hidden');
+        }
+
+        // Populate BOM-only table
+        const bomSection = document.getElementById('zip-preview-bom-only');
+        const bomBody = document.getElementById('zip-preview-bom-body');
+        const bomCount = document.getElementById('zip-preview-bom-count');
+        if (previewData.bom_only && previewData.bom_only.length > 0) {
+            bomSection.classList.remove('hidden');
+            bomCount.textContent = `(${previewData.bom_only.length})`;
+            bomBody.innerHTML = previewData.bom_only.map(b => {
+                return `<tr>
+                    <td class="px-3 py-1.5 text-red-800">${escapeHtml(b.filename)}</td>
+                    <td class="px-3 py-1.5 text-red-600">${escapeHtml(b.reason)}</td>
+                </tr>`;
+            }).join('');
+        } else {
+            bomSection.classList.add('hidden');
+        }
+
+        // Populate model-only table
+        const modelSection = document.getElementById('zip-preview-model-only');
+        const modelBody = document.getElementById('zip-preview-model-body');
+        const modelCount = document.getElementById('zip-preview-model-count');
+        if (previewData.model_only && previewData.model_only.length > 0) {
+            modelSection.classList.remove('hidden');
+            modelCount.textContent = `(${previewData.model_only.length})`;
+            modelBody.innerHTML = previewData.model_only.map(m => {
+                return `<tr>
+                    <td class="px-3 py-1.5 text-amber-800">${escapeHtml(m.filename)}</td>
+                    <td class="px-3 py-1.5 text-amber-600">${escapeHtml(m.reason)}</td>
+                </tr>`;
+            }).join('');
+        } else {
+            modelSection.classList.add('hidden');
+        }
+
+        // Show modal with animation
+        modal.classList.remove('hidden');
+        requestAnimationFrame(() => {
+            panel.classList.remove('translate-y-full');
+        });
+
+        function close(result) {
+            panel.classList.add('translate-y-full');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                cleanup();
+                resolve(result);
+            }, 300);
+        }
+
+        function cleanup() {
+            closeBtn.removeEventListener('click', onClose);
+            cancelBtn.removeEventListener('click', onCancel);
+            confirmBtn.removeEventListener('click', onConfirm);
+            backdrop.removeEventListener('click', onCancel);
+        }
+
+        function onClose() { close(false); }
+        function onCancel() { close(false); }
+        function onConfirm() { close(true); }
+
+        closeBtn.addEventListener('click', onClose);
+        cancelBtn.addEventListener('click', onCancel);
+        confirmBtn.addEventListener('click', onConfirm);
+        backdrop.addEventListener('click', onCancel);
+    });
 }
 
 /**

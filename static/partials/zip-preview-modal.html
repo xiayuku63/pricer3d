@@ -1,0 +1,91 @@
+            <!-- ZIP 上传预览确认弹窗 -->
+            <div id="zip-preview-modal" class="hidden fixed inset-0 z-50">
+                <div id="zip-preview-backdrop" class="absolute inset-0 bg-black/50"></div>
+                <div class="relative z-10 h-full w-full flex items-end sm:items-center justify-center p-0 sm:p-4">
+                    <div id="zip-preview-panel" class="w-full sm:max-w-2xl bg-white rounded-t-2xl sm:rounded-lg sm:shadow-xl overflow-hidden max-h-[90dvh] sm:max-h-[90vh] flex flex-col transform translate-y-full sm:translate-y-0 transition-transform duration-300 ease-out">
+                        <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
+                            <div class="flex items-center gap-2">
+                                <div class="w-8 h-1 bg-gray-300 rounded-full sm:hidden mx-auto mb-1 absolute left-1/2 -translate-x-1/2 top-2"></div>
+                                <h4 class="text-base sm:text-sm font-semibold text-gray-800" data-i18n="zipPreview.title">ZIP 文件预览</h4>
+                            </div>
+                            <button id="zip-preview-close-btn" type="button" class="text-gray-500 hover:text-gray-700 min-h-[44px] min-w-[44px] flex items-center justify-center" data-i18n="common.close">关闭</button>
+                        </div>
+                        <div class="p-4 space-y-4 overflow-y-auto flex-1 overscroll-contain">
+                            <!-- 匹配摘要 -->
+                            <div id="zip-preview-summary" class="flex flex-wrap items-center gap-2 text-sm">
+                                <!-- Populated by JS -->
+                            </div>
+
+                            <!-- 清单中有但无对应模型 (BOM only) -->
+                            <div id="zip-preview-bom-only" class="hidden">
+                                <h5 class="text-sm font-semibold text-red-700 mb-1.5 flex items-center gap-1">
+                                    <span class="inline-block w-2 h-2 rounded-full bg-red-500"></span>
+                                    <span data-i18n="zipPreview.bomOnlyTitle">清单中有但无对应模型</span>
+                                    <span id="zip-preview-bom-count" class="text-xs font-normal text-red-500"></span>
+                                </h5>
+                                <div class="bg-red-50 border border-red-200 rounded-lg overflow-hidden">
+                                    <table class="w-full text-xs">
+                                        <thead class="bg-red-100 text-red-800">
+                                            <tr>
+                                                <th class="px-3 py-1.5 text-left" data-i18n="quote.filename">文件名</th>
+                                                <th class="px-3 py-1.5 text-left" data-i18n="zipPreview.reason">原因</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="zip-preview-bom-body" class="divide-y divide-red-100">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- 模型不在清单中 (model only) -->
+                            <div id="zip-preview-model-only" class="hidden">
+                                <h5 class="text-sm font-semibold text-amber-700 mb-1.5 flex items-center gap-1">
+                                    <span class="inline-block w-2 h-2 rounded-full bg-amber-500"></span>
+                                    <span data-i18n="zipPreview.modelOnlyTitle">模型不在清单中</span>
+                                    <span id="zip-preview-model-count" class="text-xs font-normal text-amber-500"></span>
+                                </h5>
+                                <div class="bg-amber-50 border border-amber-200 rounded-lg overflow-hidden">
+                                    <table class="w-full text-xs">
+                                        <thead class="bg-amber-100 text-amber-800">
+                                            <tr>
+                                                <th class="px-3 py-1.5 text-left" data-i18n="quote.filename">文件名</th>
+                                                <th class="px-3 py-1.5 text-left" data-i18n="zipPreview.reason">原因</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="zip-preview-model-body" class="divide-y divide-amber-100">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- 已匹配列表 (matched) -->
+                            <div id="zip-preview-matched" class="hidden">
+                                <h5 class="text-sm font-semibold text-green-700 mb-1.5 flex items-center gap-1">
+                                    <span class="inline-block w-2 h-2 rounded-full bg-green-500"></span>
+                                    <span data-i18n="zipPreview.matchedTitle">已匹配</span>
+                                    <span id="zip-preview-matched-count" class="text-xs font-normal text-green-500"></span>
+                                </h5>
+                                <div class="bg-green-50 border border-green-200 rounded-lg overflow-hidden">
+                                    <table class="w-full text-xs">
+                                        <thead class="bg-green-100 text-green-800">
+                                            <tr>
+                                                <th class="px-3 py-1.5 text-left" data-i18n="quote.filename">文件名</th>
+                                                <th class="px-3 py-1.5 text-left" data-i18n="quote.material">材料</th>
+                                                <th class="px-3 py-1.5 text-left" data-i18n="quote.color">颜色</th>
+                                                <th class="px-3 py-1.5 text-left" data-i18n="quote.quantity">数量</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="zip-preview-matched-body" class="divide-y divide-green-100">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- 底部按钮 -->
+                        <div class="px-4 py-3 border-t border-gray-200 flex items-center justify-end gap-3 flex-shrink-0 pb-[env(safe-area-inset-bottom)]">
+                            <button id="zip-preview-cancel-btn" type="button" class="px-4 py-2.5 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 min-h-[44px]" data-i18n="common.cancel">取消</button>
+                            <button id="zip-preview-confirm-btn" type="button" class="px-5 py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 min-h-[44px]" data-i18n="zipPreview.confirmSlice">确认切片</button>
+                        </div>
+                    </div>
+                </div>
+            </div>

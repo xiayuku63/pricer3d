@@ -13,6 +13,7 @@ import io
 import json
 import logging
 import os
+import time
 import uuid
 import zipfile
 from typing import List, Optional
@@ -83,84 +84,295 @@ def _resolve_color_hex(color_str: str, fallback: str = "") -> str:
 # Max ZIP file size (1GB)
 MAX_ZIP_SIZE_BYTES = 1024 * 1024 * 1024
 
+# ── Preview session store (in-memory, TTL 10 minutes) ──
+_preview_sessions = {}  # {session_id: {data dict, expires_at}}
+_PREVIEW_SESSION_TTL = 600  # 10 minutes
+
+
+def _store_preview_session(data: dict) -> str:
+    """Store parsed ZIP data in memory and return a session_id."""
+    session_id = uuid.uuid4().hex
+    _preview_sessions[session_id] = {
+        "data": data,
+        "expires_at": time.time() + _PREVIEW_SESSION_TTL,
+    }
+    # Cleanup expired sessions
+    now = time.time()
+    expired = [k for k, v in _preview_sessions.items() if v["expires_at"] < now]
+    for k in expired:
+        _preview_sessions.pop(k, None)
+    return session_id
+
+
+def _get_preview_session(session_id: str) -> Optional[dict]:
+    """Retrieve stored preview data by session_id. Returns None if expired/missing."""
+    entry = _preview_sessions.get(session_id)
+    if not entry:
+        return None
+    if entry["expires_at"] < time.time():
+        _preview_sessions.pop(session_id, None)
+        return None
+    return entry["data"]
+
+
+def _consume_preview_session(session_id: str) -> Optional[dict]:
+    """Retrieve and delete stored preview data (one-time use)."""
+    data = _get_preview_session(session_id)
+    if data:
+        _preview_sessions.pop(session_id, None)
+    return data
+
+
+def _parse_zip_contents(file_bytes: bytes) -> dict:
+    """Parse ZIP bytes and return {excel_bytes, stl_files, checklist, match_result}.
+
+    Shared logic between preview and zip_quote endpoints.
+    """
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(file_bytes))
+    except zipfile.BadZipFile:
+        raise HTTPException(status_code=400, detail="无效的 ZIP 文件，请检查文件完整性")
+
+    excel_bytes = None
+    stl_files = []
+
+    for entry in zf.infolist():
+        if entry.is_dir():
+            continue
+        bn = os.path.basename(entry.filename)
+        if bn.startswith(".") or bn.startswith("__MACOSX") or bn.startswith("~$"):
+            continue
+
+        entry_bytes = zf.read(entry)
+        lower = bn.lower()
+
+        if lower.endswith((".xlsx", ".xls")):
+            if excel_bytes is None:
+                excel_bytes = entry_bytes
+                logger.info(f"ZIP: found Excel checklist: {bn}")
+        else:
+            ext = os.path.splitext(lower)[1]
+            if ext in SUPPORTED_EXTENSIONS:
+                stem = os.path.splitext(bn)[0].lower()
+                stl_files.append({
+                    "filename": bn,
+                    "name_stem": stem,
+                    "file_bytes": entry_bytes,
+                    "ext": ext,
+                })
+                logger.info(f"ZIP: found model file: {bn} (stem={stem})")
+
+    zf.close()
+
+    if not stl_files:
+        raise HTTPException(status_code=400, detail="ZIP 中未找到支持的模型文件（.stl/.stp/.step/.obj/.3mf）")
+    if len(stl_files) > MAX_FILES_PER_REQUEST:
+        raise HTTPException(status_code=400, detail=f"ZIP 中模型文件数量不能超过 {MAX_FILES_PER_REQUEST} 个")
+
+    checklist = _parse_excel_checklist(excel_bytes) if excel_bytes else None
+
+    if checklist:
+        match_result = _match_checklist_to_models(checklist, stl_files)
+    else:
+        match_result = {
+            "matched": [],
+            "checklist_only": [],
+            "stl_only": stl_files,
+            "match_mode": "none",
+        }
+
+    return {
+        "excel_bytes": excel_bytes,
+        "stl_files": stl_files,
+        "checklist": checklist,
+        "match_result": match_result,
+    }
+
+
+async def zip_preview(
+    request: Request,
+    file: UploadFile = File(...),
+    current_user=Depends(get_current_user),
+):
+    """
+    POST /api/quote/zip/preview
+    Parse ZIP and return match analysis without slicing.
+    Stores parsed data in memory keyed by session_id for the confirm step.
+    """
+    try:
+        fname = (file.filename or "").lower()
+        if not fname.endswith(".zip"):
+            raise HTTPException(status_code=400, detail="请上传 .zip 压缩文件")
+
+        content = await file.read()
+        if len(content) >= MAX_ZIP_SIZE_BYTES:
+            raise HTTPException(status_code=400, detail=f"ZIP 文件必须小于 {MAX_ZIP_SIZE_BYTES // (1024*1024)}MB")
+
+        parsed = _parse_zip_contents(content)
+        match_result = parsed["match_result"]
+        stl_files = parsed["stl_files"]
+        checklist = parsed["checklist"]
+
+        # Build response lists
+        matched_list = []
+        for m in match_result["matched"]:
+            matched_list.append({
+                "filename": m["stl"]["filename"],
+                "checklist": m["checklist"],
+            })
+
+        bom_only_list = []
+        for c in match_result["checklist_only"]:
+            bom_only_list.append({
+                "filename": c.get("filename", c.get("filename_stem", "")),
+                "reason": "清单中有但无对应模型",
+            })
+
+        model_only_list = []
+        for s in match_result["stl_only"]:
+            model_only_list.append({
+                "filename": s["filename"],
+                "reason": "模型不在清单中，将使用默认参数",
+            })
+
+        # Store parsed data for the confirm step
+        session_id = _store_preview_session({
+            "file_bytes": content,
+            "stl_files": parsed["stl_files"],
+            "checklist": parsed["checklist"],
+            "match_result": parsed["match_result"],
+            "excel_bytes": parsed["excel_bytes"],
+        })
+
+        return JSONResponse({
+            "matched": matched_list,
+            "bom_only": bom_only_list,
+            "model_only": model_only_list,
+            "match_summary": {
+                "matched": len(matched_list),
+                "bom_only": len(bom_only_list),
+                "model_only": len(model_only_list),
+            },
+            "session_id": session_id,
+        })
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"ZIP preview failed: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"ZIP 预览失败 ({str(e)})")
+
 
 async def zip_quote(
     request: Request,
-    file: UploadFile = File(...),
+    file: Optional[UploadFile] = File(default=None),
     material: str = Form("PLA"),
     color: str = Form("White"),
     quantity: int = Form(1),
     printer_model: Optional[str] = Form(default=None),
     slicer_preset_id: Optional[int] = Form(default=None),
+    session_id: Optional[str] = Form(default=None),
     current_user=Depends(get_current_user),
 ):
     """
     Upload a .zip file containing an Excel checklist (.xlsx/.xls) + STL model files.
     Returns match analysis + triggers slicing for matched models.
 
+    If session_id is provided (from preview step), uses stored parsed data directly.
+    Otherwise file is required (backward-compatible original flow).
+
     Request: multipart/form-data with:
-        file: the .zip file (required)
+        file: the .zip file (required unless session_id is given)
         material: default material (optional, default PLA)
         color: default color (optional, default White)
         quantity: default quantity (optional, default 1)
+        session_id: preview session id (optional, from /api/quote/zip/preview)
     """
     import asyncio
 
     try:
-        # Validate file extension
-        fname = (file.filename or "").lower()
-        if not fname.endswith(".zip"):
-            raise HTTPException(status_code=400, detail="请上传 .zip 压缩文件")
+        # ── Branch: use preview session data ──
+        if session_id:
+            preview_data = _consume_preview_session(session_id)
+            if not preview_data:
+                raise HTTPException(status_code=400, detail="预览会话已过期或不存在，请重新上传")
+            stl_files = preview_data["stl_files"]
+            checklist = preview_data["checklist"]
+            match_result = preview_data["match_result"]
+            content = preview_data["file_bytes"]
+        else:
+            # ── Original flow: parse ZIP from uploaded file ──
+            if not file:
+                raise HTTPException(status_code=400, detail="请上传 .zip 压缩文件或提供 session_id")
 
-        # Read file content
-        content = await file.read()
-        if len(content) >= MAX_ZIP_SIZE_BYTES:
-            raise HTTPException(status_code=400, detail=f"ZIP 文件必须小于 {MAX_ZIP_SIZE_BYTES // (1024*1024)}MB")
+            # Validate file extension
+            fname = (file.filename or "").lower()
+            if not fname.endswith(".zip"):
+                raise HTTPException(status_code=400, detail="请上传 .zip 压缩文件")
 
-        # Parse ZIP
-        try:
-            zf = zipfile.ZipFile(io.BytesIO(content))
-        except zipfile.BadZipFile:
-            raise HTTPException(status_code=400, detail="无效的 ZIP 文件，请检查文件完整性")
+            # Read file content
+            content = await file.read()
+            if len(content) >= MAX_ZIP_SIZE_BYTES:
+                raise HTTPException(status_code=400, detail=f"ZIP 文件必须小于 {MAX_ZIP_SIZE_BYTES // (1024*1024)}MB")
 
-        # Separate Excel and STL files from ZIP
-        excel_bytes = None
-        stl_files = []  # [{filename, name_stem, file_bytes}]
+            # Parse ZIP
+            try:
+                zf = zipfile.ZipFile(io.BytesIO(content))
+            except zipfile.BadZipFile:
+                raise HTTPException(status_code=400, detail="无效的 ZIP 文件，请检查文件完整性")
 
-        for entry in zf.infolist():
-            # Skip directories and __MACOSX junk
-            if entry.is_dir():
-                continue
-            bn = os.path.basename(entry.filename)
-            if bn.startswith(".") or bn.startswith("__MACOSX") or bn.startswith("~$"):
-                continue
+            # Separate Excel and STL files from ZIP
+            excel_bytes = None
+            stl_files = []  # [{filename, name_stem, file_bytes}]
 
-            entry_bytes = zf.read(entry)
+            for entry in zf.infolist():
+                # Skip directories and __MACOSX junk
+                if entry.is_dir():
+                    continue
+                bn = os.path.basename(entry.filename)
+                if bn.startswith(".") or bn.startswith("__MACOSX") or bn.startswith("~$"):
+                    continue
 
-            lower = bn.lower()
-            if lower.endswith((".xlsx", ".xls")):
-                if excel_bytes is None:
-                    excel_bytes = entry_bytes
-                    logger.info(f"ZIP: found Excel checklist: {bn}")
+                entry_bytes = zf.read(entry)
+
+                lower = bn.lower()
+                if lower.endswith((".xlsx", ".xls")):
+                    if excel_bytes is None:
+                        excel_bytes = entry_bytes
+                        logger.info(f"ZIP: found Excel checklist: {bn}")
+                else:
+                    ext = os.path.splitext(lower)[1]
+                    if ext in SUPPORTED_EXTENSIONS:
+                        stem = os.path.splitext(bn)[0].lower()
+                        stl_files.append({
+                            "filename": bn,
+                            "name_stem": stem,
+                            "file_bytes": entry_bytes,
+                            "ext": ext,
+                        })
+                        logger.info(f"ZIP: found model file: {bn} (stem={stem})")
+
+            zf.close()
+
+            if not stl_files:
+                raise HTTPException(status_code=400, detail="ZIP 中未找到支持的模型文件（.stl/.stp/.step/.obj/.3mf）")
+
+            if len(stl_files) > MAX_FILES_PER_REQUEST:
+                raise HTTPException(status_code=400, detail=f"ZIP 中模型文件数量不能超过 {MAX_FILES_PER_REQUEST} 个")
+
+            # Parse Excel checklist
+            checklist = _parse_excel_checklist(excel_bytes) if excel_bytes else None
+
+            # Match checklist to models
+            if checklist:
+                match_result = _match_checklist_to_models(checklist, stl_files)
             else:
-                ext = os.path.splitext(lower)[1]
-                if ext in SUPPORTED_EXTENSIONS:
-                    stem = os.path.splitext(bn)[0].lower()
-                    stl_files.append({
-                        "filename": bn,
-                        "name_stem": stem,
-                        "file_bytes": entry_bytes,
-                        "ext": ext,
-                    })
-                    logger.info(f"ZIP: found model file: {bn} (stem={stem})")
-
-        zf.close()
-
-        if not stl_files:
-            raise HTTPException(status_code=400, detail="ZIP 中未找到支持的模型文件（.stl/.stp/.step/.obj/.3mf）")
-
-        if len(stl_files) > MAX_FILES_PER_REQUEST:
-            raise HTTPException(status_code=400, detail=f"ZIP 中模型文件数量不能超过 {MAX_FILES_PER_REQUEST} 个")
+                match_result = {
+                    "matched": [],
+                    "checklist_only": [],
+                    "stl_only": stl_files,
+                    "match_mode": "none",
+                }
 
         # 免费用户累计模型总数限制
         from .deps import is_member_user
@@ -177,9 +389,6 @@ async def zip_quote(
             if existing_count >= FREE_TOTAL_MODEL_LIMIT:
                 raise HTTPException(status_code=400, detail=f"免费用户最多累计 {FREE_TOTAL_MODEL_LIMIT} 个模型，升级会员无限制")
 
-        # Parse Excel checklist
-        checklist = _parse_excel_checklist(excel_bytes) if excel_bytes else None
-
         # Pre-save all model files to disk so thumbnails work even if slicing fails
         from app.utils import _user_base_dir
         _user_folder = f"user_{current_user['id']}_{current_user['username']}"
@@ -191,17 +400,6 @@ async def zip_quote(
             with open(_saved, "wb") as _f:
                 _f.write(_sf["file_bytes"])
             _sf["_pre_saved_path"] = _saved
-
-        # Match checklist to models
-        if checklist:
-            match_result = _match_checklist_to_models(checklist, stl_files)
-        else:
-            match_result = {
-                "matched": [],
-                "checklist_only": [],
-                "stl_only": stl_files,
-                "match_mode": "none",
-            }
 
         # Get user materials + pricing + defaults
         from .db import get_db_session
