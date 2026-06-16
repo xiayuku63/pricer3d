@@ -114,6 +114,8 @@ export default {
   'quote.quoteResults': '报价结果',
   'quote.filename': '文件名',
   'quote.material': '材料',
+  'quote.materialType': '材料类型',
+  'quote.materialBrand': '材料品牌',
   'quote.brand': '品牌',
   'quote.color': '颜色',
   'quote.quantity': '数量',

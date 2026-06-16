@@ -113,6 +113,8 @@ export default {
   'quote.quoteResults': 'Quote Results',
   'quote.filename': 'Filename',
   'quote.material': 'Material',
+  'quote.materialType': 'Material Type',
+  'quote.materialBrand': 'Material Brand',
   'quote.brand': 'Brand',
   'quote.color': 'Color',
   'quote.quantity': 'Qty',

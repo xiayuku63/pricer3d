@@ -708,11 +708,13 @@ function _buildChecklistHtml(item) {
 function _buildBomDataBadgeHtml(item) {
     const src = item._checklist_source || {};
     const parts = [];
+    if (src.material_type) parts.push(t('quote.materialType') + ':' + src.material_type);
+    if (src.material_brand) parts.push(t('quote.materialBrand') + ':' + src.material_brand);
     if (src.material) parts.push(t('quote.material') + ':' + src.material);
     if (src.color) parts.push(t('quote.color') + ':' + src.color);
     if (src.quantity) parts.push(t('quote.quantity') + ':' + src.quantity);
     const tip = t('quote.usedBomData') + (parts.length ? '：' + parts.join(' | ') : '');
-    return ` <span class="inline-block whitespace-nowrap text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1 cursor-help" title="${tip}">\u{1F4CB}${t('quote.badgeBomData')}</span>`;
+    return ` <span class="inline-block whitespace-nowrap text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1 cursor-help" title="${tip}">📋${t('quote.badgeBomData')}</span>`;
 }
 
 // Helper: build default params badge HTML
