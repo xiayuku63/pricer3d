@@ -47,6 +47,39 @@ from .zip_parser import (
 
 logger = logging.getLogger(__name__)
 
+
+# Color name → hex mapping for checklist fuzzy-match
+_COLOR_NAME_TO_HEX = {}
+try:
+    from .config import DEFAULT_COLORS
+    for _c in DEFAULT_COLORS:
+        if isinstance(_c, dict) and _c.get("name") and _c.get("hex"):
+            _COLOR_NAME_TO_HEX[_c["name"].strip()] = _c["hex"].strip()
+except Exception:
+    pass
+# Also map English color names
+_ENGLISH_COLOR_MAP = {
+    "White": "#ffffff", "Black": "#000000", "Gray": "#808080", "Grey": "#808080",
+    "Red": "#dc2626", "Blue": "#2563eb", "Green": "#16a34a", "Yellow": "#ca8a04",
+    "Orange": "#ea580c", "Purple": "#9333ea", "Pink": "#db2777",
+}
+_COLOR_NAME_TO_HEX.update(_ENGLISH_COLOR_MAP)
+
+
+def _resolve_color_hex(color_str: str, fallback: str = "") -> str:
+    """Convert a color name or hex to a valid hex string."""
+    s = color_str.strip()
+    if not s:
+        return fallback
+    if s.startswith("#") and len(s) == 7:
+        return s
+    hex_val = _COLOR_NAME_TO_HEX.get(s)
+    if hex_val:
+        return hex_val
+    for name, hx in _COLOR_NAME_TO_HEX.items():
+        if name in s or s in name:
+            return hx
+    return fallback or s
 # Max ZIP file size (1GB)
 MAX_ZIP_SIZE_BYTES = 1024 * 1024 * 1024
 
@@ -290,7 +323,7 @@ async def zip_quote(
 
                         # Use checklist quantity/color/material if present, else form defaults
                         cl_qty = cl.get("quantity_parsed", quantity)
-                        cl_color = cl.get("color", "").strip() or color
+                        cl_color = _resolve_color_hex(cl.get("color", ""), _resolve_color_hex(color))
                         cl_material = cl.get("material_type", "").strip() or material
 
                         # ── Printer: checklist > user default ──
@@ -372,7 +405,7 @@ async def zip_quote(
                             layer_height=0.2,
                             infill=20,
                             quantity=quantity,
-                            color=color,
+                            color=_resolve_color_hex(color),
                             user_materials=user_materials,
                             pricing_config=file_pricing,
                             slicer_preset=_default_preset,
