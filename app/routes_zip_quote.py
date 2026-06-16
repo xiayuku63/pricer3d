@@ -259,37 +259,65 @@ async def zip_quote(
                         cl = _item["checklist"]
                         stl = _item["stl"]
 
-                        # Build per-file options from checklist
-                        lh = cl.get("layer_height_parsed", 0.2)
-                        if isinstance(lh, str):
+                        # ── Check if checklist actually specified print params ──
+                        _cl_lh_raw = cl.get("layer_height_parsed")
+                        _cl_wc_raw = cl.get("wall_count_parsed")
+                        _cl_inf_raw = cl.get("infill_parsed")
+                        has_print_params = any([_cl_lh_raw, _cl_wc_raw, _cl_inf_raw])
+
+                        # Parse values when present
+                        if _cl_lh_raw:
                             try:
-                                lh = float(lh)
+                                lh = float(_cl_lh_raw)
                             except (ValueError, TypeError):
-                                lh = 0.2
-                        wc = cl.get("wall_count_parsed", 3)
-                        if isinstance(wc, str):
+                                lh = None
+                        else:
+                            lh = None
+                        if _cl_wc_raw:
                             try:
-                                wc = int(float(wc))
+                                wc = int(float(_cl_wc_raw))
                             except (ValueError, TypeError):
-                                wc = 3
-                        inf = cl.get("infill_parsed", 20)
-                        if isinstance(inf, str):
+                                wc = None
+                        else:
+                            wc = None
+                        if _cl_inf_raw:
                             try:
-                                inf = int(float(inf))
+                                inf = int(float(_cl_inf_raw))
                             except (ValueError, TypeError):
-                                inf = 20
+                                inf = None
+                        else:
+                            inf = None
 
                         # Use checklist quantity/color/material if present, else form defaults
                         cl_qty = cl.get("quantity_parsed", quantity)
                         cl_color = cl.get("color", "").strip() or color
                         cl_material = cl.get("material_type", "").strip() or material
+
+                        # ── Printer: checklist > user default ──
                         cl_printer = str(cl.get("printer_model", "")).strip()
                         cl_nozzle = str(cl.get("nozzle", "")).strip()
-                        compound_id = _lookup_printer(cl_printer, cl_nozzle)
+                        has_printer = bool(cl_printer)
+                        if has_printer:
+                            compound_id = _lookup_printer(cl_printer, cl_nozzle)
+                        else:
+                            compound_id = _default_compound_id
 
                         file_pricing = dict(pricing_config)
                         if compound_id:
                             file_pricing["printer_model"] = compound_id
+
+                        # ── Print params: checklist has values → use them + no preset;
+                        #                 checklist empty → use default preset ──
+                        if has_print_params:
+                            file_preset = None
+                            _lh = lh if lh is not None else 0.2
+                            _wc = wc if wc is not None else 3
+                            _inf = inf if inf is not None else 20
+                        else:
+                            file_preset = _default_preset
+                            _lh = 0.2   # will be overridden by preset inside process_single_file
+                            _wc = 3
+                            _inf = 20
 
                         fake_file = UploadFile(
                             filename=stl["filename"],
@@ -299,24 +327,24 @@ async def zip_quote(
                         result = await process_single_file(
                             fake_file,
                             material=cl_material,
-                            layer_height=lh,
-                            infill=inf,
+                            layer_height=_lh,
+                            infill=_inf,
                             quantity=cl_qty,
                             color=cl_color,
                             user_materials=user_materials,
                             pricing_config=file_pricing,
-                            slicer_preset=None,
-                            perimeters=wc,
+                            slicer_preset=file_preset,
+                            perimeters=_wc,
                             current_user=current_user,
                             auto_orient=False,
                         )
                         result["_checklist_params"] = True
                         result["_checklist_source"] = {
-                            "layer_height": lh,
-                            "wall_count": wc,
-                            "infill": inf,
-                            "printer_model": compound_id or cl_printer or "",
-                            "nozzle": cl_nozzle or "",
+                            "layer_height": _lh if has_print_params else "",
+                            "wall_count": _wc if has_print_params else "",
+                            "infill": _inf if has_print_params else "",
+                            "printer_model": (compound_id or cl_printer or "") if has_printer else "",
+                            "nozzle": cl_nozzle if has_printer else "",
                             "material_type": cl.get("material_type", ""),
                             "material_brand": cl.get("material_brand", ""),
                             "color": cl_color,
