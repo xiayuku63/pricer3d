@@ -323,7 +323,8 @@ async def zip_quote(
 
                         # Use checklist quantity/color/material if present, else form defaults
                         cl_qty = cl.get("quantity_parsed", quantity)
-                        cl_color = _resolve_color_hex(cl.get("color", ""), _resolve_color_hex(color))
+                        cl_color_raw = cl.get("color", "").strip()  # 保留原始颜色字符串
+                        cl_color = _resolve_color_hex(cl_color_raw, _resolve_color_hex(color))
                         cl_material = cl.get("material_type", "").strip() or material
 
                         # ── Printer: checklist > user default ──
@@ -380,7 +381,7 @@ async def zip_quote(
                             "nozzle": cl_nozzle if has_printer else "",
                             "material_type": cl.get("material_type", ""),
                             "material_brand": cl.get("material_brand", ""),
-                            "color": cl_color,
+                            "color": cl_color_raw or cl_color,  # 优先显示原始颜色字符串
                             "quantity": cl_qty,
                         }
                         if result.get("_saved_path"):
