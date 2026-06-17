@@ -89,3 +89,23 @@
                     </div>
                 </div>
             </div>
+
+<!-- 离开确认弹窗 -->
+<div id="leave-confirm-modal" class="hidden fixed inset-0 z-[60]">
+    <div class="absolute inset-0 bg-black/50"></div>
+    <div class="relative z-10 h-full w-full flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="w-full sm:max-w-sm bg-white rounded-t-2xl sm:rounded-lg sm:shadow-xl overflow-hidden">
+            <div class="px-6 pt-5 pb-2 text-center">
+                <div class="mx-auto w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mb-3">
+                    <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+                </div>
+                <h4 class="text-base font-semibold text-gray-800 mb-1">确认离开？</h4>
+                <p class="text-sm text-gray-500">您有未保存的文件，离开后将丢失</p>
+            </div>
+            <div class="px-6 pt-3 pb-5 flex items-center gap-3">
+                <button id="leave-confirm-cancel" type="button" class="flex-1 px-4 py-2.5 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50">取消</button>
+                <button id="leave-confirm-ok" type="button" class="flex-1 px-4 py-2.5 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700">确认离开</button>
+            </div>
+        </div>
+    </div>
+</div>

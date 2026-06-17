@@ -1223,13 +1223,34 @@ document.addEventListener('DOMContentLoaded', () => {
     preloadPrinterSelectors();
     window.addEventListener('resize', updateViewerSize);
 
-    // Before unload warning
+    // Before unload warning — custom modal instead of browser native dialog
     window.addEventListener('beforeunload', (event) => {
         if (selectedFilesMap.size > 0) {
             event.preventDefault();
-            event.returnValue = '您有未保存的文件，确定要离开吗？';
+            event.returnValue = '';
         }
     });
+    // Intercept link clicks and navigation when files are selected
+    document.addEventListener('click', (e) => {
+        if (selectedFilesMap.size === 0) return;
+        const link = e.target.closest('a[href]');
+        if (!link || link.target === '_blank') return;
+        const href = link.getAttribute('href');
+        if (!href || href === '#' || href.startsWith('javascript:')) return;
+        e.preventDefault();
+        _showLeaveConfirmModal(() => { window.location.href = href; });
+    });
+    function _showLeaveConfirmModal(onConfirm) {
+        const modal = document.getElementById('leave-confirm-modal');
+        const cancelBtn = document.getElementById('leave-confirm-cancel');
+        const okBtn = document.getElementById('leave-confirm-ok');
+        if (!modal) { onConfirm(); return; }
+        modal.classList.remove('hidden');
+        function close() { modal.classList.add('hidden'); cancelBtn.onclick = null; okBtn.onclick = null; }
+        cancelBtn.onclick = close;
+        okBtn.onclick = function() { close(); onConfirm(); };
+        modal.querySelector('.bg-black\/50')?.addEventListener('click', close, { once: true });
+    }
 
     refreshOptionsSummary();
     initializeAuth().then(() => {
