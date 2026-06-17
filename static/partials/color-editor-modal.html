@@ -12,10 +12,10 @@
                     <div class="border-t pt-3">
                         <label class="text-xs text-gray-600">新增颜色</label>
                         <div class="flex items-center gap-2 mt-1">
-                            <input id="color-editor-picker" type="color" class="w-8 h-8 rounded border border-gray-300 cursor-pointer" value="#6366f1">
-                            <span id="color-editor-hex" class="text-xs font-mono">#6366f1</span>
-                            <input id="color-editor-name" type="text" class="flex-1 text-xs border border-gray-300 rounded px-2 py-1" placeholder="颜色名称（可选）">
-                            <button id="color-editor-add" type="button" class="px-3 py-1.5 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700">添加</button>
+                            <input id="color-editor-picker" type="color" class="w-8 h-8 rounded border border-gray-300 cursor-pointer p-0" oninput="document.getElementById('color-editor-hex').textContent = this.value">
+                            <span id="color-editor-hex" class="text-xs font-mono text-gray-500 w-18">#6366f1</span>
+                            <input id="color-editor-name" type="text" placeholder="颜色名称（可选）" class="flex-1 border border-gray-300 rounded-sm text-xs px-2 py-1.5">
+                            <button id="color-editor-add" type="button" class="px-3 py-1.5 text-xs bg-indigo-600 text-white rounded-md hover:bg-indigo-700">添加</button>
                         </div>
                     </div>
                 </div>

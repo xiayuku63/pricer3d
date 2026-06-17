@@ -400,11 +400,11 @@ function _showZipPreviewModal(previewData) {
         modal.onclick = function(e) {
             const target = e.target;
             if (target.closest('#zip-preview-close-btn') || target.closest('#zip-preview-cancel-btn')) {
-                onCancel();
+                close(false);
             } else if (target.closest('#zip-preview-confirm-btn')) {
-                onConfirm();
+                close(true);
             } else if (target.id === 'zip-preview-backdrop' || target.id === 'zip-preview-modal') {
-                onCancel();
+                close(false);
             }
         };
     });

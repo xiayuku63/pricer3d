@@ -60,29 +60,11 @@ export async function setLang(l) {
   // 确保语言包已加载
   await _loadPack(l);
 
-  // 更新 DOM 中 data-i18n 元素（只更新直接文本节点，保留子元素如 sort-arrow）
+  // 更新 DOM 中 data-i18n 元素
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
-    if (!key) return;
-    const translated = t(key);
-    if (translated === undefined) return;
-    // For buttons/inputs: use textContent (no child elements to preserve)
-    if (el.tagName === 'BUTTON' || el.tagName === 'INPUT') {
-      el.textContent = translated;
-      return;
-    }
-    // For other elements: update only the first text node, preserve children
-    let textNode = null;
-    for (const node of el.childNodes) {
-      if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
-        textNode = node;
-        break;
-      }
-    }
-    if (textNode) {
-      textNode.textContent = translated + ' ';
-    } else {
-      el.insertBefore(document.createTextNode(translated + ' '), el.firstChild);
+    if (key) {
+      el.textContent = t(key);
     }
   });
   // 更新 placeholder
