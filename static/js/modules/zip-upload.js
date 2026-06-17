@@ -130,9 +130,7 @@ async function _handleZipUpload(zipFiles, modelFiles, validFiles) {
         hideProgress();
 
         // ── Step 2: Show preview modal and wait for user confirmation ──
-        console.log('[ZIP Upload] Showing preview modal...');
         const confirmed = await _showZipPreviewModal(previewData);
-        console.log('[ZIP Upload] Modal result:', confirmed);
         if (!confirmed) {
             hideProgress();
             dom.fileNameDisplay.textContent = t('zipPreview.cancelled') || '已取消 ZIP 切片';
@@ -154,7 +152,6 @@ async function _handleZipUpload(zipFiles, modelFiles, validFiles) {
             zipCancelBtn.onclick = () => { zipAbortController.abort(); };
         }
 
-        console.log('[ZIP Upload] Confirm step - session_id:', previewData.session_id);
         const sliceFormData = new FormData();
         sliceFormData.append('session_id', previewData.session_id);
         sliceFormData.append('material', quoteOptions.material);
@@ -167,7 +164,6 @@ async function _handleZipUpload(zipFiles, modelFiles, validFiles) {
         const zipPresetId = (zipPresetEl && zipPresetEl.value) ? Number(zipPresetEl.value) : null;
         if (zipPresetId) sliceFormData.append('slicer_preset_id', String(zipPresetId));
 
-        console.log('[ZIP Upload] Calling /api/quote/zip with session_id:', previewData.session_id);
         const resp = await fetch('/api/quote/zip', {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${authToken}` },
@@ -281,8 +277,7 @@ async function _handleZipUpload(zipFiles, modelFiles, validFiles) {
             showToast(t('quote.processingCancelled'), 'warning');
             dom.fileNameDisplay.textContent = t('quote.processingCancelled');
         } else {
-            console.error('[ZIP Upload] Error:', err);
-            showProgressError(err.message || 'ZIP 解析失败');
+                        showProgressError(err.message || 'ZIP 解析失败');
             hideProgress();
             showToast(err.message || 'ZIP 解析失败', 'error');
             dom.fileNameDisplay.textContent = 'ZIP 文件处理失败';
@@ -391,10 +386,8 @@ function _showZipPreviewModal(previewData) {
         });
 
         function close(result) {
-            console.log('[ZIP Modal] close(' + result + ') called');
             panel.classList.add('translate-y-full');
             setTimeout(() => {
-                console.log('[ZIP Modal] setTimeout fired, resolving with:', result);
                 modal.classList.add('hidden');
                 cleanup();
                 resolve(result);
@@ -408,9 +401,6 @@ function _showZipPreviewModal(previewData) {
             backdrop.removeEventListener('click', onCancel);
         }
 
-        function onClose() { console.log('[ZIP Modal] Close button clicked'); close(false); }
-        function onCancel() { console.log('[ZIP Modal] Cancel button clicked'); close(false); }
-        function onConfirm() { console.log('[ZIP Modal] Confirm button clicked'); close(true); }
 
         closeBtn.addEventListener('click', onClose);
         cancelBtn.addEventListener('click', onCancel);
