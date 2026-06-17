@@ -796,8 +796,13 @@ function _sortResults(arr) {
 // Update sort arrow indicators in thead
 function _updateSortArrows() {
     document.querySelectorAll('thead th[data-sort-key]').forEach(th => {
-        const arrow = th.querySelector('.sort-arrow');
-        if (!arrow) return;
+        let arrow = th.querySelector('.sort-arrow');
+        // Create arrow span if missing (i18n may have removed it)
+        if (!arrow) {
+            arrow = document.createElement('span');
+            arrow.className = 'sort-arrow text-gray-400 text-[9px]';
+            th.appendChild(arrow);
+        }
         if (th.getAttribute('data-sort-key') === _sortState.key) {
             arrow.textContent = _sortState.direction === 'asc' ? ' ▲' : ' ▼';
             arrow.classList.remove('text-gray-400');

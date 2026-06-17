@@ -121,7 +121,7 @@ async function _handleZipUpload(zipFiles, modelFiles, validFiles) {
             let errMsg = 'ZIP 上传失败';
             try {
                 const errData = await previewResp.json();
-                errMsg = errData.detail || errMsg;
+                errMsg = errData.message || errData.detail || errMsg;
             } catch (_) {}
             throw new Error(errMsg);
         }
@@ -175,7 +175,7 @@ async function _handleZipUpload(zipFiles, modelFiles, validFiles) {
             let errMsg = 'ZIP 切片失败';
             try {
                 const errData = await resp.json();
-                errMsg = errData.detail || errMsg;
+                errMsg = errData.message || errData.detail || errMsg;
             } catch (_) {}
             throw new Error(errMsg);
         }
@@ -192,7 +192,8 @@ async function _handleZipUpload(zipFiles, modelFiles, validFiles) {
             buffer += decoder.decode(value, {stream: true});
             while (buffer.includes('\n\n')) {
                 const idx = buffer.indexOf('\n\n');
-                const line = buffer.substring(0, idx).replace('data: ', '');
+                const rawLine = buffer.substring(0, idx);
+                const line = rawLine.startsWith('data: ') ? rawLine.slice(6) : rawLine;
                 buffer = buffer.substring(idx + 2);
                 let event;
                 try { event = JSON.parse(line); } catch (_) { continue; }
@@ -299,6 +300,12 @@ function _showZipPreviewModal(previewData) {
 
         if (!modal || !panel) {
             // Fallback: if modal not found, auto-confirm
+            resolve(true);
+            return;
+        }
+
+        // Guard all required interactive elements
+        if (!closeBtn || !cancelBtn || !confirmBtn || !backdrop) {
             resolve(true);
             return;
         }
