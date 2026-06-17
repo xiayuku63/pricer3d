@@ -260,6 +260,7 @@ async function _handleZipUpload(zipFiles, modelFiles, validFiles) {
         }
 
         showProgressSuccess('ZIP 解析完成');
+        await new Promise(r => setTimeout(r, 600)); // 最小显示时间
         hideProgress();
         if (zipCancelBtn) zipCancelBtn.classList.add('hidden');
 
