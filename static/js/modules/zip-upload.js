@@ -386,26 +386,27 @@ function _showZipPreviewModal(previewData) {
         });
 
         function close(result) {
-            panel.classList.add('translate-y-full');
-            setTimeout(() => {
-                modal.classList.add('hidden');
-                cleanup();
-                resolve(result);
-            }, 300);
+            modal.classList.add('hidden');
+            cleanup();
+            resolve(result);
         }
 
         function cleanup() {
-            closeBtn.removeEventListener('click', onClose);
-            cancelBtn.removeEventListener('click', onCancel);
-            confirmBtn.removeEventListener('click', onConfirm);
-            backdrop.removeEventListener('click', onCancel);
+            modal.onclick = null;
         }
 
 
-        closeBtn.addEventListener('click', onClose);
-        cancelBtn.addEventListener('click', onCancel);
-        confirmBtn.addEventListener('click', onConfirm);
-        backdrop.addEventListener('click', onCancel);
+        // Event delegation on modal - handles all button clicks
+        modal.onclick = function(e) {
+            const target = e.target;
+            if (target.closest('#zip-preview-close-btn') || target.closest('#zip-preview-cancel-btn')) {
+                onCancel();
+            } else if (target.closest('#zip-preview-confirm-btn')) {
+                onConfirm();
+            } else if (target.id === 'zip-preview-backdrop' || target.id === 'zip-preview-modal') {
+                onCancel();
+            }
+        };
     });
 }
 
