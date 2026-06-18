@@ -15,7 +15,7 @@ import {
     defaultMaterial, setDefaultMaterial,
     defaultColor, setDefaultColor,
     defaultBrand, setDefaultBrand,
-    getBrandOptions, getMaterialsByBrand, getUsedBrandOptions, MATERIAL_TYPE_PRESETS,
+    getBrandOptions, getMaterialsByBrand, MATERIAL_TYPE_PRESETS,
 } from './state.js';
 import { t } from './i18n.js';
 import { openLoginModal } from './auth.js';
@@ -202,11 +202,11 @@ export function renderUserCenterUI() {
             { value: 'custom', label: t('material.brandCustom') },
         ];
 
-        // Populate default brand dropdown (only brands with materials configured)
+        // Populate default brand dropdown (all brands including MAJOR_BRANDS)
         const defaultBrandSel = document.getElementById('uc-default-brand');
         if (defaultBrandSel) {
-            const usedBrands = getUsedBrandOptions();
-            defaultBrandSel.innerHTML = usedBrands.map(b =>
+            const allBrands = getBrandOptions();
+            defaultBrandSel.innerHTML = allBrands.map(b =>
                 `<option value="${escapeHtml(b)}" ${defaultBrand === b ? 'selected' : ''}>${escapeHtml(b)}</option>`
             ).join('');
             if (!defaultBrandSel.value && defaultBrandSel.options.length) defaultBrandSel.value = defaultBrandSel.options[0].value;
@@ -295,11 +295,11 @@ export function renderUserCenterUI() {
         }
     }
 
-    // Populate default brand dropdown (only brands with materials configured)
+    // Populate default brand dropdown (all brands including MAJOR_BRANDS)
     const defaultBrandSel = document.getElementById('uc-default-brand');
     if (defaultBrandSel) {
-        const usedBrands = getUsedBrandOptions();
-        defaultBrandSel.innerHTML = usedBrands.map(b =>
+        const allBrands = getBrandOptions();
+        defaultBrandSel.innerHTML = allBrands.map(b =>
             `<option value="${escapeHtml(b)}" ${defaultBrand === b ? 'selected' : ''}>${escapeHtml(b)}</option>`
         ).join('');
         // 如果已选品牌不在列表中，重置为第一个
