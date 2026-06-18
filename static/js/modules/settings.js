@@ -15,7 +15,7 @@ import {
     defaultMaterial, setDefaultMaterial,
     defaultColor, setDefaultColor,
     defaultBrand, setDefaultBrand,
-    getBrandOptions, getMaterialsByBrand, MATERIAL_TYPE_PRESETS,
+    getBrandOptions, getMaterialsByBrand, getUsedBrandOptions, MATERIAL_TYPE_PRESETS,
 } from './state.js';
 import { t } from './i18n.js';
 import { openLoginModal } from './auth.js';
