@@ -738,7 +738,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (dom.addMaterialBtn) dom.addMaterialBtn.addEventListener('click', () => {
         const defaultType = Object.keys(MATERIAL_TYPE_PRESETS)[0] || 'PLA';
         const defaultPreset = MATERIAL_TYPE_PRESETS[defaultType] || { density: 1.24, price_per_kg: 80 };
-        MATERIAL_OPTIONS.push({ name: defaultType, brand: "Generic", density: defaultPreset.density, price_per_kg: defaultPreset.price_per_kg, colors: [{ name: "黑色", hex: "#000000" }, { name: "白色", hex: "#ffffff" }] });
+        MATERIAL_OPTIONS.push({ name: defaultType, brand: (quoteOptions.brand || "Generic"), density: defaultPreset.density, price_per_kg: defaultPreset.price_per_kg, colors: [{ name: "黑色", hex: "#000000" }, { name: "白色", hex: "#ffffff" }] });
         renderUserCenterUI();
     });
     const matRestoreBtn = document.getElementById('material-restore-defaults-btn');

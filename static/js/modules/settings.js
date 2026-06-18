@@ -171,6 +171,29 @@ export function buildPrinterOptionsHtml(selectedId) {
 }
 
 // ── Render user center ──
+/**
+ * Get available material types for a row, excluding types already used by same brand.
+ */
+function _getTypeOptionsForRow(m, rowIdx) {
+    const brand = (m.brand || 'Generic').trim();
+    const allTypes = new Set(Object.keys(MATERIAL_TYPE_PRESETS));
+    // Include custom types from MATERIAL_OPTIONS
+    for (const mat of MATERIAL_OPTIONS) {
+        if (mat.name && !MATERIAL_TYPE_PRESETS[mat.name]) allTypes.add(mat.name);
+    }
+    // Exclude types already used by same brand in other rows
+    for (let i = 0; i < MATERIAL_OPTIONS.length; i++) {
+        if (i === rowIdx) continue;
+        const other = MATERIAL_OPTIONS[i];
+        if ((other.brand || 'Generic').trim() === brand && other.name) {
+            allTypes.delete(other.name);
+        }
+    }
+    // Always keep current row's type
+    if (m.name) allTypes.add(m.name);
+    return [...allTypes].sort();
+}
+
 export function renderUserCenterUI() {
     const {
         materialsTbody, cfgMachineHourlyRate, cfgSetupFee, cfgMinJobFee,
@@ -236,12 +259,11 @@ export function renderUserCenterUI() {
                 </td>
                 <td class="px-3 py-2.5">
                     <div class="flex items-center gap-1">
-                        <input type="text" list="type-options-${idx}" class="flex-1 min-w-0 border-gray-300 rounded-md text-xs px-2 py-1.5 material-type-input" value="${escapeHtml(m.name)}" data-idx="${idx}" data-field="name" placeholder="${t('material.typePlaceholder') || '输入或选择类型'}">
+                        <select class="flex-1 min-w-0 border-gray-300 rounded-md text-xs px-1 py-1.5 material-type-input" data-idx="${idx}" data-field="name">
+                            ${_getTypeOptionsForRow(m, idx).map(tp => `<option value="${tp}"${tp === m.name ? ' selected' : ''}>${tp}</option>`).join('')}
+                        </select>
                         ${typeCustomBadge}
                     </div>
-                    <datalist id="type-options-${idx}">
-                        ${presetTypes.map(tp => `<option value="${tp}">`).join('')}
-                    </datalist>
                 </td>
                 <td class="px-3 py-2.5"><input type="number" step="0.01" class="w-full border-gray-300 rounded-md text-xs px-2 py-1.5" value="${m.density}" data-idx="${idx}" data-field="density"></td>
                 <td class="px-3 py-2.5"><input type="number" step="0.01" class="w-full border-gray-300 rounded-md text-xs px-2 py-1.5" value="${m.price_per_kg}" data-idx="${idx}" data-field="price_per_kg"></td>
