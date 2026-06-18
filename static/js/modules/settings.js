@@ -221,8 +221,8 @@ export function renderUserCenterUI() {
             const presetTypes = Object.keys(MATERIAL_TYPE_PRESETS);
             const isInPreset = presetTypes.includes(m.name);
             
-            const brandCustomBadge = isCustomBrand ? `<span class="custom-brand-badge text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded whitespace-nowrap flex-shrink-0" title="${t('material.brandCustom') || '自定义品牌'}">${t('material.brandCustom') || '自定义'}</span>` : '';
-            const typeCustomBadge = !isInPreset ? `<span class="custom-type-badge text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded whitespace-nowrap flex-shrink-0" title="${t('material.typeCustom') || '自定义类型'}">${t('material.typeCustom') || '自定义'}</span>` : '';
+            const brandCustomBadge = isCustomBrand ? `<span class="custom-brand-badge text-[9px] bg-amber-100 text-amber-700 px-1 py-px rounded-sm whitespace-nowrap flex-shrink-0" title="${t('material.brandCustom') || '自定义品牌'}">自定义</span>` : '';
+            const typeCustomBadge = !isInPreset ? `<span class="custom-type-badge text-[9px] bg-amber-100 text-amber-700 px-1 py-px rounded-sm whitespace-nowrap flex-shrink-0" title="${t('material.typeCustom') || '自定义类型'}">自定义</span>` : '';
             
             return `
             <tr class="hover:bg-gray-50">
