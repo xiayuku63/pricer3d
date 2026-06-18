@@ -2,7 +2,7 @@
 import {
     quoteOptions, currentResults, setCurrentResults,
     MATERIAL_OPTIONS, renderColorDropdown, getActivePrinterCompoundId,
-    getUsedBrandOptions, getMaterialsByBrand,
+    getBrandOptions, getMaterialsByBrand,
 } from './state.js';
 import { renderResultsTable, recalcSummaryFromCurrentResults, refreshOptionsSummary } from './quote-render.js';
 import { reQuoteAllSelectedFiles } from './quote-api.js';
@@ -15,7 +15,7 @@ export function setBatchDom(d) { _dom = d; }
 export function refreshBatchBrandDropdown() {
     const sel = document.getElementById('batch-brand');
     if (!sel) return;
-    const brands = getUsedBrandOptions();
+    const brands = getBrandOptions();
     const prev = sel.value || quoteOptions.brand || '';
     sel.innerHTML = brands.map(b => `<option value="${b}">${b}</option>`).join('');
     // 恢复选中：优先用上次值，其次 quoteOptions.brand
