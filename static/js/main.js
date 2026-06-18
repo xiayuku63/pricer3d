@@ -457,6 +457,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (batchBrand) batchBrand.addEventListener('change', refreshBatchMaterialDropdown);
     if (batchMaterial) batchMaterial.addEventListener('change', refreshBatchColorDropdown);
     if (batchApplyBtn) batchApplyBtn.addEventListener('click', batchApplyToAll);
+    _bind(document.getElementById('batch-recalculate-btn'), 'click', () => reQuoteAllSelectedFiles(t('quote.recalculate')));
     if (batchQuantity) {
         batchQuantity.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') { e.preventDefault(); batchApplyToAll(); }

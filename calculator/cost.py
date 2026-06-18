@@ -312,6 +312,7 @@ def calculate_cost(
                 rp = resolve_printer(printer_id)
                 if rp:
                     _printer_profile = os.path.join(os.path.dirname(os.path.dirname(__file__)), rp["profile"])
+                    logger.info(f"Resolved printer: id={printer_id} → profile={_printer_profile} name={rp.get('name','?')}")
 
             # Pre-check: model height vs printer max_print_height
             _printer_max_z = None
@@ -358,9 +359,7 @@ def calculate_cost(
                 **_speed_kwargs,
             )
             if stats.get("time_s", 0) > 0:
-                correction = float(cfg.get("prusa_time_correction") or 1.0)
-                if correction <= 0 or correction > 5:
-                    correction = 1.0
+                correction = 1.0  # 时间校正系数已取消，直接使用 PrusaSlicer 原始预估
                 slicer_time_s = max(1, int(stats["time_s"] * correction))
                 logger.info(f"PrusaSlicer raw={stats['time_s']}s × corr={correction} = {slicer_time_s}s")
             if stats.get("filament_g", 0) > 0:

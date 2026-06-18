@@ -127,6 +127,7 @@ export default {
   'quote.actions': 'Actions',
   'quote.remove': 'Remove',
   'quote.recalc': 'Recalc',
+  'quote.recalculate': 'Recalculate',
   'quote.recalculating': 'Recalculating...',
   'quote.noFiles': 'No files uploaded yet. Drag STL/STP/3MF files here or click to upload.',
   'quote.quoteBtn': 'Generate Quote',

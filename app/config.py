@@ -112,7 +112,7 @@ DEFAULT_PRICING_CONFIG = {
     "material_waste_percent": 5.0,
     "support_percent_of_model": 3.0,
     "post_process_fee_per_part_cny": 0.0,
-    "prusa_time_correction": 0.44,
+    "prusa_time_correction": 1.0,
     "use_prusaslicer": 1,
     "support_mode": "on",
     "support_price_per_g": 0.0,

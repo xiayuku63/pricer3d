@@ -128,6 +128,7 @@ export default {
   'quote.actions': '操作',
   'quote.remove': '移除',
   'quote.recalc': '重算',
+  'quote.recalculate': '重新计算',
   'quote.recalculating': '重新计算中',
   'quote.noFiles': '尚未上传文件。拖拽 STL/STP/3MF 文件到上方区域或点击上传。',
   'quote.quoteBtn': '生成报价',

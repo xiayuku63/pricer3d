@@ -786,13 +786,13 @@ async function _handleRowEdit(event, signal) {
     const pm = pmSel ? pmSel.value : '';
     const sp = spSel ? (spSel.value ? Number(spSel.value) : null) : null;
     if (errorContainer) errorContainer.classList.add('hidden');
-    row.querySelector('[data-role="status-cell"]').textContent = '成功';
-    row.querySelector('[data-role="status-cell"]').className = 'px-2 py-1.5 text-green-600';
+    row.querySelector('[data-role="status-cell"]').innerHTML = '<span class="inline-block w-2 h-2 rounded-full mr-1 align-middle bg-amber-500"></span>' + t('quote.recalculating');
+    row.querySelector('[data-role="status-cell"]').className = 'px-2 py-1.5 text-amber-600';
 
     const idx = currentResults.findIndex((i) => i.filename === filename);
     const prevItem = idx >= 0 ? { ...currentResults[idx] } : null;
     if (idx >= 0) {
-        currentResults[idx] = { ...currentResults[idx], status: 'pending', cost_cny: 0 };
+        currentResults[idx] = { ...currentResults[idx], status: 'success', _recalculating: true, cost_cny: 0 };
     }
     recalcSummaryFromCurrentResults();
 

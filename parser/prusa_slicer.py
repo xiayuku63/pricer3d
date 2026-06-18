@@ -355,7 +355,7 @@ def run_prusa_slice(
         cmd.append("--support-material")
     cmd.append(model_path)
 
-    logger.info(f"PrusaSlicer: preset={preset_label} model={os.path.basename(model_path)}")
+    logger.info(f"PrusaSlicer: preset={preset_label} model={os.path.basename(model_path)} profile={printer_profile_path or 'none'}")
 
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=_SLICE_TIMEOUT)

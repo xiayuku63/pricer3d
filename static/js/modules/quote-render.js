@@ -943,7 +943,7 @@ export function renderResultsTable() {
                     <div class="text-[10px] leading-tight">${recalculating ? '-' : ('¥ ' + Number(item.unit_cost_cny || 0).toFixed(2))}</div>
                     <div class="text-xs leading-tight font-medium">${recalculating ? '-' : ('¥ ' + Number(item.cost_cny || 0).toFixed(2))}</div>
                 </td>
-                <td data-role="status-cell" class="px-2 py-1.5 whitespace-nowrap text-green-600 font-medium text-[11px]"><span class="inline-block w-2 h-2 rounded-full bg-green-500 mr-1 align-middle"></span>${t('common.success')}</td>
+                <td data-role="status-cell" class="px-2 py-1.5 whitespace-nowrap font-medium text-[11px] ${recalculating ? 'text-amber-600' : 'text-green-600'}"><span class="inline-block w-2 h-2 rounded-full mr-1 align-middle ${recalculating ? 'bg-amber-500' : 'bg-green-500'}"></span>${recalculating ? t('quote.recalculating') : t('common.success')}</td>
                 <td class="px-2 py-1.5 space-x-1"><button type="button" data-delete-file="${item.filename}" class="text-xs text-red-500 hover:text-red-700">${t('common.delete')}</button></td>
             `;
         } else {
@@ -984,9 +984,13 @@ export function renderResultsTable() {
                 <td class="px-2 py-1.5"><input data-field="quantity" type="number" min="1" value="${quantityValue}" class="row-edit w-14 text-[11px] border border-gray-300 rounded px-1 py-0.5" /></td>
                 <td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td>
                 <td data-role="status-cell" class="px-2 py-1.5 whitespace-nowrap">
+                    ${recalculating ? `
+                    <span class="relative cursor-default text-amber-600 font-medium text-[11px]"><span class="inline-block w-2 h-2 rounded-full bg-amber-500 mr-1 align-middle"></span>${t('quote.recalculating')}</span>
+                    ` : `
                     <span class="status-fail-badge relative cursor-default text-red-600 font-medium text-[11px]"><span class="inline-block w-2 h-2 rounded-full bg-red-500 mr-1 align-middle"></span>${t('common.failed')}
                         <span class="status-fail-tooltip hidden absolute z-50 top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-2 text-[11px] font-normal text-left text-white bg-gray-800 rounded-lg shadow-lg whitespace-normal break-words leading-relaxed">${escapeHtml(item.error || t('common.error'))}</span>
                     </span>
+                    `}
                 </td>
                 <td class="px-2 py-1.5 space-x-1"><button type="button" data-delete-file="${item.filename}" class="text-xs text-red-500 hover:text-red-700">${t('common.delete')}</button></td>
             `;

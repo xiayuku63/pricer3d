@@ -61,7 +61,7 @@ class PricingConfig(BaseModel):
     unit_cost_formula: str = ""
     total_cost_formula: str = ""
     use_prusaslicer: Optional[int] = 0
-    prusa_time_correction: Optional[float] = 0.44
+    prusa_time_correction: Optional[float] = 1.0
     support_mode: Optional[str] = "on"
     support_price_per_g: Optional[float] = 0.0
     time_overhead_min: Optional[float] = 5.0
