@@ -232,7 +232,7 @@ export function renderUserCenterUI() {
                         ${brandCustomBadge}
                     </div>
                     <datalist id="brand-options-${idx}">
-                        ${majorBrands.filter(b => b.value !== 'custom').map(b => `<option value="${b.value}">${b.label}</option>`).join('')}
+                        ${getBrandOptions().map(b => `<option value="${b}">${b}</option>`).join('')}
                     </datalist>
                 </td>
                 <td class="px-3 py-2.5">
