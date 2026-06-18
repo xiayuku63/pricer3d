@@ -278,6 +278,7 @@ export default {
   'material.colorExists': 'Color already exists',
   'material.brandESUN': 'eSUN',
   'material.brandCustom': 'Custom...',
+  'material.typeCustom': 'Custom Type',
 
   // ── Settings ──
   'settings.title': 'User Center',

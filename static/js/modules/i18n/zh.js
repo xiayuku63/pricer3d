@@ -279,6 +279,7 @@ export default {
   'material.colorExists': '该颜色已存在',
   'material.brandESUN': 'eSUN (易生)',
   'material.brandCustom': '自定义...',
+  'material.typeCustom': '自定义类型',
 
   // ── Settings / 用户中心 ──
   'settings.title': '用户中心',
