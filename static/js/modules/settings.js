@@ -205,8 +205,8 @@ export function renderUserCenterUI() {
         // Populate default brand dropdown (all brands including MAJOR_BRANDS)
         const defaultBrandSel = document.getElementById('uc-default-brand');
         if (defaultBrandSel) {
-            const allBrands = getBrandOptions();
-            defaultBrandSel.innerHTML = allBrands.map(b =>
+            const usedBrands = getUsedBrandOptions();
+            defaultBrandSel.innerHTML = usedBrands.map(b =>
                 `<option value="${escapeHtml(b)}" ${defaultBrand === b ? 'selected' : ''}>${escapeHtml(b)}</option>`
             ).join('');
             if (!defaultBrandSel.value && defaultBrandSel.options.length) defaultBrandSel.value = defaultBrandSel.options[0].value;
@@ -228,12 +228,11 @@ export function renderUserCenterUI() {
             <tr class="hover:bg-gray-50">
                 <td class="px-3 py-2.5">
                     <div class="flex items-center gap-1">
-                        <input type="text" list="brand-options-${idx}" class="flex-1 min-w-0 border-gray-300 rounded-md text-xs px-2 py-1.5 material-brand-input" value="${escapeHtml(brand)}" data-idx="${idx}" data-field="brand" placeholder="${t('material.brandPlaceholder') || '输入或选择品牌'}">
+                        <select class="flex-1 min-w-0 border-gray-300 rounded-md text-xs px-2 py-1.5 material-brand-input" data-idx="${idx}" data-field="brand">
+                            ${getBrandOptions().map(b => `<option value="${b}"${b === brand ? ' selected' : ''}>${b}</option>`).join('')}
+                        </select>
                         ${brandCustomBadge}
                     </div>
-                    <datalist id="brand-options-${idx}">
-                        ${getBrandOptions().map(b => `<option value="${b}">${b}</option>`).join('')}
-                    </datalist>
                 </td>
                 <td class="px-3 py-2.5">
                     <div class="flex items-center gap-1">
@@ -298,8 +297,8 @@ export function renderUserCenterUI() {
     // Populate default brand dropdown (all brands including MAJOR_BRANDS)
     const defaultBrandSel = document.getElementById('uc-default-brand');
     if (defaultBrandSel) {
-        const allBrands = getBrandOptions();
-        defaultBrandSel.innerHTML = allBrands.map(b =>
+        const usedBrands = getUsedBrandOptions();
+        defaultBrandSel.innerHTML = usedBrands.map(b =>
             `<option value="${escapeHtml(b)}" ${defaultBrand === b ? 'selected' : ''}>${escapeHtml(b)}</option>`
         ).join('');
         // 如果已选品牌不在列表中，重置为第一个

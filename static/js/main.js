@@ -28,7 +28,7 @@ import {
     renderColorDropdown, getColorsForMaterial, colorToObj, pickAllowedColor,
     authFetch,
     setDefaultSlicerPresetId,
-    getMaterialsByBrand, MATERIAL_TYPE_PRESETS, getUsedBrandOptions, getBrandOptions,
+    getMaterialsByBrand, MATERIAL_TYPE_PRESETS, getUsedBrandOptions,
 } from './modules/state.js';
 
 import {
@@ -650,9 +650,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const brandSel = document.getElementById('uc-default-brand');
                 const matSel = document.getElementById('uc-default-material');
                 if (brandSel) {
-                    const allBrands = getBrandOptions();
+                    const usedBrands = getUsedBrandOptions();
                     const prevBrand = brandSel.value;
-                    brandSel.innerHTML = allBrands.map(b =>
+                    brandSel.innerHTML = usedBrands.map(b =>
                         '<option value="' + escapeHtml(b) + '"' + (b === prevBrand ? ' selected' : '') + '>' + escapeHtml(b) + '</option>'
                     ).join('');
                     if (!brandSel.value && brandSel.options.length) brandSel.value = brandSel.options[0].value;
