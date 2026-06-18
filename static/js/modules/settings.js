@@ -228,7 +228,7 @@ export function renderUserCenterUI() {
             <tr class="hover:bg-gray-50">
                 <td class="px-3 py-2.5">
                     <div class="flex items-center gap-1">
-                        <input type="text" list="brand-options-${idx}" class="flex-1 w-full border-gray-300 rounded-md text-xs px-2 py-1.5 material-brand-input min-w-[100px]" value="${escapeHtml(brand)}" data-idx="${idx}" data-field="brand" placeholder="${t('material.brandPlaceholder') || '输入或选择品牌'}">
+                        <input type="text" list="brand-options-${idx}" class="flex-1 min-w-0 border-gray-300 rounded-md text-xs px-2 py-1.5 material-brand-input" value="${escapeHtml(brand)}" data-idx="${idx}" data-field="brand" placeholder="${t('material.brandPlaceholder') || '输入或选择品牌'}">
                         ${brandCustomBadge}
                     </div>
                     <datalist id="brand-options-${idx}">
@@ -237,7 +237,7 @@ export function renderUserCenterUI() {
                 </td>
                 <td class="px-3 py-2.5">
                     <div class="flex items-center gap-1">
-                        <input type="text" list="type-options-${idx}" class="flex-1 w-full border-gray-300 rounded-md text-xs px-2 py-1.5 material-type-input" value="${escapeHtml(m.name)}" data-idx="${idx}" data-field="name" placeholder="${t('material.typePlaceholder') || '输入或选择类型'}">
+                        <input type="text" list="type-options-${idx}" class="flex-1 min-w-0 border-gray-300 rounded-md text-xs px-2 py-1.5 material-type-input" value="${escapeHtml(m.name)}" data-idx="${idx}" data-field="name" placeholder="${t('material.typePlaceholder') || '输入或选择类型'}">
                         ${typeCustomBadge}
                     </div>
                     <datalist id="type-options-${idx}">
