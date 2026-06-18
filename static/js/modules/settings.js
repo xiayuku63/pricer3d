@@ -251,17 +251,15 @@ export function renderUserCenterUI() {
             <tr class="hover:bg-gray-50">
                 <td class="px-3 py-2.5">
                     <div class="flex items-center gap-1">
-                        <select class="flex-1 min-w-0 border-gray-300 rounded-md text-xs px-2 py-1.5 material-brand-input" data-idx="${idx}" data-field="brand">
-                            ${getBrandOptions().map(b => `<option value="${b}"${b === brand ? ' selected' : ''}>${b}</option>`).join('')}
-                        </select>
+                        <input type="text" list="brand-opts-${idx}" class="flex-1 min-w-0 border-gray-300 rounded-md text-xs px-2 py-1.5 material-brand-input" value="${escapeHtml(brand)}" data-idx="${idx}" data-field="brand" onfocus="this.select()">
+                        <datalist id="brand-opts-${idx}">${getBrandOptions().map(b => `<option value="${b}">`).join('')}</datalist>
                         ${brandCustomBadge}
                     </div>
                 </td>
                 <td class="px-3 py-2.5">
                     <div class="flex items-center gap-1">
-                        <select class="flex-1 min-w-0 border-gray-300 rounded-md text-xs px-1 py-1.5 material-type-input" data-idx="${idx}" data-field="name">
-                            ${_getTypeOptionsForRow(m, idx).map(tp => `<option value="${tp}"${tp === m.name ? ' selected' : ''}>${tp}</option>`).join('')}
-                        </select>
+                        <input type="text" list="type-opts-${idx}" class="flex-1 min-w-0 border-gray-300 rounded-md text-xs px-1 py-1.5 material-type-input" value="${escapeHtml(m.name)}" data-idx="${idx}" data-field="name" onfocus="this.select()">
+                        <datalist id="type-opts-${idx}">${_getTypeOptionsForRow(m, idx).map(tp => `<option value="${tp}">`).join('')}</datalist>
                         ${typeCustomBadge}
                     </div>
                 </td>
