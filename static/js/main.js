@@ -653,7 +653,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const allBrands = getBrandOptions();
                     const prevBrand = brandSel.value;
                     brandSel.innerHTML = allBrands.map(b =>
-                        '<option value="' + escapeHtml(b) + '"' + (b === prevBrand ? ' selected' : '') + '>' + escapeHtml(b) + '</option>
+                        '<option value="' + escapeHtml(b) + '"' + (b === prevBrand ? ' selected' : '') + '>' + escapeHtml(b) + '</option>'
                     ).join('');
                     if (!brandSel.value && brandSel.options.length) brandSel.value = brandSel.options[0].value;
                     quoteOptions.brand = brandSel.value;
