@@ -510,6 +510,12 @@ async function renderViaGLB(file, orientation = null, colorKey = null) {
             currentMesh.updateMatrixWorld(true);
             box = new THREE.Box3().setFromObject(currentMesh);
             currentMesh.position.z -= box.min.z;
+            // 旋转后重新 X/Y 居中到热床中心（旋转会使包围盒中心偏移，否则模型偏离底板中心）
+            currentMesh.updateMatrixWorld(true);
+            box.setFromObject(currentMesh);
+            const _glbReCenter = box.getCenter(new THREE.Vector3());
+            currentMesh.position.x += (bc - _glbReCenter.x);
+            currentMesh.position.y += (bc - _glbReCenter.y);
         }
         fitCameraToMesh(currentMesh);
         previewPlaceholder.classList.add('hidden');
@@ -586,6 +592,12 @@ export function renderSTL(file, colorKey = 'Blue', orientation = null) {
                 currentMesh.updateMatrixWorld(true);
                 var box = new THREE.Box3().setFromObject(currentMesh);
                 currentMesh.position.z -= box.min.z;
+                // 旋转后重新 X/Y 居中到热床中心（旋转会使包围盒中心偏移，否则模型偏离底板中心）
+                currentMesh.updateMatrixWorld(true);
+                box.setFromObject(currentMesh);
+                var _reCenter = box.getCenter(new THREE.Vector3());
+                currentMesh.position.x += (bc - _reCenter.x);
+                currentMesh.position.y += (bc - _reCenter.y);
             }
             scene.add(currentMesh);
             fitCameraToMesh(currentMesh);
