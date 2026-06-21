@@ -353,6 +353,7 @@ def run_prusa_slice(
     ]
     if enable_supports:
         cmd.append("--support-material")
+        cmd.append("--support-material-style=organic")
     cmd.append(model_path)
 
     logger.info(f"PrusaSlicer: preset={preset_label} model={os.path.basename(model_path)} profile={printer_profile_path or 'none'}")

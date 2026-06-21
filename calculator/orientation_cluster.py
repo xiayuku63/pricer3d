@@ -191,6 +191,88 @@ def _extract_cluster_outline_p3d(
     return all_3d, all_2d
 
 
+def _build_hull_coplanar_planes(conv_hull, exact_eps: float = 1e-3):
+    """OrcaSlicer-style convex-hull coplanar clustering.
+
+    Mirrors GLGizmoFlatten.cpp ``update_planes()``: BFS-cluster the convex-hull
+    triangles by edge adjacency using **exact component-wise** normal match
+    (``|a-b| < exact_eps``), then emit one plane per coplanar group.  Because the
+    clustering happens ON the hull, cavity / internal faces are excluded at the
+    source and can never become candidate planes.
+
+    Returns ``(plane_normals[K,3], plane_offsets[K])`` (offset = signed distance
+    of the plane from origin) or ``None`` on failure.
+    """
+    hfaces = np.asarray(conv_hull.faces)
+    hverts = np.asarray(conv_hull.vertices, dtype=np.float64)
+    nf = len(hfaces)
+    if nf == 0:
+        return None
+    v0 = hverts[hfaces[:, 0]]
+    v1 = hverts[hfaces[:, 1]]
+    v2 = hverts[hfaces[:, 2]]
+    cross = np.cross(v1 - v0, v2 - v0)
+    areas = np.linalg.norm(cross, axis=1) * 0.5
+    norms = np.zeros_like(cross)
+    valid = areas > 1e-12
+    norms[valid] = cross[valid] / (areas[valid, np.newaxis] * 2.0)
+    centers = (v0 + v1 + v2) / 3.0
+    offs = np.einsum("ij,ij->i", norms, centers)
+
+    # edge adjacency among hull triangles
+    edge_to_faces: dict = {}
+    for fi, (a, b, c) in enumerate(hfaces):
+        for e in (
+            (min(a, b), max(a, b)),
+            (min(b, c), max(b, c)),
+            (min(c, a), max(c, a)),
+        ):
+            edge_to_faces.setdefault(e, []).append(fi)
+    adj: list[list] = [[] for _ in range(nf)]
+    for fl in edge_to_faces.values():
+        for i in range(len(fl)):
+            for j in range(i + 1, len(fl)):
+                adj[fl[i]].append(fl[j])
+                adj[fl[j]].append(fl[i])
+
+    plane_normals = []
+    plane_offsets = []
+    visited = np.zeros(nf, dtype=bool)
+    for s in range(nf):
+        if visited[s]:
+            continue
+        seed_normal = norms[s]
+        stack = [s]
+        visited[s] = True
+        grp = []
+        while stack:
+            fi = stack.pop()
+            grp.append(fi)
+            for nj in adj[fi]:
+                if visited[nj]:
+                    continue
+                # exact component-wise match (OrcaSlicer |a-b| < 0.001)
+                if np.max(np.abs(norms[nj] - seed_normal)) < exact_eps:
+                    visited[nj] = True
+                    stack.append(nj)
+        g = np.array(grp, dtype=int)
+        w = areas[g]
+        wsum = float(w.sum())
+        if wsum < 1e-12:
+            continue
+        nrm = (norms[g] * w[:, np.newaxis]).sum(axis=0) / wsum
+        nlen = float(np.linalg.norm(nrm))
+        if nlen < 1e-9:
+            continue
+        nrm /= nlen
+        off = float((offs[g] * w).sum() / wsum)
+        plane_normals.append(nrm)
+        plane_offsets.append(off)
+    if not plane_normals:
+        return None
+    return np.array(plane_normals), np.array(plane_offsets)
+
+
 def cluster_coplanar_faces(mesh: trimesh.Trimesh) -> list[dict]:
     """Cluster mesh triangles into coplanar groups usable as print-bed contact faces.
 
@@ -319,32 +401,181 @@ def cluster_coplanar_faces(mesh: trimesh.Trimesh) -> list[dict]:
     # ── Step 4: post-merge adjacent same-plane clusters ──
     merged = _merge_planar_clusters_internal(initial_clusters, vertices, faces, cos_threshold, offset_tol)
 
-    # ── Step 4.5: filter internal faces (normals pointing into cavities) ──
-    filtered = []
-    for mc in merged:
-        cf = mc["faces"]
-        if not cf:
-            continue
-        cn = np.array(mc["normal"])
-        cv = vertices[np.unique(faces[cf].flatten())]
-        if len(cv) < 3:
-            continue
-        centroid = cv.mean(axis=0)
-        test_pt = centroid + cn * 2.0
+    # ── Step 4.5: filter internal faces ──
+    # 参考 OrcaSlicer/BambuStudio GLGizmoFlatten.cpp update_planes():
+    #   1) 构造模型凸包 ch = convex_hull_3d()
+    #   2) 在凸包三角面集上 BFS 邻接聚类, 法向量分量级精确匹配 |a-b|<1e-3
+    #   3) 仅凸包面保留为候选 → 凹腔/内部面从源头剔除
+    # 本实现: 先用 _build_hull_coplanar_planes() 在凸包上 BFS 聚类得到「凸包平面集」,
+    # 再要求每个原始候选簇与某凸包平面真正共面 (法向对齐 cos>=0.999 且平面偏移在
+    # 【紧】容差内). 紧容差彻底拒绝浅凹内部面:
+    #   - 凸包边界面 (真外表面): 偏移差 ≈ 0 (1e-9级) → 通过
+    #   - 凹腔/内部面: 偏移差 = 腔深 (mm级) → 被滤除
+    # v0.40.0 旧偏移容差 max(diag*0.01, 0.5) 过松, 使 0.3~3mm 浅凹内部面误判为
+    # 外表面而被高亮 — 这正是「内部面还是被高亮」的根因.
+    # model_diag 已在前面计算
+    test_offset = max(model_diag * 0.02, 5.0)  # 动态偏移，最小5mm
+    convex_hull_thresh = model_diag * 0.05  # 旧方法4阈值
+
+    # 过滤A阈值 (OrcaSlicer 凸包聚类做法)
+    HULL_NORMAL_COS_THRESHOLD = 0.999        # 候选簇法向 vs 凸包平面法向 (夹角 < 2.56°)
+    # 紧容差: 0.1% 模型对角线, 最小 0.05mm. 仅真正共面通过; 浅凹内部面被拒.
+    HULL_PLANE_OFFSET_TOL_TIGHT = max(model_diag * 0.001, 0.05)
+    # 兜底容差 (v0.40.0 旧值): 紧过滤 0 候选时降级使用, 保证不返回空列表
+    HULL_PLANE_OFFSET_TOL_FALLBACK = max(model_diag * 0.01, 0.5)
+    # 过滤B阈值: normal.z > NORMAL_Z_MAX 视为朝上面 → 拒绝 (即与 +Z 夹角 < 84°)
+    NORMAL_Z_MAX = 0.1
+
+    # 预计算凸包 — 过滤A(凸包表面)与原方法4都需要
+    conv_hull = None
+    try:
+        conv_hull = mesh.convex_hull
+    except Exception:
+        conv_hull = None
+
+    # 过滤A: 在凸包上 BFS 邻接聚类建立「凸包平面集」(OrcaSlicer 做法)
+    # 失败仅跳过A, 降级到仅方法4等补充过滤
+    hull_planes = None
+    if conv_hull is not None and len(conv_hull.faces) > 0:
         try:
-            test_pts = [centroid + cn * 2.0]
-            for vi in cv[:min(5, len(cv))]:
-                test_pts.append(vertices[vi] + cn * 2.0)
-            inside_count = 0
-            for tp in test_pts:
-                inside_count += int(mesh.contains([tp])[0])
-            inside = inside_count > len(test_pts) * 0.5
+            hull_planes = _build_hull_coplanar_planes(conv_hull, exact_eps=1e-3)
         except Exception:
-            inside = False
-        if inside:
-            logger.debug(f"过滤内部面: area={mc['area']:.1f}mm²")
-            continue
-        filtered.append(mc)
+            hull_planes = None
+    hull_available = (
+        hull_planes is not None
+        and len(hull_planes[0]) > 0
+    )
+
+    def _run_internal_face_filter(offset_tol: float) -> list[dict]:
+        """Run filter A (hull coplanarity at given offset tol) + B + 4 safety nets.
+
+        Returns the list of surviving merged clusters.  ``offset_tol`` controls
+        how strictly filter A requires the candidate plane to coincide with a
+        convex-hull plane.
+        """
+        hp_n, hp_o = (hull_planes[0], hull_planes[1]) if hull_available else (None, None)
+        out: list[dict] = []
+        for mc in merged:
+            cf = mc["faces"]
+            if not cf:
+                continue
+            cn = np.array(mc["normal"], dtype=np.float64)
+            cv = vertices[np.unique(faces[cf].flatten())]
+            if len(cv) < 3:
+                continue
+            centroid = cv.mean(axis=0)
+
+            # ── 过滤A: 凸包表面筛选 (主过滤手段) ──
+            # 候选面簇若不在凸包表面上 → 内部/凹腔面 → 直接过滤, 无需后续射线检测
+            if hull_available:
+                # 1) 法向量匹配: 候选簇法向量须与某凸包平面法向量高度对齐
+                cos_sims = np.nan_to_num(
+                    hp_n @ cn, nan=-2.0, posinf=1.0, neginf=-2.0
+                )
+                max_cos = float(cos_sims.max())
+                if max_cos < HULL_NORMAL_COS_THRESHOLD:
+                    logger.debug(
+                        f"过滤内部面[A-法向不匹配]: area={mc['area']:.1f}mm², "
+                        f"max_cos={max_cos:.4f}, threshold={HULL_NORMAL_COS_THRESHOLD}"
+                    )
+                    continue
+                # 2) 平面偏移匹配: 候选簇平面到匹配凸包平面须真正共面 (紧容差)
+                matching = np.where(cos_sims >= HULL_NORMAL_COS_THRESHOLD)[0]
+                plane_off_cluster = float(np.dot(cn, centroid))
+                min_offset_diff = float(
+                    np.min(np.abs(hp_o[matching] - plane_off_cluster))
+                )
+                if min_offset_diff > offset_tol:
+                    logger.debug(
+                        f"过滤内部面[A-平面偏移不匹配]: area={mc['area']:.1f}mm², "
+                        f"min_offset_diff={min_offset_diff:.3f}mm, "
+                        f"tol={offset_tol:.3f}mm"
+                    )
+                    continue
+
+            # ── 过滤B: 法向量方向过滤 ──
+            # 朝上面 (normal.z > 0.1) 需翻转180°才可作底面, 实际摆放不合理 → 过滤
+            if float(cn[2]) > NORMAL_Z_MAX:
+                logger.debug(
+                    f"过滤朝上面[B-法向朝上]: area={mc['area']:.1f}mm², "
+                    f"normal_z={float(cn[2]):.3f}, threshold={NORMAL_Z_MAX}"
+                )
+                continue
+
+            # ── 补充防护: 原4道内部面过滤 ──
+            # (此时已通过过滤A的凸包表面验证; 此4道为补充防护, 极少触发)
+            inside_reason = None
+
+            # 方法1: contains() 检测空腔内部面
+            test_pt_main = centroid + cn * test_offset
+            try:
+                if bool(mesh.contains([test_pt_main])[0]):
+                    inside_reason = "contains"
+            except Exception:
+                pass
+
+            # 方法2: 射线投射检测面向实体内部的假面
+            if inside_reason is None:
+                try:
+                    ray_origin = centroid + cn * 0.01
+                    locations, _, _ = mesh.ray.intersects_location(
+                        ray_origins=np.array([ray_origin]),
+                        ray_directions=np.array([cn])
+                    )
+                    if len(locations) > 0:
+                        dist = float(np.linalg.norm(locations[0] - ray_origin))
+                        if dist < 1.0:
+                            inside_reason = "ray"
+                except Exception:
+                    pass
+
+            # 方法3: 双向射线投射 — 正负法向两侧首次命中都<2mm 说明被夹在实体之间
+            # 起点分别偏到面两侧 0.01mm，避免命中候选面自身
+            if inside_reason is None:
+                try:
+                    origin_pos = centroid + cn * 0.01
+                    origin_neg = centroid - cn * 0.01
+                    loc_pos, _, _ = mesh.ray.intersects_location(
+                        ray_origins=np.array([origin_pos]),
+                        ray_directions=np.array([cn])
+                    )
+                    loc_neg, _, _ = mesh.ray.intersects_location(
+                        ray_origins=np.array([origin_neg]),
+                        ray_directions=np.array([-cn])
+                    )
+                    dist_pos = float(np.linalg.norm(loc_pos[0] - origin_pos)) if len(loc_pos) > 0 else float("inf")
+                    dist_neg = float(np.linalg.norm(loc_neg[0] - origin_neg)) if len(loc_neg) > 0 else float("inf")
+                    if dist_pos < 2.0 and dist_neg < 2.0:
+                        inside_reason = "dual_ray"
+                except Exception:
+                    pass
+
+            # 方法4: 凸包测试 — 面在凹腔内部则其质心距凸包表面较远
+            if inside_reason is None and conv_hull is not None:
+                try:
+                    _, dist_arr, _ = conv_hull.nearest.on_surface([centroid])
+                    if float(dist_arr[0]) > convex_hull_thresh:
+                        inside_reason = "convex_hull"
+                except Exception:
+                    pass
+
+            if inside_reason is not None:
+                logger.debug(
+                    f"过滤内部面[补充4道]: area={mc['area']:.1f}mm², 原因={inside_reason}"
+                )
+                continue
+            out.append(mc)
+        return out
+
+    # 紧容差过滤 (仅真正在凸包表面的外表面通过 → 内部面被剔除)
+    filtered = _run_internal_face_filter(HULL_PLANE_OFFSET_TOL_TIGHT)
+    # 兜底: 紧容差若 0 候选 (极端几何, 如无平面的纯曲面凸包), 降级到旧容差
+    # (v0.40.0 行为) 保证不返回空列表 — 宁可降级也不要让 UI 拿到 0 个候选.
+    if not filtered and hull_available:
+        logger.debug(
+            f"凸包紧过滤后 0 候选, 降级 offset_tol={HULL_PLANE_OFFSET_TOL_FALLBACK:.3f}mm"
+        )
+        filtered = _run_internal_face_filter(HULL_PLANE_OFFSET_TOL_FALLBACK)
     merged = filtered
 
     # ── Step 5: generate output ──

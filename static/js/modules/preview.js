@@ -30,10 +30,20 @@ function applyAxonometricRotation(meshObject) {
 
 const stlLoader = new STLLoader();
 
+// Parsed-geometry cache for STL thumbnails: skip re-parsing when only the color changes
+const _thumbGeometryCache = new Map();
+
 export async function buildStlThumbnail(file, colorKey = "Blue") {
-    const arrayBuffer = await file.arrayBuffer();
-    const geometry = stlLoader.parse(arrayBuffer);
-    geometry.computeVertexNormals();
+    const _fileKey = (file.name || '') + ':' + (file.size || 0);
+    let _baseGeo = _thumbGeometryCache.get(_fileKey);
+    if (!_baseGeo) {
+        const arrayBuffer = await file.arrayBuffer();
+        _baseGeo = stlLoader.parse(arrayBuffer);
+        _baseGeo.computeVertexNormals();
+        _thumbGeometryCache.set(_fileKey, _baseGeo);
+    }
+    // Clone so the per-render center() does not mutate the cached geometry
+    const geometry = _baseGeo.clone();
     geometry.center();
 
     const width = 220, height = 140;
@@ -153,7 +163,10 @@ export async function ensureThumbnailForFile(file, colorKey) {
 
 export async function buildThumbnails(selectedFiles, colorByFilename = {}) {
     for (const file of selectedFiles) {
-        const selectedColor = colorByFilename[file.name] || quoteOptions.color;
+        var selectedColor = colorByFilename[file.name] || quoteOptions.color;
+        // Normalize to hex if possible so thumbnails use the real material color
+        var _thumbColorObj = colorToObj(selectedColor);
+        if (_thumbColorObj && _thumbColorObj.hex) selectedColor = _thumbColorObj.hex;
         await ensureThumbnailForFile(file, selectedColor);
     }
 }
@@ -195,8 +208,12 @@ export function previewByFilename(filename, ext) {
     }
     if (previewPlaceholder) { previewPlaceholder.textContent = t('preview.loadingFile', { filename: filename, size: (file.size/1024).toFixed(0) }); previewPlaceholder.classList.remove('hidden'); }
     const rowData = currentResults.find((i) => i && i.filename === filename);
-    const colorForPreview = (rowData && rowData.color) ? rowData.color : quoteOptions.color;
-    renderSTL(file, colorForPreview);
+    var perFileOrient = (rowData && rowData.euler_angles_deg) ? rowData.euler_angles_deg : null;
+    var colorForPreview = (rowData && rowData.color) ? rowData.color : quoteOptions.color;
+    // Normalize to hex string if possible (handles bare-color-name / object inputs)
+    var _previewColorObj = colorToObj(colorForPreview);
+    if (_previewColorObj && _previewColorObj.hex) colorForPreview = _previewColorObj.hex;
+    renderSTL(file, colorForPreview, perFileOrient);
 }
 
 // ── View cube ──

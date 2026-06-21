@@ -4,6 +4,7 @@ import asyncio
 import concurrent.futures
 import json
 import logging
+import re
 from datetime import datetime
 from typing import List, Optional
 
@@ -41,6 +42,7 @@ async def get_quote(
     auto_orient: Optional[bool] = Form(default=False),
     current_user=Depends(get_current_user),
 ):
+    logger.warning("ROUTE_DEBUG auto_orient=%s type=%s", auto_orient, type(auto_orient).__name__)
     from .config import MEMBER_DISCOUNT_PERCENT
     try:
         idem_key = get_idempotency_key_from_request(request)
@@ -252,6 +254,79 @@ def _save_quote_history(user_id: int, results: list) -> None:
     now = datetime.now(timezone.utc).isoformat()
     with get_db_session() as db:
         for item in results:
+            # Extract new fields
+            raw_pm = item.get("_printer_model") or item.get("printer_model") or ""
+            slicer_preset_id = item.get("_slicer_preset_id") or item.get("slicer_preset_id")
+
+            breakdown = item.get("cost_breakdown")
+            gcode_summary = (breakdown or {}).get("gcode_summary") or {}
+            core_params = gcode_summary.get("core_params") or {}
+
+            # nozzle_diameter from slicer params — init before extraction so we can fallback
+            nozzle_diameter = None
+            if core_params.get("nozzle_diameter") is not None:
+                try:
+                    nozzle_diameter = float(core_params["nozzle_diameter"])
+                except (ValueError, TypeError):
+                    pass
+
+            # 从复合ID(bambu_a1_04)提取裸模型ID，喷嘴直径作为fallback
+            m = re.match(r'^(.+?)_(\d{2})$', raw_pm) if raw_pm else None
+            if m:
+                printer_model = m.group(1)  # bambu_a1
+                # 查找打印机显示名称
+                try:
+                    from app.printers import PRINTER_MODELS
+                    for pm_def in PRINTER_MODELS:
+                        if pm_def["id"] == printer_model:
+                            printer_model = pm_def["name"]
+                            break
+                except Exception:
+                    pass  # keep raw ID if resolution fails
+                if nozzle_diameter is None:
+                    nozzle_diameter = float(m.group(2)) / 10.0  # 04 → 0.4
+            else:
+                printer_model = raw_pm or None
+                # 非复合ID（如user_3），也尝试解析显示名称
+                if printer_model:
+                    try:
+                        from app.printers import PRINTER_MODELS, resolve_printer
+                        rp = resolve_printer(printer_model)
+                        if rp:
+                            printer_model = rp.get("name", printer_model)
+                    except Exception:
+                        pass
+
+            # layer_height from item directly
+            layer_height_val = item.get("layer_height")
+            try:
+                layer_height_val = float(layer_height_val) if layer_height_val is not None else None
+            except (ValueError, TypeError):
+                layer_height_val = None
+
+            # wall_count from slicer params perimeters
+            wall_count = None
+            if core_params.get("perimeters") is not None:
+                try:
+                    wall_count = int(core_params["perimeters"])
+                except (ValueError, TypeError):
+                    pass
+
+            # infill from slicer params fill_density (strip %)
+            infill_val = None
+            raw_fill = core_params.get("fill_density")
+            if raw_fill is not None:
+                try:
+                    infill_val = int(float(str(raw_fill).replace("%", "")))
+                except (ValueError, TypeError):
+                    pass
+
+            # brand from item
+            brand = item.get("brand") or ""
+
+            # cost_breakdown as JSON string
+            cost_breakdown_str = json.dumps(breakdown) if isinstance(breakdown, dict) else None
+
             entry = QuoteHistory(
                 user_id=user_id,
                 filename=str(item.get("filename") or "")[:200],
@@ -266,6 +341,14 @@ def _save_quote_history(user_id: int, results: list) -> None:
                 status=str(item.get("status") or "success")[:20],
                 error_msg=str(item.get("error") or "")[:300] if item.get("status") != "success" else None,
                 created_at=now,
+                printer_model=str(printer_model)[:50] if printer_model else None,
+                slicer_preset_id=int(slicer_preset_id) if slicer_preset_id is not None else None,
+                nozzle_diameter=round(float(nozzle_diameter), 2) if nozzle_diameter is not None else None,
+                layer_height=round(float(layer_height_val), 2) if layer_height_val is not None else None,
+                wall_count=wall_count,
+                infill=infill_val,
+                brand=str(brand)[:40] if brand else None,
+                cost_breakdown=cost_breakdown_str,
             )
             db.add(entry)
 
@@ -350,6 +433,14 @@ async def quote_history(limit: int = 20, offset: int = 0, current_user=Depends(g
                 "status": r.status,
                 "error_msg": r.error_msg,
                 "created_at": r.created_at,
+                "printer_model": r.printer_model,
+                "slicer_preset_id": r.slicer_preset_id,
+                "nozzle_diameter": round(float(r.nozzle_diameter), 2) if r.nozzle_diameter is not None else None,
+                "layer_height": round(float(r.layer_height), 2) if r.layer_height is not None else None,
+                "wall_count": r.wall_count,
+                "infill": r.infill,
+                "brand": r.brand,
+                "cost_breakdown": json.loads(r.cost_breakdown) if r.cost_breakdown else None,
             })
     return {"items": items, "total": total, "limit": safe_limit, "offset": safe_offset}
 
@@ -366,6 +457,13 @@ _EXPORT_COLUMNS = [
     ("estimated_time_h", "打印时间(h)"),
     ("cost_cny", "成本(元)"),
     ("created_at", "创建时间"),
+    ("printer_model", "打印机型号"),
+    ("slicer_preset_id", "切片预设ID"),
+    ("nozzle_diameter", "喷嘴直径(mm)"),
+    ("layer_height", "层高(mm)"),
+    ("wall_count", "墙层数"),
+    ("infill", "填充(%)"),
+    ("brand", "品牌"),
 ]
 
 
@@ -396,6 +494,13 @@ def _row_to_export_list(row) -> list:
         round(float(row.estimated_time_h or 0), 2),
         round(float(row.cost_cny or 0), 2),
         row.created_at or "",
+        row.printer_model or "",
+        int(row.slicer_preset_id) if row.slicer_preset_id is not None else "",
+        round(float(row.nozzle_diameter), 2) if row.nozzle_diameter is not None else "",
+        round(float(row.layer_height), 2) if row.layer_height is not None else "",
+        int(row.wall_count) if row.wall_count is not None else "",
+        int(row.infill) if row.infill is not None else "",
+        row.brand or "",
     ]
 
 
@@ -588,6 +693,12 @@ async def export_quote_pdf(
                 "weight_g": round(float(r.weight_g or 0), 2),
                 "estimated_time_h": round(float(r.estimated_time_h or 0), 2),
                 "cost_cny": round(float(r.cost_cny or 0), 2),
+                "printer_model": r.printer_model or "",
+                "nozzle_diameter": round(float(r.nozzle_diameter), 2) if r.nozzle_diameter is not None else "",
+                "layer_height": round(float(r.layer_height), 2) if r.layer_height is not None else 0,
+                "wall_count": int(r.wall_count) if r.wall_count is not None else 0,
+                "infill_percent": int(r.infill) if r.infill is not None else 0,
+                "brand": r.brand or "",
             })
 
         # Determine member discount

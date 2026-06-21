@@ -1,5 +1,5 @@
 // ── Quote history modal ──
-import { escapeHtml, formatTimeHMS, quoteOptions, authToken } from './state.js';
+import { escapeHtml, formatTimeHMS, authToken } from './state.js';
 import { t } from './i18n.js';
 
 let historyTbody, quoteHistoryModal, quoteHistoryBackdrop;
@@ -82,11 +82,6 @@ export function initQuoteHistory() {
 
     if (historyTbody) {
         historyTbody.addEventListener('click', (e) => {
-            const reQuoteBtn = e.target.closest('[data-action="requote"]');
-            if (reQuoteBtn) {
-                handleReQuote(reQuoteBtn.dataset);
-                return;
-            }
             const deleteBtn = e.target.closest('[data-action="delete"]');
             if (deleteBtn) {
                 handleDelete(deleteBtn.dataset.id);
@@ -94,43 +89,6 @@ export function initQuoteHistory() {
             }
         });
     }
-}
-
-// ── Re-quote: fill history item params back into the quote form ──
-async function handleReQuote(data) {
-    const material = data.material || '';
-    const color = data.color || '';
-    const quantity = parseInt(data.quantity, 10) || 1;
-
-    // Update global quoteOptions
-    quoteOptions.material = material || quoteOptions.material;
-    quoteOptions.color = color || quoteOptions.color;
-    quoteOptions.quantity = quantity || quoteOptions.quantity;
-
-    // Dynamic import to avoid circular dependency with quote.js
-    try {
-        const quote = await import('./quote.js');
-        quote.refreshBatchMaterialDropdown();
-        quote.refreshBatchColorDropdown();
-        quote.refreshOptionsSummary();
-    } catch (e) {
-        // Fallback: quote module not yet loaded, options already updated
-    }
-
-    // Close history modal
-    quoteHistoryModal?.classList.add('hidden');
-
-    // Scroll to upload zone for user to re-upload the file
-    const uploadZone = document.getElementById('upload-zone') || document.querySelector('[data-upload-zone]');
-    if (uploadZone) {
-        uploadZone.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        // Brief highlight effect
-        uploadZone.classList.add('ring-2', 'ring-indigo-400', 'ring-offset-2');
-        setTimeout(() => uploadZone.classList.remove('ring-2', 'ring-indigo-400', 'ring-offset-2'), 2500);
-    }
-
-    // Show inline notification
-    showToast(t('history.requoteReady', { material, color, quantity }));
 }
 
 // ── Delete a single history record ──
@@ -259,7 +217,7 @@ export async function loadQuoteHistory(token) {
         totalRecords = data.total || 0;
 
         if (!data.items || data.items.length === 0) {
-            historyTbody.innerHTML = '<tr><td class="px-3 py-12 text-gray-400 text-center" colspan="10"><div class="text-6xl mb-3">📭</div><p class="text-sm">' + t('history.noRecords') + '</p><p class="text-xs mt-1 text-gray-300">' + t('history.noRecordsSubtext') + '</p></td></tr>';
+            historyTbody.innerHTML = '<tr><td class="px-3 py-12 text-gray-400 text-center" colspan="15"><div class="text-6xl mb-3">📭</div><p class="text-sm">' + t('history.noRecords') + '</p><p class="text-xs mt-1 text-gray-300">' + t('history.noRecordsSubtext') + '</p></td></tr>';
             if (paginationContainer) paginationContainer.innerHTML = '';
             return;
         }
@@ -270,15 +228,17 @@ export async function loadQuoteHistory(token) {
                 ? '<span class="text-green-600 font-medium">' + t('history.success') + '</span>'
                 : `<span class="text-red-500 font-medium" title="${escapeHtml(item.error_msg || '')}">` + t('history.failed') + '</span>';
 
-            // Re-quote button
-            const reQuoteBtn = `<button data-action="requote" data-material="${escapeHtml(item.material || '')}" data-color="${escapeHtml(item.color || '')}" data-quantity="${item.quantity || 1}" class="text-indigo-600 hover:text-indigo-800 hover:underline text-[11px] px-1" title="${t('history.requote')}">${t('history.requote')}</button>`;
-
             // Delete button
             const deleteBtn = `<button data-action="delete" data-id="${item.id}" class="text-xs text-red-500 hover:text-red-700" title="${t('common.delete')}">${t('common.delete')}</button>`;
 
             return `<tr class="border-t border-gray-100 hover:bg-gray-50">
                 <td class="px-3 py-2 text-gray-500">${ts}</td>
                 <td class="px-3 py-2 max-w-[120px] truncate" title="${escapeHtml(item.filename)}">${escapeHtml(item.filename)}</td>
+                <td class="px-3 py-2">${escapeHtml(item.printer_model || '-')}</td>
+                <td class="px-3 py-2">${item.nozzle_diameter || '-'}</td>
+                <td class="px-3 py-2">${item.layer_height || '-'}</td>
+                <td class="px-3 py-2">${item.wall_count || '-'}</td>
+                <td class="px-3 py-2">${item.infill ? item.infill + '%' : '-'}</td>
                 <td class="px-3 py-2">${escapeHtml(item.material)}</td>
                 <td class="px-3 py-2">${item.quantity}</td>
                 <td class="px-3 py-2">${item.volume_cm3}</td>
@@ -286,13 +246,13 @@ export async function loadQuoteHistory(token) {
                 <td class="px-3 py-2">${formatTimeHMS(item.estimated_time_h)}</td>
                 <td class="px-3 py-2 font-medium text-indigo-600">¥${item.cost_cny}</td>
                 <td class="px-3 py-2">${statusBadge}</td>
-                <td class="px-3 py-2 whitespace-nowrap">${reQuoteBtn}${deleteBtn}</td>
+                <td class="px-3 py-2 whitespace-nowrap">${deleteBtn}</td>
             </tr>`;
         }).join('');
 
         renderPagination();
     } catch (e) {
-        historyTbody.innerHTML = '<tr><td class="px-3 py-4 text-gray-400 text-center" colspan="10">' + t('common.loadError') + '</td></tr>';
+        historyTbody.innerHTML = '<tr><td class="px-3 py-4 text-gray-400 text-center" colspan="15">' + t('common.loadError') + '</td></tr>';
         if (paginationContainer) paginationContainer.innerHTML = '';
     }
 }

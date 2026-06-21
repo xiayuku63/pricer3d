@@ -1,7 +1,7 @@
 // ── Orientation UI: layface, orientation controls, training ──
 import * as THREE from 'three';
 import {
-    currentMesh, controls,
+    currentMesh, controls, requestRender,
 } from './viewer.js';
 import {
     renderClusters, clearClusters, setClusterHover, intersectClusters,
@@ -113,6 +113,7 @@ export async function toggleLayFace() {
             },
             setClusterHover
         );
+        requestRender();
         if (layFaceBtn) layFaceBtn.textContent = t('orientation.exit');
     } catch (e) {
         console.error('Lay on Face error:', e);
@@ -148,12 +149,35 @@ export async function submitTraining() {
         const data = await resp.json();
         if (!resp.ok) throw new Error(data.detail || t('orientation.requestFailed'));
         if (orientTrainStatus) { orientTrainStatus.textContent = t('orientation.marked'); orientTrainStatus.className = 'text-xs text-green-600'; }
+
+        // 标记成功 → 用当前朝向立即重新报价
+        try {
+            const { quoteSingleFileWithOptions } = await import('./quote-api.js');
+            const { mergeResultsByFilename } = await import('./quote-api.js');
+            const { renderResultsTable, recalcSummaryFromCurrentResults } = await import('./quote-render.js');
+            const { ensureThumbnailForFile } = await import('./preview.js');
+            await ensureThumbnailForFile(file, quoteOptions.color);
+            const updated = await quoteSingleFileWithOptions(file, {
+                material: quoteOptions.material,
+                color: quoteOptions.color,
+                quantity: quoteOptions.quantity || 1,
+            });
+            mergeResultsByFilename([updated]);
+            renderResultsTable();
+            recalcSummaryFromCurrentResults();
+            if (orientTrainStatus) {
+                orientTrainStatus.textContent = t('orientation.markedAndQuoted') || (t('orientation.marked') + ' — 报价已刷新');
+            }
+        } catch (requoteErr) {
+            console.warn('重新报价失败:', requoteErr);
+            // 不阻塞，标记本身已成功
+        }
     } catch (e) {
         if (orientTrainStatus) { orientTrainStatus.textContent = t('orientation.markFailed', { msg: (e.message || t('common.unknownError')) }); orientTrainStatus.className = 'text-xs text-red-600'; }
     } finally {
         if (orientTrainBtn) orientTrainBtn.disabled = false;
         setTimeout(() => {
             if (orientTrainStatus) { orientTrainStatus.classList.add('hidden'); orientTrainStatus.textContent = ''; }
-        }, 3000);
+        }, 5000);
     }
 }

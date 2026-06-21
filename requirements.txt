@@ -13,3 +13,5 @@ openpyxl
 sqlalchemy
 alembic
 resend
+shapely>=2.0,<3.0
+scikit-learn>=1.3,<2.0

@@ -1036,7 +1036,20 @@ export function renderResultsTable() {
             }
 
             // 费用明细 + 材料说明 + 打印建议
-            detailDiv.innerHTML = gcodeHtml + speedHtml +
+            var _orientHtml = '';
+            if (item.auto_orient_score != null) {
+                _orientHtml = '<div class="mb-3 p-2 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-md">' +
+                    '<div class="text-[10px] font-semibold text-green-700 mb-1">🎯 自动摆放优化</div>' +
+                    '<div class="text-[10px] text-green-600">' +
+                    '评分: ' + (item.auto_orient_score || 0).toFixed(1) +
+                    ' · 角度: X' + ((item.euler_angles_deg && item.euler_angles_deg.x != null) ? item.euler_angles_deg.x.toFixed(1) : '-') +
+                    '° Y' + ((item.euler_angles_deg && item.euler_angles_deg.y != null) ? item.euler_angles_deg.y.toFixed(1) : '-') +
+                    '° Z' + ((item.euler_angles_deg && item.euler_angles_deg.z != null) ? item.euler_angles_deg.z.toFixed(1) : '-') + '°' +
+                    '</div>' +
+                    (item.tune_report ? '<div class="text-[10px] text-green-600 mt-0.5">📝 ' + item.tune_report + '</div>' : '') +
+                    '</div>';
+            }
+            detailDiv.innerHTML = gcodeHtml + speedHtml + _orientHtml +
                 '<div class="grid grid-cols-1 lg:grid-cols-3 gap-2">' +
                 _buildCostBreakdownHtml(item) +
                 _buildMaterialInfoHtml(item.material) +

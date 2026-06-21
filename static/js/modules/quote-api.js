@@ -16,6 +16,22 @@ import { uploadWithProgress, showProgress, showProgressSuccess, showProgressErro
 let _dom = {};
 export function setApiDom(d) { _dom = d; }
 
+// ── Global abort controller for recalc ──
+let _globalAbortController = null;
+
+export function abortActiveRecalc() {
+    if (_globalAbortController) {
+        _globalAbortController.abort();
+        _globalAbortController = null;
+    }
+}
+
+function _newAbortController() {
+    abortActiveRecalc();
+    _globalAbortController = new AbortController();
+    return _globalAbortController;
+}
+
 // ── Quote API ──
 
 function _getActivePrinterModel() {
@@ -30,7 +46,7 @@ function _getActiveSlicerPresetId() {
         ? quoteOptions.slicer_preset_id : null;
 }
 
-export async function quoteSingleFileWithOptions(file, options) {
+export async function quoteSingleFileWithOptions(file, options, signal) {
     const formData = new FormData();
     formData.append("files", file);
     // Use per-file printer if provided, else global
@@ -53,7 +69,13 @@ export async function quoteSingleFileWithOptions(file, options) {
     if (wcEl && wcEl.value) formData.append("wall_count", wcEl.value);
     if (ifEl && ifEl.value) formData.append("infill", ifEl.value);
     formData.append("use_prusaslicer", "true");
-    const response = await authFetch('/api/quote', { method: 'POST', body: formData });
+    const autoOrientCheckbox1 = document.getElementById('batch-auto-orient');
+    if (autoOrientCheckbox1 && autoOrientCheckbox1.checked) {
+        formData.append('auto_orient', 'true');
+    }
+    const fetchOpts = { method: 'POST', body: formData };
+    if (signal) fetchOpts.signal = signal;
+    const response = await authFetch('/api/quote', fetchOpts);
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || data.error || t('quote.requestFailed'));
     return data.results && data.results.length > 0 ? data.results[0] : { filename: file.name, status: "failed", error: "空响应" };
@@ -101,6 +123,10 @@ async function _quoteSelectedFilesInternal(selectedFiles, useProgress) {
     if (wcEl2 && wcEl2.value) formData.append("wall_count", wcEl2.value);
     if (ifEl2 && ifEl2.value) formData.append("infill", ifEl2.value);
     formData.append("use_prusaslicer", "true");
+    const autoOrientCheckbox2 = document.getElementById('batch-auto-orient');
+    if (autoOrientCheckbox2 && autoOrientCheckbox2.checked) {
+        formData.append('auto_orient', 'true');
+    }
     if (useProgress) {
         showProgress(`批量报价 (${selectedFiles.length} 个文件)...`);
         try {
@@ -176,6 +202,11 @@ export async function reQuoteAllSelectedFiles(reasonLabel) {
     if (errorMsg) errorMsg.textContent = '';
     if (errorContainer) errorContainer.classList.add('hidden');
 
+    // 中断上一个重算
+    abortActiveRecalc();
+    const controller = _newAbortController();
+    const signal = controller.signal;
+
     currentResults.splice(0, currentResults.length, ...currentResults.map((item) => {
         if (!item || !item.filename) return item;
         const next = { ...item };
@@ -191,6 +222,8 @@ export async function reQuoteAllSelectedFiles(reasonLabel) {
 
     if (fileNameDisplay) fileNameDisplay.classList.add('text-indigo-600', 'font-medium');
     for (let i = 0; i < files.length; i += 1) {
+        // 检查是否已被中断
+        if (signal.aborted) break;
         const file = files[i];
         const existing = currentResults.find((r) => r && r.filename === file.name) || null;
         const material = existing && existing.material ? existing.material : quoteOptions.material;
@@ -204,15 +237,20 @@ export async function reQuoteAllSelectedFiles(reasonLabel) {
         if (fileNameDisplay) fileNameDisplay.textContent = `${reasonLabel}：${i + 1}/${files.length}（${file.name}）`;
         try {
             await ensureThumbnailForFile(file, color);
+            if (signal.aborted) break;
             const opts = { material, color, quantity, _printer_model: pm };
             if (sp !== null) opts._slicer_preset_id = sp;
-            const updated = await quoteSingleFileWithOptions(file, opts);
+            const updated = await quoteSingleFileWithOptions(file, opts, signal);
             mergeResultsByFilename([updated]);
         } catch (err) {
+            // AbortError: 静默处理
+            if (err.name === 'AbortError') break;
             mergeResultsByFilename([{ filename: file.name, status: 'failed', error: err.message || '重算失败', material, color, quantity }]);
         }
         renderResultsTable();
         recalcSummaryFromCurrentResults();
     }
-    if (fileNameDisplay) fileNameDisplay.textContent = `${reasonLabel}完成（共 ${files.length} 个文件）`;
+    if (fileNameDisplay) fileNameDisplay.textContent = signal.aborted
+        ? `${reasonLabel}已中断`
+        : `${reasonLabel}完成（共 ${files.length} 个文件）`;
 }

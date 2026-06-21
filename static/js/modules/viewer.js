@@ -16,6 +16,19 @@ let mouse = new THREE.Vector2();
 let highlightGroup = null;
 let highlightMode = false;
 
+// Bed (print platform) references — for dynamic bed size updates
+let _bedGrid = null;
+let _bedPlane = null;
+let _bedAxes = [];
+let _pendingBedSize = null;  // {width, depth} queued before initViewer finishes
+let _bedLabel = null;            // DOM overlay (top-right) showing bed W×D×H
+let _bedDims = { w: 256, d: 256, h: 256 };
+
+// Recolor fast-path cache: skip re-parsing STL/GLB when only the color changes
+let _lastRenderedFileKey = null;
+let _lastRenderedColorKey = null;
+let _lastRenderedOrientation = null;
+
 // Mobile touch state
 let _isMobile = false;
 let _touchStartTime = 0;
@@ -23,6 +36,152 @@ let _touchMoved = false;
 let _gestureHintShown = false;
 let _lastPinchDist = 0;
 let _renderRequested = true;  // dirty flag for on-demand rendering
+
+/** Remove existing bed elements from scene and dispose their GPU resources. */
+function _removeBed() {
+    if (_bedGrid) {
+        scene.remove(_bedGrid);
+        if (_bedGrid.geometry) _bedGrid.geometry.dispose();
+        if (_bedGrid.material) {
+            if (Array.isArray(_bedGrid.material)) _bedGrid.material.forEach(function(m) { m.dispose(); });
+            else _bedGrid.material.dispose();
+        }
+        _bedGrid = null;
+    }
+    if (_bedPlane) {
+        scene.remove(_bedPlane);
+        if (_bedPlane.geometry) _bedPlane.geometry.dispose();
+        if (_bedPlane.material) _bedPlane.material.dispose();
+        _bedPlane = null;
+    }
+    for (var i = 0; i < _bedAxes.length; i++) {
+        scene.remove(_bedAxes[i]);
+        if (_bedAxes[i].dispose) _bedAxes[i].dispose();
+    }
+    _bedAxes = [];
+}
+
+/**
+ * Create the print bed (grid + plane + origin axes) with the given dimensions.
+ * Left-bottom corner sits at world origin (0, 0, 0).
+ * @param {number} width - bed width in mm (X axis)
+ * @param {number} depth - bed depth in mm (Y axis)
+ */
+function _createBed(width, depth) {
+    _removeBed();
+    var w = Number(width) || 256;
+    var d = Number(depth) || 256;
+    var maxDim = Math.max(w, d);
+    var divisions = Math.max(2, Math.round(maxDim / 8));  // ~8mm per cell
+
+    // Grid: GridHelper is square (maxDim x maxDim), scaled to actual w x d
+    _bedGrid = new THREE.GridHelper(maxDim, divisions, 0x334155, 0x1e293b);
+    _bedGrid.rotation.x = Math.PI / 2;
+    _bedGrid.scale.set(w / maxDim, d / maxDim, 1);
+    _bedGrid.position.set(w / 2, d / 2, 0);
+    scene.add(_bedGrid);
+
+    // Semi-transparent bed plane
+    var bedGeo = new THREE.PlaneGeometry(w, d);
+    var bedMat = new THREE.MeshStandardMaterial({
+        color: 0xeef2ff,
+        transparent: true,
+        opacity: 0.15,
+        side: THREE.DoubleSide,
+    });
+    _bedPlane = new THREE.Mesh(bedGeo, bedMat);
+    _bedPlane.position.set(w / 2, d / 2, 0);
+    scene.add(_bedPlane);
+
+    // Origin axes (fixed length — do not scale with bed)
+    var axLen = 40;
+    _bedAxes = [
+        new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 0), axLen, 0xff4444),
+        new THREE.ArrowHelper(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 0), axLen, 0x44ff44),
+        new THREE.ArrowHelper(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, 0), axLen, 0x4488ff),
+    ];
+    for (var k = 0; k < _bedAxes.length; k++) scene.add(_bedAxes[k]);
+
+    // Bed center used by renderSTL / placeFaceOnBed for model centering
+    window._BED_CENTER = w / 2;
+}
+
+/**
+ * Update the 3D viewer bed to match a printer's build volume.
+ * Safe to call before initViewer — the size is queued and applied during init.
+ * @param {number} width - bed width in mm
+ * @param {number} depth - bed depth in mm
+ */
+export function updateBedSize(width, depth) {
+    // Update the text overlay immediately (even before init) so the UI reflects the selection
+    setBedLabel(width, depth, null);
+    if (!initialised || !scene) {
+        _pendingBedSize = { width: width, depth: depth };
+        return;
+    }
+    _createBed(width, depth);
+    requestRender();
+}
+
+function _formatBedLabel(w, d, h) {
+    return Math.round(w) + ' × ' + Math.round(d) + ' × ' + Math.round(h) + ' mm';
+}
+
+/**
+ * Update the bed-dimensions overlay (top-right of the 3D preview canvas).
+ * @param {number} w - bed width in mm
+ * @param {number} d - bed depth in mm
+ * @param {number|null} h - bed height in mm; pass null to keep the previous value
+ */
+export function setBedLabel(w, d, h) {
+    _bedDims.w = Number(w) || _bedDims.w;
+    _bedDims.d = Number(d) || _bedDims.d;
+    if (h != null) _bedDims.h = Number(h) || _bedDims.h;
+    if (_bedLabel) _bedLabel.textContent = _formatBedLabel(_bedDims.w, _bedDims.d, _bedDims.h);
+}
+
+/**
+ * Resolve a colorKey (hex string, bare name, or object) to a Three.js hex number.
+ * Handles the fallback object returned by getRenderColorHex for bare names.
+ * @param {*} colorKey - hex string like "#ff0000", bare name like "Blue", or null
+ * @returns {number} hex color number usable by THREE.MeshStandardMaterial
+ */
+function _colorNumFromKey(colorKey) {
+    var r = getRenderColorHex(colorKey);
+    if (typeof r === 'number') return r;
+    if (r && typeof r === 'object' && r.fallback) {
+        var c = new THREE.Color();
+        c.setHSL(r.hue / 360, 0.58, 0.56);
+        return c.getHex();
+    }
+    return 0x3b82f6;  // default blue
+}
+
+function _orientationEqual(a, b) {
+    if (a == null && b == null) return true;
+    if (a == null || b == null) return false;
+    return ((a.x || 0) === (b.x || 0) && (a.y || 0) === (b.y || 0) && (a.z || 0) === (b.z || 0));
+}
+
+/**
+ * Recolor the currently-loaded mesh without re-parsing the source file.
+ * Fast path used when only the color changed (same file + orientation).
+ * @param {*} colorKey - hex string / bare name / null
+ * @returns {boolean} true if a mesh was recolored, false if no mesh is loaded
+ */
+export function recolorCurrentMesh(colorKey) {
+    if (!currentMesh) return false;
+    const colorNum = _colorNumFromKey(colorKey);
+    currentMesh.traverse(function(c) {
+        if (c.isMesh && c.material && c.material.color) {
+            c.material.color.setHex(colorNum);
+            c.material.needsUpdate = true;
+        }
+    });
+    _lastRenderedColorKey = colorKey;
+    requestRender();
+    return true;
+}
 
 export function initViewer(previewContainerEl, previewPlaceholderEl) {
     previewContainer = previewContainerEl;
@@ -41,6 +200,16 @@ export function initViewer(previewContainerEl, previewPlaceholderEl) {
     renderer.setPixelRatio(dpr);
     renderer.setSize(previewContainer.clientWidth, previewContainer.clientHeight);
     previewContainer.appendChild(renderer.domElement);
+
+    // Bed-size overlay (top-right of the preview canvas)
+    if (getComputedStyle(previewContainer).position === 'static') {
+        previewContainer.style.position = 'relative';
+    }
+    _bedLabel = document.createElement('div');
+    _bedLabel.className = 'bed-size-label';
+    _bedLabel.style.cssText = 'position:absolute;top:8px;right:10px;z-index:20;background:rgba(255,255,255,0.8);color:#334155;font-size:10px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;padding:3px 7px;border-radius:6px;border:1px solid #cbd5e1;pointer-events:none;line-height:1.35;letter-spacing:0.02em;';
+    _bedLabel.textContent = _formatBedLabel(_bedDims.w, _bedDims.d, _bedDims.h);
+    previewContainer.appendChild(_bedLabel);
 
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -96,35 +265,12 @@ export function initViewer(previewContainerEl, previewPlaceholderEl) {
     dirLight.position.set(80, 80, 120);
     scene.add(dirLight);
 
-    const BED_SIZE = 256;
-    const BED_HALF = BED_SIZE / 2; // 128
-
-    // 打印底板网格：左下角 (0,0,0)，尺寸 256×256
-    const gridHelper = new THREE.GridHelper(BED_SIZE, 32, 0x334155, 0x1e293b);
-    gridHelper.rotation.x = Math.PI / 2;
-    gridHelper.position.set(BED_HALF, BED_HALF, 0);
-    scene.add(gridHelper);
-
-    // 底板半透明平面
-    const bedGeo = new THREE.PlaneGeometry(BED_SIZE, BED_SIZE);
-    const bedMat = new THREE.MeshStandardMaterial({
-        color: 0xeef2ff,
-        transparent: true,
-        opacity: 0.15,
-        side: THREE.DoubleSide,
-    });
-    const bedPlane = new THREE.Mesh(bedGeo, bedMat);
-    bedPlane.position.set(BED_HALF, BED_HALF, 0);
-    scene.add(bedPlane);
-
-    // 坐标轴（原点 = 网格左下角，带箭头）
-    const axLen = 40;
-    scene.add(new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 0), axLen, 0xff4444));
-    scene.add(new THREE.ArrowHelper(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 0), axLen, 0x44ff44));
-    scene.add(new THREE.ArrowHelper(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, 0), axLen, 0x4488ff));
-
-    // 打印平面中心位置常量（供所有加载函数使用）
-    window._BED_CENTER = BED_HALF;
+    // 打印底板（网格 + 平面 + 坐标轴）。默认 256×256；如有 pending size 则使用之。
+    var _initBedW = _pendingBedSize ? _pendingBedSize.width : 256;
+    var _initBedD = _pendingBedSize ? _pendingBedSize.depth : 256;
+    _createBed(_initBedW, _initBedD);
+    setBedLabel(_initBedW, _initBedD, null);
+    _pendingBedSize = null;
 
     function handleInteraction(event) {
         if (!currentMesh) return;
@@ -197,7 +343,7 @@ export function initViewer(previewContainerEl, previewPlaceholderEl) {
 }
 
 /** Request a render on next frame */
-function requestRender() {
+export function requestRender() {
     _renderRequested = true;
 }
 
@@ -310,7 +456,7 @@ export function clearCurrentMesh() {
 }
 
 
-async function renderViaGLB(file) {
+async function renderViaGLB(file, orientation = null, colorKey = null) {
     const formData = new FormData();
     formData.append('file', file);
     try {
@@ -323,7 +469,14 @@ async function renderViaGLB(file) {
         URL.revokeObjectURL(url);
 
         const model = gltf.scene;
-        model.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+        var _glbColorNum = _colorNumFromKey(colorKey || 'Blue');
+        model.traverse(function(c) {
+            if (c.isMesh) {
+                c.castShadow = true;
+                c.receiveShadow = true;
+                c.material = new THREE.MeshStandardMaterial({ color: _glbColorNum, metalness: 0.15, roughness: 0.65 });
+            }
+        });
         // 自适应缩放 + 居中
         model.updateMatrixWorld(true);
         let box = new THREE.Box3().setFromObject(model);
@@ -350,8 +503,19 @@ async function renderViaGLB(file) {
         clearCurrentMesh();
         currentMesh = model;
         scene.add(currentMesh);
+        if (orientation) {
+            currentMesh.rotation.x = THREE.MathUtils.degToRad(orientation.x || 0);
+            currentMesh.rotation.y = THREE.MathUtils.degToRad(orientation.y || 0);
+            currentMesh.rotation.z = THREE.MathUtils.degToRad(orientation.z || 0);
+            currentMesh.updateMatrixWorld(true);
+            box = new THREE.Box3().setFromObject(currentMesh);
+            currentMesh.position.z -= box.min.z;
+        }
         fitCameraToMesh(currentMesh);
         previewPlaceholder.classList.add('hidden');
+        _lastRenderedFileKey = (file.name || '') + ':' + (file.size || 0);
+        _lastRenderedColorKey = colorKey;
+        _lastRenderedOrientation = orientation ? { x: orientation.x || 0, y: orientation.y || 0, z: orientation.z || 0 } : null;
         return true;
     } catch (e) {
         console.warn('GLB render failed:', e);
@@ -359,17 +523,25 @@ async function renderViaGLB(file) {
     }
 }
 
-export function renderSTL(file, colorKey = 'Blue') {
+export function renderSTL(file, colorKey = 'Blue', orientation = null) {
     if (!file || !(file instanceof Blob) || file.size === 0) {
         previewPlaceholder.textContent = '文件无效或为空，请重新上传';
         previewPlaceholder.classList.remove('hidden');
+        return;
+    }
+    // Fast path: same file + orientation already loaded → just recolor, skip re-parse
+    var _fileKey = (file.name || '') + ':' + (file.size || 0);
+    if (currentMesh && _fileKey === _lastRenderedFileKey
+        && _orientationEqual(orientation, _lastRenderedOrientation)) {
+        recolorCurrentMesh(colorKey);
+        previewPlaceholder.classList.add('hidden');
         return;
     }
     const ext = file.name && file.name.includes('.') ? file.name.split('.').pop().toLowerCase() : '';
     if (ext !== 'stl') {
         // 为 3MF/OBJ/STP 通过后端转为 GLB 预览
         clearCurrentMesh();
-        renderViaGLB(file).then(ok => {
+        renderViaGLB(file, orientation, colorKey).then(ok => {
             if (!ok) {
                 previewPlaceholder.innerHTML = '<div style="text-align:center;padding-top:20%"><div style="font-size:4rem;margin-bottom:1rem">📦</div><p style="color:#64748b">' + ext.toUpperCase() + ' 预览失败</p><p style="color:#94a3b8;font-size:0.8rem">上传后将自动切片报价</p></div>';
                 previewPlaceholder.classList.remove('hidden');
@@ -399,7 +571,7 @@ export function renderSTL(file, colorKey = 'Blue') {
             geometry.translate(0, 0, -geometry.boundingBox.min.z);
             clearCurrentMesh();
             const material = new THREE.MeshStandardMaterial({
-                color: getRenderColorHex(colorKey), metalness: 0.15, roughness: 0.65,
+                color: _colorNumFromKey(colorKey), metalness: 0.15, roughness: 0.65,
             });
             currentMesh = new THREE.Mesh(geometry, material);
             currentMesh.rotation.set(0, 0, 0);
@@ -407,9 +579,20 @@ export function renderSTL(file, colorKey = 'Blue') {
             const bc = window._BED_CENTER || 128;
             currentMesh.position.set(bc, bc, 0);
             _initialMeshPos = currentMesh.position.clone();
+            if (orientation) {
+                currentMesh.rotation.x = THREE.MathUtils.degToRad(orientation.x || 0);
+                currentMesh.rotation.y = THREE.MathUtils.degToRad(orientation.y || 0);
+                currentMesh.rotation.z = THREE.MathUtils.degToRad(orientation.z || 0);
+                currentMesh.updateMatrixWorld(true);
+                var box = new THREE.Box3().setFromObject(currentMesh);
+                currentMesh.position.z -= box.min.z;
+            }
             scene.add(currentMesh);
             fitCameraToMesh(currentMesh);
             previewPlaceholder.classList.add('hidden');
+            _lastRenderedFileKey = _fileKey;
+            _lastRenderedColorKey = colorKey;
+            _lastRenderedOrientation = orientation ? { x: orientation.x || 0, y: orientation.y || 0, z: orientation.z || 0 } : null;
         } catch (e) {
             previewPlaceholder.textContent = '预览失败，请确认 STL 文件有效';
             previewPlaceholder.classList.remove('hidden');

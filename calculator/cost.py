@@ -3,6 +3,7 @@ import json
 import ast
 import math
 import re
+import shutil
 import time
 import tempfile
 import uuid
@@ -246,10 +247,20 @@ def calculate_cost(
     # ── 自动朝向优化 (Lay on Face) ──
     orientation_info: dict = {}
     _oriented_tmp_path: Optional[str] = None
+    logger.warning("AUTO_ORIENT_DEBUG: auto_orient=%s model_path=%s", auto_orient, bool(model_path))
     if auto_orient and model_path and os.path.exists(model_path):
         try:
             from calculator.orientation import get_best_face_for_slicing
-            orient_result = get_best_face_for_slicing(model_path)
+            # 优先使用自学习模型 (若已训练)
+            _learned_model = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                "data", "orientation_model.pkl",
+            )
+            _orient_method = "learned" if os.path.exists(_learned_model) else "coplanar"
+            orient_result = get_best_face_for_slicing(model_path, method=_orient_method)
+            logger.warning("ORIENT_RESULT keys=%s score=%s oriented_path=%s", 
+                list(orient_result.keys()) if orient_result else 'NONE',
+                orient_result.get('score'), orient_result.get('oriented_path','')[-40:] if orient_result.get('oriented_path') else None)
             oriented_path = orient_result.get("oriented_path")
             if oriented_path and oriented_path != model_path:
                 _oriented_tmp_path = oriented_path
@@ -267,7 +278,7 @@ def calculate_cost(
                 }
                 model_path = oriented_path
         except Exception as e:
-            logger.warning("自动朝向优化失败，使用原始朝向: %s", e)
+            logger.warning("自动朝向优化失败，使用原始朝向: %s", e, exc_info=True)
 
     # Determine whether to use PrusaSlicer
     raw_prusa = cfg.get("use_prusaslicer")
@@ -369,6 +380,16 @@ def calculate_cost(
                 slicer_filament_g_per_part = filament_cm3 * spec["density"]
             if not preset_used and stats.get("preset_used"):
                 preset_used = str(stats["preset_used"])
+
+            # ── 复制 G-code 到桌面输出目录 ──
+            desktop_dir = "/app/desktop_outputs"
+            if os.path.isdir(desktop_dir):
+                try:
+                    dest = os.path.join(desktop_dir, os.path.basename(output_gcode))
+                    shutil.copy2(output_gcode, dest)
+                    logger.info(f"G-code copied to desktop: {dest}")
+                except Exception as e:
+                    logger.warning(f"Failed to copy gcode to desktop: {e}")
         except Exception as e:
             logger.error(f"PrusaSlicer failed for {model_path}: {e}")
             slicer_time_s = None

@@ -2,7 +2,7 @@
             <div id="quote-history-modal" class="hidden fixed inset-0 z-50">
                 <div id="quote-history-backdrop" class="absolute inset-0 bg-black/50"></div>
                 <div class="relative z-10 h-full w-full flex items-center justify-center p-4">
-                    <div class="w-full max-w-5xl bg-white rounded-lg shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
+                    <div class="w-full max-w-7xl bg-white rounded-lg shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
                         <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
                             <h4 class="text-sm font-semibold text-gray-800" data-i18n="history.title">报价历史</h4>
                             <div class="flex items-center gap-2">
@@ -18,6 +18,11 @@
                                         <tr>
                                             <th class="px-3 py-2" data-i18n="history.time">时间</th>
                                             <th class="px-3 py-2" data-i18n="history.files">文件名</th>
+                                            <th class="px-3 py-2" data-i18n="quote.printerModel">打印机</th>
+                                            <th class="px-3 py-2" data-i18n="quote.nozzleDiameter">喷嘴</th>
+                                            <th class="px-3 py-2" data-i18n="history.layerHeight">层高(mm)</th>
+                                            <th class="px-3 py-2" data-i18n="history.wallCount">墙层数</th>
+                                            <th class="px-3 py-2" data-i18n="history.infill">填充</th>
                                             <th class="px-3 py-2" data-i18n="quote.material">材料</th>
                                             <th class="px-3 py-2" data-i18n="quote.quantity">数量</th>
                                             <th class="px-3 py-2" data-i18n="history.volume">体积(cm³)</th>
@@ -29,7 +34,7 @@
                                         </tr>
                                     </thead>
                                     <tbody id="history-tbody">
-                                        <tr><td class="px-3 py-12 text-gray-400 text-center" colspan="11">
+                                        <tr><td class="px-3 py-12 text-gray-400 text-center" colspan="16">
                                             <div class="text-6xl mb-3">📭</div>
                                             <p class="text-sm" data-i18n="history.noRecords">暂无报价历史记录</p>
                                             <p class="text-xs mt-1 text-gray-300" data-i18n="history.noRecordsSubtext">上传模型完成报价后，记录将显示在这里</p>

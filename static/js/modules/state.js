@@ -354,7 +354,7 @@ export function renderColorDropdown(name, selectedColor, compact) {
             + '<span class="color-dd-swatch w-3.5 h-3.5 rounded-sm border border-gray-400 flex-shrink-0" style="background:' + safeHex + '"></span>'
             + '<svg class="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>'
             + '</button>'
-            + '<div class="color-dd-list hidden absolute z-30 left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto min-w-[140px]">'
+            + '<div class="color-dd-list hidden absolute z-50 left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg overflow-y-auto min-w-[140px]" style="max-height:220px;">'
             + listItems
             + '</div>'
             + '<input type="hidden" class="row-color-value" value="' + safeHex + '">'
@@ -368,7 +368,7 @@ export function renderColorDropdown(name, selectedColor, compact) {
         + '<span class="color-dd-label flex-1 text-left font-mono text-xs">' + safeHex + '</span>'
         + '<svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>'
         + '</button>'
-        + '<div class="color-dd-list hidden absolute z-30 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">'
+        + '<div class="color-dd-list hidden absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg overflow-y-auto" style="max-height:220px;">'
         + listItems
         + '</div>'
         + '<input type="hidden" class="row-color-value" value="' + safeHex + '">'

@@ -13,16 +13,154 @@
 import * as THREE from 'three';
 import { currentMeshCenterOffset, fitCameraToMesh } from './viewer.js';
 
-const FACE_COLORS = [
-    0xff6b6b, 0x4ecdc4, 0x45b7d1, 0xf9ca24, 0xa55eea,
-    0x26de81, 0xfd9644, 0xeb3b5a, 0x2bcbba, 0xfc5c65,
-    0x45aaf2, 0xa9e34b, 0xff922b, 0x748ffc, 0x20c997,
-];
+// Unified white highlight color for BambuSlicer-style oval overlays
+const FACE_COLORS = 0xffffff;
 
 let clusterOverlays = [];       // 高亮 Mesh 数组
 let clusterClickCallback = null; // 点击回调
 let clusterHighlightGroup = null;
 let clusterMode = false;        // 当前是否处于 Cluster 模式
+
+/**
+ * Build a BambuSlicer-style ellipse overlay for one face cluster.
+ * Projects the cluster's face vertices onto the face plane, runs PCA to find
+ * the principal axes, then emits a filled ellipse (triangle fan) plus a crisp
+ * LineLoop outline that bounds all projected points. The ellipse sits in the
+ * face's plane and is nudged along the face normal to avoid z-fighting.
+ *
+ * @param {number[]} flatVerts - flat [x,y,z, x,y,z, ...] already offset to model space
+ * @param {number[]} normalArr - [nx, ny, nz] face normal
+ * @param {number} clusterIndex - index used for click hit-detection
+ * @returns {{mesh: THREE.Mesh, outline: THREE.LineLoop} | null}
+ */
+function _buildEllipseOverlay(flatVerts, normalArr, clusterIndex) {
+    // Gather 3D points
+    const pts = [];
+    for (let i = 0; i + 2 < flatVerts.length; i += 3) {
+        pts.push(new THREE.Vector3(flatVerts[i], flatVerts[i + 1], flatVerts[i + 2]));
+    }
+    if (pts.length < 3) return null;
+
+    // Centroid
+    const centroid = new THREE.Vector3();
+    for (const p of pts) centroid.add(p);
+    centroid.multiplyScalar(1 / pts.length);
+
+    // Face normal + in-plane orthonormal basis (u, v)
+    const n = new THREE.Vector3(normalArr[0], normalArr[1], normalArr[2]).normalize();
+    let u = (Math.abs(n.x) < 0.9) ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+    u.sub(n.clone().multiplyScalar(n.dot(u))).normalize();   // project u into the plane
+    const v = new THREE.Vector3().crossVectors(n, u).normalize();
+
+    // 2D coordinates relative to centroid
+    const p2 = pts.map(function(p) {
+        const d = p.clone().sub(centroid);
+        return [d.dot(u), d.dot(v)];
+    });
+
+    // PCA on the 2D points (covariance eigen-decomposition)
+    let mx = 0, my = 0;
+    for (const q of p2) { mx += q[0]; my += q[1]; }
+    mx /= p2.length; my /= p2.length;
+    let sxx = 0, sxy = 0, syy = 0;
+    for (const q of p2) {
+        const dx = q[0] - mx, dy = q[1] - my;
+        sxx += dx * dx; sxy += dx * dy; syy += dy * dy;
+    }
+    sxx /= p2.length; syy /= p2.length; sxy /= p2.length;
+    const trace = sxx + syy;
+    const disc = Math.sqrt(Math.max(0, (sxx - syy) * (sxx - syy) + 4 * sxy * sxy));
+    const l1 = (trace + disc) / 2;
+    // Principal-axis angle (eigenvector of largest eigenvalue)
+    let theta;
+    if (Math.abs(sxy) < 1e-9) {
+        theta = (sxx >= syy) ? 0 : Math.PI / 2;
+    } else {
+        theta = Math.atan2(l1 - sxx, sxy);
+    }
+    const e1x = Math.cos(theta), e1y = Math.sin(theta);   // major axis (2D)
+    const e2x = -e1y,       e2y = e1x;                     // minor axis (2D)
+
+    // Semi-axes = max projection magnitude along each principal axis (bounds all points)
+    let semi1 = 0, semi2 = 0;
+    for (const q of p2) {
+        const dx = q[0] - mx, dy = q[1] - my;
+        const proj1 = Math.abs(dx * e1x + dy * e1y);
+        const proj2 = Math.abs(dx * e2x + dy * e2y);
+        if (proj1 > semi1) semi1 = proj1;
+        if (proj2 > semi2) semi2 = proj2;
+    }
+    semi1 *= 1.08; semi2 *= 1.08;   // small padding so the oval clearly surrounds the face
+    if (semi1 < 1e-4 || semi2 < 1e-4) return null;
+
+    // Map 2D principal axes back to 3D
+    const e1_3d = u.clone().multiplyScalar(e1x).add(v.clone().multiplyScalar(e1y));
+    const e2_3d = u.clone().multiplyScalar(e2x).add(v.clone().multiplyScalar(e2y));
+
+    // Build the ellipse as a triangle fan centered at centroid
+    const SEG = 48;
+    const positions = [centroid.x, centroid.y, centroid.z];
+    for (let i = 0; i <= SEG; i++) {
+        const a = (i / SEG) * Math.PI * 2;
+        const ca = Math.cos(a), sa = Math.sin(a);
+        positions.push(
+            centroid.x + e1_3d.x * semi1 * ca + e2_3d.x * semi2 * sa,
+            centroid.y + e1_3d.y * semi1 * ca + e2_3d.y * semi2 * sa,
+            centroid.z + e1_3d.z * semi1 * ca + e2_3d.z * semi2 * sa
+        );
+    }
+    const indices = [];
+    for (let i = 1; i <= SEG; i++) indices.push(0, i, i + 1);
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setIndex(indices);
+    geo.computeVertexNormals();
+
+    const mat = new THREE.MeshStandardMaterial({
+        color: FACE_COLORS,
+        transparent: true,
+        opacity: 0.35,
+        side: THREE.DoubleSide,
+        depthTest: true,
+        depthWrite: false,
+        emissive: FACE_COLORS,
+        emissiveIntensity: 0.2,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.userData = {
+        clusterIndex: clusterIndex,
+        isClusterOverlay: true,
+        normal: normalArr,
+    };
+    mesh.renderOrder = 1;
+
+    // Offset along the face normal to avoid z-fighting
+    const off = n.clone().multiplyScalar(0.3);
+    mesh.position.copy(off);
+
+    // Crisp outline (LineLoop) — improves visibility of the white fill on light models
+    const outlinePts = [];
+    for (let i = 0; i < SEG; i++) {
+        const a = (i / SEG) * Math.PI * 2;
+        const ca = Math.cos(a), sa = Math.sin(a);
+        outlinePts.push(
+            centroid.x + off.x + e1_3d.x * semi1 * ca + e2_3d.x * semi2 * sa,
+            centroid.y + off.y + e1_3d.y * semi1 * ca + e2_3d.y * semi2 * sa,
+            centroid.z + off.z + e1_3d.z * semi1 * ca + e2_3d.z * semi2 * sa
+        );
+    }
+    const lineGeo = new THREE.BufferGeometry();
+    lineGeo.setAttribute('position', new THREE.Float32BufferAttribute(outlinePts, 3));
+    const lineMat = new THREE.LineBasicMaterial({
+        color: FACE_COLORS, transparent: true, opacity: 0.9,
+        depthTest: true, depthWrite: false,
+    });
+    const outline = new THREE.LineLoop(lineGeo, lineMat);
+    mesh.userData.outline = outline;
+
+    return { mesh: mesh, outline: outline };
+}
 
 /**
  * 在模型上渲染共面面簇高亮
@@ -62,37 +200,12 @@ export function renderClusters(parent, clusters, onClick, onHover) {
         }
         if (verts.length < 9) return;
 
-        const geo = new THREE.BufferGeometry();
-        geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
-        geo.computeVertexNormals();
-
-        const color = FACE_COLORS[ci % FACE_COLORS.length];
-        const mat = new THREE.MeshStandardMaterial({
-            color,
-            transparent: true,
-            opacity: 0.35,
-            side: THREE.DoubleSide,
-            depthTest: true,
-            depthWrite: false,
-            emissive: color,
-            emissiveIntensity: 0.2,
-        });
-
-        const mesh = new THREE.Mesh(geo, mat);
-        mesh.userData = {
-            clusterIndex: ci,
-            isClusterOverlay: true,
-            normal: cluster.normal,
-        };
-        mesh.renderOrder = 1;
-
-        // 沿法向量微偏移避免 z-fighting
-        const off = new THREE.Vector3(cluster.normal[0], cluster.normal[1], cluster.normal[2])
-            .multiplyScalar(0.3);
-        mesh.position.copy(off);
-
-        clusterHighlightGroup.add(mesh);
-        clusterOverlays.push(mesh);
+        // BambuSlicer 风格：面簇顶点投影到面平面 → PCA 主轴 → 椭圆 overlay
+        const overlay = _buildEllipseOverlay(verts, cluster.normal, ci);
+        if (!overlay) return;
+        clusterHighlightGroup.add(overlay.mesh);
+        if (overlay.outline) clusterHighlightGroup.add(overlay.outline);
+        clusterOverlays.push(overlay.mesh);
     });
 
     clusterMode = true;
@@ -126,9 +239,11 @@ export function setClusterHover(index, active) {
     if (active) {
         o.material.opacity = 0.85;
         o.material.emissiveIntensity = 1.2;
+        if (o.userData && o.userData.outline) o.userData.outline.material.opacity = 1.0;
     } else {
         o.material.opacity = 0.35;
         o.material.emissiveIntensity = 0.2;
+        if (o.userData && o.userData.outline) o.userData.outline.material.opacity = 0.6;
     }
 }
 
@@ -178,6 +293,15 @@ export function placeFaceOnBed(mesh, normal, upAxis = 'Z') {
     mesh.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(mesh);
     mesh.position.z -= box.min.z;
+
+    // X/Y 居中到热床中心（与 orientation-ui.js centerModel() 逻辑一致）
+    mesh.updateMatrixWorld(true);
+    const box2 = new THREE.Box3().setFromObject(mesh);
+    const center = box2.getCenter(new THREE.Vector3());
+    const bc = window._BED_CENTER || 128;
+    mesh.position.x += (bc - center.x);
+    mesh.position.y += (bc - center.y);
+    mesh.updateMatrixWorld(true);
 
     // 重新适配相机视角
     try { fitCameraToMesh(mesh); } catch(e) { /* ignore */ }

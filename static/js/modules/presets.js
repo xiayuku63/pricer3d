@@ -12,6 +12,7 @@ import {
 import { openLoginModal } from './auth.js';
 import { t, onLangChange } from './i18n.js';
 import { reQuoteAllSelectedFiles } from './quote.js';
+import { updateBedSize, setBedLabel } from './viewer.js';
 
 let dom = {};
 let _printerModels = [];  // cached printer list from API
@@ -260,6 +261,11 @@ export async function fetchPrinterModels() {
         batchSel.addEventListener("change", () => {
             _populateNozzleDropdown("batch-nozzle-diameter", batchSel.value);
             _syncBatchPrinter();
+            var _changedPrinter = _printerModels.find(function(p) { return p.id === batchSel.value; });
+            if (_changedPrinter && _changedPrinter.bed_width && _changedPrinter.bed_depth) {
+                setBedLabel(_changedPrinter.bed_width, _changedPrinter.bed_depth, _changedPrinter.bed_height);
+                updateBedSize(_changedPrinter.bed_width, _changedPrinter.bed_depth);
+            }
         });
         if (batchNozzle) {
             batchNozzle.addEventListener("change", _syncBatchPrinter);
@@ -293,6 +299,8 @@ export async function fetchPrinterModels() {
                 if (dom.printerBedInfo) {
                     dom.printerBedInfo.textContent = t('printer.bedInfo', { x: printer.bed_width, y: printer.bed_depth, z: printer.bed_height });
                 }
+                setBedLabel(printer.bed_width, printer.bed_depth, printer.bed_height);
+                updateBedSize(printer.bed_width, printer.bed_depth);
                 updatePrinterDetailPanel(printer);
             } else {
                 updatePrinterDetailPanel(null);
@@ -306,6 +314,8 @@ export async function fetchPrinterModels() {
             if (dom.printerBedInfo) {
                 dom.printerBedInfo.textContent = t('printer.bedInfo', { x: printer.bed_width, y: printer.bed_depth, z: printer.bed_height });
             }
+            setBedLabel(printer.bed_width, printer.bed_depth, printer.bed_height);
+            updateBedSize(printer.bed_width, printer.bed_depth);
             updatePrinterDetailPanel(printer);
         }
     }
@@ -324,6 +334,16 @@ export async function fetchPrinterModels() {
         });
         // Initial hint update
         if (typeof updateLayerHeightRangeHint === 'function') updateLayerHeightRangeHint();
+    }
+
+    // ── Update 3D viewer bed size to match the currently selected batch printer ──
+    var _batchSelFinal = document.getElementById("batch-printer-model");
+    if (_batchSelFinal && _batchSelFinal.value) {
+        var _curPrinter = _printerModels.find(function(p) { return p.id === _batchSelFinal.value; });
+        if (_curPrinter && _curPrinter.bed_width && _curPrinter.bed_depth) {
+            setBedLabel(_curPrinter.bed_width, _curPrinter.bed_depth, _curPrinter.bed_height);
+            updateBedSize(_curPrinter.bed_width, _curPrinter.bed_depth);
+        }
     }
 }
 

@@ -5,6 +5,9 @@ echo "[pricer3d] Starting pricer3d (PrusaSlicer only)..."
 echo "[pricer3d] Data dir:  ${DB_PATH:-/app/data/app.db}"
 echo "[pricer3d] Env:       ${APP_ENV:-development}"
 
+# Ensure desktop output directory exists
+mkdir -p /app/desktop_outputs 2>/dev/null || true
+
 # Background cleanup loop — runs daily
 (
   while true; do

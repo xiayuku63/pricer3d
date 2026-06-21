@@ -137,6 +137,14 @@ class QuoteHistory(Base):
     status = Column(String, default="success")
     error_msg = Column(Text)
     created_at = Column(String, index=True)
+    printer_model = Column(String(50))
+    slicer_preset_id = Column(Integer)
+    nozzle_diameter = Column(Float)
+    layer_height = Column(Float)
+    wall_count = Column(Integer)
+    infill = Column(Integer)
+    brand = Column(String(40))
+    cost_breakdown = Column(Text)
 
 
 class PaymentOrder(Base):

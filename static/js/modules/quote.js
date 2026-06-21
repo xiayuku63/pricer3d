@@ -31,6 +31,7 @@ import {
 import {
     quoteSingleFileWithOptions, quoteSelectedFiles, quoteSelectedFilesWithProgress,
     mergeResultsByFilename, normalizeResultsWithCurrentOptions, reQuoteAllSelectedFiles,
+    abortActiveRecalc,
 } from './quote-api.js';
 import {
     refreshBatchBrandDropdown, refreshBatchMaterialDropdown,
@@ -50,6 +51,7 @@ export {
     mergeResultsByFilename,
     normalizeResultsWithCurrentOptions,
     reQuoteAllSelectedFiles,
+    abortActiveRecalc,
     refreshBatchBrandDropdown,
     refreshBatchMaterialDropdown,
     refreshBatchColorDropdown,
@@ -518,17 +520,19 @@ export function handleCardEditChange(event) {
     if (!card) return;
     const filename = card.getAttribute('data-card-file');
     if (_rowEditTimers.has(filename)) { clearTimeout(_rowEditTimers.get(filename)); }
-    if (_rowEditSignals.has(filename)) { _rowEditSignals.get(filename).cancelled = true; }
+    // Abort any in-flight request for this file
+    const oldCtrl = _rowEditAbortControllers.get(filename);
+    if (oldCtrl) { oldCtrl.abort(); _rowEditAbortControllers.delete(filename); }
     _rowEditTimers.set(filename, setTimeout(async () => {
         _rowEditTimers.delete(filename);
-        const signal = { cancelled: false };
-        _rowEditSignals.set(filename, signal);
-        await _handleCardEdit(card, filename, signal);
-        if (_rowEditSignals.get(filename) === signal) _rowEditSignals.delete(filename);
+        const controller = new AbortController();
+        _rowEditAbortControllers.set(filename, controller);
+        await _handleCardEdit(card, filename, controller.signal);
+        if (_rowEditAbortControllers.get(filename) === controller) _rowEditAbortControllers.delete(filename);
     }, 400));
 }
 
-async function _handleCardEdit(card, filename, signal) {
+async function _handleCardEdit(card, filename, abortSignal) {
     const { errorContainer, errorMsg } = dom;
     if (!authToken) {
         if (errorMsg) { errorMsg.textContent = '请先登录后再修改报价参数'; errorContainer.classList.remove('hidden'); }
@@ -558,14 +562,14 @@ async function _handleCardEdit(card, filename, signal) {
     try {
         const currentColor = idx >= 0 ? (currentResults[idx].color || quoteOptions.color) : quoteOptions.color;
         await ensureThumbnailForFile(file, currentColor);
-        if (signal.cancelled) {
+        if (abortSignal.aborted) {
             if (prevItem && idx >= 0) currentResults[idx] = prevItem;
             return;
         }
         const opts = { material, color: currentColor, quantity, _printer_model: pm };
         if (sp !== null) opts._slicer_preset_id = sp;
-        const updated = await quoteSingleFileWithOptions(file, opts);
-        if (signal.cancelled) {
+        const updated = await quoteSingleFileWithOptions(file, opts, abortSignal);
+        if (abortSignal.aborted) {
             if (prevItem && idx >= 0) currentResults[idx] = prevItem;
             return;
         }
@@ -579,7 +583,8 @@ async function _handleCardEdit(card, filename, signal) {
         renderResultsTable();
         recalcSummaryFromCurrentResults();
     } catch (err) {
-        if (signal.cancelled) return;
+        // AbortError: 静默处理
+        if (err.name === 'AbortError' || abortSignal.aborted) return;
         if (prevItem && idx >= 0) currentResults[idx] = prevItem;
         renderResultsTable();
         recalcSummaryFromCurrentResults();
@@ -709,7 +714,7 @@ export function exportExcel() {
 
 // ── Row editing ──
 const _rowEditTimers = new Map();
-const _rowEditSignals = new Map();
+const _rowEditAbortControllers = new Map();
 
 export function handleRowEditChange(event) {
     const target = event.target;
@@ -718,17 +723,19 @@ export function handleRowEditChange(event) {
     if (!row) return;
     const filename = row.getAttribute('data-row-file');
     if (_rowEditTimers.has(filename)) { clearTimeout(_rowEditTimers.get(filename)); }
-    if (_rowEditSignals.has(filename)) { _rowEditSignals.get(filename).cancelled = true; }
+    // Abort any in-flight request for this file
+    const oldCtrl = _rowEditAbortControllers.get(filename);
+    if (oldCtrl) { oldCtrl.abort(); _rowEditAbortControllers.delete(filename); }
     _rowEditTimers.set(filename, setTimeout(async () => {
         _rowEditTimers.delete(filename);
-        const signal = { cancelled: false };
-        _rowEditSignals.set(filename, signal);
-        await _handleRowEdit(event, signal);
-        if (_rowEditSignals.get(filename) === signal) _rowEditSignals.delete(filename);
+        const controller = new AbortController();
+        _rowEditAbortControllers.set(filename, controller);
+        await _handleRowEdit(event, controller.signal);
+        if (_rowEditAbortControllers.get(filename) === controller) _rowEditAbortControllers.delete(filename);
     }, 400));
 }
 
-async function _handleRowEdit(event, signal) {
+async function _handleRowEdit(event, abortSignal) {
     const { errorContainer, errorMsg } = dom;
     const target = event.target;
     if (!authToken) {
@@ -798,14 +805,14 @@ async function _handleRowEdit(event, signal) {
 
     try {
         await ensureThumbnailForFile(file, color);
-        if (signal.cancelled) {
+        if (abortSignal.aborted) {
             if (prevItem && idx >= 0) currentResults[idx] = prevItem;
             return;
         }
         const opts = { material, color, quantity, _printer_model: pm };
         if (sp !== null) opts._slicer_preset_id = sp;
-        const updated = await quoteSingleFileWithOptions(file, opts);
-        if (signal.cancelled) {
+        const updated = await quoteSingleFileWithOptions(file, opts, abortSignal);
+        if (abortSignal.aborted) {
             if (prevItem && idx >= 0) currentResults[idx] = prevItem;
             return;
         }
@@ -821,7 +828,8 @@ async function _handleRowEdit(event, signal) {
         renderResultsTable();
         recalcSummaryFromCurrentResults();
     } catch (err) {
-        if (signal.cancelled) return;
+        // AbortError: 静默处理
+        if (err.name === 'AbortError' || abortSignal.aborted) return;
         if (prevItem && idx >= 0) {
             currentResults[idx] = prevItem;
         }

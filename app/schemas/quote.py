@@ -29,6 +29,10 @@ class QuoteFileResult(BaseModel):
     cost_breakdown: Optional[dict] = None
     slicer_preset_id: Optional[int] = Field(default=None, alias='_slicer_preset_id')
     printer_model: Optional[str] = Field(default=None, alias='_printer_model')
+    auto_orient_score: Optional[float] = None
+    euler_angles_deg: Optional[dict] = None
+    selected_face_area: Optional[float] = None
+    tune_report: Optional[str] = None
 
 
 class QuoteResponse(BaseModel):
@@ -64,3 +68,11 @@ class QuoteHistoryItem(BaseModel):
     status: str
     error_msg: Optional[str] = None
     created_at: str
+    printer_model: Optional[str] = None
+    slicer_preset_id: Optional[int] = None
+    nozzle_diameter: Optional[float] = None
+    layer_height: Optional[float] = None
+    wall_count: Optional[int] = None
+    infill: Optional[int] = None
+    brand: Optional[str] = None
+    cost_breakdown: Optional[dict] = None

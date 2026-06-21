@@ -445,6 +445,9 @@ export default {
   'history.weight': 'Weight(g)',
   'history.duration': 'Duration',
   'history.cost': 'Cost(¥)',
+  'history.layerHeight': 'Layer(mm)',
+  'history.wallCount': 'Walls',
+  'history.infill': 'Infill',
   'history.select': 'Select',
   'history.selectAll': 'Select All',
   'history.exportPdf': 'Export PDF',
@@ -461,6 +464,7 @@ export default {
 
   // ── Orientation ──
   'orientation.autoOrient': '🎯 Auto Orient (Lay on Face)',
+  'orientation.autoPlace': '🎯 Auto Orient',
   'orientation.exit': '🔙 Exit Lay Mode',
   'orientation.noFace': 'No surface available',
   'orientation.analyzeError': 'Analysis failed',

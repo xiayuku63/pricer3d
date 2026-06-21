@@ -61,6 +61,14 @@ def init_db() -> None:
         _safe_add_column(conn, "users", "default_material", "TEXT")
         _safe_add_column(conn, "users", "default_color", "TEXT")
         _safe_add_column(conn, "users", "default_brand", "TEXT")
+        _safe_add_column(conn, "quote_history", "printer_model", "TEXT")
+        _safe_add_column(conn, "quote_history", "slicer_preset_id", "INTEGER")
+        _safe_add_column(conn, "quote_history", "nozzle_diameter", "REAL")
+        _safe_add_column(conn, "quote_history", "layer_height", "REAL")
+        _safe_add_column(conn, "quote_history", "wall_count", "INTEGER")
+        _safe_add_column(conn, "quote_history", "infill", "INTEGER")
+        _safe_add_column(conn, "quote_history", "brand", "TEXT")
+        _safe_add_column(conn, "quote_history", "cost_breakdown", "TEXT")
         conn.commit()
 
     # Step 3: Seed membership plans if empty

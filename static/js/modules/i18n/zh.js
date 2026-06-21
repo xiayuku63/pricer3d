@@ -446,6 +446,9 @@ export default {
   'history.weight': '重量(g)',
   'history.duration': '时间',
   'history.cost': '费用(¥)',
+  'history.layerHeight': '层高(mm)',
+  'history.wallCount': '墙层数',
+  'history.infill': '填充',
   'history.select': '选择',
   'history.selectAll': '全选',
   'history.exportPdf': '导出 PDF',
@@ -462,6 +465,7 @@ export default {
 
   // ── Orientation / 朝向 ──
   'orientation.autoOrient': '🎯 智能摆放 (Lay on Face)',
+  'orientation.autoPlace': '🎯 自动摆放',
   'orientation.exit': '🔙 退出摆放模式',
   'orientation.noFace': '无可用摆放面',
   'orientation.analyzeError': '分析失败',

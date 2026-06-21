@@ -257,14 +257,29 @@ def apply_orientation_to_mesh(
                 pass
 
 
-def get_best_face_for_slicing(model_path: str) -> dict:
-    """Auto-select the best print-bed face using coplanar clustering + scoring.
+def get_best_face_for_slicing(
+    model_path: str,
+    method: str = "coplanar",
+    sa_config: Optional[dict] = None,
+) -> dict:
+    """Auto-select the best print-bed face using coplanar clustering or SA.
 
-    Strategy:
+    Strategy (method="coplanar", default):
     1. Coplanar clustering to find all flat candidate faces
     2. Score each candidate (support / time / adhesion)
     3. Pick highest-scoring face
     4. Export rotated STL for slicing
+
+    Strategy (method="sa"):
+    1. Simulated Annealing in SO(3) space with Shapely bed stability
+    2. Global optimum search, not limited to flat faces
+    3. Export rotated STL for slicing
+
+    Args:
+        model_path: Path to STL/3MF model file
+        method: "coplanar" (default) or "sa" for simulated annealing
+        sa_config: Optional kwargs dict passed to optimize_orientation_sa()
+                   (only used when method="sa")
 
     Returns:
         {
@@ -276,8 +291,16 @@ def get_best_face_for_slicing(model_path: str) -> dict:
             face: {...},            # Selected face info
             tune_report: str,
             all_candidates: [...],  # Top N candidates
+            # SA-only fields: cost, cost_components, sa_history
         }
     """
+    if method == "sa":
+        from calculator.orientation_sa import optimize_orientation_sa
+        return optimize_orientation_sa(model_path, **(sa_config or {}))
+
+    if method == "learned":
+        return _learned_best_face(model_path)
+
     mesh = _load_mesh(model_path)
 
     # Step 1: coplanar clustering
@@ -365,4 +388,137 @@ def get_best_face_for_slicing(model_path: str) -> dict:
         "face": best["face"],
         "tune_report": tune["report"],
         "all_candidates": candidates[:TOP_N_RESULTS],
+    }
+
+
+def _learned_best_face(model_path: str) -> dict:
+    """使用自学习模型 (Logistic Regression) 选择最优打印面。
+
+    候选生成仍用 coplanar 聚类，评分用训练好的 LR 模型替代固定权重。
+    无训练模型时自动 fallback 到原 coplanar 方法。
+
+    Args:
+        model_path: 模型文件路径
+
+    Returns:
+        同 get_best_face_for_slicing() 的返回结构
+    """
+    from calculator.orientation_learner import (
+        OrientationLearner,
+        FaceFeatureExtractor,
+    )
+
+    mesh = _load_mesh(model_path)
+    clusters = cluster_coplanar_faces(mesh)
+
+    # 确定数据目录 (与 routes 中保持一致)
+    import os as _os
+    data_dir = _os.path.join(
+        _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
+        "data",
+    )
+    learner = OrientationLearner(data_dir=data_dir)
+
+    if not learner.is_trained() or len(clusters) < 2:
+        logger.info(
+            "学习模型未训练 (trained=%s) 或候选面不足 (n=%d)，回退到固定权重评分",
+            learner.is_trained(), len(clusters),
+        )
+        result = get_best_face_for_slicing(model_path, method="coplanar")
+        result["method_used"] = "coplanar"
+        result["fallback"] = True
+        return result
+
+    # 批量提取特征
+    extractor = FaceFeatureExtractor()
+    features_batch_list = []
+    for cluster in clusters:
+        try:
+            feat = extractor.extract(mesh, cluster)
+            features_batch_list.append(feat)
+        except Exception as e:
+            logger.warning("特征提取失败 (cluster), 使用零向量: %s", e)
+            features_batch_list.append(np.zeros(16, dtype=np.float64))
+
+    features_batch = np.array(features_batch_list, dtype=np.float64)
+
+    # 学习模型评分
+    try:
+        scores = learner.predict_proba(features_batch)
+    except Exception as e:
+        logger.warning("模型预测失败: %s，回退到固定权重评分", e)
+        result = get_best_face_for_slicing(model_path, method="coplanar")
+        result["method_used"] = "coplanar"
+        result["fallback"] = True
+        return result
+
+    # 构建候选列表
+    candidates = []
+    for i, cluster in enumerate(clusters):
+        normal = np.array(cluster["normal"], dtype=np.float64)
+        up = -normal
+        up_norm = float(np.linalg.norm(up))
+        if up_norm < 1e-8:
+            up = np.array([0.0, 0.0, 1.0])
+        else:
+            up = up / up_norm
+            if up[2] < 0:
+                up = -up
+
+        R = rotation_from_up_vector(up)
+        eval_result = evaluate_orientation(mesh, R)
+
+        candidates.append({
+            "face": cluster,
+            "score": round(float(scores[i]) * 100, 2),
+            "metrics": eval_result["metrics"],
+            "euler_angles_deg": eval_result["euler_angles_deg"],
+            "learned_prob": round(float(scores[i]), 4),
+        })
+
+    # 排序
+    candidates.sort(key=lambda c: c["score"], reverse=True)
+
+    if not candidates:
+        return {
+            "oriented_path": model_path,
+            "original_path": model_path,
+            "rotation_matrix": [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+            "euler_angles_deg": {"x": 0, "y": 0, "z": 0},
+            "score": 0,
+            "face": None,
+            "all_candidates": [],
+        }
+
+    best = candidates[0]
+    best_normal = np.array(best["face"]["normal"], dtype=np.float64)
+
+    # 计算旋转 + 微调 + 导出
+    up = -best_normal
+    up_norm = float(np.linalg.norm(up))
+    if up_norm < 1e-8:
+        up = np.array([0.0, 0.0, 1.0])
+    else:
+        up = up / up_norm
+        if up[2] < 0:
+            up = -up
+
+    R = rotation_from_up_vector(up)
+    tune = fine_tune_orientation(mesh, R[:3, :3])
+    R_opt = tune["R"]
+    euler = rotation_to_euler(R_opt)
+
+    oriented_path = apply_orientation_to_mesh(model_path, R_opt)
+
+    return {
+        "oriented_path": oriented_path,
+        "original_path": model_path,
+        "rotation_matrix": [[round(float(R_opt[i, j]), 6) for j in range(3)] for i in range(3)],
+        "euler_angles_deg": euler,
+        "score": best["score"],
+        "face": best["face"],
+        "tune_report": tune["report"],
+        "all_candidates": candidates[:TOP_N_RESULTS],
+        "method_used": "learned",
+        "fallback": False,
     }

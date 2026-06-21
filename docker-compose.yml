@@ -10,6 +10,7 @@ services:
       - /app/venv
       - /app/__pycache__
       - pricer3d_data:/app/data
+      - /mnt/c/Users/Administrator/Desktop/pricer3d_outputs:/app/desktop_outputs
     env_file:
       - .env
     environment:
