@@ -62,7 +62,7 @@ export async function buildStlThumbnail(file, colorKey = "Blue") {
         c.setHSL(hexInfo.hue / 360, 0.58, 0.56);
         colorHex = c.getHex();
     } else {
-        colorHex = hexInfo || 0x3b82f6;
+        colorHex = (hexInfo !== null && hexInfo !== undefined) ? hexInfo : 0x3b82f6;
     }
 
     const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: colorHex, metalness: 0.15, roughness: 0.65 }));
@@ -116,7 +116,7 @@ export async function buildNonStlThumbnail(file, colorKey) {
         c.setHSL(hexInfo.hue / 360, 0.58, 0.56);
         colorHex = c.getHex();
     } else {
-        colorHex = hexInfo || 0x3b82f6;
+        colorHex = (hexInfo !== null && hexInfo !== undefined) ? hexInfo : 0x3b82f6;
     }
 
     const model = gltf.scene;
