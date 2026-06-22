@@ -556,7 +556,8 @@ async function _handleCardEdit(card, filename, abortSignal) {
     const idx = currentResults.findIndex((i) => i.filename === filename);
     const prevItem = idx >= 0 ? { ...currentResults[idx] } : null;
     if (idx >= 0) {
-        currentResults[idx] = { ...currentResults[idx], _recalculating: true };
+        // Immediately update color in currentResults so preview sees the correct color
+        currentResults[idx] = { ...currentResults[idx], color: currentColor, _recalculating: true };
     }
     renderResultsTable();
 
@@ -575,8 +576,10 @@ async function _handleCardEdit(card, filename, abortSignal) {
             return;
         }
         if (idx >= 0) {
+            // Preserve the card-selected color; do NOT let the API response overwrite it
             currentResults[idx] = {
                 ...updated,
+                color: currentColor,
                 _printer_model: pm || prevItem?._printer_model,
             };
             if (sp !== null) currentResults[idx]._slicer_preset_id = sp;
@@ -809,7 +812,8 @@ async function _handleRowEdit(event, abortSignal) {
     const idx = currentResults.findIndex((i) => i.filename === filename);
     const prevItem = idx >= 0 ? { ...currentResults[idx] } : null;
     if (idx >= 0) {
-        currentResults[idx] = { ...currentResults[idx], status: 'success', _recalculating: true, cost_cny: 0 };
+        // Immediately update color in currentResults so previewByFilename sees the new color
+        currentResults[idx] = { ...currentResults[idx], color, status: 'success', _recalculating: true, cost_cny: 0 };
     }
     recalcSummaryFromCurrentResults();
 
@@ -827,8 +831,11 @@ async function _handleRowEdit(event, abortSignal) {
             return;
         }
         if (idx >= 0) {
+            // Preserve the dropdown-selected color; do NOT let the API response overwrite it
+            const dropdownColor = color;  // captured from the .row-color-value at line ~786
             currentResults[idx] = {
                 ...updated,
+                color: dropdownColor,
                 _printer_model: pm || prevItem._printer_model,
             };
             if (sp !== null) {

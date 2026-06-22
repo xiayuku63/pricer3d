@@ -18,7 +18,7 @@ export function setCaptchaUrl(v) { currentCaptchaUrl = v; }
 export const quoteOptions = {
     brand: "",
     material: "PLA",
-    color: "",
+    color: "#ffffff",  // match DEFAULT_COLORS[0].hex — always a valid hex, never empty
     quantity: 1,
     slicer_preset_id: null,
     printer_model: "",
