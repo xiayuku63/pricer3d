@@ -65,7 +65,7 @@ export async function buildStlThumbnail(file, colorKey = "Blue") {
         colorHex = (hexInfo !== null && hexInfo !== undefined) ? hexInfo : 0x3b82f6;
     }
 
-    const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: colorHex, metalness: 0.15, roughness: 0.65 }));
+    const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: colorHex }));
     applyAxonometricRotation(mesh);
     scene.add(mesh);
     scene.add(new THREE.AmbientLight(0xffffff, 0.65));
@@ -121,7 +121,7 @@ export async function buildNonStlThumbnail(file, colorKey) {
 
     const model = gltf.scene;
     model.traverse(c => {
-        if (c.isMesh) c.material = new THREE.MeshStandardMaterial({ color: colorHex, metalness: 0.15, roughness: 0.65 });
+        if (c.isMesh) c.material = new THREE.MeshBasicMaterial({ color: colorHex });
     });
     model.rotation.x = THREE.MathUtils.degToRad(-30);
     model.rotation.y = THREE.MathUtils.degToRad(-45);

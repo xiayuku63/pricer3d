@@ -83,7 +83,7 @@ function _createBed(width, depth) {
 
     // Semi-transparent bed plane
     var bedGeo = new THREE.PlaneGeometry(w, d);
-    var bedMat = new THREE.MeshStandardMaterial({
+    var bedMat = new THREE.MeshBasicMaterial({
         color: 0xeef2ff,
         transparent: true,
         opacity: 0.15,
@@ -155,7 +155,7 @@ export function setBedLabel(w, d, h) {
  * Resolve a colorKey (hex string, bare name, or object) to a Three.js hex number.
  * Handles the fallback object returned by getRenderColorHex for bare names.
  * @param {*} colorKey - hex string like "#ff0000", bare name like "Blue", or null
- * @returns {number} hex color number usable by THREE.MeshStandardMaterial
+ * @returns {number} hex color number usable by THREE.MeshBasicMaterial
  */
 function _colorNumFromKey(colorKey) {
     var r = getRenderColorHex(colorKey);
@@ -485,7 +485,7 @@ async function renderViaGLB(file, orientation = null, colorKey = null) {
             if (c.isMesh) {
                 c.castShadow = true;
                 c.receiveShadow = true;
-                c.material = new THREE.MeshStandardMaterial({ color: _glbColorNum, metalness: 0.15, roughness: 0.65 });
+                c.material = new THREE.MeshBasicMaterial({ color: _glbColorNum });
             }
         });
         // 自适应缩放 + 居中
@@ -587,8 +587,8 @@ export function renderSTL(file, colorKey = 'Blue', orientation = null) {
             geometry.computeBoundingBox();
             geometry.translate(0, 0, -geometry.boundingBox.min.z);
             clearCurrentMesh();
-            const material = new THREE.MeshStandardMaterial({
-                color: _colorNumFromKey(colorKey), metalness: 0.15, roughness: 0.65,
+            const material = new THREE.MeshBasicMaterial({
+                color: _colorNumFromKey(colorKey),
             });
             currentMesh = new THREE.Mesh(geometry, material);
             currentMesh.rotation.set(0, 0, 0);

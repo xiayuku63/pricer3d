@@ -117,15 +117,13 @@ function _buildEllipseOverlay(flatVerts, normalArr, clusterIndex) {
     geo.setIndex(indices);
     geo.computeVertexNormals();
 
-    const mat = new THREE.MeshStandardMaterial({
+    const mat = new THREE.MeshBasicMaterial({
         color: FACE_COLORS,
         transparent: true,
         opacity: 0.35,
         side: THREE.DoubleSide,
         depthTest: true,
         depthWrite: false,
-        emissive: FACE_COLORS,
-        emissiveIntensity: 0.2,
     });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.userData = {
