@@ -164,6 +164,10 @@ export async function ensureThumbnailForFile(file, colorKey) {
 export async function buildThumbnails(selectedFiles, colorByFilename = {}) {
     for (const file of selectedFiles) {
         var selectedColor = colorByFilename[file.name] || quoteOptions.color;
+        // Ensure we never pass an empty color (would trigger hash-based fallback)
+        if (!selectedColor || String(selectedColor).trim() === '') {
+            selectedColor = '#ffffff';
+        }
         // Normalize to hex if possible so thumbnails use the real material color
         var _thumbColorObj = colorToObj(selectedColor);
         if (_thumbColorObj && _thumbColorObj.hex) selectedColor = _thumbColorObj.hex;
@@ -210,6 +214,10 @@ export function previewByFilename(filename, ext) {
     const rowData = currentResults.find((i) => i && i.filename === filename);
     var perFileOrient = (rowData && rowData.euler_angles_deg) ? rowData.euler_angles_deg : null;
     var colorForPreview = (rowData && rowData.color) ? rowData.color : quoteOptions.color;
+    // Fallback: ensure we always have a valid hex, never empty
+    if (!colorForPreview || String(colorForPreview).trim() === '') {
+        colorForPreview = '#ffffff';
+    }
     // Normalize to hex string if possible (handles bare-color-name / object inputs)
     var _previewColorObj = colorToObj(colorForPreview);
     if (_previewColorObj && _previewColorObj.hex) colorForPreview = _previewColorObj.hex;
