@@ -83,10 +83,10 @@ function _createBed(width, depth) {
 
     // Semi-transparent bed plane
     var bedGeo = new THREE.PlaneGeometry(w, d);
-    var bedMat = new THREE.MeshBasicMaterial({
-        color: 0xeef2ff,
+    var bedMat = new THREE.MeshStandardMaterial({
+        color: 0xcbd5e1,
         transparent: true,
-        opacity: 0.15,
+        opacity: 0.3,
         side: THREE.DoubleSide,
     });
     _bedPlane = new THREE.Mesh(bedGeo, bedMat);
@@ -184,9 +184,12 @@ export function recolorCurrentMesh(colorKey) {
     if (!currentMesh) return false;
     const colorNum = _colorNumFromKey(colorKey);
     currentMesh.traverse(function(c) {
-        if (c.isMesh && c.material && c.material.color) {
-            c.material.color.setHex(colorNum);
-            c.material.needsUpdate = true;
+        if (c.isMesh) {
+            c.material = new THREE.MeshStandardMaterial({
+                color: colorNum,
+                metalness: 0.0,
+                roughness: 0.6,
+            });
         }
     });
     _lastRenderedColorKey = colorKey;
@@ -270,10 +273,10 @@ export function initViewer(previewContainerEl, previewPlaceholderEl) {
 
     raycaster = new THREE.Raycaster();
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
     scene.add(ambientLight);
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
-    dirLight.position.set(80, 80, 120);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.35);
+    dirLight.position.set(2, 3, 1);
     scene.add(dirLight);
 
     // 打印底板（网格 + 平面 + 坐标轴）。默认 256×256；如有 pending size 则使用之。
@@ -485,7 +488,11 @@ async function renderViaGLB(file, orientation = null, colorKey = null) {
             if (c.isMesh) {
                 c.castShadow = true;
                 c.receiveShadow = true;
-                c.material = new THREE.MeshBasicMaterial({ color: _glbColorNum });
+                c.material = new THREE.MeshStandardMaterial({
+                    color: _glbColorNum,
+                    metalness: 0.0,
+                    roughness: 0.6,
+                });
             }
         });
         // 自适应缩放 + 居中
@@ -587,8 +594,10 @@ export function renderSTL(file, colorKey = 'Blue', orientation = null) {
             geometry.computeBoundingBox();
             geometry.translate(0, 0, -geometry.boundingBox.min.z);
             clearCurrentMesh();
-            const material = new THREE.MeshBasicMaterial({
+            const material = new THREE.MeshStandardMaterial({
                 color: _colorNumFromKey(colorKey),
+                metalness: 0.0,
+                roughness: 0.6,
             });
             currentMesh = new THREE.Mesh(geometry, material);
             currentMesh.rotation.set(0, 0, 0);
