@@ -65,12 +65,16 @@ export async function buildStlThumbnail(file, colorKey = "Blue") {
         colorHex = (hexInfo !== null && hexInfo !== undefined) ? hexInfo : 0x3b82f6;
     }
 
-    const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: colorHex }));
+    const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
+        color: colorHex,
+        metalness: 0.0,
+        roughness: 0.6,
+    }));
     applyAxonometricRotation(mesh);
     scene.add(mesh);
-    scene.add(new THREE.AmbientLight(0xffffff, 0.65));
-    const light = new THREE.DirectionalLight(0xffffff, 0.85);
-    light.position.set(40, 60, 90);
+    scene.add(new THREE.AmbientLight(0xffffff, 1.0));
+    const light = new THREE.DirectionalLight(0xffffff, 0.35);
+    light.position.set(2, 3, 1);
     scene.add(light);
 
     const box = new THREE.Box3().setFromObject(mesh);
@@ -121,14 +125,18 @@ export async function buildNonStlThumbnail(file, colorKey) {
 
     const model = gltf.scene;
     model.traverse(c => {
-        if (c.isMesh) c.material = new THREE.MeshBasicMaterial({ color: colorHex });
+        if (c.isMesh) c.material = new THREE.MeshStandardMaterial({
+            color: colorHex,
+            metalness: 0.0,
+            roughness: 0.6,
+        });
     });
     model.rotation.x = THREE.MathUtils.degToRad(-30);
     model.rotation.y = THREE.MathUtils.degToRad(-45);
     scene.add(model);
-    scene.add(new THREE.AmbientLight(0xffffff, 0.65));
-    const light = new THREE.DirectionalLight(0xffffff, 0.85);
-    light.position.set(40, 60, 90);
+    scene.add(new THREE.AmbientLight(0xffffff, 1.0));
+    const light = new THREE.DirectionalLight(0xffffff, 0.35);
+    light.position.set(2, 3, 1);
     scene.add(light);
 
     const box = new THREE.Box3().setFromObject(model);
