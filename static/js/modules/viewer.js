@@ -120,6 +120,17 @@ export function updateBedSize(width, depth) {
         return;
     }
     _createBed(width, depth);
+    // ── Re-center the already-loaded model to the new bed centre ──
+    // After _createBed updates window._BED_CENTER, the model's bounding-box
+    // centre may differ from the new bc, so we shift it to match.
+    if (currentMesh) {
+        currentMesh.updateMatrixWorld(true);
+        const bc = window._BED_CENTER || 128;
+        const box = new THREE.Box3().setFromObject(currentMesh);
+        const center = box.getCenter(new THREE.Vector3());
+        currentMesh.position.x += (bc - center.x);
+        currentMesh.position.y += (bc - center.y);
+    }
     requestRender();
 }
 
