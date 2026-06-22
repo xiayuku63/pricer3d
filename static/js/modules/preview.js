@@ -156,7 +156,7 @@ export async function ensureThumbnailForFile(file, colorKey) {
         const thumb = ext === 'stl' ? await buildStlThumbnail(file, colorKey) : await buildNonStlThumbnail(file, colorKey);
         thumbnailMap.set(file.name, thumb);
     } catch (e) {
-        console.warn('Thumbnail failed:', e.message);
+        console.warn('Thumbnail failed for', file.name, 'color=' + colorKey + ':', e.message);
         thumbnailMap.set(file.name, buildPlaceholderThumbnail(ext));
     }
 }

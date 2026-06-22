@@ -469,7 +469,13 @@ document.addEventListener('DOMContentLoaded', () => {
             // the thumbnail (cached STL geometry -> instant) + live 3D preview mesh.
             const rowCtx = wrapper.closest('tr[data-row-file], [data-card-file]');
             if (rowCtx) {
-                _applyInlineRecolor(rowCtx, hex);
+                (async () => {
+                    try {
+                        await _applyInlineRecolor(rowCtx, hex);
+                    } catch(e) {
+                        console.warn('Inline recolor failed:', e.message);
+                    }
+                })();
             }
         }
     });
@@ -482,7 +488,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (idx >= 0) currentResults[idx].color = hex;
         const file = selectedFilesMap.get(filename);
         if (file) {
-            try { await ensureThumbnailForFile(file, hex); } catch (e) { /* ignore */ }
+            try { await ensureThumbnailForFile(file, hex); } catch (e) { console.warn('Thumbnail generation failed:', e.message); }
             const newThumb = thumbnailMap.get(filename);
             if (newThumb) {
                 rowCtx.querySelectorAll('button[data-preview-file] img').forEach(function(img) { img.src = newThumb; });
@@ -494,7 +500,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 && currentPreviewFilename === filename) {
                 recolorCurrentMesh(hex);
             }
-        } catch (e) { /* ignore */ }
+        } catch (e) { console.warn('3D preview recolor failed:', e.message); }
     }
 
     // ── Global: G-code 详情展开/收起 ──
