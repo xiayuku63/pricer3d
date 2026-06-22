@@ -38,6 +38,7 @@ import {
     refreshBatchColorDropdown, batchApplyToAll,
 } from './quote-batch.js';
 import { MATERIAL_INFO } from './quote-data.js';
+import { updateBedSize, setBedLabel } from './viewer.js';
 
 // ── Re-export all public symbols for backward compatibility ──
 export {
@@ -791,6 +792,15 @@ async function _handleRowEdit(event, abortSignal) {
     const pmSel = row.querySelector('[data-field="_printer_model"]');
     const spSel = row.querySelector('[data-field="_slicer_preset_id"]');
     const pm = pmSel ? pmSel.value : '';
+    // ── 当打印机型号变更时，更新 3D 预览底板 ──
+    if (target.getAttribute('data-field') === '_printer_model') {
+        const printerModels = getCachedPrinterModels();
+        const printer = printerModels.find(function(p) { return p.id === pm; });
+        if (printer && printer.bed_width && printer.bed_depth) {
+            setBedLabel(printer.bed_width, printer.bed_depth, printer.bed_height);
+            updateBedSize(printer.bed_width, printer.bed_depth);
+        }
+    }
     const sp = spSel ? (spSel.value ? Number(spSel.value) : null) : null;
     if (errorContainer) errorContainer.classList.add('hidden');
     row.querySelector('[data-role="status-cell"]').innerHTML = '<span class="inline-block w-2 h-2 rounded-full mr-1 align-middle bg-amber-500"></span>' + t('quote.recalculating');
