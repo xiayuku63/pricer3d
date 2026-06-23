@@ -93,7 +93,9 @@ export async function toggleLayFace() {
             const cluster = clusters[hit.index];
             if (!cluster || !cluster.normal) return false;
             placeFaceOnBed(currentMesh, cluster.normal, 'Z');
+            // Force re-center + re-render
             centerModel();
+            requestRender();
             syncOrientationFromMesh();
             clearClusters();
             window.__onLayFaceClick = null;
@@ -107,6 +109,7 @@ export async function toggleLayFace() {
                 if (c && c.normal) {
                     placeFaceOnBed(currentMesh, c.normal, 'Z');
                     centerModel();
+                    requestRender();
                     syncOrientationFromMesh();
                     clearClusters();
                     window.__onLayFaceClick = null;
