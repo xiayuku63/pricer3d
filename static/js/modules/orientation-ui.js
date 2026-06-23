@@ -92,6 +92,7 @@ export async function toggleLayFace() {
             if (!hit) return false;
             const cluster = clusters[hit.index];
             if (!cluster || !cluster.normal) return false;
+            clearClusters();  // 先移除彩块，避免污染包围盒计算
             placeFaceOnBed(currentMesh, cluster.normal, 'Z');
             syncOrientationFromMesh();
             clearClusters();
@@ -104,6 +105,7 @@ export async function toggleLayFace() {
             (idx) => {
                 const c = clusters[idx];
                 if (c && c.normal) {
+                    clearClusters();  // 先移除彩块，避免污染包围盒计算
                     placeFaceOnBed(currentMesh, c.normal, 'Z');
                     syncOrientationFromMesh();
                     clearClusters();

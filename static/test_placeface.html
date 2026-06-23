@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>PlaceFaceOnBed Test</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: monospace; }
+        #info {
+            position: absolute; top: 10px; left: 10px; z-index: 100;
+            background: rgba(0,0,0,0.8); color: #0f0; padding: 12px;
+            font-size: 12px; border-radius: 6px; max-height: 90vh; overflow-y: auto;
+            min-width: 400px; white-space: pre-wrap;
+        }
+        #info.success { border-left: 4px solid #0f0; }
+        #info.error { border-left: 4px solid #f00; }
+        #info .highlight { color: #ff0; font-weight: bold; }
+        #controls {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            z-index: 100; display: flex; gap: 10px;
+        }
+        #controls button {
+            padding: 10px 20px; font-size: 14px; cursor: pointer;
+            background: #333; color: #fff; border: 1px solid #666; border-radius: 6px;
+        }
+        #controls button:hover { background: #555; }
+        #log {
+            position: absolute; bottom: 80px; left: 10px; z-index: 100;
+            background: rgba(0,0,0,0.7); color: #0f0; padding: 8px;
+            font-size: 11px; border-radius: 4px; max-height: 200px; overflow-y: auto;
+            width: 500px; white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+<div id="info">Initializing...</div>
+<div id="log">[log] waiting...</div>
+<div id="controls">
+    <button id="btn-load">1. Load Test Cube</button>
+    <button id="btn-analyze">2. Get Clusters (API)</button>
+    <button id="btn-show-clusters">3. Show Clusters</button>
+    <button id="btn-place" style="background:#c60;">4. Place on Face (simulate click)</button>
+    <button id="btn-reset">Reset</button>
+</div>
+
+<script type="importmap">
+{
+    "imports": {
+        "three": "/static/js/vendor/three.module.js",
+        "three/addons/": "/static/js/vendor/addons/"
+    }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+
+// ── DOM refs ──
+const infoEl = document.getElementById('info');
+const logEl = document.getElementById('log');
+const btnLoad = document.getElementById('btn-load');
+const btnAnalyze = document.getElementById('btn-analyze');
+const btnShow = document.getElementById('btn-show-clusters');
+const btnPlace = document.getElementById('btn-place');
+const btnReset = document.getElementById('btn-reset');
+
+const BED_SIZE = 256;
+window._BED_CENTER = BED_SIZE / 2;  // 128
+
+function log(msg) {
+    const t = new Date().toISOString().slice(11, 23);
+    logEl.textContent += `[${t}] ${msg}\n`;
+    logEl.scrollTop = logEl.scrollHeight;
+}
+
+function setInfo(html, isError) {
+    infoEl.innerHTML = html;
+    infoEl.className = isError ? 'error' : 'success';
+}
+
+// ── Scene setup ──
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a1a2e);
+
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 10000);
+camera.position.set(0, 0, 250);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
+document.body.prepend(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.1;
+
+// Lights
+scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
+dirLight.position.set(2, 3, 5);
+scene.add(dirLight);
+
+// ── Bed ──
+function createBed() {
+    const w = BED_SIZE, d = BED_SIZE;
+    const grid = new THREE.GridHelper(w, 32, 0x334155, 0x1e293b);
+    grid.rotation.x = Math.PI / 2;
+    grid.position.set(w/2, d/2, 0);
+    scene.add(grid);
+
+    const planeGeo = new THREE.PlaneGeometry(w, d);
+    const planeMat = new THREE.MeshStandardMaterial({
+        color: 0x334155, transparent: true, opacity: 0.2, side: THREE.DoubleSide
+    });
+    const plane = new THREE.Mesh(planeGeo, planeMat);
+    plane.position.set(w/2, d/2, 0);
+    scene.add(plane);
+
+    // Center marker
+    const markerGeo = new THREE.SphereGeometry(3, 16, 16);
+    const markerMat = new THREE.MeshBasicMaterial({ color: 0xff4444 });
+    const marker = new THREE.Mesh(markerGeo, markerMat);
+    marker.position.set(w/2, d/2, 0);
+    scene.add(marker);
+
+    // Axes
+    const axLen = 40;
+    scene.add(new THREE.ArrowHelper(new THREE.Vector3(1,0,0), new THREE.Vector3(0,0,0), axLen, 0xff4444));
+    scene.add(new THREE.ArrowHelper(new THREE.Vector3(0,1,0), new THREE.Vector3(0,0,0), axLen, 0x44ff44));
+    scene.add(new THREE.ArrowHelper(new THREE.Vector3(0,0,1), new THREE.Vector3(0,0,0), axLen, 0x4488ff));
+}
+createBed();
+
+// ── State ──
+let currentMesh = null;
+let clusterData = null;
+let clusterOverlays = [];
+let clusterHighlightGroup = null;
+
+// ── Load STL ──
+async function loadTestCube() {
+    setInfo('Loading test_cube.stl...');
+    log('Loading test_cube.stl...');
+
+    if (currentMesh) {
+        scene.remove(currentMesh);
+        if (currentMesh.geometry) currentMesh.geometry.dispose();
+        if (currentMesh.material) currentMesh.material.dispose();
+        currentMesh = null;
+    }
+
+    const resp = await fetch('/static/test_cube.stl');
+    const buffer = await resp.arrayBuffer();
+
+    const loader = new STLLoader();
+    const geometry = loader.parse(buffer);
+    geometry.computeVertexNormals();
+    geometry.computeBoundingBox();
+
+    // ===== renderSTL logic (viewer.js lines 589-606) =====
+    const centerOffset = new THREE.Vector3();
+    geometry.boundingBox.getCenter(centerOffset);
+    log(`1. Original geometry center: (${centerOffset.x.toFixed(2)}, ${centerOffset.y.toFixed(2)}, ${centerOffset.z.toFixed(2)})`);
+    const geoCenterBefore = geometry.boundingBox.getCenter(new THREE.Vector3());
+    log(`   Original bbox center: (${geoCenterBefore.x.toFixed(2)}, ${geoCenterBefore.y.toFixed(2)}, ${geoCenterBefore.z.toFixed(2)})`);
+
+    geometry.center();
+    geometry.computeBoundingBox();
+    const afterCenter = geometry.boundingBox.getCenter(new THREE.Vector3());
+    log(`2. After center(): bbox center = (${afterCenter.x.toFixed(2)}, ${afterCenter.y.toFixed(2)}, ${afterCenter.z.toFixed(2)})`);
+    const afterCenterSize = geometry.boundingBox.getSize(new THREE.Vector3());
+    log(`   Size: (${afterCenterSize.x.toFixed(2)}, ${afterCenterSize.y.toFixed(2)}, ${afterCenterSize.z.toFixed(2)})`);
+
+    const minZ = geometry.boundingBox.min.z;
+    geometry.translate(0, 0, -minZ);
+    geometry.computeBoundingBox();
+    const afterSink = geometry.boundingBox.getCenter(new THREE.Vector3());
+    log(`3. After translate(0,0,${(-minZ).toFixed(2)}): bbox center = (${afterSink.x.toFixed(2)}, ${afterSink.y.toFixed(2)}, ${afterSink.z.toFixed(2)})`);
+    log(`   bbox min = (${geometry.boundingBox.min.x.toFixed(2)}, ${geometry.boundingBox.min.y.toFixed(2)}, ${geometry.boundingBox.min.z.toFixed(2)})`);
+    log(`   bbox max = (${geometry.boundingBox.max.x.toFixed(2)}, ${geometry.boundingBox.max.y.toFixed(2)}, ${geometry.boundingBox.max.z.toFixed(2)})`);
+
+    const material = new THREE.MeshStandardMaterial({
+        color: 0x3b82f6, metalness: 0.0, roughness: 0.6
+    });
+    currentMesh = new THREE.Mesh(geometry, material);
+    currentMesh.rotation.set(0, 0, 0);
+    const bc = window._BED_CENTER;
+    currentMesh.position.set(bc, bc, 0);
+    log(`4. mesh.position set to (${currentMesh.position.x}, ${currentMesh.position.y}, ${currentMesh.position.z})`);
+
+    scene.add(currentMesh);
+
+    // Expose to window for console testing
+    window.currentMesh = currentMesh;
+
+    // Compute world-space bbox
+    currentMesh.updateMatrixWorld(true);
+    const wBox = new THREE.Box3().setFromObject(currentMesh);
+    const wCenter = wBox.getCenter(new THREE.Vector3());
+    const wSize = wBox.getSize(new THREE.Vector3());
+    log(`5. World bbox center: (${wCenter.x.toFixed(2)}, ${wCenter.y.toFixed(2)}, ${wCenter.z.toFixed(2)})`);
+    log(`   World bbox size: (${wSize.x.toFixed(2)}, ${wSize.y.toFixed(2)}, ${wSize.z.toFixed(2)})`);
+    log(`   BED_CENTER = ${bc}`);
+
+    setInfo(
+        `Loaded test_cube.stl<br>` +
+        `Geometry size: ${afterCenterSize.x.toFixed(1)} × ${afterCenterSize.y.toFixed(1)} × ${afterCenterSize.z.toFixed(1)}<br>` +
+        `World center: (${wCenter.x.toFixed(1)}, ${wCenter.y.toFixed(1)}, ${wCenter.z.toFixed(1)})<br>` +
+        `Ready for next step`
+    );
+    log('✅ Load complete');
+    fitCamera();
+}
+
+function fitCamera() {
+    if (!currentMesh) return;
+    const box = new THREE.Box3().setFromObject(currentMesh);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z, 1);
+    const fov = camera.fov * (Math.PI / 180);
+    let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.6;
+    camera.position.set(center.x, center.y, center.z + cameraZ);
+    camera.near = Math.max(maxDim / 100, 0.1);
+    camera.far = Math.max(maxDim * 20, 1000);
+    camera.updateProjectionMatrix();
+    controls.target.copy(center);
+    controls.update();
+}
+
+// ── Get clusters from API ──
+async function getClusters() {
+    if (!currentMesh) { alert('Load the cube first!'); return; }
+    setInfo('Fetching clusters from /api/orientation/coplanar... (may need auth)');
+    log('Fetching clusters...');
+
+    try {
+        const blob = await fetch('/static/test_cube.stl').then(r => r.blob());
+        const formData = new FormData();
+        formData.append('file', blob, 'test_cube.stl');
+
+        const resp = await fetch('/api/orientation/coplanar', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (resp.status === 401) {
+            setInfo('⚠️ Need auth. Let me try directly...', true);
+            log('Auth required for API. Will test with manual compute.');
+            // Generate clusters manually from geometry
+            generateManualClusters();
+            return;
+        }
+
+        const data = await resp.json();
+        clusterData = data.clusters || [];
+        log(`Got ${clusterData.length} clusters from API`);
+        setInfo(`Got ${clusterData.length} clusters`);
+    } catch (e) {
+        log(`Error: ${e.message}`);
+        setInfo(`Error: ${e.message}`, true);
+    }
+}
+
+function generateManualClusters() {
+    // For a cube, we know normals: ±X, ±Y, ±Z
+    const normals = [
+        [1,0,0], [-1,0,0],
+        [0,1,0], [0,-1,0],
+        [0,0,1], [0,0,-1]
+    ];
+    clusterData = normals.map((n, i) => ({
+        normal: n,
+        face_vertices: [],
+        cluster_id: i
+    }));
+    log(`Generated ${clusterData.length} manual face normals for cube`);
+    setInfo(`Generated ${clusterData.length} face clusters (no auth needed)`);
+}
+
+// ── Show clusters (render overlays like renderClusters) ──
+function showClusters() {
+    if (!currentMesh || !clusterData) { alert('Load and analyze first!'); return; }
+    if (clusterOverlays.length > 0) clearOverlays();
+
+    log('Rendering cluster overlays...');
+
+    // Simplified renderClusters
+    clusterHighlightGroup = new THREE.Group();
+    currentMesh.add(clusterHighlightGroup);
+
+    clusterData.forEach((cluster, ci) => {
+        const n = new THREE.Vector3(cluster.normal[0], cluster.normal[1], cluster.normal[2]);
+        // Create a small colored patch on the surface
+        const patchGeo = new THREE.PlaneGeometry(30, 30);
+        const patchMat = new THREE.MeshBasicMaterial({
+            color: [0x22c55e, 0x3b82f6, 0xa855f7, 0xeab308, 0xf97316, 0xec4899][ci % 6],
+            transparent: true,
+            opacity: 0.6,
+            side: THREE.DoubleSide,
+            depthTest: true,
+            depthWrite: false,
+        });
+        const patch = new THREE.Mesh(patchGeo, patchMat);
+
+        // Orient the patch to face outward
+        const up = new THREE.Vector3(0, 0, 1);
+        const quat = new THREE.Quaternion().setFromUnitVectors(up, n);
+        patch.quaternion.copy(quat);
+
+        // Position the patch at a point along the face normal
+        // Place it at the mesh center offset slightly along the normal
+        const box = new THREE.Box3().setFromObject(currentMesh);
+        const size = box.getSize(new THREE.Vector3());
+        const center = new THREE.Vector3();
+        box.getCenter(center);
+
+        // Position at local center + half-extent along normal
+        const localCenter = new THREE.Vector3(0, 0, 0); // local origin is at geometry center
+        const halfExtent = new THREE.Vector3(size.x/2, size.y/2, size.z/2);
+        const offset = new THREE.Vector3(
+            n.x * Math.abs(halfExtent.x) || 0,
+            n.y * Math.abs(halfExtent.y) || 0,
+            n.z * Math.abs(halfExtent.z) || 0
+        );
+        patch.position.copy(localCenter.clone().add(offset));
+        patch.userData = { clusterIndex: ci, normal: cluster.normal, isClusterOverlay: true };
+        patch.renderOrder = 1;
+
+        clusterHighlightGroup.add(patch);
+        clusterOverlays.push(patch);
+    });
+
+    log(`Rendered ${clusterOverlays.length} cluster overlays`);
+    setInfo(`Showing ${clusterOverlays.length} face clusters — click a colored patch below`);
+}
+
+function clearOverlays() {
+    if (clusterHighlightGroup && clusterHighlightGroup.parent) {
+        clusterHighlightGroup.traverse(c => {
+            if (c.geometry) c.geometry.dispose();
+            if (c.material) c.material.dispose();
+        });
+        clusterHighlightGroup.parent.remove(clusterHighlightGroup);
+    }
+    clusterHighlightGroup = null;
+    clusterOverlays = [];
+}
+
+// ── placeFaceOnBed (exact copy from layface.js) ──
+function placeFaceOnBed(mesh, normal, upAxis = 'Z') {
+    if (!mesh) return;
+
+    log('========== PLACE FACE ON BED ==========');
+
+    const n = new THREE.Vector3(normal[0], normal[1], normal[2]).normalize();
+    log(`Face normal: (${normal[0].toFixed(4)}, ${normal[1].toFixed(4)}, ${normal[2].toFixed(4)})`);
+
+    // -normal should align to Z+
+    const targetDir = n.clone().negate();
+    const up = new THREE.Vector3(0, 0, 1);
+
+    const targetQuat = new THREE.Quaternion().setFromUnitVectors(targetDir, up);
+    mesh.quaternion.copy(targetQuat);
+    log(`Rotation applied: quat (${targetQuat.x.toFixed(4)}, ${targetQuat.y.toFixed(4)}, ${targetQuat.z.toFixed(4)}, ${targetQuat.w.toFixed(4)})`);
+
+    // Track state before Z sinking
+    log(`  BEFORE Z-sink: mesh.pos=(${mesh.position.x.toFixed(4)}, ${mesh.position.y.toFixed(4)}, ${mesh.position.z.toFixed(4)})`);
+
+    // Sink to Z=0
+    mesh.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(mesh);
+    log(`  After rotation: bbox min=(${box.min.x.toFixed(4)}, ${box.min.y.toFixed(4)}, ${box.min.z.toFixed(4)})`);
+    log(`  After rotation: bbox max=(${box.max.x.toFixed(4)}, ${box.max.y.toFixed(4)}, ${box.max.z.toFixed(4)})`);
+    log(`  Z-sink amount: ${(-box.min.z).toFixed(4)}`);
+    mesh.position.z -= box.min.z;
+
+    // After Z sink, recompute and center X/Y
+    mesh.updateMatrixWorld(true);
+    const box2 = new THREE.Box3().setFromObject(mesh);
+    const center = box2.getCenter(new THREE.Vector3());
+    const bc = window._BED_CENTER || 128;
+
+    log(`  AFTER Z-sink, BEFORE X/Y center:`);
+    log(`    mesh.pos=(${mesh.position.x.toFixed(4)}, ${mesh.position.y.toFixed(4)}, ${mesh.position.z.toFixed(4)})`);
+    log(`    bbox center=(${center.x.toFixed(4)}, ${center.y.toFixed(4)}, ${center.z.toFixed(4)})`);
+    log(`    BED_CENTER=${bc}`);
+    log(`    X offset = bc(${bc}) - center.x(${center.x.toFixed(4)}) = ${(bc - center.x).toFixed(4)}`);
+    log(`    Y offset = bc(${bc}) - center.y(${center.y.toFixed(4)}) = ${(bc - center.y).toFixed(4)}`);
+
+    mesh.position.x += (bc - center.x);
+    mesh.position.y += (bc - center.y);
+
+    // Final state
+    mesh.updateMatrixWorld(true);
+    const box3 = new THREE.Box3().setFromObject(mesh);
+    const finalCenter = box3.getCenter(new THREE.Vector3());
+    log(`  AFTER X/Y centering:`);
+    log(`    mesh.pos=(${mesh.position.x.toFixed(4)}, ${mesh.position.y.toFixed(4)}, ${mesh.position.z.toFixed(4)})`);
+    log(`    bbox center=(${finalCenter.x.toFixed(4)}, ${finalCenter.y.toFixed(4)}, ${finalCenter.z.toFixed(4)})`);
+    log(`    Should be centered at (${bc}, ${bc}, ?)`);
+
+    // Compare with expected
+    const cxOk = Math.abs(finalCenter.x - bc) < 0.01;
+    const cyOk = Math.abs(finalCenter.y - bc) < 0.01;
+    const czOk = Math.abs(finalCenter.z) < 0.01;
+    log(`✅ X centered: ${cxOk} (actual diff=${(finalCenter.x - bc).toFixed(4)})`);
+    log(`✅ Y centered: ${cyOk} (actual diff=${(finalCenter.y - bc).toFixed(4)})`);
+    log(`✅ Z at bed: ${czOk} (actual Z=${finalCenter.z.toFixed(4)})`);
+
+    if (!cxOk || !cyOk || !czOk) {
+        log(`❌ NOT PROPERLY CENTERED!`);
+    } else {
+        log(`✅ ALL GOOD — model is properly centered!`);
+    }
+
+    setInfo(
+        `PlaceFace complete<br>` +
+        `Mesh pos: (${mesh.position.x.toFixed(1)}, ${mesh.position.y.toFixed(1)}, ${mesh.position.z.toFixed(1)})<br>` +
+        `Final bbox center: (${finalCenter.x.toFixed(1)}, ${finalCenter.y.toFixed(1)}, ${finalCenter.z.toFixed(1)})<br>` +
+        `Expected center: (${bc}, ${bc}, ~0)<br>` +
+        `<span class="highlight">${(!cxOk || !cyOk || !czOk) ? '❌ NOT CENTERED!' : '✅ CENTERED!'}</span>`
+    );
+
+    fitCamera();
+}
+
+// ── Simulate clicking a cluster ──
+function simulateClick(clusterIdx) {
+    if (!currentMesh || !clusterData || clusterData.length === 0) {
+        alert('Need mesh and clusters first!');
+        return;
+    }
+    const cluster = clusterData[clusterIdx];
+    if (!cluster || !cluster.normal) return;
+
+    log(`\n========== SIMULATING CLICK ON FACE ${clusterIdx} ==========`);
+    log(`Face normal: (${cluster.normal[0]}, ${cluster.normal[1]}, ${cluster.normal[2]})`);
+
+    // Record state BEFORE
+    log(`\n--- BEFORE placeFaceOnBed ---`);
+    currentMesh.updateMatrixWorld(true);
+    const beforeBox = new THREE.Box3().setFromObject(currentMesh);
+    const beforeCenter = beforeBox.getCenter(new THREE.Vector3());
+    log(`currentMesh.position: (${currentMesh.position.x.toFixed(4)}, ${currentMesh.position.y.toFixed(4)}, ${currentMesh.position.z.toFixed(4)})`);
+    log(`bbox center: (${beforeCenter.x.toFixed(4)}, ${beforeCenter.y.toFixed(4)}, ${beforeCenter.z.toFixed(4)})`);
+    log(`BED_CENTER: ${window._BED_CENTER}`);
+
+    // Execute placeFaceOnBed
+    placeFaceOnBed(currentMesh, cluster.normal, 'Z');
+
+    // Record state AFTER
+    log(`\n--- AFTER placeFaceOnBed ---`);
+    currentMesh.updateMatrixWorld(true);
+    const afterBox = new THREE.Box3().setFromObject(currentMesh);
+    const afterCenter = afterBox.getCenter(new THREE.Vector3());
+    log(`currentMesh.position: (${currentMesh.position.x.toFixed(4)}, ${currentMesh.position.y.toFixed(4)}, ${currentMesh.position.z.toFixed(4)})`);
+    log(`bbox center: (${afterCenter.x.toFixed(4)}, ${afterCenter.y.toFixed(4)}, ${afterCenter.z.toFixed(4)})`);
+    log(`BED_CENTER: ${window._BED_CENTER}`);
+
+    const cxDiff = afterCenter.x - window._BED_CENTER;
+    const cyDiff = afterCenter.y - window._BED_CENTER;
+    log(`\n🔍 ANALYSIS:`);
+    log(`X centering offset (bc - center.x): ${(window._BED_CENTER - beforeCenter.x).toFixed(4)} → applied`);
+    log(`  Result: center.x = ${afterCenter.x.toFixed(4)}, diff from bc = ${cxDiff.toFixed(4)}`);
+    log(`Y centering offset (bc - center.y): ${(window._BED_CENTER - beforeCenter.y).toFixed(4)} → applied`);
+    log(`  Result: center.y = ${afterCenter.y.toFixed(4)}, diff from bc = ${cyDiff.toFixed(4)}`);
+
+    if (Math.abs(cxDiff) < 0.1 && Math.abs(cyDiff) < 0.1) {
+        log(`✅ MODEL IS CENTERED!`);
+    } else {
+        log(`❌ MODEL IS NOT CENTERED! X diff=${cxDiff.toFixed(2)}, Y diff=${cyDiff.toFixed(2)}`);
+    }
+
+    clearOverlays();
+}
+
+// ── Reset ──
+function resetModel() {
+    if (!currentMesh) return;
+    currentMesh.rotation.set(0, 0, 0);
+    currentMesh.position.set(window._BED_CENTER, window._BED_CENTER, 0);
+    currentMesh.updateMatrixWorld(true);
+    clearOverlays();
+    fitCamera();
+    log('Reset to initial position');
+    setInfo('Model reset');
+}
+
+// ── Event handlers ──
+btnLoad.addEventListener('click', loadTestCube);
+btnAnalyze.addEventListener('click', getClusters);
+btnShow.addEventListener('click', showClusters);
+btnPlace.addEventListener('click', () => simulateClick(0)); // Click first face (Z+)
+btnReset.addEventListener('click', resetModel);
+
+// ── Click on overlays ──
+renderer.domElement.addEventListener('click', (event) => {
+    if (!currentMesh || clusterOverlays.length === 0) return;
+
+    const rect = renderer.domElement.getBoundingClientRect();
+    const mouse = new THREE.Vector2();
+    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(mouse, camera);
+
+    const intersects = raycaster.intersectObjects(clusterOverlays, false);
+    if (intersects.length > 0) {
+        const obj = intersects[0].object;
+        const idx = obj.userData.clusterIndex;
+        log(`Clicked overlay cluster index: ${idx}`);
+        simulateClick(idx);
+    }
+});
+
+// ── Resize ──
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ── Render loop ──
+function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+}
+animate();
+
+// Expose for console debugging
+window.currentMesh = currentMesh;
+window.scene = scene;
+window.camera = camera;
+window.controls = controls;
+window.placeFaceOnBed = placeFaceOnBed;
+window.B3 = THREE.Box3;
+window.V3 = THREE.Vector3;
+
+log('Test page loaded. Click "1. Load Test Cube" to begin.');
+setInfo('Ready — click "Load Test Cube"');
+</script>
+</body>
+</html>
