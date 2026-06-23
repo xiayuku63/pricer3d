@@ -1,7 +1,7 @@
 // ── Orientation UI: layface, orientation controls, training ──
 import * as THREE from 'three';
 import {
-    currentMesh, controls, requestRender, fitCameraToMesh,
+    currentMesh, controls, requestRender,
 } from './viewer.js';
 import {
     renderClusters, clearClusters, setClusterHover, intersectClusters,
@@ -93,17 +93,6 @@ export async function toggleLayFace() {
             const cluster = clusters[hit.index];
             if (!cluster || !cluster.normal) return false;
             placeFaceOnBed(currentMesh, cluster.normal, 'Z');
-            // 直接强制模型居中到床中心，不依赖任何增量计算
-            requestAnimationFrame(function() {
-                if (!currentMesh) return;
-                var bc = window._BED_CENTER || 128;
-                currentMesh.position.set(bc, bc, 0);
-                currentMesh.updateMatrixWorld(true);
-                var box = new THREE.Box3().setFromObject(currentMesh);
-                currentMesh.position.z -= box.min.z;
-                fitCameraToMesh(currentMesh);
-                requestRender();
-            });
             syncOrientationFromMesh();
             clearClusters();
             window.__onLayFaceClick = null;
@@ -116,16 +105,6 @@ export async function toggleLayFace() {
                 const c = clusters[idx];
                 if (c && c.normal) {
                     placeFaceOnBed(currentMesh, c.normal, 'Z');
-                    requestAnimationFrame(function() {
-                        if (!currentMesh) return;
-                        var bc = window._BED_CENTER || 128;
-                        currentMesh.position.set(bc, bc, 0);
-                        currentMesh.updateMatrixWorld(true);
-                        var box = new THREE.Box3().setFromObject(currentMesh);
-                        currentMesh.position.z -= box.min.z;
-                        fitCameraToMesh(currentMesh);
-                        requestRender();
-                    });
                     syncOrientationFromMesh();
                     clearClusters();
                     window.__onLayFaceClick = null;

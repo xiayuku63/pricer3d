@@ -1,7 +1,8 @@
 # pricer3d 版本号
 # 规则: 语义化版本 (Semantic Versioning) MAJOR.MINOR.PATCH
-0.41.14
-deployed_at: 2026-06-23T01:35+08:00
+0.41.15
+deployed_at: 2026-06-23T22:40+08:00
+# 0.41.15 (2026-06-23): 移除破坏placeFaceOnBed居中逻辑的requestAnimationFrame覆盖——智能摆放后模型居中
 # 0.41.14 (2026-06-23): 智能摆放后直接position.set(bc,bc,0)+lift Z=0+fitCamera，不再依赖增量居中
 # 0.41.13 (2026-06-23): 智能摆放后强制requestRender刷新生效
 # 0.41.8 (2026-06-23): MeshStandardMaterial→MeshBasicMaterial，渲染颜色精确匹配hex色号
