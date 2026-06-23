@@ -653,10 +653,17 @@ export function applyOrientationRotation(data) {
     currentMesh.rotation.x = THREE.MathUtils.degToRad(euler.x || 0);
     currentMesh.rotation.y = THREE.MathUtils.degToRad(euler.y || 0);
     currentMesh.rotation.z = THREE.MathUtils.degToRad(euler.z || 0);
-    // Compute world-space bounding box and lift bottom to Z=0
-    currentMesh.updateMatrixWorld();
+    // Compute world-space bounding box, lift bottom to Z=0, and re-centre X/Y
+    currentMesh.updateMatrixWorld(true);
     var box = new THREE.Box3().setFromObject(currentMesh);
     currentMesh.position.z -= box.min.z;
+    // Rotation shifts the bounding-box centre, so re-centre X/Y on the bed
+    currentMesh.updateMatrixWorld(true);
+    box.setFromObject(currentMesh);
+    var centre = box.getCenter(new THREE.Vector3());
+    var bc = window._BED_CENTER || 128;
+    currentMesh.position.x += (bc - centre.x);
+    currentMesh.position.y += (bc - centre.y);
     requestRender();
 }
 
