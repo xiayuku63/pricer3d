@@ -1,9 +1,9 @@
 # pricer3d 版本号
 # 规则: 语义化版本 (Semantic Versioning) MAJOR.MINOR.PATCH
-0.41.10
-deployed_at: 2026-06-23T00:55+08:00
+0.41.11
+deployed_at: 2026-06-23T01:05+08:00
+# 0.41.11 (2026-06-23): 预览弹窗重新打开时应用quoteOptions.orientation（智能摆放后旋转不丢失）
 # 0.41.10 (2026-06-23): applyOrientationRotation旋转后重新居中X/Y包围盒中心偏移
-# 0.41.9 (2026-06-23): 恢复MeshStandardMaterial+均衡光照(ambient1.0+directional0.35) + 底板改浅灰#cbd5e1
 # 0.41.8 (2026-06-23): MeshStandardMaterial→MeshBasicMaterial，渲染颜色精确匹配hex色号
 # 0.41.7 (2026-06-23): 黑色#000000被||视为falsy导致显示蓝色：hexInfo||改为null/undefined显式判断
 # 0.41.6 (2026-06-23): 移除破坏模块导入的debug脚本（缩略图崩溃根因）

@@ -221,6 +221,11 @@ export function previewByFilename(filename, ext) {
     if (previewPlaceholder) { previewPlaceholder.textContent = t('preview.loadingFile', { filename: filename, size: (file.size/1024).toFixed(0) }); previewPlaceholder.classList.remove('hidden'); }
     const rowData = currentResults.find((i) => i && i.filename === filename);
     var perFileOrient = (rowData && rowData.euler_angles_deg) ? rowData.euler_angles_deg : null;
+    // 如果没有 per-file 方向（API 不返回），使用最后一次用户设置的 quoteOptions.orientation
+    if (!perFileOrient && quoteOptions.orientation &&
+        (quoteOptions.orientation.x || quoteOptions.orientation.y || quoteOptions.orientation.z)) {
+        perFileOrient = quoteOptions.orientation;
+    }
     var colorForPreview = (rowData && rowData.color) ? rowData.color : quoteOptions.color;
     // Fallback: ensure we always have a valid hex, never empty
     if (!colorForPreview || String(colorForPreview).trim() === '') {
