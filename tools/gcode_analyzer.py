@@ -27,9 +27,9 @@ from collections import defaultdict
 # ══════════════════════════════════════════════════════════════════
 
 _FILAMENT_STATS = [
-    ("filament_mm",     r"; filament used \[mm\]\s*=\s*([\d.]+)"),
-    ("filament_cm3",    r"; filament used \[cm3\]\s*=\s*([\d.]+)"),
-    ("filament_g",      r"; total filament used \[g\]\s*=\s*([\d.]+)"),
+    ("filament_mm", r"; filament used \[mm\]\s*=\s*([\d.]+)"),
+    ("filament_cm3", r"; filament used \[cm3\]\s*=\s*([\d.]+)"),
+    ("filament_g", r"; total filament used \[g\]\s*=\s*([\d.]+)"),
 ]
 
 _TIME_PATTERNS = [
@@ -73,9 +73,9 @@ def parse_gcode(filepath: str) -> dict:
         "slice_date": None,
         "config_settings_count": 0,
         # 动态值
-        "heights": defaultdict(int),          # {height_str: count}
-        "widths_by_type": defaultdict(set),   # {type_name: {width_str, ...}}
-        "type_counts": defaultdict(int),       # {type_name: count}
+        "heights": defaultdict(int),  # {height_str: count}
+        "widths_by_type": defaultdict(set),  # {type_name: {width_str, ...}}
+        "type_counts": defaultdict(int),  # {type_name: count}
         "layer_count": 0,
     }
 
@@ -88,11 +88,11 @@ def parse_gcode(filepath: str) -> dict:
     # ── 挤出宽度声明 (头部) ──
     for key, pat in [
         ("external_perimeters_extrusion_width", r"; external perimeters extrusion width = (.+)"),
-        ("perimeters_extrusion_width",          r"; perimeters extrusion width = (.+)"),
-        ("infill_extrusion_width",              r"; infill extrusion width = (.+)"),
-        ("solid_infill_extrusion_width",        r"; solid infill extrusion width = (.+)"),
-        ("top_infill_extrusion_width",          r"; top infill extrusion width = (.+)"),
-        ("first_layer_extrusion_width",         r"; first layer extrusion width = (.+)"),
+        ("perimeters_extrusion_width", r"; perimeters extrusion width = (.+)"),
+        ("infill_extrusion_width", r"; infill extrusion width = (.+)"),
+        ("solid_infill_extrusion_width", r"; solid infill extrusion width = (.+)"),
+        ("top_infill_extrusion_width", r"; top infill extrusion width = (.+)"),
+        ("first_layer_extrusion_width", r"; first layer extrusion width = (.+)"),
     ]:
         m = re.search(pat, content)
         if m:
@@ -115,13 +115,11 @@ def parse_gcode(filepath: str) -> dict:
             result["settings"][k.strip()] = v.strip()
 
         result["config_settings_count"] = sum(
-            1 for l in config_section.split("\n")
-            if l.strip().startswith("; ") and "=" in l
+            1 for line_val in config_section.split("\n") if line_val.strip().startswith("; ") and "=" in line_val
         )
 
     # ── 动态值: 逐行扫描 HEIGHT / WIDTH / TYPE ──
     current_type = None
-    layer_z_set = set()
     for line in content.split("\n"):
         line = line.strip()
 
@@ -175,21 +173,21 @@ def parse_gcode(filepath: str) -> dict:
 
 # 核心参数: (显示名, [keys], 单位)
 _CORE_PARAMS = [
-    ("层高",          ["layer_height"],                                   "mm"),
-    ("首层层高",      ["first_layer_height"],                             "mm"),
-    ("喷嘴直径",      ["nozzle_diameter"],                                "mm"),
-    ("墙层数",        ["perimeters", "wall_loops"],                       "圈"),
-    ("顶部实心层",    ["top_shell_layers", "top_solid_layers"],           "层"),
-    ("底部实心层",    ["bottom_shell_layers", "bottom_solid_layers"],     "层"),
-    ("填充率",        ["fill_density"],                                   ""),
-    ("底边宽度",      ["brim_width"],                                     "mm"),
-    ("支撑",          ["support_material"],                               ""),
-    ("材料直径",      ["filament_diameter"],                              "mm"),
-    ("材料密度",      ["filament_density"],                               "g/cm³"),
-    ("喷嘴温度",      ["temperature"],                                    "°C"),
-    ("热床温度",      ["bed_temperature"],                                "°C"),
-    ("打印机类型",    ["printer_technology"],                             ""),
-    ("打印机型号",    ["printer_model"],                                  ""),
+    ("层高", ["layer_height"], "mm"),
+    ("首层层高", ["first_layer_height"], "mm"),
+    ("喷嘴直径", ["nozzle_diameter"], "mm"),
+    ("墙层数", ["perimeters", "wall_loops"], "圈"),
+    ("顶部实心层", ["top_shell_layers", "top_solid_layers"], "层"),
+    ("底部实心层", ["bottom_shell_layers", "bottom_solid_layers"], "层"),
+    ("填充率", ["fill_density"], ""),
+    ("底边宽度", ["brim_width"], "mm"),
+    ("支撑", ["support_material"], ""),
+    ("材料直径", ["filament_diameter"], "mm"),
+    ("材料密度", ["filament_density"], "g/cm³"),
+    ("喷嘴温度", ["temperature"], "°C"),
+    ("热床温度", ["bed_temperature"], "°C"),
+    ("打印机类型", ["printer_technology"], ""),
+    ("打印机型号", ["printer_model"], ""),
 ]
 
 # TYPE 中文映射
@@ -315,7 +313,7 @@ def print_report(result: dict) -> None:
         print("  ④ 耗材用量")
         print("=" * 64)
         if "filament_mm" in fil:
-            print(f"  线长:    {fil['filament_mm']:>10.2f} mm  ({fil['filament_mm']/1000:.2f} m)")
+            print(f"  线长:    {fil['filament_mm']:>10.2f} mm  ({fil['filament_mm'] / 1000:.2f} m)")
         if "filament_cm3" in fil:
             print(f"  体积:    {fil['filament_cm3']:>10.2f} cm³")
         if "filament_g" in fil:
@@ -329,8 +327,10 @@ def print_report(result: dict) -> None:
             if density > 0 and "filament_cm3" in fil:
                 expected_g = fil["filament_cm3"] * density
                 if abs(expected_g - fil["filament_g"]) > 0.01:
-                    print(f"           ⚠️  密度{density} × 体积{fil['filament_cm3']} = {expected_g:.2f}g，"
-                          f"与 gcode 声明 ({fil['filament_g']}g) 不一致")
+                    print(
+                        f"           ⚠️  密度{density} × 体积{fil['filament_cm3']} = {expected_g:.2f}g，"
+                        f"与 gcode 声明 ({fil['filament_g']}g) 不一致"
+                    )
 
     # ── ⑤ 时间 ──
     t = result["time"]
@@ -357,7 +357,7 @@ def print_verify_table(result: dict, expected: list) -> None:
     print("  ⑥ 参数核对")
     print("=" * 64)
     print(f"  {'参数':<16} {'期望':>8}  {'实际':>8}  结果")
-    print(f"  {'─'*16} {'─'*8}  {'─'*8}  {'─'*6}")
+    print(f"  {'─' * 16} {'─' * 8}  {'─' * 8}  {'─' * 6}")
 
     all_ok = True
     for label, key, expected_val in expected:

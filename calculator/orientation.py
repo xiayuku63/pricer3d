@@ -15,7 +15,6 @@ Submodules:
     orientation_cluster — 共面聚类（PrusaSlicer Lay on Face 算法）
 """
 
-import math
 import os
 import re
 import subprocess
@@ -43,19 +42,14 @@ from calculator.orientation_scoring import (
     ADHESION_WEIGHT,
     FINE_TUNE_Z_RANGE,
     FINE_TUNE_STEP,
-    _score_orientation_3x3,
     fine_tune_orientation,
     evaluate_orientation,
     get_stable_faces,
 )
 from calculator.orientation_cluster import (
     COPLANAR_ANGLE_TOLERANCE_DEG,
-    COPLANAR_ANGLE_TOLERANCE_RAD,
     COPLANAR_COS_THRESHOLD,
     MIN_COPLANAR_AREA_MM2,
-    _clean_value,
-    _merge_planar_clusters_internal,
-    _extract_cluster_outline_p3d,
     cluster_coplanar_faces,
 )
 
@@ -104,11 +98,14 @@ def _load_mesh(model_path: str) -> trimesh.Trimesh:
     if ext in (".stp", ".step"):
         import tempfile as _tempfile
         import subprocess as _subprocess
+
         fd, _tmp = _tempfile.mkstemp(suffix=".stl", prefix="p3d_orient_step_")
         os.close(fd)
         result = _subprocess.run(
             ["prusa-slicer", "--export-stl", "--output", _tmp, model_path],
-            capture_output=True, text=True, timeout=120,
+            capture_output=True,
+            text=True,
+            timeout=120,
         )
         if result.returncode != 0 or not os.path.exists(_tmp):
             if _tmp and os.path.exists(_tmp):
@@ -125,7 +122,7 @@ def _load_mesh(model_path: str) -> trimesh.Trimesh:
             mesh = trimesh.util.concatenate(meshes)
         if not isinstance(mesh, trimesh.Trimesh) or mesh.vertices.shape[0] == 0:
             raise ValueError("无法加载模型: {}".format(model_path))
-        if not hasattr(mesh, 'face_normals') or mesh.face_normals is None or len(mesh.face_normals) == 0:
+        if not hasattr(mesh, "face_normals") or mesh.face_normals is None or len(mesh.face_normals) == 0:
             mesh = trimesh.Trimesh(vertices=mesh.vertices, faces=mesh.faces, process=True, validate=True)
         return mesh
     finally:
@@ -198,11 +195,14 @@ def apply_orientation_to_mesh(
     if ext in (".stp", ".step"):
         import tempfile as _tempfile
         import subprocess as _subprocess
+
         fd, _tmp = _tempfile.mkstemp(suffix=".stl", prefix="p3d_orient_apply_")
         os.close(fd)
         result = _subprocess.run(
             ["prusa-slicer", "--export-stl", "--output", _tmp, model_path],
-            capture_output=True, text=True, timeout=120,
+            capture_output=True,
+            text=True,
+            timeout=120,
         )
         if result.returncode != 0 or not os.path.exists(_tmp):
             if _tmp and os.path.exists(_tmp):
@@ -243,6 +243,7 @@ def apply_orientation_to_mesh(
         )
 
         import tempfile
+
         fd, out_path = tempfile.mkstemp(suffix=".stl", prefix="p3d_orient_")
         os.close(fd)
         rotated_mesh.export(out_path, file_type="stl")
@@ -300,6 +301,7 @@ def get_best_face_for_slicing(
     """
     if method == "sa":
         from calculator.orientation_sa import optimize_orientation_sa
+
         return optimize_orientation_sa(model_path, **(sa_config or {}))
 
     if method == "learned":
@@ -324,12 +326,14 @@ def get_best_face_for_slicing(
 
         R = rotation_from_up_vector(up)
         eval_result = evaluate_orientation(mesh, R)
-        candidates.append({
-            "face": cluster,
-            "score": eval_result["score"],
-            "metrics": eval_result["metrics"],
-            "euler_angles_deg": eval_result["euler_angles_deg"],
-        })
+        candidates.append(
+            {
+                "face": cluster,
+                "score": eval_result["score"],
+                "metrics": eval_result["metrics"],
+                "euler_angles_deg": eval_result["euler_angles_deg"],
+            }
+        )
 
     # Step 3: fallback to stable faces if no coplanar clusters found
     if not candidates:
@@ -338,16 +342,18 @@ def get_best_face_for_slicing(
             contact = float(f.get("metrics", {}).get("contact_area", 0))
             overhang = float(f.get("metrics", {}).get("overhang_ratio", 0))
             score = contact * (1.0 - overhang) * 0.5
-            candidates.append({
-                "face": {"normal": f.get("normal", [0, 0, 0]), "area": f.get("area", 0)},
-                "score": round(score, 2),
-                "metrics": {
-                    "contact_area": contact,
-                    "overhang_ratio": overhang,
-                    "z_height": f.get("metrics", {}).get("z_height", 0),
-                },
-                "euler_angles_deg": {"x": 0, "y": 0, "z": 0},
-            })
+            candidates.append(
+                {
+                    "face": {"normal": f.get("normal", [0, 0, 0]), "area": f.get("area", 0)},
+                    "score": round(score, 2),
+                    "metrics": {
+                        "contact_area": contact,
+                        "overhang_ratio": overhang,
+                        "z_height": f.get("metrics", {}).get("z_height", 0),
+                    },
+                    "euler_angles_deg": {"x": 0, "y": 0, "z": 0},
+                }
+            )
 
     # Step 4: sort by score
     candidates.sort(key=lambda c: c["score"], reverse=True)
@@ -397,6 +403,7 @@ def get_best_face_for_slicing(
 
 # ── PrusaSlicer 切片解析 ──
 
+
 def slice_with_prusaslicer(model_path: str, timeout: int = 30) -> dict:
     """调用 PrusaSlicer CLI 切片并解析 G-code 统计信息。
 
@@ -417,19 +424,21 @@ def slice_with_prusaslicer(model_path: str, timeout: int = 30) -> dict:
         return {"success": False, "error": "文件不存在"}
 
     try:
-        tmp_gcode = os.path.join(
-            tempfile.gettempdir(), f"p3d_slice_{uuid.uuid4().hex[:8]}.gcode"
-        )
+        tmp_gcode = os.path.join(tempfile.gettempdir(), f"p3d_slice_{uuid.uuid4().hex[:8]}.gcode")
 
         result = subprocess.run(
             [
                 "prusa-slicer",
                 "--export-gcode",
-                "--output", tmp_gcode,
-                "--center", "125,125",
+                "--output",
+                tmp_gcode,
+                "--center",
+                "125,125",
                 model_path,
             ],
-            capture_output=True, text=True, timeout=timeout,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
         )
 
         if result.returncode != 0 or not os.path.exists(tmp_gcode):
@@ -458,13 +467,17 @@ def slice_with_prusaslicer(model_path: str, timeout: int = 30) -> dict:
                     hm = re.findall(r"(\d+)h", time_str)
                     mm = re.findall(r"(\d+)m", time_str)
                     ss = re.findall(r"(\d+)s", time_str)
-                    if hm: total_seconds += int(hm[0]) * 3600
-                    if mm: total_seconds += int(mm[0]) * 60
-                    if ss: total_seconds += int(ss[0])
+                    if hm:
+                        total_seconds += int(hm[0]) * 3600
+                    if mm:
+                        total_seconds += int(mm[0]) * 60
+                    if ss:
+                        total_seconds += int(ss[0])
                     if "s" in time_str and not re.search(r"\d+h|\d+m", time_str):
                         # 只有秒数
                         s_only = re.findall(r"(\d+)s", time_str)
-                        if s_only: total_seconds = int(s_only[0])
+                        if s_only:
+                            total_seconds = int(s_only[0])
                     print_time_s = total_seconds
 
         # 清理
@@ -558,7 +571,7 @@ def _learned_best_face(model_path: str) -> dict:
         # ── 类 OrcaSlicer 复合评分 ──
         # 核心: 接触面积^1.5(越大越好) × (1-悬垂)²(越少越好) / z_height(越矮越好)
         # 接触面积是 FDM 成败的第一要素
-        score = (c_a ** 1.5) * ((1.0 - o_r) ** 2) / max(z_h, 1.0)
+        score = (c_a**1.5) * ((1.0 - o_r) ** 2) / max(z_h, 1.0)
 
         # ── 最小接触面积过滤 (拒绝接触面积过小的朝向) ──
         bottom_area = c_a
@@ -576,7 +589,7 @@ def _learned_best_face(model_path: str) -> dict:
                 prob = float(learner.predict_proba(feat_batch)[0])
                 lr_prob = prob
                 # LR 模型作为微弱 bonus: 最多加 5% (当前仅 20 正样本)
-                score *= (0.95 + 0.05 * prob)
+                score *= 0.95 + 0.05 * prob
             except Exception:
                 pass
 
@@ -593,6 +606,7 @@ def _learned_best_face(model_path: str) -> dict:
                 cog = np.asarray(mesh.center_mass, dtype=np.float64) @ R[:3, :3].T
                 cog_xy = cog[:2]
                 from scipy.spatial import ConvexHull, Delaunay
+
                 hull = ConvexHull(bottom_xy)
                 tri = Delaunay(bottom_xy[hull.vertices])
                 stable = tri.find_simplex(cog_xy) >= 0
@@ -642,6 +656,7 @@ def _learned_best_face(model_path: str) -> dict:
     # ══════════════════════════════════════════════
     try:
         from calculator.orientation_math import fibonacci_sphere_sampling
+
         samples = fibonacci_sphere_sampling(128)
         for i in range(samples.shape[0]):
             normal = samples[i].copy()
@@ -668,8 +683,11 @@ def _learned_best_face(model_path: str) -> dict:
 
     logger.info(
         "智能摆放: 候选 %d 个, 最佳得分=%.2f (label=%s, 稳定=%s, lr=%s)",
-        len(used_ups), best_score, best_overall.get("label"),
-        best_overall.get("stable"), best_overall.get("learned_prob"),
+        len(used_ups),
+        best_score,
+        best_overall.get("label"),
+        best_overall.get("stable"),
+        best_overall.get("learned_prob"),
     )
 
     # ══════════════════════════════════════════════
@@ -693,9 +711,7 @@ def _learned_best_face(model_path: str) -> dict:
         tune_tmp = fine_tune_orientation(mesh, R_tmp[:3, :3])
         R_final = tune_tmp["R"]
         # 导出临时 STL
-        tmp_rotated = os.path.join(
-            tempfile.gettempdir(), f"p3d_orient_{uuid.uuid4().hex[:8]}.stl"
-        )
+        tmp_rotated = os.path.join(tempfile.gettempdir(), f"p3d_orient_{uuid.uuid4().hex[:8]}.stl")
         mesh_rotated = mesh.copy()
         mesh_rotated.vertices = np.asarray(mesh.vertices) @ R_final.T
         mesh_rotated.export(tmp_rotated)
@@ -705,7 +721,8 @@ def _learned_best_face(model_path: str) -> dict:
             prusa_info = slice_result
             logger.info(
                 "PrusaSlicer 验证: filament=%.1fmm, time=%ds",
-                slice_result["filament_mm"], slice_result["print_time_s"],
+                slice_result["filament_mm"],
+                slice_result["print_time_s"],
             )
         # 清理
         try:

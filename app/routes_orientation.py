@@ -16,7 +16,7 @@ import numpy as np
 
 from .config import MAX_FILE_SIZE_BYTES, SUPPORTED_EXTENSIONS
 from .deps import get_current_user
-from calculator.orientation import analyze_orientation, get_stable_faces, cluster_coplanar_faces, get_best_face_for_slicing
+from calculator.orientation import analyze_orientation, get_stable_faces, cluster_coplanar_faces
 
 logger = logging.getLogger(__name__)
 
@@ -139,6 +139,7 @@ async def list_coplanar_clusters(
             f.write(content)
 
         import trimesh
+
         mesh = trimesh.load(tmp_path, force="mesh")
         if isinstance(mesh, trimesh.Scene):
             meshes = mesh.dump()
@@ -188,6 +189,7 @@ async def train_sample(
             f.write(content)
 
         import trimesh
+
         mesh = trimesh.load(tmp_path, force="mesh")
         if isinstance(mesh, trimesh.Scene):
             meshes = mesh.dump()
@@ -201,7 +203,6 @@ async def train_sample(
         from calculator.orientation_learner import (
             FaceFeatureExtractor,
             OrientationLearner,
-            FEATURE_DIM,
         )
 
         # Step 1: coplanar 聚类 → 候选面列表
@@ -209,8 +210,8 @@ async def train_sample(
         if not clusters:
             # 无候选面时回退到全局特征 (兼容旧格式)
             logger.info("无 coplanar 候选面，写全局特征")
-            volume = float(mesh.volume) if hasattr(mesh, 'volume') else 0.0
-            surface_area = float(mesh.area) if hasattr(mesh, 'area') else 0.0
+            volume = float(mesh.volume) if hasattr(mesh, "volume") else 0.0
+            surface_area = float(mesh.area) if hasattr(mesh, "area") else 0.0
             bbox = mesh.bounds
             z_height = float(bbox[1, 2] - bbox[0, 2])
             sample = {
@@ -255,7 +256,9 @@ async def train_sample(
         if best_cos < POSITIVE_COS_THRESHOLD or best_cluster_idx < 0:
             logger.info(
                 "无可匹配正样本 (best_cos=%.3f < %.2f)，跳过面级标注: %s",
-                best_cos, POSITIVE_COS_THRESHOLD, filename,
+                best_cos,
+                POSITIVE_COS_THRESHOLD,
+                filename,
             )
             return {"status": "ok", "message": "已标记 (无匹配正样本)", "cos_sim": round(best_cos, 4)}
 
@@ -270,7 +273,7 @@ async def train_sample(
 
         with open(jsonl_path, "a") as f:
             for i, cluster in enumerate(clusters):
-                is_positive = (i == best_cluster_idx)
+                is_positive = i == best_cluster_idx
                 try:
                     feat = extractor.extract(mesh, cluster)
                 except Exception as e:
@@ -293,7 +296,10 @@ async def train_sample(
 
         logger.info(
             "训练样本已保存(面级): %s, clusters=%d, pos_idx=%d, cos=%.4f",
-            filename, n_written, best_cluster_idx, best_cos,
+            filename,
+            n_written,
+            best_cluster_idx,
+            best_cos,
         )
 
         # Step 5: 检查是否达到自动重训阈值 (如果配置开启)
@@ -303,6 +309,7 @@ async def train_sample(
                 ORIENT_LEARNING_AUTO_RETRAIN,
                 ORIENT_LEARNING_MIN_NEW_SAMPLES,
             )
+
             if ORIENT_LEARNING_AUTO_RETRAIN:
                 # 统计当前总样本行数
                 with open(jsonl_path, "r") as f_sample:
@@ -352,17 +359,13 @@ async def model_status(
     """
     from calculator.orientation_learner import OrientationLearner
 
-    data_dir = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data"
-    )
+    data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
     learner = OrientationLearner(data_dir=data_dir)
 
     last_trained = None
     model_path = os.path.join(data_dir, "orientation_model.pkl")
     if os.path.exists(model_path):
-        last_trained = datetime.fromtimestamp(
-            os.path.getmtime(model_path), tz=timezone.utc
-        ).isoformat()
+        last_trained = datetime.fromtimestamp(os.path.getmtime(model_path), tz=timezone.utc).isoformat()
 
     return {
         "trained": learner.is_trained(),
@@ -389,20 +392,17 @@ async def admin_train_model(
     → {status, n_samples, n_positive, accuracy, coef}
     """
     from .deps import require_admin
+
     require_admin(current_user)
 
     from calculator.orientation_learner import OrientationLearner
 
-    data_dir = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data"
-    )
+    data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
     learner = OrientationLearner(data_dir=data_dir)
     samples = learner.load_samples("training_samples.jsonl")
 
     if not samples:
-        raise HTTPException(
-            status_code=400, detail="无训练样本，请先通过 /api/orientation/train 提交样本"
-        )
+        raise HTTPException(status_code=400, detail="无训练样本，请先通过 /api/orientation/train 提交样本")
 
     n_positive = sum(1 for s in samples if s.get("is_positive"))
     if n_positive < 2:

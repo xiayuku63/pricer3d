@@ -35,7 +35,6 @@ from typing import Optional
 
 from calculator.orientation_scoring import (
     _score_orientation_3x3,
-    OVERHANG_ANGLE_DEG,
 )
 from calculator.orientation_math import rotation_from_up_vector
 
@@ -138,13 +137,27 @@ class FaceFeatureExtractor:
         except Exception:
             anisotropy = 1.0
 
-        return np.array([
-            float(normal[0]), float(normal[1]), float(normal[2]),
-            area, compactness, float(face_count), area_ratio,
-            z_height, footprint, aspect,
-            overhang_ratio, support_volume, base_contact_area,
-            cog_z, cog_xy_offset, anisotropy,
-        ], dtype=np.float64)
+        return np.array(
+            [
+                float(normal[0]),
+                float(normal[1]),
+                float(normal[2]),
+                area,
+                compactness,
+                float(face_count),
+                area_ratio,
+                z_height,
+                footprint,
+                aspect,
+                overhang_ratio,
+                support_volume,
+                base_contact_area,
+                cog_z,
+                cog_xy_offset,
+                anisotropy,
+            ],
+            dtype=np.float64,
+        )
 
     # ── 内部辅助方法 ──
 
@@ -173,16 +186,19 @@ class FaceFeatureExtractor:
             x_axis /= float(np.linalg.norm(x_axis))
         y_axis = np.cross(normal, x_axis)
 
-        proj_2d = np.column_stack([
-            (verts - centroid) @ x_axis,
-            (verts - centroid) @ y_axis,
-        ])
+        proj_2d = np.column_stack(
+            [
+                (verts - centroid) @ x_axis,
+                (verts - centroid) @ y_axis,
+            ]
+        )
 
         try:
             from scipy.spatial import ConvexHull
+
             if len(proj_2d) >= 3:
                 hull = ConvexHull(proj_2d)
-                hull_area = float(hull.volume)   # 2D convex hull 面积
+                hull_area = float(hull.volume)  # 2D convex hull 面积
                 # 周长 = 各边长度之和
                 hull_verts = proj_2d[hull.vertices]
                 perimeter = 0.0
@@ -217,6 +233,7 @@ class FaceFeatureExtractor:
 
         try:
             from scipy.spatial import ConvexHull
+
             hull = ConvexHull(bottom_xy)
             footprint = float(hull.volume)  # 2D 凸包面积
         except Exception:
@@ -380,7 +397,7 @@ class OrientationLearner:
             class_weight=class_weight,
             max_iter=1000,
             C=1.0,
-            solver='lbfgs',
+            solver="lbfgs",
             random_state=42,
         )
         self.model.fit(X, y)
@@ -396,7 +413,9 @@ class OrientationLearner:
         self._save()
         logger.info(
             "模型已训练: samples=%d, pos=%d, accuracy=%.3f, coef=%s",
-            self._n_samples, self._n_positive, accuracy,
+            self._n_samples,
+            self._n_positive,
+            accuracy,
             str(np.round(self.model.coef_[0], 3).tolist()),
         )
         return accuracy
@@ -444,11 +463,22 @@ class OrientationLearner:
         cog_z, cog_xy_offset, anisotropy
         """
         keys = [
-            "face_normal_x", "face_normal_y", "face_normal_z",
-            "face_area_mm2", "face_compactness", "face_count", "face_area_ratio",
-            "z_height_mm", "bed_footprint_mm2", "bed_aspect_ratio",
-            "overhang_ratio", "support_volume_mm3", "base_contact_area_mm2",
-            "cog_z_mm", "cog_xy_offset_mm", "anisotropy_ratio",
+            "face_normal_x",
+            "face_normal_y",
+            "face_normal_z",
+            "face_area_mm2",
+            "face_compactness",
+            "face_count",
+            "face_area_ratio",
+            "z_height_mm",
+            "bed_footprint_mm2",
+            "bed_aspect_ratio",
+            "overhang_ratio",
+            "support_volume_mm3",
+            "base_contact_area_mm2",
+            "cog_z_mm",
+            "cog_xy_offset_mm",
+            "anisotropy_ratio",
         ]
         try:
             return np.array([float(feats.get(k, 0.0)) for k in keys], dtype=np.float64)
@@ -466,11 +496,22 @@ class OrientationLearner:
             dict with named feature keys
         """
         keys = [
-            "face_normal_x", "face_normal_y", "face_normal_z",
-            "face_area_mm2", "face_compactness", "face_count", "face_area_ratio",
-            "z_height_mm", "bed_footprint_mm2", "bed_aspect_ratio",
-            "overhang_ratio", "support_volume_mm3", "base_contact_area_mm2",
-            "cog_z_mm", "cog_xy_offset_mm", "anisotropy_ratio",
+            "face_normal_x",
+            "face_normal_y",
+            "face_normal_z",
+            "face_area_mm2",
+            "face_compactness",
+            "face_count",
+            "face_area_ratio",
+            "z_height_mm",
+            "bed_footprint_mm2",
+            "bed_aspect_ratio",
+            "overhang_ratio",
+            "support_volume_mm3",
+            "base_contact_area_mm2",
+            "cog_z_mm",
+            "cog_xy_offset_mm",
+            "anisotropy_ratio",
         ]
         return {k: float(feature_array[i]) for i, k in enumerate(keys)}
 
@@ -503,7 +544,8 @@ class OrientationLearner:
             self._accuracy = data.get("accuracy")
             logger.info(
                 "模型已加载: samples=%d, pos=%d, accuracy=%s",
-                self._n_samples, self._n_positive,
+                self._n_samples,
+                self._n_positive,
                 f"{self._accuracy:.3f}" if self._accuracy else "N/A",
             )
         except Exception as e:
@@ -513,6 +555,7 @@ class OrientationLearner:
 
 
 # ── 便捷函数 ──
+
 
 def extract_face_features(mesh: trimesh.Trimesh, cluster: dict) -> np.ndarray:
     """提取单个 coplanar 候选面的 16 维特征的便捷函数。

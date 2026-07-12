@@ -27,9 +27,7 @@ from .config import (
     SMTP_USE_TLS,
     RESEND_API_KEY,
     VERIFY_CODE_TTL_SECONDS,
-    VERIFY_CODE_TTL_SECONDS,
     VERIFY_CODE_MAX_ATTEMPTS,
-    VERIFY_SEND_COOLDOWN_SECONDS,
 )
 from .db import get_db_session
 from .models_orm import User, VerificationCode, LoginFailure
@@ -78,9 +76,10 @@ def _user_to_dict(user) -> dict:
 
 # ---------- password ----------
 
+
 def get_password_hash(password: str) -> str:
     salt = bcrypt.gensalt()
-    return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
+    return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
 
 
 def verify_password(plain_password: str, password_hash: str) -> bool:
@@ -88,6 +87,7 @@ def verify_password(plain_password: str, password_hash: str) -> bool:
 
 
 # ---------- JWT ----------
+
 
 def create_access_token(user_id: int, username: str, expire_hours: Optional[int] = None) -> str:
     hours = expire_hours if expire_hours is not None else JWT_EXPIRE_HOURS
@@ -97,6 +97,7 @@ def create_access_token(user_id: int, username: str, expire_hours: Optional[int]
 
 
 # ---------- user queries ----------
+
 
 def get_user_by_username(username: str):
     with get_db_session() as db:
@@ -143,6 +144,7 @@ def authenticate_user(identifier: str, password: str):
 
 
 # ---------- verification codes ----------
+
 
 def create_verification_code(channel: str, target: str) -> tuple[str, int]:
     code = generate_numeric_code(6)
@@ -213,6 +215,7 @@ def consume_verification_code(channel: str, target: str, code: str) -> bool:
 
 # ---------- SMTP email ----------
 
+
 def is_smtp_configured() -> bool:
     if RESEND_API_KEY:
         return True
@@ -228,9 +231,11 @@ def is_smtp_configured() -> bool:
 def send_email_via_resend(to_email: str, code: str) -> tuple[bool, str]:
     """Send via Resend API. Returns (ok, error_message)."""
     import logging
+
     logger = logging.getLogger(__name__)
     try:
         import resend
+
         resend.api_key = RESEND_API_KEY
         html_body = f"""\
 <div style="max-width:480px;margin:0 auto;padding:24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb">
@@ -241,12 +246,14 @@ def send_email_via_resend(to_email: str, code: str) -> tuple[bool, str]:
   </div>
   <p style="color:#6b7280;font-size:12px;line-height:1.6">有效期：{int(VERIFY_CODE_TTL_SECONDS)} 秒<br>如非本人操作，请忽略本邮件。</p>
 </div>"""
-        resend.Emails.send({
-            "from": "noreply@pricer3d.top",
-            "to": [to_email],
-            "subject": "邮箱验证码 - 3D打印自动报价系统",
-            "html": html_body,
-        })
+        resend.Emails.send(
+            {
+                "from": "noreply@pricer3d.top",
+                "to": [to_email],
+                "subject": "邮箱验证码 - 3D打印自动报价系统",
+                "html": html_body,
+            }
+        )
         return True, ""
     except Exception as e:
         msg = str(e)[:200]
@@ -256,6 +263,7 @@ def send_email_via_resend(to_email: str, code: str) -> tuple[bool, str]:
 
 def send_email_verification_code(to_email: str, code: str) -> None:
     import os
+
     # Resend 优先
     if RESEND_API_KEY:
         ok, err = send_email_via_resend(to_email, code)
@@ -304,8 +312,12 @@ def send_email_verification_code(to_email: str, code: str) -> None:
 
 # ---------- user creation ----------
 
-def create_user(username: str, password: str, email: Optional[str], phone: Optional[str], email_verified: int, phone_verified: int):
+
+def create_user(
+    username: str, password: str, email: Optional[str], phone: Optional[str], email_verified: int, phone_verified: int
+):
     import json
+
     # Hard guard: block duplicates at application layer
     if get_user_by_username(username):
         raise HTTPException(status_code=409, detail="用户名已存在")
@@ -355,6 +367,7 @@ def create_user(username: str, password: str, email: Optional[str], phone: Optio
 
 # ---------- login failure tracking ----------
 
+
 def _login_failure_key_hash(identifier: str) -> str:
     raw = (identifier or "").strip().lower()
     return hashlib.sha256((raw + "|" + JWT_SECRET_KEY).encode("utf-8")).hexdigest()
@@ -385,6 +398,7 @@ def clear_login_failures(identifier: str) -> None:
 
 def record_login_failure(identifier: str) -> tuple[bool, int]:
     from .config import LOGIN_FAILED_MAX_ATTEMPTS, LOGIN_FAILED_WINDOW_SECONDS, LOGIN_LOCK_SECONDS
+
     key_hash = _login_failure_key_hash(identifier)
     now = time.time()
     now_iso = datetime.now(timezone.utc).isoformat()

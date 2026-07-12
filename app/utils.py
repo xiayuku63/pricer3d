@@ -94,7 +94,7 @@ def hash_verify_code(code: str) -> str:
 
 def generate_numeric_code(length: int = 6) -> str:
     length = max(4, min(int(length), 8))
-    upper = 10 ** length
+    upper = 10**length
     return str(secrets.randbelow(upper)).zfill(length)
 
 
@@ -132,7 +132,6 @@ def validate_password_or_raise(password: str) -> str:
 def normalize_materials(raw_materials, fallback_colors: Optional[List[str]] = None):
     if not raw_materials:
         return DEFAULT_MATERIALS
-    effective_fallback_colors = fallback_colors or DEFAULT_COLORS
     normalized = []
     for m in raw_materials:
         name = str(m.get("name") or "").strip()
@@ -149,7 +148,9 @@ def normalize_materials(raw_materials, fallback_colors: Optional[List[str]] = No
             colors = []
             for c in raw_colors:
                 if isinstance(c, dict):
-                    colors.append({"name": str(c.get("name", c.get("hex", ""))).strip(), "hex": str(c.get("hex", "")).strip()})
+                    colors.append(
+                        {"name": str(c.get("name", c.get("hex", ""))).strip(), "hex": str(c.get("hex", "")).strip()}
+                    )
                 else:
                     val = str(c).strip()
                     if val:
@@ -158,7 +159,15 @@ def normalize_materials(raw_materials, fallback_colors: Optional[List[str]] = No
         else:
             fallback = fallback_colors or DEFAULT_COLORS
             colors = [{"name": str(f).strip(), "hex": ""} for f in fallback if str(f).strip()]
-        normalized.append({"name": name, "brand": str(m.get("brand", "Generic") or "Generic").strip(), "density": density, "price_per_kg": price_per_kg, "colors": colors})
+        normalized.append(
+            {
+                "name": name,
+                "brand": str(m.get("brand", "Generic") or "Generic").strip(),
+                "density": density,
+                "price_per_kg": price_per_kg,
+                "colors": colors,
+            }
+        )
     return normalized or DEFAULT_MATERIALS
 
 

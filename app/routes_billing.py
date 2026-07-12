@@ -29,6 +29,7 @@ class BillingMockCompleteRequest(BaseModel):
 
 # ---------- internal helpers ----------
 
+
 def _create_order_no() -> str:
     ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
     rnd = secrets.token_urlsafe(12).replace("-", "").replace("_", "")[:18]
@@ -78,13 +79,18 @@ def _mark_order_paid_and_upgrade(order_no: str, provider_txn_id: str, raw_json: 
         if str(order.status or "") == "paid":
             user = db.query(User).filter(User.id == int(order.user_id)).first()
             level, expires_ts = get_membership_effective(user)
-            return {"status": "paid", "order_no": order_no, "membership_level": level, "membership_expires_at": expires_ts}
+            return {
+                "status": "paid",
+                "order_no": order_no,
+                "membership_level": level,
+                "membership_expires_at": expires_ts,
+            }
         if str(order.status or "") != "created":
             raise HTTPException(status_code=400, detail="订单状态不支持支付")
 
-        plan = db.query(MembershipPlan).filter(
-            MembershipPlan.code == order.plan_code, MembershipPlan.active == 1
-        ).first()
+        plan = (
+            db.query(MembershipPlan).filter(MembershipPlan.code == order.plan_code, MembershipPlan.active == 1).first()
+        )
         if not plan:
             raise HTTPException(status_code=400, detail="套餐不可用")
 
@@ -116,10 +122,16 @@ def _mark_order_paid_and_upgrade(order_no: str, provider_txn_id: str, raw_json: 
         user.membership_level = "member"
         user.membership_expires_at = str(new_expires_ts) if new_expires_ts is not None else None
 
-    return {"status": "paid", "order_no": order_no, "membership_level": "member", "membership_expires_at": new_expires_ts}
+    return {
+        "status": "paid",
+        "order_no": order_no,
+        "membership_level": "member",
+        "membership_expires_at": new_expires_ts,
+    }
 
 
 # ---------- routes ----------
+
 
 async def billing_plans():
     return {"items": _get_active_membership_plans()}
@@ -148,10 +160,21 @@ async def billing_checkout(payload: BillingCheckoutRequest, request: Request, cu
         action="billing.order.created",
         request=request,
         user=current_user,
-        detail={"order_no": order_no, "plan_code": plan["code"], "amount_cny": float(plan["price_cny"] or 0.0), "provider": PAYMENT_PROVIDER},
+        detail={
+            "order_no": order_no,
+            "plan_code": plan["code"],
+            "amount_cny": float(plan["price_cny"] or 0.0),
+            "provider": PAYMENT_PROVIDER,
+        },
     )
     pay_url = f"/pay/mock?order_no={order_no}" if PAYMENT_PROVIDER == "mock" else ""
-    return {"order_no": order_no, "plan": {"code": plan["code"], "name": plan["name"]}, "amount_cny": float(plan["price_cny"] or 0.0), "currency": "CNY", "pay_url": pay_url}
+    return {
+        "order_no": order_no,
+        "plan": {"code": plan["code"], "name": plan["name"]},
+        "amount_cny": float(plan["price_cny"] or 0.0),
+        "currency": "CNY",
+        "pay_url": pay_url,
+    }
 
 
 async def billing_orders(limit: int = 20, offset: int = 0, current_user=Depends(get_current_user)):
@@ -183,7 +206,9 @@ async def billing_orders(limit: int = 20, offset: int = 0, current_user=Depends(
     return {"items": items, "limit": safe_limit, "offset": safe_offset}
 
 
-async def billing_mock_complete(payload: BillingMockCompleteRequest, request: Request, current_user=Depends(get_current_user)):
+async def billing_mock_complete(
+    payload: BillingMockCompleteRequest, request: Request, current_user=Depends(get_current_user)
+):
     order_no = (payload.order_no or "").strip()
     if not order_no:
         raise HTTPException(status_code=400, detail="订单号不合法")
@@ -192,7 +217,11 @@ async def billing_mock_complete(payload: BillingMockCompleteRequest, request: Re
     if not order or int(order.user_id) != int(current_user["id"]):
         raise HTTPException(status_code=404, detail="订单不存在")
     provider_txn_id = f"MOCK{secrets.token_urlsafe(10)}"
-    result = _mark_order_paid_and_upgrade(order_no=order_no, provider_txn_id=provider_txn_id, raw_json={"provider": "mock", "order_no": order_no, "paid_at": datetime.now(timezone.utc).isoformat()})
+    result = _mark_order_paid_and_upgrade(
+        order_no=order_no,
+        provider_txn_id=provider_txn_id,
+        raw_json={"provider": "mock", "order_no": order_no, "paid_at": datetime.now(timezone.utc).isoformat()},
+    )
     write_audit_event(
         action="billing.order.paid",
         request=request,

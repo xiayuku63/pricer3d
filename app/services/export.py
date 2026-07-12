@@ -2,7 +2,6 @@
 
 import csv
 import io
-import json
 import logging
 from datetime import datetime
 from typing import Optional
@@ -126,7 +125,7 @@ async def export_quote_history(
             ws = wb.active
             ws.title = "报价历史"
 
-            header_font = Font(bold=True, size=11)
+            Font(bold=True, size=11)
             header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
             header_font_white = Font(bold=True, size=11, color="FFFFFF")
             thin_border = Border(
@@ -150,7 +149,9 @@ async def export_quote_history(
 
             for col_idx, (_, title) in enumerate(_EXPORT_COLUMNS, 1):
                 max_len = len(title) * 2
-                for row in ws.iter_rows(min_row=2, max_row=min(len(export_rows) + 1, 102), min_col=col_idx, max_col=col_idx):
+                for row in ws.iter_rows(
+                    min_row=2, max_row=min(len(export_rows) + 1, 102), min_col=col_idx, max_col=col_idx
+                ):
                     for cell in row:
                         if cell.value is not None:
                             val_len = len(str(cell.value))
@@ -219,22 +220,24 @@ async def export_quote_pdf(
             )
             items = []
             for r in rows:
-                items.append({
-                    "filename": r.filename or "",
-                    "material": r.material or "",
-                    "color": r.color or "",
-                    "quantity": int(r.quantity or 1),
-                    "volume_cm3": round(float(r.volume_cm3 or 0), 2),
-                    "weight_g": round(float(r.weight_g or 0), 2),
-                    "estimated_time_h": round(float(r.estimated_time_h or 0), 2),
-                    "cost_cny": round(float(r.cost_cny or 0), 2),
-                    "printer_model": r.printer_model or "",
-                    "nozzle_diameter": round(float(r.nozzle_diameter), 2) if r.nozzle_diameter is not None else "",
-                    "layer_height": round(float(r.layer_height), 2) if r.layer_height is not None else 0,
-                    "wall_count": int(r.wall_count) if r.wall_count is not None else 0,
-                    "infill_percent": int(r.infill) if r.infill is not None else 0,
-                    "brand": r.brand or "",
-                })
+                items.append(
+                    {
+                        "filename": r.filename or "",
+                        "material": r.material or "",
+                        "color": r.color or "",
+                        "quantity": int(r.quantity or 1),
+                        "volume_cm3": round(float(r.volume_cm3 or 0), 2),
+                        "weight_g": round(float(r.weight_g or 0), 2),
+                        "estimated_time_h": round(float(r.estimated_time_h or 0), 2),
+                        "cost_cny": round(float(r.cost_cny or 0), 2),
+                        "printer_model": r.printer_model or "",
+                        "nozzle_diameter": round(float(r.nozzle_diameter), 2) if r.nozzle_diameter is not None else "",
+                        "layer_height": round(float(r.layer_height), 2) if r.layer_height is not None else 0,
+                        "wall_count": int(r.wall_count) if r.wall_count is not None else 0,
+                        "infill_percent": int(r.infill) if r.infill is not None else 0,
+                        "brand": r.brand or "",
+                    }
+                )
 
         if not items:
             raise HTTPException(status_code=404, detail="??????????")

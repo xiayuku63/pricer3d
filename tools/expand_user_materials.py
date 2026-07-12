@@ -12,14 +12,14 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from app.material_seed import DEFAULT_COLOR_PALETTE, DEFAULT_MATERIALS
+from app.material_seed import DEFAULT_COLOR_PALETTE, DEFAULT_MATERIALS  # noqa: E402
 
 
 def _color_key(color) -> tuple[str, str]:
     if isinstance(color, dict):
-        return ((color.get('name') or '').strip().lower(), (color.get('hex') or '').strip().lower())
-    raw = str(color or '').strip().lower()
-    return (raw, '')
+        return ((color.get("name") or "").strip().lower(), (color.get("hex") or "").strip().lower())
+    raw = str(color or "").strip().lower()
+    return (raw, "")
 
 
 def merge_colors(existing, default_colors):
@@ -37,24 +37,32 @@ def merge_colors(existing, default_colors):
 
 def merge_material(existing: dict, default: dict) -> dict:
     merged = dict(existing)
-    merged['name'] = existing.get('name') or default.get('name')
-    merged['brand'] = existing.get('brand') or default.get('brand')
-    merged['density'] = existing.get('density') if existing.get('density') not in (None, '') else default.get('density')
-    merged['price_per_kg'] = existing.get('price_per_kg') if existing.get('price_per_kg') not in (None, '') else default.get('price_per_kg')
-    merged['hotend_temp'] = existing.get('hotend_temp') if existing.get('hotend_temp') not in (None, '') else default.get('hotend_temp')
-    merged['bed_temp'] = existing.get('bed_temp') if existing.get('bed_temp') not in (None, '') else default.get('bed_temp')
-    merged['colors'] = merge_colors(existing.get('colors'), default.get('colors'))
+    merged["name"] = existing.get("name") or default.get("name")
+    merged["brand"] = existing.get("brand") or default.get("brand")
+    merged["density"] = existing.get("density") if existing.get("density") not in (None, "") else default.get("density")
+    merged["price_per_kg"] = (
+        existing.get("price_per_kg") if existing.get("price_per_kg") not in (None, "") else default.get("price_per_kg")
+    )
+    merged["hotend_temp"] = (
+        existing.get("hotend_temp") if existing.get("hotend_temp") not in (None, "") else default.get("hotend_temp")
+    )
+    merged["bed_temp"] = (
+        existing.get("bed_temp") if existing.get("bed_temp") not in (None, "") else default.get("bed_temp")
+    )
+    merged["colors"] = merge_colors(existing.get("colors"), default.get("colors"))
     return merged
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument('--db', required=True)
+    parser.add_argument("--db", required=True)
     args = parser.parse_args()
 
-    default_map = {str(item.get('name')).strip().lower(): item for item in DEFAULT_MATERIALS}
+    default_map = {str(item.get("name")).strip().lower(): item for item in DEFAULT_MATERIALS}
     conn = sqlite3.connect(args.db)
-    rows = conn.execute('SELECT id, materials, colors, default_material, default_brand, default_color FROM users').fetchall()
+    rows = conn.execute(
+        "SELECT id, materials, colors, default_material, default_brand, default_color FROM users"
+    ).fetchall()
     updated = 0
     for user_id, materials_json, colors_json, default_material, default_brand, default_color in rows:
         try:
@@ -69,7 +77,7 @@ def main() -> int:
         for item in materials:
             if not isinstance(item, dict):
                 continue
-            name = str(item.get('name') or '').strip()
+            name = str(item.get("name") or "").strip()
             if not name:
                 continue
             key = name.lower()
@@ -86,15 +94,15 @@ def main() -> int:
 
         merged_materials = [merged_by_name[key] for key in order if key in merged_by_name]
         merged_colors = merge_colors(json.loads(colors_json) if colors_json else [], DEFAULT_COLOR_PALETTE)
-        next_default_material = default_material or (merged_materials[0]['name'] if merged_materials else None)
-        next_default_brand = default_brand or (merged_materials[0].get('brand') if merged_materials else None)
+        next_default_material = default_material or (merged_materials[0]["name"] if merged_materials else None)
+        next_default_brand = default_brand or (merged_materials[0].get("brand") if merged_materials else None)
         next_default_color = default_color
         if not next_default_color and merged_colors:
             first = merged_colors[0]
-            next_default_color = first.get('hex') if isinstance(first, dict) else str(first)
+            next_default_color = first.get("hex") if isinstance(first, dict) else str(first)
 
         conn.execute(
-            'UPDATE users SET materials = ?, colors = ?, default_material = ?, default_brand = ?, default_color = ? WHERE id = ?',
+            "UPDATE users SET materials = ?, colors = ?, default_material = ?, default_brand = ?, default_color = ? WHERE id = ?",
             (
                 json.dumps(merged_materials, ensure_ascii=False),
                 json.dumps(merged_colors, ensure_ascii=False),
@@ -108,9 +116,15 @@ def main() -> int:
 
     conn.commit()
     conn.close()
-    print({'updated_users': updated, 'default_material_count': len(DEFAULT_MATERIALS), 'default_color_count': len(DEFAULT_COLOR_PALETTE)})
+    print(
+        {
+            "updated_users": updated,
+            "default_material_count": len(DEFAULT_MATERIALS),
+            "default_color_count": len(DEFAULT_COLOR_PALETTE),
+        }
+    )
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     raise SystemExit(main())

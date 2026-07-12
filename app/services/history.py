@@ -2,7 +2,6 @@
 
 import json
 import logging
-from typing import Optional
 
 from fastapi import HTTPException, Request
 
@@ -10,7 +9,7 @@ from fastapi import Depends
 
 from app.audit import write_audit_event
 from app.db import get_db_session
-from app.deps import get_current_user, get_membership_effective, is_member_user
+from app.deps import get_current_user, is_member_user
 from app.models_orm import QuoteHistory
 
 logger = logging.getLogger(__name__)
@@ -35,29 +34,31 @@ def quote_history(limit: int = 20, offset: int = 0, current_user=Depends(get_cur
         )
         items = []
         for r in rows:
-            items.append({
-                "id": r.id,
-                "filename": r.filename,
-                "material": r.material,
-                "color": r.color,
-                "quantity": r.quantity,
-                "volume_cm3": round(float(r.volume_cm3 or 0), 2),
-                "weight_g": round(float(r.weight_g or 0), 2),
-                "estimated_time_h": round(float(r.estimated_time_h or 0), 2),
-                "cost_cny": round(float(r.cost_cny or 0), 2),
-                "dimensions": r.dimensions,
-                "status": r.status,
-                "error_msg": r.error_msg,
-                "created_at": r.created_at,
-                "printer_model": r.printer_model,
-                "slicer_preset_id": r.slicer_preset_id,
-                "nozzle_diameter": round(float(r.nozzle_diameter), 2) if r.nozzle_diameter is not None else None,
-                "layer_height": round(float(r.layer_height), 2) if r.layer_height is not None else None,
-                "wall_count": r.wall_count,
-                "infill": r.infill,
-                "brand": r.brand,
-                "cost_breakdown": json.loads(r.cost_breakdown) if r.cost_breakdown else None,
-            })
+            items.append(
+                {
+                    "id": r.id,
+                    "filename": r.filename,
+                    "material": r.material,
+                    "color": r.color,
+                    "quantity": r.quantity,
+                    "volume_cm3": round(float(r.volume_cm3 or 0), 2),
+                    "weight_g": round(float(r.weight_g or 0), 2),
+                    "estimated_time_h": round(float(r.estimated_time_h or 0), 2),
+                    "cost_cny": round(float(r.cost_cny or 0), 2),
+                    "dimensions": r.dimensions,
+                    "status": r.status,
+                    "error_msg": r.error_msg,
+                    "created_at": r.created_at,
+                    "printer_model": r.printer_model,
+                    "slicer_preset_id": r.slicer_preset_id,
+                    "nozzle_diameter": round(float(r.nozzle_diameter), 2) if r.nozzle_diameter is not None else None,
+                    "layer_height": round(float(r.layer_height), 2) if r.layer_height is not None else None,
+                    "wall_count": r.wall_count,
+                    "infill": r.infill,
+                    "brand": r.brand,
+                    "cost_breakdown": json.loads(r.cost_breakdown) if r.cost_breakdown else None,
+                }
+            )
     return {"items": items, "total": total, "limit": safe_limit, "offset": safe_offset}
 
 
@@ -66,10 +67,14 @@ def delete_quote_history(id: int, request: Request, current_user=Depends(get_cur
     uid = int(current_user["id"])
     try:
         with get_db_session() as db:
-            row = db.query(QuoteHistory).filter(
-                QuoteHistory.id == int(id),
-                QuoteHistory.user_id == uid,
-            ).first()
+            row = (
+                db.query(QuoteHistory)
+                .filter(
+                    QuoteHistory.id == int(id),
+                    QuoteHistory.user_id == uid,
+                )
+                .first()
+            )
             if row is None:
                 raise HTTPException(status_code=404, detail="报价记录不存在或无权限删除")
             db.delete(row)

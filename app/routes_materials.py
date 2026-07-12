@@ -17,6 +17,7 @@ router = APIRouter(prefix="/api/materials", tags=["materials"])
 
 # ── Brand Schemas ──
 
+
 class BrandResponse(BaseModel):
     id: int
     name: str
@@ -35,6 +36,7 @@ class BrandCreate(BaseModel):
 
 
 # ── Type Schemas ──
+
 
 class TypeResponse(BaseModel):
     id: int
@@ -56,6 +58,7 @@ class TypeCreate(BaseModel):
 
 
 # ── Material Schemas ──
+
 
 class MaterialResponse(BaseModel):
     id: int
@@ -109,6 +112,7 @@ class MaterialUpdate(BaseModel):
 
 # ── Brand Endpoints ──
 
+
 @router.get("/brands", response_model=List[BrandResponse])
 async def list_brands(active_only: bool = Query(True)):
     """获取所有品牌"""
@@ -117,7 +121,7 @@ async def list_brands(active_only: bool = Query(True)):
         if active_only:
             query = query.filter(MaterialBrand.active == 1)
         brands = query.order_by(MaterialBrand.sort_order).all()
-        
+
         return [
             BrandResponse(
                 id=b.id,
@@ -136,12 +140,12 @@ async def list_brands(active_only: bool = Query(True)):
 async def create_brand(data: BrandCreate, user: dict = Depends(get_current_user)):
     """创建品牌（需要登录）"""
     now = datetime.now(timezone.utc).isoformat()
-    
+
     with get_db_session() as db:
         existing = db.query(MaterialBrand).filter(MaterialBrand.name == data.name).first()
         if existing:
             raise HTTPException(status_code=400, detail="品牌名称已存在")
-        
+
         brand = MaterialBrand(
             name=data.name,
             logo_url=data.logo_url,
@@ -151,7 +155,7 @@ async def create_brand(data: BrandCreate, user: dict = Depends(get_current_user)
         )
         db.add(brand)
         db.commit()
-        
+
         return BrandResponse(
             id=brand.id,
             name=brand.name,
@@ -165,6 +169,7 @@ async def create_brand(data: BrandCreate, user: dict = Depends(get_current_user)
 
 # ── Type Endpoints ──
 
+
 @router.get("/types", response_model=List[TypeResponse])
 async def list_types(active_only: bool = Query(True)):
     """获取所有材料类型"""
@@ -173,7 +178,7 @@ async def list_types(active_only: bool = Query(True)):
         if active_only:
             query = query.filter(MaterialType.active == 1)
         types = query.order_by(MaterialType.sort_order).all()
-        
+
         return [
             TypeResponse(
                 id=t.id,
@@ -193,12 +198,12 @@ async def list_types(active_only: bool = Query(True)):
 async def create_type(data: TypeCreate, user: dict = Depends(get_current_user)):
     """创建材料类型（需要登录）"""
     now = datetime.now(timezone.utc).isoformat()
-    
+
     with get_db_session() as db:
         existing = db.query(MaterialType).filter(MaterialType.name == data.name).first()
         if existing:
             raise HTTPException(status_code=400, detail="材料类型名称已存在")
-        
+
         mat_type = MaterialType(
             name=data.name,
             display_name=data.display_name,
@@ -209,7 +214,7 @@ async def create_type(data: TypeCreate, user: dict = Depends(get_current_user)):
         )
         db.add(mat_type)
         db.commit()
-        
+
         return TypeResponse(
             id=mat_type.id,
             name=mat_type.name,
@@ -224,33 +229,28 @@ async def create_type(data: TypeCreate, user: dict = Depends(get_current_user)):
 
 # ── Material Endpoints ──
 
+
 @router.get("", response_model=List[MaterialResponse])
 async def list_materials(
-    brand_id: Optional[int] = Query(None),
-    type_id: Optional[int] = Query(None),
-    active_only: bool = Query(True)
+    brand_id: Optional[int] = Query(None), type_id: Optional[int] = Query(None), active_only: bool = Query(True)
 ):
     """获取材料列表（可按品牌、类型筛选）"""
     with get_db_session() as db:
-        query = db.query(Material, MaterialBrand, MaterialType).join(
-            MaterialBrand, Material.brand_id == MaterialBrand.id
-        ).join(
-            MaterialType, Material.type_id == MaterialType.id
+        query = (
+            db.query(Material, MaterialBrand, MaterialType)
+            .join(MaterialBrand, Material.brand_id == MaterialBrand.id)
+            .join(MaterialType, Material.type_id == MaterialType.id)
         )
-        
+
         if brand_id is not None:
             query = query.filter(Material.brand_id == brand_id)
         if type_id is not None:
             query = query.filter(Material.type_id == type_id)
         if active_only:
             query = query.filter(Material.active == 1)
-        
-        results = query.order_by(
-            MaterialBrand.sort_order,
-            MaterialType.sort_order,
-            Material.name
-        ).all()
-        
+
+        results = query.order_by(MaterialBrand.sort_order, MaterialType.sort_order, Material.name).all()
+
         return [
             MaterialResponse(
                 id=m.id,
@@ -280,15 +280,17 @@ async def list_materials(
 async def get_material(material_id: int):
     """获取单个材料详情"""
     with get_db_session() as db:
-        result = db.query(Material, MaterialBrand, MaterialType).join(
-            MaterialBrand, Material.brand_id == MaterialBrand.id
-        ).join(
-            MaterialType, Material.type_id == MaterialType.id
-        ).filter(Material.id == material_id).first()
-        
+        result = (
+            db.query(Material, MaterialBrand, MaterialType)
+            .join(MaterialBrand, Material.brand_id == MaterialBrand.id)
+            .join(MaterialType, Material.type_id == MaterialType.id)
+            .filter(Material.id == material_id)
+            .first()
+        )
+
         if not result:
             raise HTTPException(status_code=404, detail="材料不存在")
-        
+
         m, b, t = result
         return MaterialResponse(
             id=m.id,
@@ -316,7 +318,7 @@ async def get_material(material_id: int):
 async def create_material(data: MaterialCreate, user: dict = Depends(get_current_user)):
     """创建材料（需要登录）"""
     now = datetime.now(timezone.utc).isoformat()
-    
+
     with get_db_session() as db:
         # 验证品牌和类型存在
         brand = db.query(MaterialBrand).filter(MaterialBrand.id == data.brand_id).first()
@@ -325,16 +327,16 @@ async def create_material(data: MaterialCreate, user: dict = Depends(get_current
         mat_type = db.query(MaterialType).filter(MaterialType.id == data.type_id).first()
         if not mat_type:
             raise HTTPException(status_code=400, detail="材料类型不存在")
-        
+
         # 检查是否已存在
-        existing = db.query(Material).filter(
-            Material.brand_id == data.brand_id,
-            Material.type_id == data.type_id,
-            Material.name == data.name
-        ).first()
+        existing = (
+            db.query(Material)
+            .filter(Material.brand_id == data.brand_id, Material.type_id == data.type_id, Material.name == data.name)
+            .first()
+        )
         if existing:
             raise HTTPException(status_code=400, detail="该品牌下已存在同名材料")
-        
+
         material = Material(
             brand_id=data.brand_id,
             type_id=data.type_id,
@@ -353,7 +355,7 @@ async def create_material(data: MaterialCreate, user: dict = Depends(get_current
         )
         db.add(material)
         db.commit()
-        
+
         return MaterialResponse(
             id=material.id,
             brand_id=material.brand_id,
@@ -377,19 +379,15 @@ async def create_material(data: MaterialCreate, user: dict = Depends(get_current
 
 
 @router.put("/{material_id}", response_model=MaterialResponse)
-async def update_material(
-    material_id: int,
-    data: MaterialUpdate,
-    user: dict = Depends(get_current_user)
-):
+async def update_material(material_id: int, data: MaterialUpdate, user: dict = Depends(get_current_user)):
     """更新材料（需要登录）"""
     now = datetime.now(timezone.utc).isoformat()
-    
+
     with get_db_session() as db:
         material = db.query(Material).filter(Material.id == material_id).first()
         if not material:
             raise HTTPException(status_code=404, detail="材料不存在")
-        
+
         # 更新字段
         update_data = data.dict(exclude_unset=True)
         for field, value in update_data.items():
@@ -398,17 +396,19 @@ async def update_material(
                     setattr(material, field, 1 if value else 0)
                 else:
                     setattr(material, field, value)
-        
+
         material.updated_at = now
         db.commit()
-        
+
         # 重新查询获取品牌和类型名称
-        result = db.query(Material, MaterialBrand, MaterialType).join(
-            MaterialBrand, Material.brand_id == MaterialBrand.id
-        ).join(
-            MaterialType, Material.type_id == MaterialType.id
-        ).filter(Material.id == material_id).first()
-        
+        result = (
+            db.query(Material, MaterialBrand, MaterialType)
+            .join(MaterialBrand, Material.brand_id == MaterialBrand.id)
+            .join(MaterialType, Material.type_id == MaterialType.id)
+            .filter(Material.id == material_id)
+            .first()
+        )
+
         m, b, t = result
         return MaterialResponse(
             id=m.id,
@@ -436,14 +436,14 @@ async def update_material(
 async def delete_material(material_id: int, user: dict = Depends(get_current_user)):
     """删除材料（软删除，设置 active=0）"""
     now = datetime.now(timezone.utc).isoformat()
-    
+
     with get_db_session() as db:
         material = db.query(Material).filter(Material.id == material_id).first()
         if not material:
             raise HTTPException(status_code=404, detail="材料不存在")
-        
+
         material.active = 0
         material.updated_at = now
         db.commit()
-        
+
         return {"message": "材料已禁用", "id": material_id}

@@ -1,6 +1,9 @@
 """STL parsing tests."""
 
-import sys, os, tempfile
+import sys
+import os
+import tempfile
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import numpy as np
@@ -10,19 +13,38 @@ from parser.geometry import calculate_geometry
 
 def _make_cube_stl(size_mm: float = 10.0) -> str:
     """Generate a unit cube STL file, return path."""
-    vertices = np.array([
-        [0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0],
-        [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1],
-    ]) * size_mm
+    vertices = (
+        np.array(
+            [
+                [0, 0, 0],
+                [1, 0, 0],
+                [1, 1, 0],
+                [0, 1, 0],
+                [0, 0, 1],
+                [1, 0, 1],
+                [1, 1, 1],
+                [0, 1, 1],
+            ]
+        )
+        * size_mm
+    )
 
-    faces = np.array([
-        [0, 3, 1], [1, 3, 2],  # bottom
-        [0, 4, 7], [0, 7, 3],  # back
-        [4, 5, 6], [4, 6, 7],  # top
-        [5, 1, 2], [5, 2, 6],  # right
-        [0, 1, 5], [0, 5, 4],  # front
-        [3, 7, 6], [3, 6, 2],  # left
-    ])
+    faces = np.array(
+        [
+            [0, 3, 1],
+            [1, 3, 2],  # bottom
+            [0, 4, 7],
+            [0, 7, 3],  # back
+            [4, 5, 6],
+            [4, 6, 7],  # top
+            [5, 1, 2],
+            [5, 2, 6],  # right
+            [0, 1, 5],
+            [0, 5, 4],  # front
+            [3, 7, 6],
+            [3, 6, 2],  # left
+        ]
+    )
 
     mesh_data = np.zeros(len(faces), dtype=Mesh.dtype)
     mesh_data["vectors"] = vertices[faces]

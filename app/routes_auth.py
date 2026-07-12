@@ -1,25 +1,18 @@
 """Auth routes – captcha, verification, register, login, me."""
 
-import os
 import time
 import secrets
 import logging
-from typing import Optional, List
 
 logger = logging.getLogger(__name__)
 
-from fastapi import Request, Depends, HTTPException
-from fastapi.responses import JSONResponse, Response
+from fastapi import Request, Depends, HTTPException  # noqa: E402
+from fastapi.responses import Response  # noqa: E402
 
-from .schemas.auth import (
-    TokenResponse, CaptchaResponse,
-    VerifyCodeRequest, VerifyCodeConfirmRequest,
-    PasswordResetRequest, PasswordResetConfirmRequest,
-)
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone  # noqa: E402
 
-from .config import (
+from .config import (  # noqa: E402
     CAPTCHA_LENGTH,
     CAPTCHA_TTL_SECONDS,
     VERIFY_CODE_TTL_SECONDS,
@@ -33,18 +26,18 @@ from .config import (
     DEFAULT_PRICING_CONFIG,
     FREE_TOTAL_MODEL_LIMIT,
 )
-from .models import RegisterRequest, LoginRequest, VerifySendRequest, VerifyConfirmRequest, RegisterCheckRequest
-from pydantic import BaseModel, Field
-from .database import get_app_defaults
-from .utils import (
+from .models import RegisterRequest, LoginRequest, VerifySendRequest, VerifyConfirmRequest, RegisterCheckRequest  # noqa: E402
+from pydantic import BaseModel, Field  # noqa: E402
+from .database import get_app_defaults  # noqa: E402
+from .utils import (  # noqa: E402
     normalize_email,
     normalize_phone,
     validate_username_or_raise,
     validate_password_or_raise,
     get_client_ip,
 )
-from .captcha import captcha_store, generate_captcha_text, captcha_image_bytes, verify_captcha_or_raise
-from .auth import (
+from .captcha import captcha_store, generate_captcha_text, captcha_image_bytes, verify_captcha_or_raise  # noqa: E402
+from .auth import (  # noqa: E402
     authenticate_user,
     create_access_token,
     create_user,
@@ -61,7 +54,7 @@ from .auth import (
     record_login_failure,
     _login_failure_key_hash,
 )
-from .deps import (
+from .deps import (  # noqa: E402
     get_current_user,
     require_legal_acceptance_or_raise,
     record_legal_acceptance,
@@ -70,8 +63,8 @@ from .deps import (
     mask_email,
     mask_phone,
 )
-from .audit import write_audit_event
-from .middleware import rate_limiter
+from .audit import write_audit_event  # noqa: E402
+from .middleware import rate_limiter  # noqa: E402
 
 
 def normalize_verify_target(channel: str, target: str) -> str:
@@ -85,13 +78,18 @@ def normalize_verify_target(channel: str, target: str) -> str:
 
 # ---------- Captcha ----------
 
+
 async def get_captcha(request: Request):
     text = generate_captcha_text(CAPTCHA_LENGTH)
     captcha_id = secrets.token_urlsafe(24)
     expires_at = time.time() + CAPTCHA_TTL_SECONDS
     ct, img = captcha_image_bytes(text)
     captcha_store.put(captcha_id=captcha_id, answer=text, expires_at=expires_at, image_bytes=img, image_content_type=ct)
-    resp = {"captcha_id": captcha_id, "image_url": f"/api/auth/captcha/image/{captcha_id}", "expires_in": CAPTCHA_TTL_SECONDS}
+    resp = {
+        "captcha_id": captcha_id,
+        "image_url": f"/api/auth/captcha/image/{captcha_id}",
+        "expires_in": CAPTCHA_TTL_SECONDS,
+    }
     if SHOW_DEV_CODES:
         resp["dev_answer"] = text
     return resp
@@ -106,13 +104,18 @@ async def get_captcha_image(captcha_id: str):
 
 # ---------- Verification ----------
 
+
 async def send_verify_code(payload: VerifySendRequest, request: Request):
     channel = (payload.channel or "").strip().lower()
     target = normalize_verify_target(channel, payload.target)
     client_ip = get_client_ip(request)
-    if not rate_limiter.is_allowed(f"verify_send_ip_cooldown:{client_ip}", 1, window_seconds=VERIFY_SEND_COOLDOWN_SECONDS):
+    if not rate_limiter.is_allowed(
+        f"verify_send_ip_cooldown:{client_ip}", 1, window_seconds=VERIFY_SEND_COOLDOWN_SECONDS
+    ):
         raise HTTPException(status_code=429, detail="请求过于频繁，请稍后再试")
-    if not rate_limiter.is_allowed(f"verify_send_target_cooldown:{channel}:{target}", 1, window_seconds=VERIFY_SEND_COOLDOWN_SECONDS):
+    if not rate_limiter.is_allowed(
+        f"verify_send_target_cooldown:{channel}:{target}", 1, window_seconds=VERIFY_SEND_COOLDOWN_SECONDS
+    ):
         raise HTTPException(status_code=429, detail="请求过于频繁，请稍后再试")
     code, row_id = create_verification_code(channel=channel, target=target)
     if channel == "email":
@@ -121,7 +124,13 @@ async def send_verify_code(payload: VerifySendRequest, request: Request):
                 delete_verification_code_row(row_id)
                 raise HTTPException(status_code=500, detail="邮件服务未配置，暂无法发送邮箱验证码")
             # dev: SMTP 未配置，返回 dev_code 供开发使用
-            resp = {"status": "sent", "channel": channel, "target": target, "expires_in": VERIFY_CODE_TTL_SECONDS, "email_warning": "SMTP 未配置，邮件不会真实发送"}
+            resp = {
+                "status": "sent",
+                "channel": channel,
+                "target": target,
+                "expires_in": VERIFY_CODE_TTL_SECONDS,
+                "email_warning": "SMTP 未配置，邮件不会真实发送",
+            }
             if SHOW_DEV_CODES:
                 resp["dev_code"] = code
             return resp
@@ -134,7 +143,13 @@ async def send_verify_code(payload: VerifySendRequest, request: Request):
                 delete_verification_code_row(row_id)
                 raise HTTPException(status_code=500, detail=f"邮箱验证码发送失败：{err_msg}")
             # dev: 继续返回 dev_code，不阻塞流程
-            resp = {"status": "sent", "channel": channel, "target": target, "expires_in": VERIFY_CODE_TTL_SECONDS, "email_warning": err_msg}
+            resp = {
+                "status": "sent",
+                "channel": channel,
+                "target": target,
+                "expires_in": VERIFY_CODE_TTL_SECONDS,
+                "email_warning": err_msg,
+            }
             if SHOW_DEV_CODES:
                 resp["dev_code"] = code
             return resp
@@ -169,6 +184,7 @@ async def confirm_verify_code(payload: VerifyConfirmRequest, request: Request):
 
 # ---------- Register Check ----------
 
+
 async def check_register_exists(payload: RegisterCheckRequest):
     field = (payload.field or "").strip().lower()
     raw_value = (payload.value or "").strip()
@@ -197,6 +213,7 @@ async def check_register_exists(payload: RegisterCheckRequest):
 
 
 # ---------- Register ----------
+
 
 async def register(payload: RegisterRequest, request: Request):
     verify_captcha_or_raise(payload.captcha_id, payload.captcha_code)
@@ -231,7 +248,9 @@ async def register(payload: RegisterRequest, request: Request):
     else:
         raise HTTPException(status_code=400, detail="不支持的注册方式")
 
-    user = create_user(username, password, email=email, phone=phone, email_verified=email_verified, phone_verified=phone_verified)
+    user = create_user(
+        username, password, email=email, phone=phone, email_verified=email_verified, phone_verified=phone_verified
+    )
     write_audit_event(
         action="auth.register",
         request=request,
@@ -257,6 +276,7 @@ async def register(payload: RegisterRequest, request: Request):
 
 
 # ---------- Login ----------
+
 
 async def login(payload: LoginRequest, request: Request):
     verify_captcha_or_raise(payload.captcha_id, payload.captcha_code)
@@ -290,7 +310,10 @@ async def login(payload: LoginRequest, request: Request):
                 action="auth.login_locked",
                 request=request,
                 user=None,
-                detail={"key_hash_prefix": _login_failure_key_hash(payload.identifier)[:12], "retry_after_s": remaining2},
+                detail={
+                    "key_hash_prefix": _login_failure_key_hash(payload.identifier)[:12],
+                    "retry_after_s": remaining2,
+                },
             )
             raise HTTPException(
                 status_code=429,
@@ -328,6 +351,7 @@ async def login(payload: LoginRequest, request: Request):
 
 # ---------- Admin Login (no captcha, no legal, dev only) ----------
 
+
 async def admin_login(request: Request):
     """Admin quick login — no captcha, no legal acceptance. Auto-creates admin user.
     Only available in development environment."""
@@ -353,22 +377,25 @@ async def admin_login(request: Request):
         accepted_at = datetime.now(timezone.utc).isoformat()
         from .db import get_db_session
         from .models_orm import User as UserORM
+
         with get_db_session() as db:
-            db.add(UserORM(
-                username=admin_username,
-                password_hash=password_hash,
-                created_at=created_at,
-                materials=materials_json,
-                colors=colors_json,
-                pricing_config=pricing_json,
-                email_verified=0,
-                phone_verified=0,
-                membership_level="free",
-                terms_accepted_at=accepted_at,
-                privacy_accepted_at=accepted_at,
-                terms_version="v1",
-                privacy_version="v1",
-            ))
+            db.add(
+                UserORM(
+                    username=admin_username,
+                    password_hash=password_hash,
+                    created_at=created_at,
+                    materials=materials_json,
+                    colors=colors_json,
+                    pricing_config=pricing_json,
+                    email_verified=0,
+                    phone_verified=0,
+                    membership_level="free",
+                    terms_accepted_at=accepted_at,
+                    privacy_accepted_at=accepted_at,
+                    terms_version="v1",
+                    privacy_version="v1",
+                )
+            )
             db.commit()
         user = get_user_by_username(admin_username)
         if not user:
@@ -400,8 +427,10 @@ async def admin_login(request: Request):
 
 # ---------- Me ----------
 
+
 async def auth_me(current_user=Depends(get_current_user)):
     import logging
+
     logger = logging.getLogger(__name__)
     try:
         level, expires_ts = get_membership_effective(current_user)
@@ -412,11 +441,17 @@ async def auth_me(current_user=Depends(get_current_user)):
             from .db import get_db_session
             from .models_orm import QuoteHistory
             from sqlalchemy import func as sqlfunc
+
             with get_db_session() as db:
-                model_count_used = db.query(sqlfunc.count(QuoteHistory.id)).filter(
-                    QuoteHistory.user_id == current_user["id"],
-                    QuoteHistory.status == "success",
-                ).scalar() or 0
+                model_count_used = (
+                    db.query(sqlfunc.count(QuoteHistory.id))
+                    .filter(
+                        QuoteHistory.user_id == current_user["id"],
+                        QuoteHistory.status == "success",
+                    )
+                    .scalar()
+                    or 0
+                )
             model_count_limit = FREE_TOTAL_MODEL_LIMIT
         return {
             "id": current_user["id"],
@@ -439,6 +474,7 @@ async def auth_me(current_user=Depends(get_current_user)):
 
 
 # ── Password Reset ──
+
 
 class ResetRequestModel(BaseModel):
     email: str = Field(..., min_length=3, max_length=254)
@@ -510,9 +546,11 @@ async def password_reset_confirm(payload: ResetConfirmModel, request: Request):
         raise HTTPException(status_code=404, detail="用户不存在")
 
     from .auth import get_password_hash
+
     new_hash = get_password_hash(new_password)
     from .db import get_db_session
     from .models_orm import User as UserORM
+
     with get_db_session() as db:
         db.query(UserORM).filter(UserORM.id == int(user["id"])).update({"password_hash": new_hash})
         db.commit()

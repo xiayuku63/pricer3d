@@ -46,7 +46,7 @@ def analyze_gcode_output(output_gcode: str) -> dict | None:
             """Get setting and strip trailing suffix (e.g. '%' from fill_density)."""
             val = _gs(keys)
             if val is not None and isinstance(val, str) and val.endswith(suffix):
-                val = val[:-len(suffix)]
+                val = val[: -len(suffix)]
             return val
 
         core_params = {

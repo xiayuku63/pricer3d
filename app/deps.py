@@ -9,7 +9,7 @@ from fastapi import Depends
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 
-from .config import JWT_SECRET_KEY, JWT_ALGORITHM, MEMBER_DISCOUNT_PERCENT, ADMIN_USERNAMES, TERMS_VERSION, PRIVACY_VERSION
+from .config import JWT_SECRET_KEY, JWT_ALGORITHM, ADMIN_USERNAMES, TERMS_VERSION, PRIVACY_VERSION
 from .db import get_db_session
 from .models_orm import User
 from .auth import get_user_by_id
@@ -111,4 +111,4 @@ def mask_phone(value: Optional[str]) -> Optional[str]:
 
 
 # Need re for mask_phone
-import re
+import re  # noqa: E402

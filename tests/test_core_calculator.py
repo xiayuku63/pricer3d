@@ -1,6 +1,9 @@
 """calculator/cost.py 核心计算模块测试 — 覆盖纯函数、边界条件、异常场景。"""
 
-import sys, os, math
+import sys
+import os
+import math
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
@@ -12,7 +15,6 @@ from calculator.cost import (
     merge_pricing_config,
     with_formula_aliases,
     calculate_cost,
-    FORMULA_ALIAS_TO_CANONICAL,
     FORMULA_CANONICAL_VARS,
 )
 
@@ -305,11 +307,13 @@ class TestMergePricingConfigExtended:
 
     def test_override_multiple_values(self):
         """同时覆盖多个值。"""
-        result = merge_pricing_config({
-            "machine_hourly_rate_cny": 30.0,
-            "setup_fee_cny": 100.0,
-            "min_job_fee_cny": 50.0,
-        })
+        result = merge_pricing_config(
+            {
+                "machine_hourly_rate_cny": 30.0,
+                "setup_fee_cny": 100.0,
+                "min_job_fee_cny": 50.0,
+            }
+        )
         assert result["machine_hourly_rate_cny"] == 30.0
         assert result["setup_fee_cny"] == 100.0
         assert result["min_job_fee_cny"] == 50.0
@@ -369,15 +373,17 @@ class TestCalculateCost:
         cfg = dict(DEFAULT_CFG)
         cfg["use_prusaslicer"] = 0
         cfg["support_price_per_g"] = 0.0
-        cfg["unit_cost_formula"] = "((effective_weight_g * (price_per_kg / 1000.0)) + (unit_time_h * machine_hourly_rate_cny) + post_process_fee_per_part_cny) + support_cost_per_part_cny"
+        cfg["unit_cost_formula"] = (
+            "((effective_weight_g * (price_per_kg / 1000.0)) + (unit_time_h * machine_hourly_rate_cny) + post_process_fee_per_part_cny) + support_cost_per_part_cny"
+        )
         cfg["total_cost_formula"] = "max((unit_cost_cny * quantity) + setup_fee_cny, min_job_fee_cny)"
         return cfg
 
     def test_basic_pla_part(self):
         """标准 PLA 零件报价。"""
         unit_cost, weight, time_h, total, eff_w, total_time, bd = calculate_cost(
-            volume_mm3=100000,      # 100 cm³
-            surface_area_mm2=10000, # 100 cm²
+            volume_mm3=100000,  # 100 cm³
+            surface_area_mm2=10000,  # 100 cm²
             material="PLA",
             layer_height_mm=0.2,
             infill_percent=20,
@@ -393,21 +399,15 @@ class TestCalculateCost:
 
     def test_quantity_multiplier(self):
         """多数量应倍增总成本。"""
-        _, _, _, total1, _, _, _ = calculate_cost(
-            100000, 10000, "PLA", 0.2, 20, [self.PLA], self._default_cfg(), 1
-        )
-        _, _, _, total10, _, _, _ = calculate_cost(
-            100000, 10000, "PLA", 0.2, 20, [self.PLA], self._default_cfg(), 10
-        )
+        _, _, _, total1, _, _, _ = calculate_cost(100000, 10000, "PLA", 0.2, 20, [self.PLA], self._default_cfg(), 1)
+        _, _, _, total10, _, _, _ = calculate_cost(100000, 10000, "PLA", 0.2, 20, [self.PLA], self._default_cfg(), 10)
         assert total10 > total1 * 5  # 大致 10x（不含 setup fee 差异）
 
     def test_setup_fee_applied(self):
         """上机费应计入总价。"""
         cfg = self._default_cfg()
         cfg["setup_fee_cny"] = 50.0
-        _, _, _, total_with, _, _, _ = calculate_cost(
-            100000, 10000, "PLA", 0.2, 20, [self.PLA], cfg, 1
-        )
+        _, _, _, total_with, _, _, _ = calculate_cost(100000, 10000, "PLA", 0.2, 20, [self.PLA], cfg, 1)
         _, _, _, total_without, _, _, _ = calculate_cost(
             100000, 10000, "PLA", 0.2, 20, [self.PLA], self._default_cfg(), 1
         )
@@ -418,7 +418,14 @@ class TestCalculateCost:
         cfg = self._default_cfg()
         cfg["min_job_fee_cny"] = 1000.0
         _, _, _, total, _, _, _ = calculate_cost(
-            100, 10, "PLA", 0.2, 20, [self.PLA], cfg, 1  # 极小模型
+            100,
+            10,
+            "PLA",
+            0.2,
+            20,
+            [self.PLA],
+            cfg,
+            1,  # 极小模型
         )
         assert total >= 1000.0
 
@@ -434,16 +441,13 @@ class TestCalculateCost:
     def test_unknown_material_falls_back(self):
         """未知材料名应回退到默认材料。"""
         unit_cost, weight, _, total, _, _, _ = calculate_cost(
-            100000, 10000, "NONEXISTENT_MATERIAL", 0.2, 20,
-            [self.PLA], self._default_cfg(), 1
+            100000, 10000, "NONEXISTENT_MATERIAL", 0.2, 20, [self.PLA], self._default_cfg(), 1
         )
         assert unit_cost > 0  # 应该仍然能计算
 
     def test_breakdown_structure(self):
         """返回的 breakdown 字典应包含关键字段。"""
-        *_, bd = calculate_cost(
-            100000, 10000, "PLA", 0.2, 20, [self.PLA], self._default_cfg(), 1
-        )
+        *_, bd = calculate_cost(100000, 10000, "PLA", 0.2, 20, [self.PLA], self._default_cfg(), 1)
         assert isinstance(bd, dict)
         assert "material_cost_cny" in bd
         assert "machine_cost_cny" in bd
@@ -453,21 +457,13 @@ class TestCalculateCost:
 
     def test_higher_infill_increases_weight(self):
         """更高填充率应增加有效重量。"""
-        _, w_low, _, _, _, _, _ = calculate_cost(
-            100000, 10000, "PLA", 0.2, 10, [self.PLA], self._default_cfg(), 1
-        )
-        _, w_high, _, _, _, _, _ = calculate_cost(
-            100000, 10000, "PLA", 0.2, 80, [self.PLA], self._default_cfg(), 1
-        )
+        _, w_low, _, _, _, _, _ = calculate_cost(100000, 10000, "PLA", 0.2, 10, [self.PLA], self._default_cfg(), 1)
+        _, w_high, _, _, _, _, _ = calculate_cost(100000, 10000, "PLA", 0.2, 80, [self.PLA], self._default_cfg(), 1)
         # fill percent affects time estimation which indirectly affects cost,
         # but weight is volume-based (doesn't change with infill for estimation)
         # Let's verify the time is higher instead
-        _, _, t_low, _, _, _, _ = calculate_cost(
-            100000, 10000, "PLA", 0.2, 10, [self.PLA], self._default_cfg(), 1
-        )
-        _, _, t_high, _, _, _, _ = calculate_cost(
-            100000, 10000, "PLA", 0.2, 80, [self.PLA], self._default_cfg(), 1
-        )
+        _, _, t_low, _, _, _, _ = calculate_cost(100000, 10000, "PLA", 0.2, 10, [self.PLA], self._default_cfg(), 1)
+        _, _, t_high, _, _, _, _ = calculate_cost(100000, 10000, "PLA", 0.2, 80, [self.PLA], self._default_cfg(), 1)
         assert t_high >= t_low
 
     def test_custom_pricing_formula(self):
@@ -475,9 +471,7 @@ class TestCalculateCost:
         cfg = self._default_cfg()
         cfg["unit_cost_formula"] = "effective_weight_g * price_per_kg / 1000"
         cfg["total_cost_formula"] = "unit_cost_cny * quantity"
-        unit_cost, weight, _, total, _, _, bd = calculate_cost(
-            100000, 10000, "PLA", 0.2, 20, [self.PLA], cfg, 3
-        )
+        unit_cost, weight, _, total, _, _, bd = calculate_cost(100000, 10000, "PLA", 0.2, 20, [self.PLA], cfg, 3)
         # unit_cost = effective_weight * 80 / 1000
         assert unit_cost > 0
         assert total > 0
@@ -487,9 +481,7 @@ class TestCalculateCost:
         """后处理费应加入单件成本。"""
         cfg = self._default_cfg()
         cfg["post_process_fee_per_part_cny"] = 25.0
-        unit_cost_pp, _, _, _, _, _, _ = calculate_cost(
-            100000, 10000, "PLA", 0.2, 20, [self.PLA], cfg, 1
-        )
+        unit_cost_pp, _, _, _, _, _, _ = calculate_cost(100000, 10000, "PLA", 0.2, 20, [self.PLA], cfg, 1)
         unit_cost_no_pp, _, _, _, _, _, _ = calculate_cost(
             100000, 10000, "PLA", 0.2, 20, [self.PLA], self._default_cfg(), 1
         )
@@ -501,20 +493,14 @@ class TestCalculateCost:
         cfg_no_waste["material_waste_percent"] = 0.0
         cfg_with_waste = self._default_cfg()
         cfg_with_waste["material_waste_percent"] = 20.0
-        _, w_no, _, _, ew_no, _, _ = calculate_cost(
-            100000, 10000, "PLA", 0.2, 20, [self.PLA], cfg_no_waste, 1
-        )
-        _, w_with, _, _, ew_with, _, _ = calculate_cost(
-            100000, 10000, "PLA", 0.2, 20, [self.PLA], cfg_with_waste, 1
-        )
+        _, w_no, _, _, ew_no, _, _ = calculate_cost(100000, 10000, "PLA", 0.2, 20, [self.PLA], cfg_no_waste, 1)
+        _, w_with, _, _, ew_with, _, _ = calculate_cost(100000, 10000, "PLA", 0.2, 20, [self.PLA], cfg_with_waste, 1)
         assert ew_with > ew_no
 
     def test_support_cost_per_part(self):
         """支撑费应加入成本。"""
         cfg = self._default_cfg()
         cfg["support_price_per_g"] = 0.5
-        *_, bd_with_support = calculate_cost(
-            100000, 10000, "PLA", 0.2, 20, [self.PLA], cfg, 1
-        )
+        *_, bd_with_support = calculate_cost(100000, 10000, "PLA", 0.2, 20, [self.PLA], cfg, 1)
         # support_weight_g_per_part is 0 without slicer, but support_cost_per_part_cny should be in breakdown
         assert "support_cost_per_part_cny" in bd_with_support

@@ -20,7 +20,7 @@ import math
 import logging
 import os
 from dataclasses import dataclass, field
-from typing import Optional, Sequence
+from typing import Optional
 
 import numpy as np
 import trimesh
@@ -44,6 +44,7 @@ logger = logging.getLogger(__name__)
 # 配置数据类
 # ═══════════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class SAConfig:
     """模拟退火参数配置.
@@ -59,6 +60,7 @@ class SAConfig:
         auto_calibrate_T: 是否用随机采样自动校准T_init
         calibrate_samples: 自动校准时采样的随机朝向数
     """
+
     T_init: float = 1.0
     T_min: float = 1e-3
     cooling_rate: float = 0.95
@@ -77,6 +79,7 @@ class SACostWeights:
     代价公式: cost = w_support*S + w_time*T + w_stability*(1-B)
     其中 S=支撑归一化值, T=时间归一化值, B=热床稳定性(0~1)
     """
+
     w_support: float = 0.40
     w_time: float = 0.25
     w_stability: float = 0.35
@@ -94,6 +97,7 @@ class SAResult:
         euler_angles_deg: 欧拉角 {x, y, z}
         metrics: 详细指标 (兼容现有格式)
     """
+
     R_opt: np.ndarray
     cost: float
     cost_components: dict
@@ -109,6 +113,7 @@ class SAResult:
 # ═══════════════════════════════════════════════════════════════════════
 # BedStabilityAnalyzer — Shapely 2D热床投影分析
 # ═══════════════════════════════════════════════════════════════════════
+
 
 class BedStabilityAnalyzer:
     """Shapely 2D热床投影稳定性分析器.
@@ -135,12 +140,12 @@ class BedStabilityAnalyzer:
         try:
             from shapely import convex_hull as _ch_fn
             from shapely.geometry import MultiPoint as _mp_cls
+
             self._convex_hull_fn = _ch_fn
             self._multipoint_cls = _mp_cls
         except ImportError:
             self._use_shapely = False
-            logger.warning("Shapely不可用，热床稳定性降级为朴素XY矩形分析。"
-                           "安装: pip install 'shapely>=2.0,<3.0'")
+            logger.warning("Shapely不可用，热床稳定性降级为朴素XY矩形分析。安装: pip install 'shapely>=2.0,<3.0'")
 
     # ── 底部顶点提取 ──
 
@@ -205,7 +210,7 @@ class BedStabilityAnalyzer:
             rect = hull.minimum_rotated_rectangle
 
             # 退化情况：投影点共线时 min_rotated_rect 返回 LineString
-            if rect.geom_type == 'LineString' or rect.area < 1e-9:
+            if rect.geom_type == "LineString" or rect.area < 1e-9:
                 return (0.0, 0.0, 0.0, 0.0)
 
             # 提取矩形顶点坐标
@@ -214,7 +219,7 @@ class BedStabilityAnalyzer:
             edges = np.diff(np.vstack([rect_coords, rect_coords[0]]), axis=0)[:4]
             lengths = np.linalg.norm(edges, axis=1)
             # 矩形有两对平行边，取两个不同长度（正方形则相同）
-            unique_lengths = sorted(set(round(l, 6) for l in lengths), reverse=True)
+            unique_lengths = sorted(set(round(length_val, 6) for length_val in lengths), reverse=True)
             w = unique_lengths[0] if len(unique_lengths) > 0 else 0.0
             h = unique_lengths[1] if len(unique_lengths) > 1 else w  # 正方形: w==h
             if w < h:
@@ -318,6 +323,7 @@ class BedStabilityAnalyzer:
 # SimulatedAnnealingOptimizer — SA主优化器
 # ═══════════════════════════════════════════════════════════════════════
 
+
 class SimulatedAnnealingOptimizer:
     """模拟退火朝向优化器.
 
@@ -349,16 +355,14 @@ class SimulatedAnnealingOptimizer:
 
         # 预计算归一化参考值
         vertices = np.asarray(mesh.vertices, dtype=np.float64)
-        self._max_dim = float(np.linalg.norm(
-            vertices.max(axis=0) - vertices.min(axis=0)
-        ))
+        self._max_dim = float(np.linalg.norm(vertices.max(axis=0) - vertices.min(axis=0)))
         if self._max_dim < 1e-9:
             self._max_dim = 1.0
 
         # 支撑体积归一化参考: bounding sphere体积 × 0.5
         center = (vertices.max(axis=0) + vertices.min(axis=0)) / 2.0
         max_radius = float(np.max(np.linalg.norm(vertices - center, axis=1)))
-        sphere_vol = (4.0 / 3.0) * math.pi * (max_radius ** 3)
+        sphere_vol = (4.0 / 3.0) * math.pi * (max_radius**3)
         self._support_norm = max(sphere_vol * 0.5, 1e-3)
 
         # BedStabilityAnalyzer 缓存
@@ -390,11 +394,7 @@ class SimulatedAnnealingOptimizer:
         # 热床稳定性
         B = self._get_bed_stability(R)
 
-        cost = (
-            self.weights.w_support * S
-            + self.weights.w_time * T
-            + self.weights.w_stability * (1.0 - B)
-        )
+        cost = self.weights.w_support * S + self.weights.w_time * T + self.weights.w_stability * (1.0 - B)
         return float(cost)
 
     def _cost_detail(self, R: np.ndarray) -> dict:
@@ -431,8 +431,7 @@ class SimulatedAnnealingOptimizer:
     def _get_bed_stability(self, R: np.ndarray) -> float:
         """获取给定旋转的热床稳定性评分 (带缓存)."""
         R_bytes = R.tobytes()
-        if (self._bed_analyzer is None
-                or hash(R_bytes) != self._bed_analyzer_R_hash):
+        if self._bed_analyzer is None or hash(R_bytes) != self._bed_analyzer_R_hash:
             self._bed_analyzer = BedStabilityAnalyzer(self.mesh, R)
             self._bed_analyzer_R_hash = hash(R_bytes)
         return self._bed_analyzer.stability_score()
@@ -510,7 +509,7 @@ class SimulatedAnnealingOptimizer:
         if use_coplanar:
             clusters = cluster_coplanar_faces(self.mesh)
             if clusters:
-                best_cost = float('inf')
+                best_cost = float("inf")
                 best_R = np.eye(3)
                 for cluster in clusters:
                     normal = np.array(cluster["normal"], dtype=np.float64)
@@ -531,7 +530,7 @@ class SimulatedAnnealingOptimizer:
 
         # Fibonacci球面采样兜底
         fib = fibonacci_sphere_sampling(64)
-        best_cost = float('inf')
+        best_cost = float("inf")
         best_R = np.eye(3)
         for up in fib:
             if up[2] < 0:
@@ -573,8 +572,7 @@ class SimulatedAnnealingOptimizer:
 
     # ── 主优化循环 ──
 
-    def optimize(self, R_init: Optional[np.ndarray] = None,
-                 use_coplanar_init: bool = True) -> SAResult:
+    def optimize(self, R_init: Optional[np.ndarray] = None, use_coplanar_init: bool = True) -> SAResult:
         """执行模拟退火优化.
 
         Args:
@@ -596,7 +594,10 @@ class SimulatedAnnealingOptimizer:
 
         logger.info(
             "SA优化开始: T_init=%.4f, max_iter=%d, patience=%d, cooling=%.3f",
-            T, self.config.max_iter, self.config.patience, self.config.cooling_rate,
+            T,
+            self.config.max_iter,
+            self.config.patience,
+            self.config.cooling_rate,
         )
 
         # 2. 主循环
@@ -621,12 +622,14 @@ class SimulatedAnnealingOptimizer:
                 no_improve += 1
 
             # 记录历史
-            history.append({
-                "iteration": k,
-                "temperature": round(T, 6),
-                "cost_current": round(cost_current, 6),
-                "cost_best": round(cost_best, 6),
-            })
+            history.append(
+                {
+                    "iteration": k,
+                    "temperature": round(T, 6),
+                    "cost_current": round(cost_current, 6),
+                    "cost_best": round(cost_best, 6),
+                }
+            )
 
             # 温度衰减
             T *= self.config.cooling_rate
@@ -660,7 +663,8 @@ class SimulatedAnnealingOptimizer:
 
         logger.info(
             "SA优化完成: cost=%.4f, iter=%d, euler=(%.1f, %.1f, %.1f)",
-            cost_best, len(history),
+            cost_best,
+            len(history),
             result.euler_angles_deg.get("x", 0),
             result.euler_angles_deg.get("y", 0),
             result.euler_angles_deg.get("z", 0),
@@ -672,6 +676,7 @@ class SimulatedAnnealingOptimizer:
 # 便捷函数 — 与 get_best_face_for_slicing() 兼容的入口
 # ═══════════════════════════════════════════════════════════════════════
 
+
 def _load_mesh_sa(model_path: str) -> trimesh.Trimesh:
     """加载STL模型文件 (与 orientation.py 中 _load_mesh 相同逻辑)."""
     ext = os.path.splitext(model_path)[1].lower()
@@ -679,11 +684,14 @@ def _load_mesh_sa(model_path: str) -> trimesh.Trimesh:
     if ext in (".stp", ".step"):
         import tempfile
         import subprocess
+
         fd, _tmp = tempfile.mkstemp(suffix=".stl", prefix="p3d_sa_step_")
         os.close(fd)
         result = subprocess.run(
             ["prusa-slicer", "--export-stl", "--output", _tmp, model_path],
-            capture_output=True, text=True, timeout=120,
+            capture_output=True,
+            text=True,
+            timeout=120,
         )
         if result.returncode != 0 or not os.path.exists(_tmp):
             if _tmp and os.path.exists(_tmp):
@@ -700,12 +708,12 @@ def _load_mesh_sa(model_path: str) -> trimesh.Trimesh:
             mesh = trimesh.util.concatenate(meshes)
         if not isinstance(mesh, trimesh.Trimesh) or mesh.vertices.shape[0] == 0:
             raise ValueError(f"无法加载模型: {model_path}")
-        if (not hasattr(mesh, 'face_normals')
-                or mesh.face_normals is None
-                or len(mesh.face_normals) == 0):
+        if not hasattr(mesh, "face_normals") or mesh.face_normals is None or len(mesh.face_normals) == 0:
             mesh = trimesh.Trimesh(
-                vertices=mesh.vertices, faces=mesh.faces,
-                process=True, validate=True,
+                vertices=mesh.vertices,
+                faces=mesh.faces,
+                process=True,
+                validate=True,
             )
         return mesh
     finally:
@@ -759,6 +767,7 @@ def optimize_orientation_sa(
 
     # 应用旋转并导出STL
     from calculator.orientation import apply_orientation_to_mesh
+
     oriented_path = apply_orientation_to_mesh(model_path, R_opt)
 
     # 归一化得分: cost ∈ [0, ~1.5], 映射到 [0, 100]

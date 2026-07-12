@@ -80,7 +80,9 @@ async def get_user_settings(current_user=Depends(get_current_user)):
             raw_pricing = json.loads(row.pricing_config) if row and row.pricing_config else DEFAULT_PRICING_CONFIG
             default_printer_id = row.default_printer_id or None
             default_nozzle = row.default_nozzle or None
-            default_slicer_preset_id = int(row.default_slicer_preset_id) if row.default_slicer_preset_id is not None else None
+            default_slicer_preset_id = (
+                int(row.default_slicer_preset_id) if row.default_slicer_preset_id is not None else None
+            )
             default_material = row.default_material or None
             default_color = row.default_color or None
             default_brand = row.default_brand or None
@@ -93,7 +95,9 @@ async def get_user_settings(current_user=Depends(get_current_user)):
                 if c not in derived_colors:
                     derived_colors.append(c)
         return {
-            "materials": materials, "colors": derived_colors, "pricing_config": pricing_config,
+            "materials": materials,
+            "colors": derived_colors,
+            "pricing_config": pricing_config,
             "default_printer_id": default_printer_id,
             "default_nozzle": default_nozzle,
             "default_slicer_preset_id": default_slicer_preset_id,
@@ -178,6 +182,7 @@ async def change_password(req: ChangePasswordRequest, request: Request, current_
     # 验证码为可选：仅在前端提供了 captcha_id+captcha_code 时才校验
     if req.captcha_id and req.captcha_code:
         from .captcha import verify_captcha_or_raise
+
         verify_captcha_or_raise(req.captcha_id, req.captcha_code)
     new_password = validate_password_or_raise(req.new_password)
 
@@ -246,7 +251,9 @@ class ImportSettingsRequest(BaseModel):
     default_slicer_preset_id: Optional[int] = None
 
 
-async def import_user_settings(payload: ImportSettingsRequest, request: Request, current_user=Depends(get_current_user)):
+async def import_user_settings(
+    payload: ImportSettingsRequest, request: Request, current_user=Depends(get_current_user)
+):
     """Import user settings from a previously exported JSON."""
     try:
         with get_db_session() as db:
@@ -343,6 +350,7 @@ async def reset_user_section(payload: ResetSectionRequest, request: Request, cur
 
 
 # ── 品牌定制 ──
+
 
 class BrandSettingsResponse(BaseModel):
     brand_name: Optional[str] = None

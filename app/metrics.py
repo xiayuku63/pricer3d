@@ -2,7 +2,7 @@
 
 import threading
 import time
-from collections import defaultdict, deque
+from collections import deque
 
 
 class InMemoryMetrics:

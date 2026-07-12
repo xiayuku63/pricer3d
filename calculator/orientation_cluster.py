@@ -10,8 +10,6 @@ import logging
 import numpy as np
 import trimesh
 
-from calculator.orientation_math import rotation_from_up_vector
-from calculator.orientation_scoring import evaluate_orientation
 
 logger = logging.getLogger(__name__)
 
@@ -65,9 +63,7 @@ def _merge_planar_clusters_internal(
     for ci, c in enumerate(clusters):
         for fi in c["faces"]:
             f0, f1, f2 = faces[fi]
-            for e in [(min(f0, f1), max(f0, f1)),
-                      (min(f1, f2), max(f1, f2)),
-                      (min(f2, f0), max(f2, f0))]:
+            for e in [(min(f0, f1), max(f0, f1)), (min(f1, f2), max(f1, f2)), (min(f2, f0), max(f2, f0))]:
                 edge_clusters.setdefault(e, set()).add(ci)
 
     for cs in edge_clusters.values():
@@ -140,14 +136,16 @@ def _merge_planar_clusters_internal(
                 merged_centroid = [0.0, 0.0, 0.0]
                 out_vi = []
 
-            merged.append({
-                "faces": all_faces,
-                "normal": w_normal.tolist(),
-                "area": total_area,
-                "centroid": merged_centroid,
-                "plane_offset": float(w_offset / w_sum),
-                "vert_indices": out_vi,
-            })
+            merged.append(
+                {
+                    "faces": all_faces,
+                    "normal": w_normal.tolist(),
+                    "area": total_area,
+                    "centroid": merged_centroid,
+                    "plane_offset": float(w_offset / w_sum),
+                    "vert_indices": out_vi,
+                }
+            )
 
     return merged
 
@@ -169,20 +167,20 @@ def _extract_cluster_outline_p3d(
         x_axis /= np.linalg.norm(x_axis)
     y_axis = np.cross(normal, x_axis)
 
-    proj = np.column_stack([
-        (verts - centroid) @ x_axis,
-        (verts - centroid) @ y_axis,
-    ])
+    proj = np.column_stack(
+        [
+            (verts - centroid) @ x_axis,
+            (verts - centroid) @ y_axis,
+        ]
+    )
 
     try:
         from scipy.spatial import ConvexHull
+
         if len(proj) >= 3:
             hull = ConvexHull(proj[:, :2])
             hull_verts_2d = proj[hull.vertices, :2]
-            hull_verts_3d = [
-                (centroid + x_axis * v[0] + y_axis * v[1]).tolist()
-                for v in hull_verts_2d
-            ]
+            hull_verts_3d = [(centroid + x_axis * v[0] + y_axis * v[1]).tolist() for v in hull_verts_2d]
             return hull_verts_3d, hull_verts_2d.tolist()
     except Exception:
         pass
@@ -311,14 +309,12 @@ def cluster_coplanar_faces(
     norms[valid] = cross[valid] / (areas[valid, np.newaxis] * 2.0)
 
     face_centers = (v0 + v1 + v2) / 3.0
-    plane_offsets = np.einsum('ij,ij->i', norms, face_centers)
+    plane_offsets = np.einsum("ij,ij->i", norms, face_centers)
 
     # ── Step 2: edge-adjacency graph ──
     edge_to_faces: dict[tuple, list] = {}
     for fi, (f0, f1, f2) in enumerate(faces):
-        for edge in [(min(f0, f1), max(f0, f1)),
-                     (min(f1, f2), max(f1, f2)),
-                     (min(f2, f0), max(f2, f0))]:
+        for edge in [(min(f0, f1), max(f0, f1)), (min(f1, f2), max(f1, f2)), (min(f2, f0), max(f2, f0))]:
             edge_to_faces.setdefault(edge, []).append(fi)
 
     adj = [set() for _ in range(n_faces)]
@@ -393,14 +389,16 @@ def cluster_coplanar_faces(
         except Exception:
             pass
 
-        initial_clusters.append({
-            "faces": cluster_faces,
-            "normal": cluster_normal.tolist(),
-            "area": float(cluster_area),
-            "centroid": centroid.tolist(),
-            "plane_offset": float(cluster_offset_sum / cluster_n),
-            "vert_indices": np.unique(cluster_face_indices.flatten()).tolist(),
-        })
+        initial_clusters.append(
+            {
+                "faces": cluster_faces,
+                "normal": cluster_normal.tolist(),
+                "area": float(cluster_area),
+                "centroid": centroid.tolist(),
+                "plane_offset": float(cluster_offset_sum / cluster_n),
+                "vert_indices": np.unique(cluster_face_indices.flatten()).tolist(),
+            }
+        )
 
     # ── Step 4: post-merge adjacent same-plane clusters ──
     merged = _merge_planar_clusters_internal(initial_clusters, vertices, faces, cos_threshold, offset_tol)
@@ -422,7 +420,7 @@ def cluster_coplanar_faces(
     convex_hull_thresh = model_diag * 0.05  # 旧方法4阈值
 
     # 过滤A阈值 (OrcaSlicer 凸包聚类做法)
-    HULL_NORMAL_COS_THRESHOLD = 0.999        # 候选簇法向 vs 凸包平面法向 (夹角 < 2.56°)
+    HULL_NORMAL_COS_THRESHOLD = 0.999  # 候选簇法向 vs 凸包平面法向 (夹角 < 2.56°)
     # 紧容差: 0.1% 模型对角线, 最小 0.05mm. 仅真正共面通过; 浅凹内部面被拒.
     HULL_PLANE_OFFSET_TOL_TIGHT = max(model_diag * 0.001, 0.05)
     # 兜底容差 (v0.40.0 旧值): 紧过滤 0 候选时降级使用, 保证不返回空列表
@@ -445,10 +443,7 @@ def cluster_coplanar_faces(
             hull_planes = _build_hull_coplanar_planes(conv_hull, exact_eps=1e-3)
         except Exception:
             hull_planes = None
-    hull_available = (
-        hull_planes is not None
-        and len(hull_planes[0]) > 0
-    )
+    hull_available = hull_planes is not None and len(hull_planes[0]) > 0
 
     def _run_internal_face_filter(offset_tol: float) -> list[dict]:
         """Run filter A (hull coplanarity at given offset tol) + B + 4 safety nets.
@@ -473,9 +468,7 @@ def cluster_coplanar_faces(
             # 候选面簇若不在凸包表面上 → 内部/凹腔面 → 直接过滤, 无需后续射线检测
             if hull_available:
                 # 1) 法向量匹配: 候选簇法向量须与某凸包平面法向量高度对齐
-                cos_sims = np.nan_to_num(
-                    hp_n @ cn, nan=-2.0, posinf=1.0, neginf=-2.0
-                )
+                cos_sims = np.nan_to_num(hp_n @ cn, nan=-2.0, posinf=1.0, neginf=-2.0)
                 max_cos = float(cos_sims.max())
                 if max_cos < HULL_NORMAL_COS_THRESHOLD:
                     logger.debug(
@@ -486,9 +479,7 @@ def cluster_coplanar_faces(
                 # 2) 平面偏移匹配: 候选簇平面到匹配凸包平面须真正共面 (紧容差)
                 matching = np.where(cos_sims >= HULL_NORMAL_COS_THRESHOLD)[0]
                 plane_off_cluster = float(np.dot(cn, centroid))
-                min_offset_diff = float(
-                    np.min(np.abs(hp_o[matching] - plane_off_cluster))
-                )
+                min_offset_diff = float(np.min(np.abs(hp_o[matching] - plane_off_cluster)))
                 if min_offset_diff > offset_tol:
                     logger.debug(
                         f"过滤内部面[A-平面偏移不匹配]: area={mc['area']:.1f}mm², "
@@ -524,8 +515,7 @@ def cluster_coplanar_faces(
                 try:
                     ray_origin = centroid + cn * 0.01
                     locations, _, _ = mesh.ray.intersects_location(
-                        ray_origins=np.array([ray_origin]),
-                        ray_directions=np.array([cn])
+                        ray_origins=np.array([ray_origin]), ray_directions=np.array([cn])
                     )
                     if len(locations) > 0:
                         dist = float(np.linalg.norm(locations[0] - ray_origin))
@@ -541,12 +531,10 @@ def cluster_coplanar_faces(
                     origin_pos = centroid + cn * 0.01
                     origin_neg = centroid - cn * 0.01
                     loc_pos, _, _ = mesh.ray.intersects_location(
-                        ray_origins=np.array([origin_pos]),
-                        ray_directions=np.array([cn])
+                        ray_origins=np.array([origin_pos]), ray_directions=np.array([cn])
                     )
                     loc_neg, _, _ = mesh.ray.intersects_location(
-                        ray_origins=np.array([origin_neg]),
-                        ray_directions=np.array([-cn])
+                        ray_origins=np.array([origin_neg]), ray_directions=np.array([-cn])
                     )
                     dist_pos = float(np.linalg.norm(loc_pos[0] - origin_pos)) if len(loc_pos) > 0 else float("inf")
                     dist_neg = float(np.linalg.norm(loc_neg[0] - origin_neg)) if len(loc_neg) > 0 else float("inf")
@@ -565,9 +553,7 @@ def cluster_coplanar_faces(
                     pass
 
             if inside_reason is not None:
-                logger.debug(
-                    f"过滤内部面[补充4道]: area={mc['area']:.1f}mm², 原因={inside_reason}"
-                )
+                logger.debug(f"过滤内部面[补充4道]: area={mc['area']:.1f}mm², 原因={inside_reason}")
                 continue
             out.append(mc)
         return out
@@ -577,9 +563,7 @@ def cluster_coplanar_faces(
     # 兜底: 紧容差若 0 候选 (极端几何, 如无平面的纯曲面凸包), 降级到旧容差
     # (v0.40.0 行为) 保证不返回空列表 — 宁可降级也不要让 UI 拿到 0 个候选.
     if not filtered and hull_available:
-        logger.debug(
-            f"凸包紧过滤后 0 候选, 降级 offset_tol={HULL_PLANE_OFFSET_TOL_FALLBACK:.3f}mm"
-        )
+        logger.debug(f"凸包紧过滤后 0 候选, 降级 offset_tol={HULL_PLANE_OFFSET_TOL_FALLBACK:.3f}mm")
         filtered = _run_internal_face_filter(HULL_PLANE_OFFSET_TOL_FALLBACK)
     merged = filtered
 
@@ -607,16 +591,18 @@ def cluster_coplanar_faces(
         poly3d, poly2d = _extract_cluster_outline_p3d(cluster_points, cn, cc)
         poly3d_clean = [[_clean_value(v) for v in p] for p in poly3d]
 
-        result.append({
-            "normal": [_clean_value(v) for v in cn],
-            "area": round(_clean_value(ca), 2),
-            "face_count": len(cf),
-            "centroid": [_clean_value(v) for v in cc],
-            "bbox_size": [round(float(bbox_max[i] - bbox_min[i]), 2) for i in range(3)],
-            "stability": round(stability, 4),
-            "vertices": poly3d_clean,
-            "face_vertices": fv_clean,
-        })
+        result.append(
+            {
+                "normal": [_clean_value(v) for v in cn],
+                "area": round(_clean_value(ca), 2),
+                "face_count": len(cf),
+                "centroid": [_clean_value(v) for v in cc],
+                "bbox_size": [round(float(bbox_max[i] - bbox_min[i]), 2) for i in range(3)],
+                "stability": round(stability, 4),
+                "vertices": poly3d_clean,
+                "face_vertices": fv_clean,
+            }
+        )
 
     result.sort(key=lambda c: c["area"], reverse=True)
     return result[:MAX_RETURN_CLUSTERS]

@@ -1,6 +1,8 @@
 """Cost calculation unit tests."""
 
-import sys, os
+import sys
+import os
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from calculator.cost import (
@@ -89,10 +91,7 @@ class TestSafeEval:
         assert abs(result - 9.0) < 0.001
 
     def test_complex_formula(self):
-        result = safe_eval_formula(
-            "max((a * b) + c, 10)",
-            {"a": 2.0, "b": 3.0, "c": 1.0}
-        )
+        result = safe_eval_formula("max((a * b) + c, 10)", {"a": 2.0, "b": 3.0, "c": 1.0})
         assert abs(result - 10.0) < 0.001  # 2*3+1=7, max(7,10)=10
 
     def test_malicious_code_blocked(self):

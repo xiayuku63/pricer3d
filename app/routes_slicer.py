@@ -25,7 +25,9 @@ logger = logging.getLogger(__name__)
 
 
 class SlicerPresetGenerateRequest(BaseModel):
-    name: Optional[str] = Field(default=None, max_length=60, description="预设名称（若不提供则自动生成为 层高-墙层数-填充密度%）")
+    name: Optional[str] = Field(
+        default=None, max_length=60, description="预设名称（若不提供则自动生成为 层高-墙层数-填充密度%）"
+    )
     bed_width: float = Field(256.0, ge=50.0, le=1000.0, description="打印机X轴尺寸(mm)")
     bed_depth: float = Field(256.0, ge=50.0, le=1000.0, description="打印机Y轴尺寸(mm)")
     bed_height: float = Field(256.0, ge=50.0, le=1000.0, description="打印机Z轴尺寸(mm)")
@@ -38,6 +40,7 @@ class SlicerPresetGenerateRequest(BaseModel):
 async def api_get_slicer_preset(preset_id: int, current_user=Depends(get_current_user)):
     """Return a single preset with parsed parameters for form editing."""
     from .slicer_presets import get_slicer_preset_by_id
+
     try:
         preset = get_slicer_preset_by_id(int(current_user["id"]), int(preset_id))
         if not preset:
@@ -108,7 +111,9 @@ async def api_list_slicer_presets(current_user=Depends(get_current_user)):
         raise HTTPException(status_code=500, detail=f"INTERNAL_ERROR: 获取预设失败 ({str(e)})")
 
 
-async def api_generate_slicer_preset(payload: SlicerPresetGenerateRequest, request: Request, current_user=Depends(get_current_user)):
+async def api_generate_slicer_preset(
+    payload: SlicerPresetGenerateRequest, request: Request, current_user=Depends(get_current_user)
+):
     valid_nozzles = [0.2, 0.4, 0.6, 0.8]
     if not any(abs(payload.nozzle_size - v) < 0.001 for v in valid_nozzles):
         raise HTTPException(status_code=400, detail="喷嘴大小只允许 0.2, 0.4, 0.6, 0.8")
@@ -181,7 +186,12 @@ async def api_upsert_slicer_preset(
         action="slicer.preset.upsert",
         request=request,
         user=current_user,
-        detail={"preset_id": int(saved["id"]), "name": str(saved["name"]), "ext": str(saved["ext"]), "bytes": int(len(raw or b""))},
+        detail={
+            "preset_id": int(saved["id"]),
+            "name": str(saved["name"]),
+            "ext": str(saved["ext"]),
+            "bytes": int(len(raw or b"")),
+        },
     )
     return {"status": "ok", "preset": saved}
 
@@ -252,13 +262,14 @@ async def api_delete_slicer_preset(preset_id: int, request: Request, current_use
 async def api_list_printers(request: Request):
     """Return available printer models (built-in + optional user presets)."""
     from .printers import PRINTER_MODELS
+
     items = list(PRINTER_MODELS)
     # Merge user printer presets (when authenticated)
     try:
         from fastapi.security import OAuth2PasswordBearer
         from jose import jwt as _jwt
         from .config import JWT_SECRET_KEY, JWT_ALGORITHM
-        from .auth import get_user_by_id
+
         o2 = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
         token = await o2(request)
         if token:
@@ -266,20 +277,23 @@ async def api_list_printers(request: Request):
             uid = int(payload.get("sub", "0"))
             if uid > 0:
                 from .printer_presets import list_printer_presets
+
                 user_presets = list_printer_presets(uid)
                 for up in user_presets:
-                    items.append({
-                        "id": f"user_{up['id']}",
-                        "name": up["name"],
-                        "bed_width": up["bed_width"],
-                        "bed_depth": up["bed_depth"],
-                        "bed_height": up["bed_height"],
-                        "nozzle": up["nozzle"],
-                        "nozzles": up["nozzles"],
-                        "icon": "🖨️",
-                        "profile": None,
-                        "_user_preset_id": up["id"],
-                    })
+                    items.append(
+                        {
+                            "id": f"user_{up['id']}",
+                            "name": up["name"],
+                            "bed_width": up["bed_width"],
+                            "bed_depth": up["bed_depth"],
+                            "bed_height": up["bed_height"],
+                            "nozzle": up["nozzle"],
+                            "nozzles": up["nozzles"],
+                            "icon": "🖨️",
+                            "profile": None,
+                            "_user_preset_id": up["id"],
+                        }
+                    )
     except Exception:
         pass
     return {"items": items}

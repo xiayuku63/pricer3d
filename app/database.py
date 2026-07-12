@@ -33,8 +33,7 @@ def init_db() -> None:
     """
     from .db import init_orm, get_db_session, engine
     from .models_orm import (
-        User, MembershipPlan, VerificationCode, AuditEvent,
-        IdempotencyResponse, LoginFailure, AppDefault, RateLimitState,
+        MembershipPlan,
     )
 
     # Step 1: Create all tables from ORM models
@@ -79,20 +78,35 @@ def init_db() -> None:
         plans_count = db.query(MembershipPlan).count()
         if plans_count == 0:
             now_iso = datetime.now(timezone.utc).isoformat()
-            db.add(MembershipPlan(
-                code="member_month", name="会员（月）", price_cny=99.0,
-                currency="CNY", duration_days=30, active=1, created_at=now_iso,
-            ))
-            db.add(MembershipPlan(
-                code="member_year", name="会员（年）", price_cny=999.0,
-                currency="CNY", duration_days=365, active=1, created_at=now_iso,
-            ))
+            db.add(
+                MembershipPlan(
+                    code="member_month",
+                    name="会员（月）",
+                    price_cny=99.0,
+                    currency="CNY",
+                    duration_days=30,
+                    active=1,
+                    created_at=now_iso,
+                )
+            )
+            db.add(
+                MembershipPlan(
+                    code="member_year",
+                    name="会员（年）",
+                    price_cny=999.0,
+                    currency="CNY",
+                    duration_days=365,
+                    active=1,
+                    created_at=now_iso,
+                )
+            )
 
 
 def _safe_add_column(conn, table: str, column: str, col_type: str) -> None:
     """Add a column if it doesn't exist. Uses text() for SQLAlchemy 2.0 compat."""
     import logging
     from sqlalchemy import text as _text
+
     _log = logging.getLogger(__name__)
     try:
         conn.execute(_text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"))
@@ -109,6 +123,7 @@ def _safe_add_column(conn, table: str, column: str, col_type: str) -> None:
 def get_app_defaults() -> dict:
     from .db import get_db_session
     from .models_orm import AppDefault
+
     with get_db_session() as db:
         row = db.query(AppDefault).filter(AppDefault.key == APP_DEFAULTS_KEY).first()
     if not row or not row.value_json:
@@ -121,14 +136,22 @@ def get_app_defaults() -> dict:
     raw_materials = raw.get("materials")
     colors = raw.get("colors")
     raw_pricing = raw.get("pricing_config")
-    materials = normalize_materials(raw_materials, fallback_colors=(colors or DEFAULT_COLORS)) if isinstance(raw_materials, list) else DEFAULT_MATERIALS
+    materials = (
+        normalize_materials(raw_materials, fallback_colors=(colors or DEFAULT_COLORS))
+        if isinstance(raw_materials, list)
+        else DEFAULT_MATERIALS
+    )
     derived_colors: list[str] = []
     for m in materials:
         for c in m.get("colors", []):
             if c not in derived_colors:
                 derived_colors.append(c)
     pricing = merge_pricing_config(raw_pricing) if isinstance(raw_pricing, dict) else dict(DEFAULT_PRICING_CONFIG)
-    return {"materials": materials, "colors": derived_colors or (colors or list(DEFAULT_COLORS)), "pricing_config": pricing}
+    return {
+        "materials": materials,
+        "colors": derived_colors or (colors or list(DEFAULT_COLORS)),
+        "pricing_config": pricing,
+    }
 
 
 def merge_pricing_config(raw_config):

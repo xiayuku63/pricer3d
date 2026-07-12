@@ -5,19 +5,18 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import Request, Depends, HTTPException, Query
+from fastapi import Request, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from .config import DEFAULT_MATERIALS, DEFAULT_COLORS, DEFAULT_PRICING_CONFIG, APP_DEFAULTS_KEY, AUDIT_RETENTION_DAYS
 from .db import get_db_session
 from .models_orm import User, AppDefault, AuditEvent, VerificationCode, IdempotencyResponse, LoginFailure
 from sqlalchemy import or_, func, cast, Float, and_
-from .deps import get_current_user, is_admin_user, require_admin, mask_email, mask_phone
+from .deps import get_current_user, require_admin, mask_email, mask_phone
 from .utils import normalize_materials
 from .audit import write_audit_event
 from .middleware import metrics
 from .database import merge_pricing_config
-from .auth import get_user_by_id
 from .backup import create_backup, list_backups, cleanup_old_backups
 from calculator.cost import validate_formula_expression
 
@@ -29,9 +28,11 @@ class AdminMembershipUpdateRequest(BaseModel):
 
 # ---------- Defaults ----------
 
+
 async def admin_get_defaults(current_user=Depends(get_current_user)):
     require_admin(current_user)
     from .database import get_app_defaults
+
     return get_app_defaults()
 
 
@@ -87,6 +88,7 @@ async def admin_set_defaults_from_me(request: Request, current_user=Depends(get_
 
 
 # ---------- Users ----------
+
 
 async def admin_list_users(
     q: str = "",
@@ -176,6 +178,7 @@ async def admin_update_user_membership(
 
 # ---------- Audit ----------
 
+
 async def admin_list_audit(
     q: str = "",
     action: str = "",
@@ -205,11 +208,7 @@ async def admin_list_audit(
             func.ifnull(AuditEvent.path, "").like(keyword),
             func.ifnull(AuditEvent.request_id, "").like(keyword),
         )
-        total = (
-            db.query(func.count(AuditEvent.id))
-            .filter(*base_filter, keyword_filter)
-            .scalar()
-        )
+        total = db.query(func.count(AuditEvent.id)).filter(*base_filter, keyword_filter).scalar()
         rows = (
             db.query(AuditEvent)
             .filter(*base_filter, keyword_filter)
@@ -247,6 +246,7 @@ async def admin_list_audit(
 
 # ---------- Metrics ----------
 
+
 async def admin_metrics(current_user=Depends(get_current_user)):
     require_admin(current_user)
     return metrics.snapshot()
@@ -254,10 +254,12 @@ async def admin_metrics(current_user=Depends(get_current_user)):
 
 # ---------- Cleanup ----------
 
+
 async def admin_cleanup(request: Request, current_user=Depends(get_current_user)):
     require_admin(current_user)
     now = time.time()
     from .config import LOGIN_FAILED_WINDOW_SECONDS
+
     cutoff_audit = datetime.now(timezone.utc) - timedelta(days=max(1, AUDIT_RETENTION_DAYS))
     deleted = {"verification_codes": 0, "idempotency_responses": 0, "login_failures": 0, "audit_events": 0}
     with get_db_session() as db:
@@ -296,18 +298,17 @@ async def admin_cleanup(request: Request, current_user=Depends(get_current_user)
         deleted["login_failures"] = count
 
         # Delete old audit events
-        count = (
-            db.query(AuditEvent)
-            .filter(AuditEvent.created_at < cutoff_audit)
-            .delete(synchronize_session=False)
-        )
+        count = db.query(AuditEvent).filter(AuditEvent.created_at < cutoff_audit).delete(synchronize_session=False)
         deleted["audit_events"] = count
 
-    write_audit_event(action="admin.maintenance.cleanup", request=request, user=current_user, detail={"deleted": deleted})
+    write_audit_event(
+        action="admin.maintenance.cleanup", request=request, user=current_user, detail={"deleted": deleted}
+    )
     return {"status": "ok", "deleted": deleted, "audit_retention_days": AUDIT_RETENTION_DAYS}
 
 
 # ---------- Backup ----------
+
 
 async def admin_backup_create(request: Request, current_user=Depends(get_current_user)):
     require_admin(current_user)

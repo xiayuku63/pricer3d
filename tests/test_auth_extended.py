@@ -1,6 +1,9 @@
 """app/auth.py 认证模块扩展测试 — 覆盖密码哈希、JWT、工具函数、边界条件。"""
 
-import sys, os, time, re
+import sys
+import os
+import time
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 # 确保环境变量在导入前设置
@@ -30,9 +33,6 @@ from app.config import (
     EMAIL_PATTERN,
     PHONE_PATTERN,
     USERNAME_PATTERN,
-    PASSWORD_MIN_LENGTH,
-    PASSWORD_MAX_LENGTH,
-    DEFAULT_MATERIALS,
 )
 
 
@@ -108,6 +108,7 @@ class TestJWTToken:
         """token 应可解码出用户信息。"""
         from jose import jwt
         from app.config import JWT_SECRET_KEY, JWT_ALGORITHM
+
         token = create_access_token(42, "admin")
         payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
         assert payload["sub"] == "42"
@@ -117,6 +118,7 @@ class TestJWTToken:
         """token 应包含过期时间。"""
         from jose import jwt
         from app.config import JWT_SECRET_KEY, JWT_ALGORITHM
+
         token = create_access_token(1, "user")
         payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
         assert "exp" in payload
@@ -126,6 +128,7 @@ class TestJWTToken:
         """自定义过期时间应生效。"""
         from jose import jwt
         from app.config import JWT_SECRET_KEY, JWT_ALGORITHM
+
         token = create_access_token(1, "user", expire_hours=1)
         payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
         # 过期时间应约 1 小时后

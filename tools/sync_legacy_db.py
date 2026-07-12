@@ -142,12 +142,14 @@ def main() -> int:
         orders = sync_payment_orders(src, dst, user_id_map)
         presets = sync_slicer_presets(src, dst, user_id_map)
         dst.commit()
-        print({
-            "user_id_map": user_id_map,
-            "quote_history_inserted": quotes,
-            "payment_orders_inserted": orders,
-            "slicer_presets_inserted": presets,
-        })
+        print(
+            {
+                "user_id_map": user_id_map,
+                "quote_history_inserted": quotes,
+                "payment_orders_inserted": orders,
+                "slicer_presets_inserted": presets,
+            }
+        )
     finally:
         dst.close()
         src.close()

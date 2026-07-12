@@ -3,7 +3,7 @@
 """
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime, timezone
 
@@ -38,13 +38,12 @@ class PrinterParamUpdate(BaseModel):
 async def get_printer_param(printer_id: str, nozzle: float):
     """获取打印机参数"""
     with get_db_session() as db:
-        param = db.query(PrinterParam).filter(
-            PrinterParam.printer_id == printer_id,
-            PrinterParam.nozzle == nozzle
-        ).first()
+        param = (
+            db.query(PrinterParam).filter(PrinterParam.printer_id == printer_id, PrinterParam.nozzle == nozzle).first()
+        )
         if not param:
             raise HTTPException(status_code=404, detail="打印机参数不存在")
-        
+
         return PrinterParamResponse(
             id=param.id,
             printer_id=param.printer_id,
@@ -62,10 +61,10 @@ async def get_printer_param(printer_id: str, nozzle: float):
 async def get_printer_params_by_model(printer_id: str):
     """获取打印机所有喷嘴的参数"""
     with get_db_session() as db:
-        params = db.query(PrinterParam).filter(
-            PrinterParam.printer_id == printer_id
-        ).order_by(PrinterParam.nozzle).all()
-        
+        params = (
+            db.query(PrinterParam).filter(PrinterParam.printer_id == printer_id).order_by(PrinterParam.nozzle).all()
+        )
+
         return [
             PrinterParamResponse(
                 id=p.id,
@@ -84,22 +83,18 @@ async def get_printer_params_by_model(printer_id: str):
 
 @router.put("/{printer_id}/{nozzle}", response_model=PrinterParamResponse)
 async def update_printer_param(
-    printer_id: str,
-    nozzle: float,
-    data: PrinterParamUpdate,
-    user: dict = Depends(get_current_user)
+    printer_id: str, nozzle: float, data: PrinterParamUpdate, user: dict = Depends(get_current_user)
 ):
     """更新打印机参数（需要登录）"""
     now = datetime.now(timezone.utc).isoformat()
-    
+
     with get_db_session() as db:
-        param = db.query(PrinterParam).filter(
-            PrinterParam.printer_id == printer_id,
-            PrinterParam.nozzle == nozzle
-        ).first()
+        param = (
+            db.query(PrinterParam).filter(PrinterParam.printer_id == printer_id, PrinterParam.nozzle == nozzle).first()
+        )
         if not param:
             raise HTTPException(status_code=404, detail="打印机参数不存在")
-        
+
         if data.max_speed is not None:
             param.max_speed = data.max_speed
         if data.max_acceleration is not None:
@@ -108,10 +103,10 @@ async def update_printer_param(
             param.jerk_limit = data.jerk_limit
         if data.speed_enabled is not None:
             param.speed_enabled = 1 if data.speed_enabled else 0
-        
+
         param.updated_at = now
         db.commit()
-        
+
         return PrinterParamResponse(
             id=param.id,
             printer_id=param.printer_id,
@@ -127,22 +122,18 @@ async def update_printer_param(
 
 @router.post("/{printer_id}/{nozzle}", response_model=PrinterParamResponse)
 async def create_printer_param(
-    printer_id: str,
-    nozzle: float,
-    data: PrinterParamUpdate,
-    user: dict = Depends(get_current_user)
+    printer_id: str, nozzle: float, data: PrinterParamUpdate, user: dict = Depends(get_current_user)
 ):
     """创建打印机参数（需要登录）"""
     now = datetime.now(timezone.utc).isoformat()
-    
+
     with get_db_session() as db:
-        existing = db.query(PrinterParam).filter(
-            PrinterParam.printer_id == printer_id,
-            PrinterParam.nozzle == nozzle
-        ).first()
+        existing = (
+            db.query(PrinterParam).filter(PrinterParam.printer_id == printer_id, PrinterParam.nozzle == nozzle).first()
+        )
         if existing:
             raise HTTPException(status_code=400, detail="打印机参数已存在")
-        
+
         param = PrinterParam(
             printer_id=printer_id,
             nozzle=nozzle,
@@ -155,7 +146,7 @@ async def create_printer_param(
         )
         db.add(param)
         db.commit()
-        
+
         return PrinterParamResponse(
             id=param.id,
             printer_id=param.printer_id,

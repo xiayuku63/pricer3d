@@ -98,9 +98,7 @@ def estimate_print_time_hours(
     layer_factor = (ref_layer / max(layer_height_mm, 0.01)) ** layer_exp
     infill_factor = 1.0 + infill_coeff * max(0.0, (infill_percent - ref_infill) / 100.0)
     total_min = (
-        overhead_min
-        + (vol_cm3 * vol_min_per_cm3 * layer_factor * infill_factor)
-        + (area_cm2 * area_min_per_cm2)
+        overhead_min + (vol_cm3 * vol_min_per_cm3 * layer_factor * infill_factor) + (area_cm2 * area_min_per_cm2)
     )
     return max(0.0, total_min / 60.0)
 
@@ -160,12 +158,21 @@ def normalize_materials(user_materials: list) -> list:
         if not _bt:
             _bt = next((d.get("bed_temp", 55) for d in DEFAULT_MATERIALS if d["name"] == name), 55)
 
-        result.append({
-            "name": name,
-            "density": density,
-            "price_per_kg": price,
-            "hotend_temp": int(float(_ht)),
-            "bed_temp": int(float(_bt)),
-        })
+        result.append(
+            {
+                "name": name,
+                "density": density,
+                "price_per_kg": price,
+                "hotend_temp": int(float(_ht)),
+                "bed_temp": int(float(_bt)),
+            }
+        )
 
-    return result if result else [{**d, "hotend_temp": d.get("hotend_temp", 220), "bed_temp": d.get("bed_temp", 55)} for d in DEFAULT_MATERIALS]
+    return (
+        result
+        if result
+        else [
+            {**d, "hotend_temp": d.get("hotend_temp", 220), "bed_temp": d.get("bed_temp", 55)}
+            for d in DEFAULT_MATERIALS
+        ]
+    )
