@@ -1,11 +1,18 @@
 FROM ubuntu:24.04
 
-# Install dependencies
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-venv python3-pip \
     ca-certificates \
-    prusa-slicer \
+    wget \
     logrotate \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install PrusaSlicer v2.9.6 CLI from GitHub release
+RUN wget -q -O /tmp/prusa.deb \
+    "https://github.com/prusa3d/PrusaSlicer/releases/download/version_2.9.6/PrusaSlicer-2.9.6+linux-x64-GTK3-202503061506.deb" \
+    && apt-get update && apt-get install -y --no-install-recommends /tmp/prusa.deb \
+    && rm -f /tmp/prusa.deb \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
