@@ -67,7 +67,7 @@ export function _switchToView(viewId, title, subtitle) {
 
 export function initAuth(d) {
     dom = d;
-    _wireLoginForm();
+    import('./login.js').then(m => m._wireLoginForm(d));
 }
 
 export function showLoginView() {
@@ -131,7 +131,8 @@ export async function handleAuthSuccess(data) {
         console.error('loadQuoteHistory ERROR:', e.message);
     }
     await fetchPrinterModels();
-    closeLoginModal();
+    const { closeLoginModal } = await import('./login.js');
+    closeLoginModal({ loginModal: document.getElementById('login-modal') });
 
     // Notify onboarding to check if guide should start
     window.dispatchEvent(new CustomEvent('pricer3d-auth-success'));
