@@ -10,12 +10,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-# Install PrusaSlicer v2.9.6 CLI from GitHub release
-RUN wget -q -O /tmp/prusa.deb \
-    "https://github.com/prusa3d/PrusaSlicer/releases/download/version_2.9.6/PrusaSlicer-2.9.6+linux-x64-GTK3-202503061506.deb" \
-    && apt-get update && apt-get install -y --no-install-recommends /tmp/prusa.deb \
-    && rm -f /tmp/prusa.deb \
-    && rm -rf /var/lib/apt/lists/*
+# Install PrusaSlicer CLI from GitHub Release AppImage
+# Note: Prusa3D stopped shipping Linux AppImage starting from v2.9.3,
+# so we use the last available Linux build v2.8.1
+RUN wget -q -O /usr/local/bin/prusa-slicer.AppImage \
+    "https://github.com/prusa3d/PrusaSlicer/releases/download/version_2.8.1/PrusaSlicer-2.8.1+linux-x64-newer-distros-GTK3-202409181416.AppImage" \
+    && chmod +x /usr/local/bin/prusa-slicer.AppImage \
+    && ln -sf /usr/local/bin/prusa-slicer.AppImage /usr/local/bin/prusa-slicer
 
 WORKDIR /app
 COPY requirements.txt .
