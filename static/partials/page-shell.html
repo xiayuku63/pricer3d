@@ -1,68 +1,68 @@
-<body class="bg-gray-50 min-h-screen p-4 lg:p-6" style="padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left))">
+<body class="min-h-screen p-4 lg:p-6" style="background-color: var(--color-bg); padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left))">
     <!-- ── Mobile Hamburger Menu ── -->
-    <button id="mobile-menu-btn" type="button" class="lg:hidden fixed top-3 left-3 z-40 p-2 rounded-lg bg-white shadow-md border border-gray-200 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-gray-50 active:bg-gray-100 transition-colors" aria-label="菜单" aria-expanded="false" aria-controls="mobile-nav-drawer">
-        <svg id="hamburger-icon" class="w-6 h-6 text-gray-700 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <button id="mobile-menu-btn" type="button" class="lg:hidden fixed top-3 left-3 z-40 p-2 rounded-lg tw-card min-w-[44px] min-h-[44px] flex items-center justify-center tw-btn-ghost transition-colors" aria-label="菜单" aria-expanded="false" aria-controls="mobile-nav-drawer">
+        <svg id="hamburger-icon" class="w-6 h-6 tw-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
         </svg>
-        <svg id="close-icon" class="w-6 h-6 text-gray-700 transition-transform duration-200 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg id="close-icon" class="w-6 h-6 tw-text transition-transform duration-200 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
         </svg>
     </button>
 
     <!-- ── Mobile Navigation Drawer (slides from left) ── -->
-    <div id="mobile-nav-backdrop" class="lg:hidden fixed inset-0 bg-black/40 z-40 opacity-0 pointer-events-none transition-opacity duration-300"></div>
-    <nav id="mobile-nav-drawer" class="lg:hidden fixed top-0 left-0 bottom-0 w-[280px] max-w-[80vw] bg-white z-50 shadow-2xl transform -translate-x-full transition-transform duration-300 flex flex-col overflow-y-auto overscroll-contain" role="navigation" aria-label="主导航">
+    <div id="mobile-nav-backdrop" class="lg:hidden fixed inset-0 z-40 opacity-0 pointer-events-none transition-opacity duration-300" style="background-color: var(--color-overlay);"></div>
+    <nav id="mobile-nav-drawer" class="lg:hidden fixed top-0 left-0 bottom-0 w-[280px] max-w-[80vw] tw-card z-50 shadow-2xl transform -translate-x-full transition-transform duration-300 flex flex-col overflow-y-auto overscroll-contain" role="navigation" aria-label="主导航">
         <!-- Drawer Header -->
-        <div class="flex items-center justify-between p-4 border-b border-gray-200">
-            <h2 class="text-lg font-bold text-gray-900">3D打印报价</h2>
-            <button id="mobile-nav-close-btn" type="button" class="p-2 rounded-lg hover:bg-gray-100 active:bg-gray-200 min-w-[44px] min-h-[44px] flex items-center justify-center transition-colors" aria-label="关闭菜单">
-                <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        <div class="flex items-center justify-between p-4" style="border-bottom: 1px solid var(--color-border);">
+            <h2 class="text-lg font-bold tw-text-heading">3D打印报价</h2>
+            <button id="mobile-nav-close-btn" type="button" class="p-2 rounded-lg tw-btn-ghost min-w-[44px] min-h-[44px] flex items-center justify-center transition-colors" aria-label="关闭菜单">
+                <svg class="w-5 h-5 tw-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
         </div>
 
         <!-- Navigation Items -->
         <div class="flex-1 p-3 space-y-1">
             <!-- Main page (quote) -->
-            <a href="/" class="mobile-nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 active:bg-indigo-100 transition-colors min-h-[48px]" data-page="quote">
+            <a href="/" class="mobile-nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium tw-text tw-btn-ghost active:tw-bg-active transition-colors min-h-[48px]" data-page="quote">
                 <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                 <span>在线报价</span>
             </a>
 
             <!-- Quote History -->
-            <button id="mobile-open-quote-history-btn" type="button" class="mobile-nav-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 active:bg-indigo-100 transition-colors min-h-[48px]" data-page="history">
+            <button id="mobile-open-quote-history-btn" type="button" class="mobile-nav-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium tw-text tw-btn-ghost active:tw-bg-active transition-colors min-h-[48px]" data-page="history">
                 <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 <span>报价历史</span>
             </button>
 
             <!-- Membership -->
-            <button id="mobile-open-membership-btn" type="button" class="mobile-nav-item hidden w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-amber-700 hover:bg-amber-50 active:bg-amber-100 transition-colors min-h-[48px]" data-page="membership">
+            <button id="mobile-open-membership-btn" type="button" class="mobile-nav-item hidden w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium tw-text-warning tw-btn-ghost active:tw-bg-active transition-colors min-h-[48px]" data-page="membership">
                 <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
                 <span>会员服务</span>
             </button>
 
-<!-- Printer Params -->            <a href="/printer-params" class="mobile-nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 active:bg-indigo-100 transition-colors min-h-[48px]" data-page="printer-params">                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>                <span>打印机参数</span>            </a>            <!-- Materials -->            <a href="/materials" class="mobile-nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 active:bg-indigo-100 transition-colors min-h-[48px]" data-page="materials">                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>                <span>材料管理</span>            </a>
+<!-- Printer Params -->            <a href="/printer-params" class="mobile-nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium tw-text tw-btn-ghost active:tw-bg-active transition-colors min-h-[48px]" data-page="printer-params">                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>                <span>打印机参数</span>            </a>            <!-- Materials -->            <a href="/materials" class="mobile-nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium tw-text tw-btn-ghost active:tw-bg-active transition-colors min-h-[48px]" data-page="materials">                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>                <span>材料管理</span>            </a>
             <!-- User Center -->
-            <button id="mobile-open-user-center-btn" type="button" class="mobile-nav-item hidden w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 active:bg-indigo-100 transition-colors min-h-[48px]" data-page="user-center">
+            <button id="mobile-open-user-center-btn" type="button" class="mobile-nav-item hidden w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium tw-text tw-btn-ghost active:tw-bg-active transition-colors min-h-[48px]" data-page="user-center">
                 <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                 <span>用户中心</span>
             </button>
 
             <!-- Admin Users -->
-            <button id="mobile-open-admin-users-btn" type="button" class="mobile-nav-item hidden w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 active:bg-indigo-100 transition-colors min-h-[48px]" data-page="admin">
+            <button id="mobile-open-admin-users-btn" type="button" class="mobile-nav-item hidden w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium tw-text tw-btn-ghost active:tw-bg-active transition-colors min-h-[48px]" data-page="admin">
                 <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                 <span>用户管理</span>
             </button>
 
-            <div class="border-t border-gray-100 my-2"></div>
+            <div style="border-top: 1px solid var(--color-border);" class="my-2"></div>
         </div>
 
         <!-- Drawer Footer: Login / Logout -->
-        <div class="p-3 border-t border-gray-200 space-y-1">
-            <button id="mobile-open-login-btn" type="button" class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 transition-colors min-h-[48px]">
+        <div class="p-3 space-y-1" style="border-top: 1px solid var(--color-border);">
+            <button id="mobile-open-login-btn" type="button" class="tw-btn-primary w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium min-h-[48px]">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/></svg>
                 登录
             </button>
-            <button id="mobile-logout-btn" type="button" class="hidden w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium text-red-600 border border-red-200 hover:bg-red-50 active:bg-red-100 transition-colors min-h-[48px]">
+            <button id="mobile-logout-btn" type="button" class="tw-btn-danger hidden w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium min-h-[48px]">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
                 退出登录
             </button>
@@ -70,28 +70,28 @@
 
         <!-- App version -->
         <div class="px-4 py-2 text-center">
-            <span id="mobile-app-version" class="text-[10px] text-gray-400"></span>
+            <span id="mobile-app-version" class="text-[10px] tw-text-muted"></span>
         </div>
     </nav>
 
-    <div class="max-w-[1600px] mx-auto bg-white rounded-xl shadow-md overflow-hidden">
+    <div class="max-w-[1600px] mx-auto tw-card overflow-hidden">
         <div class="p-5 sm:p-8">
             <div class="flex flex-col sm:flex-row items-start sm:justify-between gap-4 mb-6">
                 <div class="w-full sm:w-auto">
-                    <div class="uppercase tracking-wide text-sm text-indigo-500 font-semibold mb-1">3D Printing Parts Automated Quoting System</div>
-                    <h2 class="text-2xl font-bold text-gray-900 inline" data-i18n="app.title">3D打印件自动报价系统</h2>
-                    <span id="app-version" class="ml-2 px-2 py-0.5 text-xs font-mono rounded-full bg-gray-100 text-gray-500 align-middle">—</span>
+                    <div class="uppercase tracking-wide text-sm tw-text-primary font-semibold mb-1">3D Printing Parts Automated Quoting System</div>
+                    <h2 class="text-2xl font-bold tw-text-heading inline" data-i18n="app.title">3D打印件自动报价系统</h2>
+                    <span id="app-version" class="ml-2 px-2 py-0.5 text-xs font-mono rounded-full tw-text-muted align-middle" style="background-color: var(--color-disabled-bg);">—</span>
                 </div>
                 <div id="auth-area" class="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full sm:w-auto sm:justify-end">
-                    <button id="open-login-btn" type="button" class="w-full sm:w-auto text-sm px-3 py-2.5 sm:py-1.5 border border-indigo-200 text-indigo-700 rounded-md hover:bg-indigo-50 min-h-[44px] sm:min-h-0">登录</button>
-                    <button id="open-membership-btn" type="button" class="hidden w-full sm:w-auto text-sm px-3 py-2.5 sm:py-1.5 border border-amber-300 text-amber-700 rounded-md hover:bg-amber-50 font-medium bg-amber-50/50 min-h-[44px] sm:min-h-0" data-i18n="common.membershipService">会员服务</button>
+                    <button id="open-login-btn" type="button" class="tw-btn-secondary w-full sm:w-auto text-sm px-3 py-2.5 sm:py-1.5 min-h-[44px] sm:min-h-0">登录</button>
+                    <button id="open-membership-btn" type="button" class="hidden w-full sm:w-auto text-sm px-3 py-2.5 sm:py-1.5 min-h-[44px] sm:min-h-0" style="border: 1px solid var(--color-warning-border); color: var(--color-warning-text); border-radius: var(--radius-md); background-color: var(--color-warning-bg);" data-i18n="common.membershipService">会员服务</button>
                     <div id="user-menu" class="hidden relative w-full sm:w-auto">
-                        <button id="user-menu-btn" type="button" class="w-full sm:w-auto text-sm px-3 py-2.5 sm:py-1.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 min-h-[44px] sm:min-h-0"></button>
-                        <div id="user-dropdown" class="hidden absolute right-0 mt-2 w-40 rounded-md border border-gray-200 bg-white shadow-lg z-50">
-                            <button id="open-admin-users-btn" type="button" class="hidden w-full text-left text-xs px-3 py-2.5 hover:bg-gray-50 min-h-[44px]">用户管理</button>
-                            <button id="open-user-center-btn" type="button" class="w-full text-left text-xs px-3 py-2.5 hover:bg-gray-50 min-h-[44px]" data-i18n="common.userCenter">用户中心</button>
-                            <button id="open-quote-history-btn" type="button" class="w-full text-left text-xs px-3 py-2.5 hover:bg-gray-50 min-h-[44px]" data-i18n="common.quoteHistory">报价历史</button>
-                            <button id="logout-btn" type="button" class="w-full text-left text-xs px-3 py-2.5 text-red-600 hover:bg-red-50 min-h-[44px]" data-i18n="auth.logout">退出登录</button>
+                        <button id="user-menu-btn" type="button" class="w-full sm:w-auto text-sm px-3 py-2.5 sm:py-1.5 min-h-[44px] sm:min-h-0 tw-input"></button>
+                        <div id="user-dropdown" class="hidden absolute right-0 mt-2 w-40 rounded-md tw-card shadow-lg z-50" style="border: 1px solid var(--color-border);">
+                            <button id="open-admin-users-btn" type="button" class="hidden w-full text-left text-xs px-3 py-2.5 tw-btn-ghost min-h-[44px]">用户管理</button>
+                            <button id="open-user-center-btn" type="button" class="w-full text-left text-xs px-3 py-2.5 tw-btn-ghost min-h-[44px]" data-i18n="common.userCenter">用户中心</button>
+                            <button id="open-quote-history-btn" type="button" class="w-full text-left text-xs px-3 py-2.5 tw-btn-ghost min-h-[44px]" data-i18n="common.quoteHistory">报价历史</button>
+                            <button id="logout-btn" type="button" class="w-full text-left text-xs px-3 py-2.5 tw-text-danger tw-btn-ghost min-h-[44px]" data-i18n="auth.logout">退出登录</button>
                         </div>
                     </div>
                 </div>
@@ -99,85 +99,85 @@
             <div class="space-y-6">
             <!-- 结果展示区 -->
             <div id="result-container" class="w-full">
-                <h3 class="text-lg leading-6 font-medium text-gray-900 mb-2" data-i18n="quote.quoteResults">报价结果</h3>
-                <div class="bg-gray-50 overflow-hidden shadow rounded-lg border border-gray-200">
+                <h3 class="text-lg leading-6 font-medium tw-text-heading mb-2" data-i18n="quote.quoteResults">报价结果</h3>
+                <div class="overflow-hidden shadow rounded-lg" style="background-color: var(--color-surface); border: 1px solid var(--color-border);">
                     <div class="px-4 py-5 sm:p-6">
                         <dl class="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-4">
                             <div>
-                                <dt class="text-sm font-medium text-gray-500" data-i18n="quote.totalFiles">文件总数</dt>
-                                <dd class="mt-1 text-sm text-gray-900" id="sum-total-files">-</dd>
+                                <dt class="text-sm font-medium tw-text-muted" data-i18n="quote.totalFiles">文件总数</dt>
+                                <dd class="mt-1 text-sm tw-text-heading" id="sum-total-files">-</dd>
                             </div>
                             <div>
-                                <dt class="text-sm font-medium text-gray-500" data-i18n="quote.successFail">成功 / 失败</dt>
-                                <dd class="mt-1 text-sm text-gray-900" id="sum-status">-</dd>
+                                <dt class="text-sm font-medium tw-text-muted" data-i18n="quote.successFail">成功 / 失败</dt>
+                                <dd class="mt-1 text-sm tw-text-heading" id="sum-status">-</dd>
                             </div>
                             <div>
-                                <dt class="text-sm font-medium text-gray-500" data-i18n="quote.totalCostCNY">总费用 (CNY)</dt>
-                                <dd class="mt-1 text-2xl font-semibold text-indigo-600" id="sum-total-cost">-</dd>
+                                <dt class="text-sm font-medium tw-text-muted" data-i18n="quote.totalCostCNY">总费用 (CNY)</dt>
+                                <dd class="mt-1 text-2xl font-semibold tw-text-primary" id="sum-total-cost">-</dd>
                             </div>
                             <div>
-                                <dt class="text-sm font-medium text-gray-500" data-i18n="quote.totalTime">总时间</dt>
-                                <dd class="mt-1 text-sm text-gray-900" id="sum-total-time">-</dd>
+                                <dt class="text-sm font-medium tw-text-muted" data-i18n="quote.totalTime">总时间</dt>
+                                <dd class="mt-1 text-sm tw-text-heading" id="sum-total-time">-</dd>
                             </div>
                         </dl>
 
                         <!-- 批量设置工具栏 -->
-                        <div id="batch-edit-bar" class="mt-4 flex items-center gap-3 p-3 bg-indigo-50 border border-indigo-200 rounded-lg flex-wrap relative z-20">
-                            <span class="text-xs font-medium text-indigo-700 whitespace-nowrap" data-i18n="quote.batchSettings">批量设置：</span>
+                        <div id="batch-edit-bar" class="mt-4 flex items-center gap-3 p-3 rounded-lg flex-wrap relative z-20" style="background-color: var(--color-primary-bg); border: 1px solid var(--color-primary-border);">
+                            <span class="text-xs font-medium whitespace-nowrap" style="color: var(--color-primary-text);" data-i18n="quote.batchSettings">批量设置：</span>
                             <div class="flex items-center gap-1.5">
-                                <label class="text-[11px] text-gray-600" data-i18n="quote.printerModel">打印机</label>
-                                <select id="batch-printer-model" class="text-[11px] border border-gray-300 rounded px-2 py-1 bg-white max-w-[155px]"></select>
+                                <label class="text-[11px] tw-text-secondary" data-i18n="quote.printerModel">打印机</label>
+                                <select id="batch-printer-model" class="text-[11px] border rounded px-2 py-1 tw-card" style="border-color: var(--color-border-strong); max-width:155px"></select>
                             </div>
                             <div class="flex items-center gap-1.5">
-                                <label class="text-[11px] text-gray-600" data-i18n="quote.nozzleDiameter">喷嘴</label>
-                                <select id="batch-nozzle-diameter" class="text-[11px] border border-gray-300 rounded px-2 py-1 bg-white w-[72px]">
+                                <label class="text-[11px] tw-text-secondary" data-i18n="quote.nozzleDiameter">喷嘴</label>
+                                <select id="batch-nozzle-diameter" class="text-[11px] border rounded px-2 py-1 tw-card" style="border-color: var(--color-border-strong); width:72px">
                                     <option value="0.2">0.2</option><option value="0.4" selected>0.4</option><option value="0.6">0.6</option><option value="0.8">0.8</option>
                                 </select>
                             </div>
                             <div class="flex items-center gap-1.5">
-                                <label class="text-[11px] text-gray-600" data-i18n="quote.preset">预设</label>
-                                <select id="batch-slicer-preset" class="text-[11px] border border-gray-300 rounded px-2 py-1 bg-white max-w-[160px]">
+                                <label class="text-[11px] tw-text-secondary" data-i18n="quote.preset">预设</label>
+                                <select id="batch-slicer-preset" class="text-[11px] border rounded px-2 py-1 tw-card" style="border-color: var(--color-border-strong); max-width:160px">
                                     <option value="">不使用预设</option>
                                 </select>
-                                <span id="batch-preset-params" class="text-[10px] text-gray-400 hidden"></span>
+                                <span id="batch-preset-params" class="text-[10px] tw-text-muted hidden"></span>
                             </div>
                             <div class="flex items-center gap-1.5">
-                                <label class="text-[11px] text-gray-600" data-i18n="quote.brand">品牌</label>
-                                <select id="batch-brand" class="text-[11px] border border-gray-300 rounded px-2 py-1 bg-white max-w-[120px]">
+                                <label class="text-[11px] tw-text-secondary" data-i18n="quote.brand">品牌</label>
+                                <select id="batch-brand" class="text-[11px] border rounded px-2 py-1 tw-card" style="border-color: var(--color-border-strong); max-width:120px">
                                 </select>
                             </div>
                             <div class="flex items-center gap-1.5">
-                                <label class="text-[11px] text-gray-600" data-i18n="quote.material">材料</label>
-                                <select id="batch-material" class="text-[11px] border border-gray-300 rounded px-2 py-1 bg-white"></select>
+                                <label class="text-[11px] tw-text-secondary" data-i18n="quote.material">材料</label>
+                                <select id="batch-material" class="text-[11px] border rounded px-2 py-1 tw-card" style="border-color: var(--color-border-strong);"></select>
                             </div>
                             <div class="flex items-center gap-1.5" id="batch-color-cell">
-                                <label class="text-[11px] text-gray-600" data-i18n="quote.color">颜色</label>
+                                <label class="text-[11px] tw-text-secondary" data-i18n="quote.color">颜色</label>
                                 <div id="batch-color-dropdown"></div>
                             </div>
                             <div class="flex items-center gap-1.5">
-                                <label class="text-[11px] text-gray-600" data-i18n="quote.quantity">数量</label>
-                                <input id="batch-quantity" type="number" min="1" value="1" class="w-16 text-[11px] border border-gray-300 rounded px-2 py-1" />
+                                <label class="text-[11px] tw-text-secondary" data-i18n="quote.quantity">数量</label>
+                                <input id="batch-quantity" type="number" min="1" value="1" class="w-16 text-[11px] border rounded px-2 py-1 tw-bg-surface" style="border-color: var(--color-border-strong);" />
                             </div>
-                            <button id="batch-apply-btn" type="button" class="text-[11px] px-3 py-1.5 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors whitespace-nowrap" data-i18n="quote.applyToAll">应用到全部</button>
-                            <span id="batch-msg" class="text-[11px] text-indigo-600 hidden"></span>
-                            <label class="inline-flex items-center gap-1 text-[11px] text-gray-600 cursor-pointer">
-                              <input type="checkbox" id="batch-auto-orient" class="rounded border-gray-300 text-green-600 focus:ring-green-500" checked>
-                              🎯 自动摆放
+                            <button id="batch-apply-btn" type="button" class="tw-btn-primary text-[11px] px-3 py-1.5 whitespace-nowrap" data-i18n="quote.applyToAll">应用到全部</button>
+                            <span id="batch-msg" class="text-[11px] tw-text-primary hidden"></span>
+                            <label class="inline-flex items-center gap-1 text-[11px] tw-text-secondary cursor-pointer ml-auto">
+                              <input type="checkbox" id="batch-auto-orient" class="rounded" style="border-color: var(--color-border-strong); color: var(--color-success);">
+                              智能摆放
                             </label>
-                            <button id="batch-recalculate-btn" type="button" class="text-[11px] px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 transition-colors whitespace-nowrap" data-i18n="quote.recalculate">重新计算</button>
+                            <button id="batch-recalculate-btn" type="button" class="tw-btn-primary text-[11px] px-3 py-1.5 whitespace-nowrap" style="background-color: var(--color-success);" data-i18n="quote.recalculate">重新计算</button>
                         </div>
 
                         <!-- 导出按钮组 -->
                         <div class="flex items-center gap-2 mt-3">
-                            <button id="export-csv-btn" type="button" class="text-xs px-2 py-1.5 border border-gray-300 text-gray-600 rounded-md hover:bg-gray-50 flex items-center gap-1">
+                            <button id="export-csv-btn" type="button" class="text-xs px-2 py-1.5 rounded-md tw-btn-ghost flex items-center gap-1" style="border: 1px solid var(--color-border-strong); color: var(--color-text-secondary);">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                                 <span data-i18n="quote.exportCSV">导出 CSV</span>
                             </button>
-                            <button id="export-excel-btn" type="button" class="text-xs px-2 py-1.5 border border-gray-300 text-gray-600 rounded-md hover:bg-gray-50 flex items-center gap-1">
+                            <button id="export-excel-btn" type="button" class="text-xs px-2 py-1.5 rounded-md tw-btn-ghost flex items-center gap-1" style="border: 1px solid var(--color-border-strong); color: var(--color-text-secondary);">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                                 <span data-i18n="quote.exportExcel">导出 Excel</span>
                             </button>
-                            <button id="export-pdf-btn" type="button" class="text-xs px-2 py-1.5 border border-amber-300 text-amber-700 bg-amber-50 rounded-md hover:bg-amber-100 flex items-center gap-1">
+                            <button id="export-pdf-btn" type="button" class="text-xs px-2 py-1.5 rounded-md flex items-center gap-1" style="border: 1px solid var(--color-warning-border); color: var(--color-warning-text); background-color: var(--color-warning-bg);">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                                 <span data-i18n="quote.exportPdf">导出 PDF</span>
                             </button>
@@ -185,66 +185,66 @@
 
                         <!-- 桌面端：表格布局（lg 及以上） -->
                         <div class="mt-4 overflow-x-auto hidden lg:block">
-                            <table class="min-w-full text-[11px] text-left border border-gray-200 rounded-md overflow-hidden" style="table-layout:fixed">
-                                <thead class="bg-gray-100 text-gray-700">
+                            <table class="min-w-full text-[11px] text-left rounded-md overflow-hidden" style="border: 1px solid var(--color-border); table-layout:fixed">
+                                <thead style="background-color: var(--color-disabled-bg); color: var(--color-text);">
                                     <tr>
-                                        <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="filename" data-i18n="quote.filename">文件名 <span class="sort-arrow text-gray-400 text-[9px]"></span></th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none tw-hover-row" data-sort-key="filename" data-i18n="quote.filename">文件名 <span class="sort-arrow tw-text-muted text-[9px]"></span></th>
                                         <th class="px-2 py-1.5 whitespace-nowrap" data-i18n="common.preview">预览</th>
-                                        <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="printer_model" data-i18n="quote.printerModel">打印机 <span class="sort-arrow text-gray-400 text-[9px]"></span></th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none tw-hover-row" data-sort-key="printer_model" data-i18n="quote.printerModel">打印机 <span class="sort-arrow tw-text-muted text-[9px]"></span></th>
                                         <th class="px-2 py-1.5 whitespace-nowrap" data-i18n="quote.preset">预设</th>
-                                        <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="brand" data-i18n="quote.brand">品牌 <span class="sort-arrow text-gray-400 text-[9px]"></span></th>
-                                        <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="material" data-i18n="quote.material">材料 <span class="sort-arrow text-gray-400 text-[9px]"></span></th>
-                                        <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="color" data-i18n="quote.color">颜色 <span class="sort-arrow text-gray-400 text-[9px]"></span></th>
-                                        <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="quantity" data-i18n="quote.quantity">数量 <span class="sort-arrow text-gray-400 text-[9px]"></span></th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none tw-hover-row" data-sort-key="brand" data-i18n="quote.brand">品牌 <span class="sort-arrow tw-text-muted text-[9px]"></span></th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none tw-hover-row" data-sort-key="material" data-i18n="quote.material">材料 <span class="sort-arrow tw-text-muted text-[9px]"></span></th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none tw-hover-row" data-sort-key="color" data-i18n="quote.color">颜色 <span class="sort-arrow tw-text-muted text-[9px]"></span></th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none tw-hover-row" data-sort-key="quantity" data-i18n="quote.quantity">数量 <span class="sort-arrow tw-text-muted text-[9px]"></span></th>
                                         <th class="px-2 py-1.5 whitespace-nowrap" data-i18n="quote.geometry">几何信息</th>
-                                        <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="weight" data-i18n="quote.weight">重量（单件/总） <span class="sort-arrow text-gray-400 text-[9px]"></span></th>
-                                        <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="time" data-i18n="quote.time">时间（单件/总） <span class="sort-arrow text-gray-400 text-[9px]"></span></th>
-                                        <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="price" data-i18n="quote.price">价格（单价/总价） <span class="sort-arrow text-gray-400 text-[9px]"></span></th>
-                                        <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="status" data-i18n="quote.status">状态 <span class="sort-arrow text-gray-400 text-[9px]"></span></th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none tw-hover-row" data-sort-key="weight" data-i18n="quote.weight">重量（单件/总） <span class="sort-arrow tw-text-muted text-[9px]"></span></th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none tw-hover-row" data-sort-key="time" data-i18n="quote.time">时间（单件/总） <span class="sort-arrow tw-text-muted text-[9px]"></span></th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none tw-hover-row" data-sort-key="price" data-i18n="quote.price">价格（单价/总价） <span class="sort-arrow tw-text-muted text-[9px]"></span></th>
+                                        <th class="px-2 py-1.5 whitespace-nowrap cursor-pointer select-none tw-hover-row" data-sort-key="status" data-i18n="quote.status">状态 <span class="sort-arrow tw-text-muted text-[9px]"></span></th>
                                         <th class="px-2 py-1.5 whitespace-nowrap" data-i18n="quote.actions">操作</th>
                                     </tr>
                                 </thead>
-                                <tbody id="batch-results-body" class="bg-white">
-                                    <tr class="border-t border-gray-100">
-                                        <td class="px-2 py-2 text-gray-500" colspan="14" data-i18n="quote.noDataUpload">暂无数据，请在表格底部上传并自动报价</td>
+                                <tbody id="batch-results-body" style="background-color: var(--color-surface);">
+                                    <tr style="border-top: 1px solid var(--color-border);">
+                                        <td class="px-2 py-2 tw-text-muted" colspan="14" data-i18n="quote.noDataUpload">暂无数据，请在表格底部上传并自动报价</td>
                                     </tr>
                                 </tbody>
                             </table>
-                            <div id="table-pagination" class="flex items-center justify-between px-2 py-2 border-t border-gray-200 bg-gray-50 text-[11px] hidden">
+                            <div id="table-pagination" class="flex items-center justify-between px-2 py-2 text-[11px] hidden rounded-b-md" style="border-top: 1px solid var(--color-border); background-color: var(--color-surface);">
                                 <div class="flex items-center gap-2">
-                                    <span class="text-gray-500">每页</span>
-                                    <select id="page-size-select" class="border border-gray-300 rounded px-1 py-0.5 text-[11px] bg-white">
+                                    <span class="tw-text-muted">每页</span>
+                                    <select id="page-size-select" class="border rounded px-1 py-0.5 text-[11px] tw-card" style="border-color: var(--color-border-strong);">
                                         <option value="10">10</option>
                                         <option value="20" selected>20</option>
                                         <option value="50">50</option>
                                         <option value="100">100</option>
                                     </select>
-                                    <span class="text-gray-500">条</span>
-                                    <span id="page-info" class="text-gray-600 ml-2"></span>
+                                    <span class="tw-text-muted">条</span>
+                                    <span id="page-info" class="tw-text-secondary ml-2"></span>
                                 </div>
                                 <div class="flex items-center gap-1">
-                                    <button id="page-first" class="px-2 py-0.5 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed" disabled>«</button>
-                                    <button id="page-prev" class="px-2 py-0.5 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed" disabled>‹</button>
+                                    <button id="page-first" class="px-2 py-0.5 border rounded tw-btn-ghost disabled:opacity-40 disabled:cursor-not-allowed" style="border-color: var(--color-border-strong);" disabled>«</button>
+                                    <button id="page-prev" class="px-2 py-0.5 border rounded tw-btn-ghost disabled:opacity-40 disabled:cursor-not-allowed" style="border-color: var(--color-border-strong);" disabled>‹</button>
                                     <div id="page-buttons" class="flex items-center gap-1"></div>
-                                    <button id="page-next" class="px-2 py-0.5 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed" disabled>›</button>
-                                    <button id="page-last" class="px-2 py-0.5 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed" disabled>»</button>
+                                    <button id="page-next" class="px-2 py-0.5 border rounded tw-btn-ghost disabled:opacity-40 disabled:cursor-not-allowed" style="border-color: var(--color-border-strong);" disabled>›</button>
+                                    <button id="page-last" class="px-2 py-0.5 border rounded tw-btn-ghost disabled:opacity-40 disabled:cursor-not-allowed" style="border-color: var(--color-border-strong);" disabled>»</button>
                                 </div>
                             </div>
                         </div>
 
                         <!-- 移动端：卡片布局（lg 以下） -->
-                        <div id="batch-results-cards" class="mt-4 space-y-3 lg:hidden">
-                            <p class="text-sm text-gray-500 text-center py-4" data-i18n="quote.noDataUpload">暂无数据，请在下方上传并自动报价</p>
+                        <div id="batch-results-cards" class="mt-4 grid grid-cols-1 gap-4 lg:hidden">
+                            <p class="text-sm tw-text-muted text-center py-4" data-i18n="quote.noDataUpload">暂无数据，请在下方上传并自动报价</p>
                         </div>
 
                         <!-- 上传区域（独立于表格，所有屏幕尺寸可见） -->
                         <div class="mt-4">
                             <form id="quote-form" class="space-y-3">
-                                <div class="mt-1 flex flex-col items-center justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md bg-gray-50 hover:bg-gray-100 transition-all duration-200 cursor-pointer" id="drop-zone">
+                                <div class="mt-1 flex flex-col items-center justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-md transition-all duration-200 cursor-pointer" id="drop-zone" style="border-color: var(--color-border-strong); background-color: var(--color-surface-hover);">
                                     <div class="space-y-1 text-center w-full">
                                         <!-- 拖拽图标 -->
                                         <div id="drop-icon" class="transition-transform duration-200">
-                                            <svg class="mx-auto h-14 w-14 text-indigo-400 animate-spin-slow" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+                                            <svg class="mx-auto h-14 w-14" style="color: var(--color-primary-400);" viewBox="0 0 64 64" fill="none" aria-hidden="true">
                                                 <g stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                     <path d="M20 20h24v24H20z"/>
                                                     <path d="M28 12h24v24H28" stroke-opacity="0.5"/>
@@ -259,27 +259,27 @@
                                                 </g>
                                             </svg>
                                         </div>
-                                        <div class="flex text-sm text-gray-600 justify-center">
-                                            <label for="file-upload" class="relative cursor-pointer rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500" onclick="event.stopPropagation()">
+                                        <div class="flex text-sm tw-text-secondary justify-center">
+                                            <label for="file-upload" class="relative cursor-pointer rounded-md font-medium tw-text-primary hover:opacity-80 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2" style="--tw-ring-color: var(--color-primary);" onclick="event.stopPropagation()">
                                                 <span data-i18n="quote.selectFile">选择文件</span>
                                                 <input id="file-upload" name="files" type="file" class="sr-only" accept=".stl,.stp,.step,.obj,.3mf,.zip" multiple required>
                                             </label>
                                         </div>
-                                        <p id="file-name" class="text-xs text-gray-500 mt-2" data-i18n="quote.noFileSelected">未选择文件（单文件<10MB，ZIP<1GB）</p>
-                                        <p id="upload-limit-hint" class="text-[10px] text-gray-400 mt-1"></p>
-                                        <div class="text-sm font-medium text-gray-700 mt-2" data-i18n="quote.uploadModels">上传 3D 模型（stl/stp/step/obj/3mf 单文件<10MB，ZIP<1GB）</div>
+                                        <p id="file-name" class="text-xs tw-text-muted mt-2" data-i18n="quote.noFileSelected">未选择文件（单文件<10MB，ZIP<1GB）</p>
+                                        <p id="upload-limit-hint" class="hidden text-[10px] tw-text-muted mt-1"></p>
+                                        <div class="text-sm font-medium tw-text mt-2" data-i18n="quote.uploadModels">上传 3D 模型（stl/stp/step/obj/3mf 单文件<10MB，ZIP<1GB）</div>
 
                                         <!-- 上传进度条 -->
                                         <div id="upload-progress-container" class="hidden mt-3 w-full max-w-md mx-auto">
                                             <div class="flex items-center justify-between mb-1">
-                                                <span id="upload-progress-label" class="text-xs text-gray-600">上传中...</span>
-                                                <span id="upload-progress-percent" class="text-xs font-medium text-indigo-600">0%</span>
+                                                <span id="upload-progress-label" class="text-xs tw-text-secondary">上传中...</span>
+                                                <span id="upload-progress-percent" class="text-xs font-medium tw-text-primary">0%</span>
                                             </div>
-                                            <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                                                <div id="upload-progress-bar" class="bg-indigo-600 h-2 rounded-full transition-all duration-300 ease-out" style="width: 0%"></div>
+                                            <div class="w-full h-2 overflow-hidden rounded-full" style="background-color: var(--color-disabled-bg);">
+                                                <div id="upload-progress-bar" class="h-2 rounded-full transition-all duration-300 ease-out" style="background-color: var(--color-primary); width: 0%"></div>
                                             </div>
-                                            <div id="upload-progress-detail" class="text-[10px] text-gray-400 mt-1"></div>
-                                            <button id="zip-cancel-btn" type="button" class="hidden mt-2 inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded hover:bg-red-100 transition-colors">
+                                            <div id="upload-progress-detail" class="text-[10px] tw-text-muted mt-1"></div>
+                                            <button id="zip-cancel-btn" type="button" class="hidden mt-2 inline-flex items-center gap-1 px-3 py-1 text-xs font-medium tw-btn-danger transition-colors">
                                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                                                 <span id="zip-cancel-btn-text">取消处理</span>
                                             </button>
@@ -289,7 +289,7 @@
 
                                 <!-- ZIP导入模板下载（放在 drop-zone 外部，避免点击触发文件上传） -->
                                 <div class="mt-2 text-center">
-                                    <a href="/api/quote/zip/template" target="_blank" rel="noopener" class="text-xs text-gray-400 hover:text-indigo-500 underline transition-colors" data-i18n="quote.downloadTemplate">下载导入模板</a>
+                                    <a href="/api/quote/zip/template" target="_blank" rel="noopener" class="text-xs tw-text-muted hover:opacity-80 underline transition-colors" style="color: var(--color-primary);" data-i18n="quote.downloadTemplate">下载导入模板</a>
                                 </div>
 
                                 <!-- 文件预览缩略图区域 -->
@@ -297,10 +297,9 @@
 
                                 <!-- Toast 通知容器 -->
                                 <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
-                                </div>
 
                                 <div class="mt-4 flex flex-col items-center justify-center gap-3">
-                                    <p class="text-xs text-indigo-600 mt-2 bg-indigo-50 px-3 py-1 rounded-full flex items-center gap-1" data-i18n="quote.prusaEnabled">
+                                    <p class="text-xs tw-text-primary mt-2 px-3 py-1 rounded-full flex items-center gap-1" style="background-color: var(--color-primary-bg);" data-i18n="quote.prusaEnabled">
                                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
                                         PrusaSlicer 切片精确估算已启用
                                     </p>
@@ -313,8 +312,8 @@
             </div>
             
             <!-- 错误提示 -->
-            <div id="error-container" class="mt-4 hidden p-4 bg-red-50 border-l-4 border-red-400 rounded-md">
-                <p class="text-sm text-red-700 font-medium" id="error-msg"></p>
+            <div id="error-container" class="mt-4 hidden p-4 rounded-md" style="background-color: var(--color-danger-bg); border-left: 4px solid var(--color-danger);">
+                <p class="text-sm tw-text-danger font-medium" id="error-msg"></p>
             </div>
 
             <!-- 登录弹窗 — GitHub 风格（多视图：登录 / 忘记密码 / 重置确认） -->

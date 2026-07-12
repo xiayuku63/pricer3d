@@ -70,9 +70,14 @@ export async function quoteSingleFileWithOptions(file, options, signal) {
     if (ifEl && ifEl.value) formData.append("infill", ifEl.value);
     formData.append("use_prusaslicer", "true");
     const autoOrientCheckbox1 = document.getElementById('batch-auto-orient');
-    if (autoOrientCheckbox1 && autoOrientCheckbox1.checked) {
+    // 如果传了指定朝向，不再走自动摆放（避免双重旋转）
+    if (autoOrientCheckbox1 && autoOrientCheckbox1.checked && !options.orient_x && !options.orient_y && !options.orient_z) {
         formData.append('auto_orient', 'true');
     }
+    // 传递指定朝向 (来自"保存"按钮)
+    if (options.orient_x != null) formData.append('orient_x', String(options.orient_x));
+    if (options.orient_y != null) formData.append('orient_y', String(options.orient_y));
+    if (options.orient_z != null) formData.append('orient_z', String(options.orient_z));
     const fetchOpts = { method: 'POST', body: formData };
     if (signal) fetchOpts.signal = signal;
     const response = await authFetch('/api/quote', fetchOpts);

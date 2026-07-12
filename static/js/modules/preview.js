@@ -13,7 +13,7 @@ import {
     lookAtView, applyOrientationRotation, resetOrientation,
     setupFaceClickHandler, highlightFaces, resetHighlight, fitCameraToMesh,
 } from './viewer.js';
-import { clearClusters } from './layface.js';
+import { clearClusters, hidePlacementPlane } from './layface.js';
 import { t } from './i18n.js';
 
 let dom = {};
@@ -33,7 +33,7 @@ const stlLoader = new STLLoader();
 // Parsed-geometry cache for STL thumbnails: skip re-parsing when only the color changes
 const _thumbGeometryCache = new Map();
 
-export async function buildStlThumbnail(file, colorKey = "Blue") {
+export async function buildStlThumbnail(file, colorKey = "Blue", orientation = null) {
     const _fileKey = (file.name || '') + ':' + (file.size || 0);
     let _baseGeo = _thumbGeometryCache.get(_fileKey);
     if (!_baseGeo) {
@@ -70,6 +70,16 @@ export async function buildStlThumbnail(file, colorKey = "Blue") {
         metalness: 0.0,
         roughness: 0.6,
     }));
+    // 若指定朝向，先旋转几何体再渲染缩略图
+    if (orientation) {
+        mesh.rotation.x = THREE.MathUtils.degToRad(orientation.x || 0);
+        mesh.rotation.y = THREE.MathUtils.degToRad(orientation.y || 0);
+        mesh.rotation.z = THREE.MathUtils.degToRad(orientation.z || 0);
+        mesh.updateMatrix();
+        mesh.geometry.applyMatrix4(mesh.matrix);
+        mesh.rotation.set(0, 0, 0);
+        mesh.updateMatrix();
+    }
     applyAxonometricRotation(mesh);
     scene.add(mesh);
     scene.add(new THREE.AmbientLight(0xffffff, 1.0));
@@ -158,11 +168,17 @@ export async function buildNonStlThumbnail(file, colorKey) {
     return dataUrl;
 }
 
-export async function ensureThumbnailForFile(file, colorKey) {
+export async function ensureThumbnailForFile(file, colorKey, orientation = null) {
     const ext = file.name.includes('.') ? file.name.split('.').pop().toLowerCase() : '';
     try {
-        const thumb = ext === 'stl' ? await buildStlThumbnail(file, colorKey) : await buildNonStlThumbnail(file, colorKey);
+        const orient = orientation || { x: 0, y: 0, z: 0 };
+        const thumb = ext === 'stl' ? await buildStlThumbnail(file, colorKey, orientation) : await buildNonStlThumbnail(file, colorKey);
+        // 同时存两份：带朝向的key + 文件名key（兼容现有读取逻辑）
         thumbnailMap.set(file.name, thumb);
+        if (orientation) {
+            const orientKey = file.name + '|' + orient.x + '_' + orient.y + '_' + orient.z;
+            thumbnailMap.set(orientKey, thumb);
+        }
     } catch (e) {
         console.warn('Thumbnail failed for', file.name, 'color=' + colorKey + ':', e.message);
         thumbnailMap.set(file.name, buildPlaceholderThumbnail(ext));
@@ -185,7 +201,7 @@ export async function buildThumbnails(selectedFiles, colorByFilename = {}) {
 
 // ── Preview modal ──
 export function openPreviewModal(onFaceClickCb) {
-    const { previewModal, previewContainer, viewCube } = dom;
+    const { previewModal, previewContainer, viewCube, layFaceBtn, orientSaveBtn, orientLearnedBtn } = dom;
     if (previewModal) previewModal.classList.remove('hidden');
     const width = previewContainer?.clientWidth || 1000;
     const height = previewContainer?.clientHeight || 700;
@@ -195,12 +211,17 @@ export function openPreviewModal(onFaceClickCb) {
     applyOrientationRotation(quoteOptions.orientation || { x: 0, y: 0, z: 0 });
     setupFaceClickHandler(onFaceClickCb);
     if (viewCube) viewCube.classList.remove('hidden');
+    // 重置按钮文字（避免上次操作遗留下的状态）
+    if (layFaceBtn) layFaceBtn.textContent = t('orientation.autoOrient');
+    if (orientSaveBtn) { orientSaveBtn.textContent = '保存当前方向并报价'; orientSaveBtn.disabled = false; }
+    if (orientLearnedBtn) { orientLearnedBtn.textContent = t('orientation.autoLearn'); orientLearnedBtn.disabled = false; }
 }
 
 export function closePreviewModal() {
     const { previewModal, viewCube, layFaceBtn } = dom;
     setupFaceClickHandler(null);
     clearClusters();
+    hidePlacementPlane();
     window.__onLayFaceClick = null;
     if (layFaceBtn) layFaceBtn.textContent = t('orientation.autoOrient');
     if (previewModal) previewModal.classList.add('hidden');

@@ -21,12 +21,21 @@ logger = logging.getLogger(__name__)
 
 def prusa_executable() -> Optional[str]:
     """Return path to prusa-slicer binary, or None if not installed."""
-    for candidate in [
+    candidates = [
         shutil.which("prusa-slicer"),
+        shutil.which("prusa-slicer-console"),
+        shutil.which("prusaslicer"),
+        shutil.which("prusaslicer-console"),
+        # Linux
         "/usr/bin/prusa-slicer",
         "/usr/local/bin/prusa-slicer",
         "/snap/bin/prusa-slicer",
-    ]:
+        # Windows
+        "C:/Program Files/Prusa3D/PrusaSlicer/prusa-slicer-console.exe",
+        "C:/Program Files/Prusa3D/PrusaSlicer/prusa-slicer.exe",
+        "C:/Program Files (x86)/Prusa3D/PrusaSlicer/prusa-slicer-console.exe",
+    ]
+    for candidate in candidates:
         if candidate and os.path.isfile(candidate) and os.access(candidate, os.X_OK):
             return candidate
     return None

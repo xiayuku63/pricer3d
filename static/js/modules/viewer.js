@@ -453,6 +453,10 @@ export function lookAtView(view, meshObject) {
 }
 
 export function clearCurrentMesh() {
+    // 清理可放置平面视觉（如果有）
+    if (typeof window.__cleanupPlaceablePlane === 'function') {
+        window.__cleanupPlaceablePlane();
+    }
     if (!currentMesh) return;
     scene.remove(currentMesh);
     if (currentMesh.type === 'Group') {
@@ -567,7 +571,7 @@ export function renderSTL(file, colorKey = 'Blue', orientation = null) {
         clearCurrentMesh();
         renderViaGLB(file, orientation, colorKey).then(ok => {
             if (!ok) {
-                previewPlaceholder.innerHTML = '<div style="text-align:center;padding-top:20%"><div style="font-size:4rem;margin-bottom:1rem">📦</div><p style="color:#64748b">' + ext.toUpperCase() + ' 预览失败</p><p style="color:#94a3b8;font-size:0.8rem">上传后将自动切片报价</p></div>';
+                previewPlaceholder.innerHTML = '<div style="text-align:center;padding-top:20%"><div style="font-size:4rem;margin-bottom:1rem">📦</div><p style="color:var(--color-text-muted)">' + ext.toUpperCase() + ' 预览失败</p><p style="color:var(--color-disabled-text);font-size:0.8rem">上传后将自动切片报价</p></div>';
                 previewPlaceholder.classList.remove('hidden');
             }
         });

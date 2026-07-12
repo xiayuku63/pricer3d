@@ -136,9 +136,9 @@ def get_user_by_id(user_id: int):
 def authenticate_user(identifier: str, password: str):
     user = get_user_by_identifier(identifier)
     if not user:
-        raise HTTPException(status_code=401, detail="账号或密码错误")
+        raise HTTPException(status_code=401, detail="账号不存在")
     if not verify_password(password, user["password_hash"]):
-        raise HTTPException(status_code=401, detail="账号或密码错误")
+        raise HTTPException(status_code=401, detail="密码错误")
     return user
 
 
@@ -154,7 +154,7 @@ def create_verification_code(channel: str, target: str) -> tuple[str, int]:
             channel=channel,
             target=target,
             code_hash=hash_verify_code(code),
-            expires_at=str(expires_at),
+            expires_at=expires_at,
             created_at=created_at,
             used_at=None,
             attempts=0,
@@ -417,18 +417,18 @@ def record_login_failure(identifier: str) -> tuple[bool, int]:
                 new_locked_until = now + LOGIN_LOCK_SECONDS
                 remaining = int(LOGIN_LOCK_SECONDS)
             row.fail_count = int(fail_count)
-            row.first_failed_at = str(first_failed_at)
-            row.last_failed_at = str(now)
-            row.locked_until = str(new_locked_until)
+            row.first_failed_at = first_failed_at
+            row.last_failed_at = now
+            row.locked_until = new_locked_until
             return locked, remaining
         else:
             lf = LoginFailure(
                 created_at=now_iso,
                 key_hash=key_hash,
                 fail_count=1,
-                first_failed_at=str(now),
-                last_failed_at=str(now),
-                locked_until="0",
+                first_failed_at=now,
+                last_failed_at=now,
+                locked_until=0.0,
             )
             db.add(lf)
             return False, 0

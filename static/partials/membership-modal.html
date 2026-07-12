@@ -1,55 +1,55 @@
             <!-- 会员服务弹窗 -->
             <div id="membership-modal" class="hidden fixed inset-0 z-50">
-                <div id="membership-backdrop" class="absolute inset-0 bg-black/50"></div>
+                <div id="membership-backdrop" class="absolute inset-0" style="background-color: var(--color-overlay);"></div>
                 <div class="relative z-10 h-full w-full flex items-center justify-center p-4">
-                    <div class="w-full max-w-2xl bg-white rounded-lg shadow-xl overflow-hidden max-h-[90vh] flex flex-col">
+                    <div class="w-full max-w-2xl tw-card shadow-xl overflow-hidden max-h-[90vh] flex flex-col" style="border-radius: var(--radius-lg);">
                         <!-- Header -->
-                        <div class="px-5 py-3 border-b border-gray-200 flex items-center justify-between shrink-0">
-                            <h4 class="text-sm font-semibold text-gray-800" data-i18n="membership.title">会员套餐</h4>
-                            <button id="membership-close-btn" type="button" class="text-gray-400 hover:text-gray-600 text-sm">关闭</button>
+                        <div class="px-5 py-3 flex items-center justify-between shrink-0" style="border-bottom: 1px solid var(--color-border);">
+                            <h4 class="text-sm font-semibold tw-text-strong" data-i18n="membership.title">会员套餐</h4>
+                            <button id="membership-close-btn" type="button" class="tw-text-muted hover:tw-text text-sm">关闭</button>
                         </div>
 
                         <!-- Body (scrollable) -->
                         <div class="p-5 space-y-4 overflow-y-auto flex-1 min-h-0">
                             <!-- 当前会员状态 -->
-                            <div id="membership-status-card" class="rounded-lg border border-gray-200 overflow-hidden">
-                                <div class="px-4 py-3 bg-gray-50 flex items-center justify-between">
+                            <div id="membership-status-card" class="rounded-lg overflow-hidden" style="border: 1px solid var(--color-border);">
+                                <div class="px-4 py-3 flex items-center justify-between" style="background-color: var(--color-bg);">
                                     <div>
-                                        <div id="membership-status-level" class="text-sm font-semibold text-gray-800">-</div>
-                                        <div id="membership-status-expire" class="text-[11px] text-gray-500"></div>
+                                        <div id="membership-status-level" class="text-sm font-semibold tw-text-strong">-</div>
+                                        <div id="membership-status-expire" class="text-[11px] tw-text-muted"></div>
                                     </div>
                                     <span id="membership-status-badge" class="hidden text-xs px-2 py-0.5 rounded-full font-medium"></span>
                                 </div>
                             </div>
 
                             <!-- 会员权益 -->
-                            <div class="rounded-lg border border-gray-200 overflow-hidden">
-                                <div class="px-4 py-2 border-b border-gray-200">
-                                    <span class="text-xs font-medium text-gray-700">会员权益</span>
+                            <div class="rounded-lg overflow-hidden" style="border: 1px solid var(--color-border);">
+                                <div class="px-4 py-2" style="border-bottom: 1px solid var(--color-border);">
+                                    <span class="text-xs font-medium tw-text">会员权益</span>
                                 </div>
                                 <div class="px-4 py-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
                                     <div>
-                                        <div class="text-xs font-medium text-gray-800">专属折扣</div>
-                                        <div id="membership-benefit-discount" class="text-[11px] text-gray-500">报价享受会员专属折扣</div>
+                                        <div class="text-xs font-medium tw-text-strong">专属折扣</div>
+                                        <div id="membership-benefit-discount" class="text-[11px] tw-text-muted">报价享受会员专属折扣</div>
                                     </div>
                                     <div>
-                                        <div class="text-xs font-medium text-gray-800">优先处理</div>
-                                        <div class="text-[11px] text-gray-500">会员订单优先排产</div>
+                                        <div class="text-xs font-medium tw-text-strong">优先处理</div>
+                                        <div class="text-[11px] tw-text-muted">会员订单优先排产</div>
                                     </div>
                                     <div>
-                                        <div class="text-xs font-medium text-gray-800">详细报表</div>
-                                        <div class="text-[11px] text-gray-500">完整费用明细和历史记录</div>
+                                        <div class="text-xs font-medium tw-text-strong">详细报表</div>
+                                        <div class="text-[11px] tw-text-muted">完整费用明细和历史记录</div>
                                     </div>
                                     <div>
-                                        <div class="text-xs font-medium text-gray-800">专属客服</div>
-                                        <div class="text-[11px] text-gray-500">一对一技术支持</div>
+                                        <div class="text-xs font-medium tw-text-strong">专属客服</div>
+                                        <div class="text-[11px] tw-text-muted">一对一技术支持</div>
                                     </div>
                                 </div>
                             </div>
 
                             <!-- 套餐列表 -->
                             <div>
-                                <div class="text-xs font-medium text-gray-700 mb-2">选择套餐</div>
+                                <div class="text-xs font-medium tw-text mb-2">选择套餐</div>
                                 <div id="membership-plans" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
                             </div>
 
@@ -58,14 +58,14 @@
 
                             <!-- 操作按钮 -->
                             <div class="flex flex-col sm:flex-row gap-2 pt-1">
-                                <button id="membership-refresh-btn" type="button" class="w-full sm:flex-1 py-2 px-3 rounded-md border border-indigo-300 text-indigo-700 text-sm hover:bg-indigo-50">刷新会员状态</button>
-                                <button id="membership-orders-btn" type="button" class="w-full sm:flex-1 py-2 px-3 rounded-md border border-gray-300 text-gray-700 text-sm hover:bg-gray-50">查看订单</button>
+                                <button id="membership-refresh-btn" type="button" class="tw-btn-secondary w-full sm:flex-1 py-2 px-3 rounded-md text-sm">刷新会员状态</button>
+                                <button id="membership-orders-btn" type="button" class="w-full sm:flex-1 py-2 px-3 rounded-md text-sm" style="border: 1px solid var(--color-border-strong); color: var(--color-text);">查看订单</button>
                             </div>
 
                             <!-- 订单历史 -->
-                            <div id="membership-orders" class="hidden overflow-x-auto border border-gray-200 rounded-md">
+                            <div id="membership-orders" class="hidden overflow-x-auto rounded-md" style="border: 1px solid var(--color-border);">
                                 <table class="min-w-full text-[11px] text-left">
-                                    <thead class="bg-gray-50 text-gray-600">
+                                    <thead style="background-color: var(--color-bg); color: var(--color-text-secondary);">
                                         <tr>
                                             <th class="px-2 py-2">订单号</th>
                                             <th class="px-2 py-2">套餐</th>
@@ -74,8 +74,8 @@
                                             <th class="px-2 py-2">创建</th>
                                         </tr>
                                     </thead>
-                                    <tbody id="membership-orders-tbody" class="bg-white divide-y divide-gray-100">
-                                        <tr><td colspan="5" class="px-2 py-3 text-gray-500">暂无数据</td></tr>
+                                    <tbody id="membership-orders-tbody" style="background-color: var(--color-surface);">
+                                        <tr><td colspan="5" class="px-2 py-3 tw-text-muted">暂无数据</td></tr>
                                     </tbody>
                                 </table>
                             </div>

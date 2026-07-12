@@ -87,10 +87,20 @@ def init_db() -> None:
 
 
 def _safe_add_column(conn, table: str, column: str, col_type: str) -> None:
+    """Add a column if it doesn't exist. Uses text() for SQLAlchemy 2.0 compat."""
+    import logging
+    from sqlalchemy import text as _text
+    _log = logging.getLogger(__name__)
     try:
-        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
-    except Exception:
-        pass
+        conn.execute(_text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"))
+        conn.commit()
+        _log.debug("ALTER TABLE %s ADD COLUMN %s %s — ok", table, column, col_type)
+    except Exception as e:
+        err = str(e).lower()
+        if "duplicate column" in err or "already exists" in err:
+            _log.debug("Column %s.%s already exists, skip", table, column)
+        else:
+            _log.warning("ALTER TABLE %s ADD COLUMN %s %s failed: %s", table, column, col_type, e)
 
 
 def get_app_defaults() -> dict:

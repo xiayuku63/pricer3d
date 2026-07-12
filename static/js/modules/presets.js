@@ -119,15 +119,15 @@ export function renderSlicerPresetsUI() {
     const items = slicerPresets || [];
     _selectedPresetId = null;
     if (!items.length) {
-        slicerPresetsTbody.innerHTML = '<tr><td colspan="3" class="px-3 py-3 text-gray-400">' + t('slicer.noPresets') + '</td></tr>';
+        slicerPresetsTbody.innerHTML = '<tr><td colspan="3" class="px-3 py-3 tw-text-muted">' + t('slicer.noPresets') + '</td></tr>';
         return;
     }
     slicerPresetsTbody.innerHTML = items.map((p, idx) => `
         <tr class="preset-row hover:bg-gray-50" data-preset-id="${p.id}">
-            <td class="px-3 py-2 text-gray-400">${idx + 1}</td>
-            <td class="px-3 py-2">${p.name || '-'}</td>
+            <td class="px-3 py-2 tw-text-muted">${idx + 1}</td>
+            <td class="px-3 py-2 tw-text">${p.name || '-'}</td>
             <td class="px-3 py-2 text-center">
-                <button type="button" class="text-xs text-red-500 hover:text-red-700 preset-delete-btn" data-preset-id="${p.id}">${t('common.delete')}</button>
+                <button type="button" class="text-xs tw-text-danger hover:tw-text-danger preset-delete-btn" data-preset-id="${p.id}">${t('common.delete')}</button>
             </td>
         </tr>
     `).join('');
@@ -715,7 +715,7 @@ export function renderPrinterVisibilityList() {
     const tbody = document.getElementById('enabled-printers-tbody');
     if (!tbody) return;
     if (!_printerModels.length) {
-        tbody.innerHTML = '<tr><td colspan="3" class="px-3 py-3 text-gray-400">暂无机型数据</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="3" class="px-3 py-3 tw-text-muted">暂无机型数据</td></tr>';
         return;
     }
     const enabled = getEnabledPrinters();
@@ -728,7 +728,7 @@ export function renderPrinterVisibilityList() {
         const tdName = document.createElement('td');
         tdName.className = 'px-3 py-2';
         const sel = document.createElement('select');
-        sel.className = 'w-full border border-gray-300 rounded-md text-xs px-2 py-1.5 bg-white';
+        sel.className = 'w-full rounded-md text-xs px-2 py-1.5 bg-white';
         _printerModels.forEach(p => {
             const opt = document.createElement('option');
             opt.value = p.id;
@@ -753,7 +753,7 @@ export function renderPrinterVisibilityList() {
         tdDel.className = 'px-3 py-2 text-center';
         const delBtn = document.createElement('button');
         delBtn.type = 'button';
-        delBtn.className = 'text-xs text-red-500 hover:text-red-700';
+        delBtn.className = 'text-xs tw-text-danger hover:tw-text-danger';
         delBtn.textContent = t('common.delete');
         delBtn.addEventListener('click', () => {
             const current = getEnabledPrinters();

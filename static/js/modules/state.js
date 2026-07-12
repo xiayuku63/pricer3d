@@ -155,6 +155,168 @@ export let PRICING_CONFIG = {
     total_cost_formula: 'max((unit_cost_cny * quantity) + setup_fee_cny, min_job_fee_cny)',
 };
 
+// ── Color wheel utilities (HSL/RGB conversions + canvas drawing) ──
+
+function _hslToRgb(h, s, l) {
+    // h: 0-360, s: 0-100, l: 0-100
+    h /= 360; s /= 100; l /= 100;
+    if (s === 0) { const v = Math.round(l * 255); return [v, v, v]; }
+    const hue2rgb = (p, q, t) => {
+        if (t < 0) t += 1;
+        if (t > 1) t -= 1;
+        if (t < 1/6) return p + (q - p) * 6 * t;
+        if (t < 1/2) return q;
+        if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+        return p;
+    };
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    return [
+        Math.round(hue2rgb(p, q, h + 1/3) * 255),
+        Math.round(hue2rgb(p, q, h) * 255),
+        Math.round(hue2rgb(p, q, h - 1/3) * 255)
+    ];
+}
+
+function _rgbToHex(r, g, b) {
+    return '#' + [r, g, b].map(x => Math.max(0, Math.min(255, Math.round(x))).toString(16).padStart(2, '0')).join('');
+}
+
+export function hexToRgb(hex) {
+    const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : [0, 0, 0];
+}
+
+function _rgbToHsl(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    let h = 0, s = 0;
+    const l = (mx + mn) / 2;
+    if (mx !== mn) {
+        const d = mx - mn;
+        s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+        if (mx === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+        else if (mx === g) h = ((b - r) / d + 2) / 6;
+        else h = ((r - g) / d + 4) / 6;
+    }
+    return [h * 360, s * 100, l * 100];
+}
+
+function _getMonochromeShades(hue, saturation, count) {
+    const shades = [];
+    for (let i = 0; i < count; i++) {
+        const t = i / (count - 1);
+        const l = 10 + t * 82;           // 10% → 92% lightness
+        const s = saturation * (1 - t * 0.5); // sat gradually drops toward light end
+        const [r, g, b] = _hslToRgb(hue, s, l);
+        shades.push(_rgbToHex(r, g, b));
+    }
+    return shades;
+}
+
+/**
+ * Draw an HSL color wheel on a canvas element with a selection dot.
+ * @param {HTMLCanvasElement} canvas
+ * @param {number} [selHue=0] - selected hue 0-360
+ * @param {number} [selSat=100] - selected saturation 0-100
+ */
+export function drawColorWheel(canvas, selHue, selSat) {
+    if (!canvas || !canvas.getContext) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width, h = canvas.height;
+    const cx = w / 2, cy = h / 2, radius = Math.min(cx, cy) - 2;
+    const imgData = ctx.createImageData(w, h);
+    const d = imgData.data;
+
+    for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+            const dx = x - cx, dy = y - cy;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const idx = (y * w + x) * 4;
+            if (dist > radius) {
+                d[idx] = d[idx + 1] = d[idx + 2] = d[idx + 3] = 0;
+                continue;
+            }
+            // Anti-alias the edge: fade alpha near boundary
+            let alpha = 255;
+            if (dist > radius - 1.5) {
+                alpha = Math.round(Math.max(0, Math.min(255, (radius - dist) * 170)));
+            }
+            let angle = Math.atan2(dy, dx);
+            if (angle < 0) angle += Math.PI * 2;
+            const hue = (angle / (Math.PI * 2)) * 360;
+            const sat = Math.min((dist / radius) * 100, 100);
+            const [r, g, b] = _hslToRgb(hue, sat, 50);
+            d[idx] = r; d[idx + 1] = g; d[idx + 2] = b; d[idx + 3] = alpha;
+        }
+    }
+    ctx.putImageData(imgData, 0, 0);
+
+    // Draw a smooth circular border (anti-aliased via canvas path)
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius - 0.5, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Selection dot (hue=0 at 3-o'clock, matching pixel rendering)
+    if (selHue !== undefined && selSat !== undefined) {
+        const angleRad = (selHue / 360) * Math.PI * 2;
+        const satDist = (selSat / 100) * radius;
+        const dotX = cx + Math.cos(angleRad) * satDist;
+        const dotY = cy + Math.sin(angleRad) * satDist;
+        ctx.beginPath(); ctx.arc(dotX, dotY, 5, 0, Math.PI * 2);
+        ctx.strokeStyle = 'white'; ctx.lineWidth = 2.5; ctx.stroke();
+        ctx.beginPath(); ctx.arc(dotX, dotY, 5, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 1; ctx.stroke();
+    }
+}
+
+/**
+ * Get hue/saturation from a click/touch position on a color wheel canvas.
+ * @returns {{hue:number, sat:number}|null}
+ */
+export function getColorWheelHueSat(canvas, clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    const x = (clientX - rect.left) * (canvas.width / rect.width);
+    const y = (clientY - rect.top) * (canvas.height / rect.height);
+    const cx = canvas.width / 2, cy = canvas.height / 2;
+    const radius = Math.min(cx, cy) - 2;
+    const dx = x - cx, dy = y - cy;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > radius) return null;
+    let angle = Math.atan2(dy, dx);
+    if (angle < 0) angle += Math.PI * 2;
+    return { hue: (angle / (Math.PI * 2)) * 360, sat: (dist / radius) * 100 };
+}
+
+/**
+ * Build a color wheel panel (preview + canvas + monochrome swatches).
+ * @param {string} hex - current selected hex color
+ * @returns {string} panel HTML
+ */
+function _buildColorWheelPanel(hex) {
+    const [r, g, b] = hexToRgb(hex);
+    const [hue, sat] = _rgbToHsl(r, g, b);
+    const shades = _getMonochromeShades(hue, sat, 10);
+    const swatches = shades.map(sh =>
+        `<button type="button" class="cw-swatch w-7 h-7 rounded-md border border-gray-300 hover:border-indigo-400 hover:shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 flex-shrink-0" style="background:${sh}" data-color-hex="${sh}" title="${sh}"></button>`
+    ).join('');
+
+    return '<div class="cw-panel-inner bg-white" style="width:240px;">'
+        + '<div class="flex items-center gap-3 mb-3">'
+        + '<span class="cw-preview-swatch w-10 h-10 rounded-lg border border-gray-300 flex-shrink-0 shadow-sm" style="background:' + hex + '"></span>'
+        + '<span class="cw-preview-hex font-mono text-sm font-semibold text-gray-700 select-all">' + hex + '</span>'
+        + '</div>'
+        + '<div class="flex justify-center mb-3">'
+        + '<canvas class="cw-canvas" width="200" height="200" style="cursor:crosshair;border-radius:50%;display:block;"></canvas>'
+        + '</div>'
+        + '<div class="flex gap-1.5 justify-center flex-wrap px-1">'
+        + swatches
+        + '</div>'
+        + '</div>';
+}
+
 // ── Utility: color (no palette lookups — uses hex from data directly) ──
 export function colorToObj(c) {
     if (!c) return null;
@@ -344,17 +506,17 @@ export function renderColorDropdown(name, selectedColor, compact) {
             + (c.hex === safeHex ? ' bg-indigo-50' : '')
             + '" data-color-hex="' + hex + '">'
             + '<span class="w-5 h-5 rounded-sm border border-gray-400 flex-shrink-0" style="background:' + hex + '"></span>'
-            + '<span class="flex-1 font-mono text-xs">' + hex + '</span>'
+            + '<span class="flex-1 font-mono text-xs tw-text-secondary">' + hex + '</span>'
             + '</button>';
     }).join('');
 
     if (compact) {
         const html = '<div class="color-dd-wrapper relative inline-block">'
-            + '<button type="button" class="color-dd-trigger flex items-center gap-1 px-1.5 py-0.5 border border-gray-400 rounded text-[11px] bg-white hover:border-gray-400 min-w-[36px]">'
+            + '<button type="button" class="color-dd-trigger flex items-center gap-1 px-1.5 py-0.5 border border-gray-400 rounded text-[11px] tw-bg-surface tw-text hover:border-gray-400 min-w-[36px]">'
             + '<span class="color-dd-swatch w-3.5 h-3.5 rounded-sm border border-gray-400 flex-shrink-0" style="background:' + safeHex + '"></span>'
             + '<svg class="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>'
             + '</button>'
-            + '<div class="color-dd-list hidden absolute z-50 left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg overflow-y-auto min-w-[140px]" style="max-height:360px;">'
+            + '<div class="color-dd-list hidden absolute z-50 left-0 mt-1 tw-bg-surface border border-gray-200 rounded-md shadow-lg overflow-y-auto min-w-[140px]" style="max-height:360px;">'
             + listItems
             + '</div>'
             + '<input type="hidden" class="row-color-value" value="' + safeHex + '">'
@@ -363,12 +525,12 @@ export function renderColorDropdown(name, selectedColor, compact) {
     }
 
     const html = '<div class="color-dd-wrapper relative">'
-        + '<button type="button" class="color-dd-trigger flex items-center gap-2 w-full px-3 py-2 border border-gray-400 rounded-md text-sm bg-white hover:border-gray-400">'
+        + '<button type="button" class="color-dd-trigger flex items-center gap-2 w-full px-3 py-2 border border-gray-400 rounded-md text-sm tw-bg-surface tw-text hover:border-gray-400">'
         + '<span class="color-dd-swatch w-5 h-5 rounded-sm border border-gray-400 flex-shrink-0" style="background:' + safeHex + '"></span>'
-        + '<span class="color-dd-label flex-1 text-left font-mono text-xs">' + safeHex + '</span>'
+        + '<span class="color-dd-label flex-1 text-left font-mono text-xs tw-text-secondary">' + safeHex + '</span>'
         + '<svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>'
         + '</button>'
-        + '<div class="color-dd-list hidden absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg overflow-y-auto" style="max-height:360px;">'
+        + '<div class="color-dd-list hidden absolute z-50 left-0 right-0 mt-1 tw-bg-surface border border-gray-200 rounded-md shadow-lg overflow-y-auto" style="max-height:360px;">'
         + listItems
         + '</div>'
         + '<input type="hidden" class="row-color-value" value="' + safeHex + '">'

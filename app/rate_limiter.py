@@ -3,6 +3,7 @@
 import time
 import logging
 import threading
+import datetime as _dt
 from collections import defaultdict, deque
 
 _logger = logging.getLogger(__name__)
@@ -43,7 +44,7 @@ class PersistentRateLimiter:
             with get_db_session() as db:
                 existing = db.query(RateLimitState).filter(RateLimitState.rate_key == key[:200]).first()
                 bucket_json = f'{{"count":{count},"limit":{limit},"window":{window}}}'
-                updated_at = time.strftime('%Y-%m-%dT%H:%M:%S', time.gmtime(now))
+                updated_at = _dt.datetime.now(_dt.timezone.utc)
                 if existing:
                     existing.bucket_json = bucket_json
                     existing.updated_at = updated_at

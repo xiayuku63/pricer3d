@@ -97,7 +97,7 @@ def create_app() -> FastAPI:
     )
     from .routes_quote import get_quote, validate_formula, quote_history, delete_quote_history, clear_quote_history, export_quote_history, export_quote_pdf, export_pdf_inline
     from .routes_zip_quote import zip_quote, zip_preview, download_zip_model, download_zip_template
-    from .routes_orientation import optimize_orientation, list_stable_faces, list_coplanar_clusters, train_sample, model_status, admin_train_model
+    from .routes_orientation import optimize_orientation, list_stable_faces, list_coplanar_clusters, train_sample, model_status, admin_train_model, auto_learned_orient
     from .routes_pages import (
         index, register_page, legal_terms, legal_privacy, admin_users_page,
         pay_mock, healthz, readyz, version,
@@ -209,6 +209,7 @@ def create_app() -> FastAPI:
     app.post("/api/orientation/train")(train_sample)
     app.get("/api/orientation/model/status")(model_status)
     app.post("/api/admin/orientation/train")(admin_train_model)
+    app.post("/api/orientation/auto-learned")(auto_learned_orient)
 
     # todo
     from .routes_todo import (

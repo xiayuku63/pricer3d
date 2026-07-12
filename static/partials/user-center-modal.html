@@ -1,61 +1,61 @@
             <!-- 用户中心弹窗 -->
             <div id="user-center-modal" class="hidden fixed inset-0 z-50">
-                <div id="user-center-backdrop" class="absolute inset-0 bg-black/50"></div>
+                <div id="user-center-backdrop" class="absolute inset-0" style="background-color: var(--color-overlay);"></div>
                 <div class="relative z-10 h-full w-full flex items-center justify-center p-4">
-                    <div class="w-full max-w-5xl bg-white rounded-lg shadow-xl overflow-hidden flex flex-col h-[85vh]">
-                        <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-                            <h4 class="text-sm font-semibold text-gray-800" data-i18n="settings.title">用户中心</h4>
+                    <div class="w-full max-w-5xl tw-card shadow-xl overflow-hidden flex flex-col h-[85vh]" style="border-radius: var(--radius-lg);">
+                        <div class="px-4 py-3 flex items-center justify-between" style="border-bottom: 1px solid var(--color-border);">
+                            <h4 class="text-sm font-semibold tw-text-strong" data-i18n="settings.title">用户中心</h4>
                             <div class="flex items-center gap-2">
                                 <div class="relative group">
-                                    <button id="user-center-set-defaults-btn" type="button" class="hidden text-xs px-3 py-1.5 rounded-md border border-dashed border-amber-400 text-amber-600 hover:bg-amber-50 hover:border-amber-500 flex items-center gap-1">
+                                    <button id="user-center-set-defaults-btn" type="button" class="hidden text-xs px-3 py-1.5 rounded-md border border-dashed flex items-center gap-1" style="border-color: var(--color-warning-400); color: var(--color-warning-600);">
                                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
                                         <span data-i18n="settings.setAsGlobalDefault">设为全局默认</span>
                                     </button>
-                                    <div class="hidden group-hover:block absolute right-0 top-full mt-1 w-56 p-2 bg-gray-800 text-white text-[11px] rounded-md shadow-lg z-50" data-i18n="settings.setAsGlobalDefaultHint">
+                                    <div class="hidden group-hover:block absolute right-0 top-full mt-1 w-56 p-2 text-white text-[11px] rounded-md shadow-lg z-50" style="background-color: var(--color-neutral-800);" data-i18n="settings.setAsGlobalDefaultHint">
                                         将当前设置复制为所有新用户的初始默认值。仅管理员可用，不影响您自己的设置。
                                     </div>
                                 </div>
-                                <button id="user-center-close-btn" type="button" class="text-gray-500 hover:text-gray-700" data-i18n="common.close">关闭</button>
+                                <button id="user-center-close-btn" type="button" class="tw-text-muted hover:tw-text" data-i18n="common.close">关闭</button>
                             </div>
                         </div>
                         <div class="flex flex-1 overflow-hidden min-h-[500px]">
                             <!-- 左侧导航 -->
-                            <div class="w-48 bg-gray-50 border-r border-gray-200 p-2 flex flex-col gap-1 overflow-y-auto">
-                                <button type="button" data-uc-tab="print-params" class="uc-tab-btn w-full text-left px-3 py-2 rounded-md text-sm font-medium text-indigo-700 bg-indigo-50" data-i18n="settings.printParams">打印参数设置</button>
-                                <button type="button" data-uc-tab="formulas" class="uc-tab-btn w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900" data-i18n="settings.formula">计算公式</button>
-                                <button type="button" data-uc-tab="costs" class="uc-tab-btn w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900" data-i18n="settings.costs">成本与时间</button>
-                                <button type="button" data-uc-tab="security" class="uc-tab-btn w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900" data-i18n="settings.security">账号安全</button>
-                                <button type="button" data-uc-tab="brand" class="uc-tab-btn w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900" data-i18n="settings.brandCustomization">品牌定制</button>
+                            <div class="w-48" style="background-color: var(--color-bg); border-right: 1px solid var(--color-border); padding: 0.5rem; display: flex; flex-direction: column; gap: 0.25rem; overflow-y: auto;">
+                                <button type="button" data-uc-tab="print-params" class="uc-tab-btn w-full text-left px-3 py-2 rounded-md text-sm font-medium tw-text-secondary hover:bg-gray-100" data-i18n="settings.printParams">打印参数</button>
+                                <button type="button" data-uc-tab="formulas" class="uc-tab-btn w-full text-left px-3 py-2 rounded-md text-sm font-medium tw-text-secondary hover:bg-gray-100" data-i18n="settings.formula">计算公式</button>
+                                <button type="button" data-uc-tab="costs" class="uc-tab-btn w-full text-left px-3 py-2 rounded-md text-sm font-medium tw-text-secondary hover:bg-gray-100" data-i18n="settings.costs">成本与时间</button>
+                                <button type="button" data-uc-tab="security" class="uc-tab-btn w-full text-left px-3 py-2 rounded-md text-sm font-medium tw-text-secondary hover:bg-gray-100" data-i18n="settings.security">账号安全</button>
+                                <button type="button" data-uc-tab="brand" class="uc-tab-btn w-full text-left px-3 py-2 rounded-md text-sm font-medium tw-text-secondary hover:bg-gray-100" data-i18n="settings.brandCustomization">品牌定制</button>
                             </div>
                             
                             <!-- 右侧内容区 -->
-                            <div class="flex-1 p-6 overflow-y-auto bg-white relative min-h-[500px]">
+                            <div class="flex-1 p-6 overflow-y-auto tw-card relative min-h-[500px]" style="border-radius: 0;">
                                 <div id="uc-tab-print-params" class="uc-tab-pane block">
                                     <!-- Sub-tab bar -->
-                                    <div class="flex gap-1 border-b border-gray-200 mb-4">
-                                        <button type="button" data-pp-tab="materials" class="pp-sub-tab-btn px-4 py-2 text-sm font-medium text-indigo-700 border-b-2 border-indigo-600" data-i18n="material.title">材料设置</button>
-                                        <button type="button" data-pp-tab="printer" class="pp-sub-tab-btn px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent" data-i18n="printer.title">机型配置</button>
-                                        <button type="button" data-pp-tab="slicer" class="pp-sub-tab-btn px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent" data-i18n="slicer.title">切片配置</button>
+                                    <div class="flex gap-1 mb-4" style="border-bottom: 1px solid var(--color-border);">
+                                        <button type="button" data-pp-tab="materials" class="pp-sub-tab-btn px-4 py-2 text-sm font-medium tw-text-muted border-b-2 border-transparent" data-i18n="material.title">材料设置</button>
+                                        <button type="button" data-pp-tab="printer" class="pp-sub-tab-btn px-4 py-2 text-sm font-medium tw-text-muted border-b-2 border-transparent" data-i18n="printer.title">机型配置</button>
+                                        <button type="button" data-pp-tab="slicer" class="pp-sub-tab-btn px-4 py-2 text-sm font-medium tw-text-muted border-b-2 border-transparent" data-i18n="slicer.title">切片配置</button>
                                     </div>
 
                                     <!-- Sub-pane: materials -->
                                     <div id="pp-sub-materials" class="pp-sub-pane space-y-4">
-                                        <p class="text-xs text-gray-500" data-i18n="settings.materialHint">管理打印材料的名称、密度、单价和可选颜色。 <span class="inline-flex items-center gap-1 ml-1 px-1.5 py-px rounded text-[10px] bg-amber-50 text-amber-700 border border-amber-200 font-normal">默认项<span class="text-gray-400 font-normal">· 点底部「保存设置」生效</span></span></p>
+                                        <p class="text-xs tw-text-muted" data-i18n="settings.materialHint">管理打印材料的名称、密度、单价和可选颜色。 <span class="inline-flex items-center gap-1 ml-1 px-1.5 py-px rounded text-[10px]" style="background-color: var(--color-warning-bg); color: var(--color-warning-text); border: 1px solid var(--color-warning-border);">默认项<span class="tw-text-muted font-normal">· 点底部「保存设置」生效</span></span></p>
 
                                         <!-- Default brand, material & color selectors -->
                                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-xl">
                                             <div>
-                                                <label class="block text-xs text-gray-600" data-i18n="settings.defaultBrand">默认品牌</label>
-                                                <select id="uc-default-brand" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md text-sm">
+                                                <label class="block text-xs tw-text-secondary" data-i18n="settings.defaultBrand">默认品牌</label>
+                                                <select id="uc-default-brand" class="tw-input mt-1 block w-full py-2 px-3 rounded-md text-sm tw-bg-surface">
                                                     </select>
                                             </div>
                                             <div>
-                                                <label class="block text-xs text-gray-600" data-i18n="settings.defaultMaterial">默认材料</label>
-                                                <select id="uc-default-material" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md text-sm">
+                                                <label class="block text-xs tw-text-secondary" data-i18n="settings.defaultMaterial">默认材料</label>
+                                                <select id="uc-default-material" class="tw-input mt-1 block w-full py-2 px-3 rounded-md text-sm tw-bg-surface">
                                                 </select>
                                             </div>
                                             <div>
-                                                <label class="block text-xs text-gray-600" data-i18n="settings.defaultColor">默认颜色</label>
+                                                <label class="block text-xs tw-text-secondary" data-i18n="settings.defaultColor">默认颜色</label>
                                                 <div id="uc-default-color-dropdown" class="mt-1">
                                                     <!-- renderColorDropdown 渲染 -->
                                                 </div>
@@ -63,27 +63,27 @@
                                         </div>
                                         
                                         <!-- Materials table -->
-                                        <div class="border-t border-gray-200 pt-4 mt-4">
+                                        <div class="pt-4 mt-4" style="border-top: 1px solid var(--color-border);">
                                             <div class="flex justify-between items-center mb-2">
-                                                <h6 class="text-xs font-medium text-gray-700" data-i18n="material.customMaterials">材料库</h6>
+                                                <h6 class="text-xs font-medium tw-text" data-i18n="material.customMaterials">材料库</h6>
                                                 <div class="flex items-center gap-2">
-                                                    <button id="add-material-btn" type="button" class="text-xs text-indigo-600 hover:text-indigo-800" data-i18n="material.addMaterial">+ 添加材料</button>
-                                                    <button id="material-restore-defaults-btn" type="button" class="text-xs text-gray-500 hover:text-indigo-600" data-i18n="printer.restoreDefault">恢复默认</button>
+                                                    <button id="add-material-btn" type="button" class="text-xs tw-text-primary hover:opacity-80" data-i18n="material.addMaterial">+ 添加材料</button>
+                                                    <button id="material-restore-defaults-btn" type="button" class="text-xs tw-text-muted hover:tw-text-primary" data-i18n="printer.restoreDefault">恢复默认</button>
                                                 </div>
                                             </div>
-                                            <div class="overflow-x-auto">
-                                                <table class="min-w-full text-xs text-left border border-gray-200 rounded-md">
-                                                    <thead class="bg-gray-50 text-gray-600">
+                                            <div class="overflow-x-auto rounded-md" style="border: 1px solid var(--color-border);">
+                                                <table class="min-w-full text-xs text-left">
+                                                    <thead style="background-color: var(--color-bg); color: var(--color-text-secondary);">
                                                                 <tr>
-                                                                    <th class="px-3 py-2 w-1/6 cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="brand" data-i18n="material.brand">品牌 <span class="sort-arrow text-gray-400 text-[9px]"></span></th>
-                                                                    <th class="px-3 py-2 w-1/6 cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="name" data-i18n="material.name">材料名称 <span class="sort-arrow text-gray-400 text-[9px]"></span></th>
-                                                                    <th class="px-3 py-2 w-1/8 cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="density" data-i18n="material.density">密度 (g/cm³) <span class="sort-arrow text-gray-400 text-[9px]"></span></th>
-                                                                    <th class="px-3 py-2 w-1/8 cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="price" data-i18n="material.price">单价 (元/KG) <span class="sort-arrow text-gray-400 text-[9px]"></span></th>
+                                                                    <th class="px-3 py-2 w-1/8 cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="brand" data-i18n="material.brand">品牌 <span class="sort-arrow tw-text-muted text-[9px]"></span></th>
+                                                                    <th class="px-3 py-2 w-1/8 cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="name" data-i18n="material.name">材料名称 <span class="sort-arrow tw-text-muted text-[9px]"></span></th>
+                                                                    <th class="px-3 py-2 w-1/6 cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="density" data-i18n="material.density">密度 (g/cm³) <span class="sort-arrow tw-text-muted text-[9px]"></span></th>
+                                                                    <th class="px-3 py-2 w-1/6 cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="price" data-i18n="material.price">单价 (元/KG) <span class="sort-arrow tw-text-muted text-[9px]"></span></th>
                                                                     <th class="px-3 py-2 w-1/4" data-i18n="material.colors">可选颜色</th>
                                                                     <th class="px-3 py-2 w-1/12 text-center" data-i18n="common.actions">操作</th>
                                                                 </tr>
                                                             </thead>
-                                                    <tbody id="materials-tbody" class="bg-white divide-y divide-gray-300">
+                                                    <tbody id="materials-tbody" style="background-color: var(--color-surface);">
                                                         <!-- 材料行动态插入 -->
                                                     </tbody>
                                                 </table>
@@ -94,16 +94,16 @@
 
                                     <!-- Sub-pane: printer -->
                                     <div id="pp-sub-printer" class="pp-sub-pane hidden space-y-4">
-                                        <p class="text-xs text-gray-500" data-i18n="settings.printerHint">选择打印机型号和喷嘴直径，切片时将自动加载对应配置。 <span class="inline-flex items-center gap-1 ml-1 px-1.5 py-px rounded text-[10px] bg-amber-50 text-amber-700 border border-amber-200 font-normal">默认项<span class="text-gray-400 font-normal">· 点底部「保存设置」生效</span></span></p>
+                                        <p class="text-xs tw-text-muted" data-i18n="settings.printerHint">选择打印机型号和喷嘴直径，切片时将自动加载对应配置。 <span class="inline-flex items-center gap-1 ml-1 px-1.5 py-px rounded text-[10px]" style="background-color: var(--color-warning-bg); color: var(--color-warning-text); border: 1px solid var(--color-warning-border);">默认项<span class="tw-text-muted font-normal">· 点底部「保存设置」生效</span></span></p>
                                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md">
                                             <div>
-                                                <label class="block text-xs text-gray-600" data-i18n="printer.model">打印机型号</label>
-                                                <select id="cfg-printer-model-main" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md text-sm">
+                                                <label class="block text-xs tw-text-secondary" data-i18n="printer.model">打印机型号</label>
+                                                <select id="cfg-printer-model-main" class="tw-input mt-1 block w-full py-2 px-3 rounded-md text-sm">
                                                 </select>
                                             </div>
                                             <div>
-                                                <label class="block text-xs text-gray-600" data-i18n="printer.nozzle">喷嘴直径</label>
-                                                <select id="cfg-nozzle-diameter" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md text-sm">
+                                                <label class="block text-xs tw-text-secondary" data-i18n="printer.nozzle">喷嘴直径</label>
+                                                <select id="cfg-nozzle-diameter" class="tw-input mt-1 block w-full py-2 px-3 rounded-md text-sm">
                                                     <option value="0.2">0.2 mm</option>
                                                     <option value="0.4" selected>0.4 mm</option>
                                                     <option value="0.6">0.6 mm</option>
@@ -111,39 +111,39 @@
                                                 </select>
                                             </div>
                                         </div>
-                                        <div id="printer-bed-info" class="text-xs text-gray-400 mt-1"></div>
+                                        <div id="printer-bed-info" class="text-xs tw-text-muted mt-1"></div>
 
                                         <!-- Enabled printers -->
-                                        <div class="border-t border-gray-200 pt-4 mt-4">
+                                        <div class="pt-4 mt-4" style="border-top: 1px solid var(--color-border);">
                                             <div class="flex justify-between items-center mb-2">
-                                                    <h6 class="text-xs font-medium text-gray-700" data-i18n="printer.allModels">启用机型</h6>
+                                                    <h6 class="text-xs font-medium tw-text" data-i18n="printer.allModels">启用机型</h6>
                                                     <div class="flex items-center gap-2">
-                                                        <button id="printer-add-slot-btn" type="button" class="text-xs text-indigo-600 hover:text-indigo-800">+ 添加机型</button>
-                                                        <button id="printer-add-custom-btn" type="button" class="text-xs text-indigo-600 hover:text-indigo-800">+ 自定义机型</button>
-                                                        <button id="printer-restore-defaults-btn" type="button" class="text-xs text-gray-500 hover:text-indigo-600" data-i18n="printer.restoreDefault">恢复默认</button>
+                                                        <button id="printer-add-slot-btn" type="button" class="text-xs tw-text-primary hover:opacity-80">+ 添加机型</button>
+                                                        <button id="printer-add-custom-btn" type="button" class="text-xs tw-text-primary hover:opacity-80">+ 自定义机型</button>
+                                                        <button id="printer-restore-defaults-btn" type="button" class="text-xs tw-text-muted hover:tw-text-primary" data-i18n="printer.restoreDefault">恢复默认</button>
                                                     </div>
                                                 </div>
                                                 <!-- Custom printer form (hidden by default) -->
-                                                <div id="custom-printer-form" class="hidden mb-3 p-3 border border-indigo-200 rounded-md bg-indigo-50/50">
+                                                <div id="custom-printer-form" class="hidden mb-3 p-3 rounded-md" style="border: 1px solid var(--color-primary-border); background-color: var(--color-primary-bg);">
                                                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
                                                         <div class="col-span-2 sm:col-span-4">
-                                                            <label class="block text-[11px] text-gray-600">打印机名称</label>
-                                                            <input id="custom-pp-name" type="text" class="mt-1 w-full border border-gray-300 rounded-sm text-xs px-2 py-1.5" placeholder="如：我的自定义打印机" />
+                                                            <label class="block text-[11px] tw-text-secondary">打印机名称</label>
+                                                            <input id="custom-pp-name" type="text" class="tw-input mt-1 w-full text-xs px-2 py-1.5" placeholder="如：我的自定义打印机" />
                                                         </div>
                                                         <div>
-                                                            <label class="block text-[11px] text-gray-600">床宽 (mm)</label>
-                                                            <input id="custom-pp-bed-x" type="number" min="50" max="1000" value="256" class="mt-1 w-full border border-gray-300 rounded-sm text-xs px-2 py-1.5" />
+                                                            <label class="block text-[11px] tw-text-secondary">床宽 (mm)</label>
+                                                            <input id="custom-pp-bed-x" type="number" min="50" max="1000" value="256" class="tw-input mt-1 w-full text-xs px-2 py-1.5" />
                                                         </div>
                                                         <div>
-                                                            <label class="block text-[11px] text-gray-600">床深 (mm)</label>
-                                                            <input id="custom-pp-bed-y" type="number" min="50" max="1000" value="256" class="mt-1 w-full border border-gray-300 rounded-sm text-xs px-2 py-1.5" />
+                                                            <label class="block text-[11px] tw-text-secondary">床深 (mm)</label>
+                                                            <input id="custom-pp-bed-y" type="number" min="50" max="1000" value="256" class="tw-input mt-1 w-full text-xs px-2 py-1.5" />
                                                         </div>
                                                         <div>
-                                                            <label class="block text-[11px] text-gray-600">床高 (mm)</label>
-                                                            <input id="custom-pp-bed-z" type="number" min="50" max="1000" value="256" class="mt-1 w-full border border-gray-300 rounded-sm text-xs px-2 py-1.5" />
+                                                            <label class="block text-[11px] tw-text-secondary">床高 (mm)</label>
+                                                            <input id="custom-pp-bed-z" type="number" min="50" max="1000" value="256" class="tw-input mt-1 w-full text-xs px-2 py-1.5" />
                                                         </div>
                                                         <div>
-                                                            <label class="block text-[11px] text-gray-600">可用喷嘴</label>
+                                                            <label class="block text-[11px] tw-text-secondary">可用喷嘴</label>
                                                             <div class="mt-1 flex flex-wrap gap-2">
                                                                 <label class="inline-flex items-center gap-1 text-[11px]"><input type="checkbox" class="custom-pp-nozzle" value="0.2" /> 0.2</label>
                                                                 <label class="inline-flex items-center gap-1 text-[11px]"><input type="checkbox" class="custom-pp-nozzle" value="0.4" checked /> 0.4</label>
@@ -153,21 +153,21 @@
                                                         </div>
                                                     </div>
                                                     <div class="flex items-center gap-2">
-                                                        <button id="custom-pp-save-btn" type="button" class="px-3 py-1.5 rounded-md bg-indigo-600 text-white text-xs hover:bg-indigo-700">保存</button>
-                                                        <button id="custom-pp-cancel-btn" type="button" class="px-3 py-1.5 rounded-md border border-gray-300 text-gray-600 text-xs hover:bg-gray-50">取消</button>
+                                                        <button id="custom-pp-save-btn" type="button" class="tw-btn-primary px-3 py-1.5 text-xs">保存</button>
+                                                        <button id="custom-pp-cancel-btn" type="button" class="px-3 py-1.5 rounded-md text-xs" style="border: 1px solid var(--color-border-strong); color: var(--color-text-secondary);">取消</button>
                                                         <span id="custom-pp-msg" class="text-xs hidden"></span>
                                                     </div>
                                                 </div>
-                                            <div class="overflow-x-auto">
-                                                <table class="min-w-full text-xs text-left border border-gray-200 rounded-md">
-                                                    <thead class="bg-gray-50 text-gray-600">
+                                            <div class="overflow-x-auto rounded-md" style="border: 1px solid var(--color-border);">
+                                                <table class="min-w-full text-xs text-left">
+                                                    <thead style="background-color: var(--color-bg); color: var(--color-text-secondary);">
                                                         <tr>
                                                             <th class="px-3 py-2" data-i18n="printer.modelName">机型名称</th>
                                                             <th class="px-3 py-2 w-32" data-i18n="printer.bedSize">打印尺寸</th>
                                                             <th class="px-3 py-2 w-16 text-center" data-i18n="common.actions">操作</th>
                                                         </tr>
                                                     </thead>
-                                                    <tbody id="enabled-printers-tbody" class="bg-white divide-y divide-gray-300">
+                                                    <tbody id="enabled-printers-tbody" style="background-color: var(--color-surface);">
                                                     </tbody>
                                                 </table>
                                             </div>
@@ -177,64 +177,64 @@
 
                                     <!-- ═══ Slicer pane (简化版) ═══ -->
                                     <div id="pp-sub-slicer" class="pp-sub-pane hidden space-y-4">
-                                        <p class="text-xs text-gray-500" data-i18n="settings.slicerHint">选择影响打印时间和重量的关键参数。 <span class="inline-flex items-center gap-1 ml-1 px-1.5 py-px rounded text-[10px] bg-amber-50 text-amber-700 border border-amber-200 font-normal">默认项<span class="text-gray-400 font-normal">· 点底部「保存设置」生效</span></span></p>
+                                        <p class="text-xs tw-text-muted" data-i18n="settings.slicerHint">选择影响打印时间和重量的关键参数。 <span class="inline-flex items-center gap-1 ml-1 px-1.5 py-px rounded text-[10px]" style="background-color: var(--color-warning-bg); color: var(--color-warning-text); border: 1px solid var(--color-warning-border);">默认项<span class="tw-text-muted font-normal">· 点底部「保存设置」生效</span></span></p>
 
                                         <!-- Default preset selector -->
                                         <div class="max-w-md">
-                                            <label class="block text-xs text-gray-600" data-i18n="settings.defaultPreset">默认切片预设</label>
-                                            <select id="gen-preset-select" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md text-sm">
+                                            <label class="block text-xs tw-text-secondary" data-i18n="settings.defaultPreset">默认切片预设</label>
+                                            <select id="gen-preset-select" class="tw-input mt-1 block w-full py-2 px-3 rounded-md text-sm">
                                             </select>
                                         </div>
 
                                         <!-- Key parameters -->
                                         <div class="space-y-3">
                                             <div class="flex items-center gap-3 py-1.5">
-                                                <label class="w-28 text-xs text-gray-600 flex-shrink-0" data-i18n="slicer.layerHeight">层高</label>
-                                                <select id="gen-layer-height" data-preset-param="layer_height" class="flex-1 max-w-[200px] border border-gray-300 bg-white rounded-sm text-xs px-2 py-1.5">
+                                                <label class="w-28 text-xs tw-text-secondary flex-shrink-0" data-i18n="slicer.layerHeight">层高</label>
+                                                <select id="gen-layer-height" data-preset-param="layer_height" class="tw-input flex-1 max-w-[200px] text-xs px-2 py-1.5">
                                                     <option value="0.08" data-i18n="slicer.layerFine">0.08 精细</option><option value="0.10">0.10</option><option value="0.12">0.12</option><option value="0.16">0.16</option><option value="0.20" selected data-i18n="slicer.layerStandard">0.20 标准</option><option value="0.28" data-i18n="slicer.layerFast">0.28 快速</option><option value="0.32">0.32</option>
                                                 </select>
-                                                <span id="layer-height-range-hint" class="text-[10px] text-gray-400 flex-shrink-0"></span>
+                                                <span id="layer-height-range-hint" class="text-[10px] tw-text-muted flex-shrink-0"></span>
                                             </div>
                                             <div class="flex items-center gap-3 py-1.5">
-                                                <label class="w-28 text-xs text-gray-600 flex-shrink-0" data-i18n="slicer.wallCount">外墙层数</label>
-                                                <select id="gen-wall-count" data-preset-param="perimeters" class="flex-1 max-w-[200px] border border-gray-300 bg-white rounded-sm text-xs px-2 py-1.5">
+                                                <label class="w-28 text-xs tw-text-secondary flex-shrink-0" data-i18n="slicer.wallCount">外墙层数</label>
+                                                <select id="gen-wall-count" data-preset-param="perimeters" class="tw-input flex-1 max-w-[200px] text-xs px-2 py-1.5">
                                                     <option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="8">8</option>
                                                 </select>
                                             </div>
                                             <div class="flex items-center gap-3 py-1.5">
-                                                <label class="w-28 text-xs text-gray-600 flex-shrink-0" data-i18n="slicer.infill">填充密度</label>
-                                                <select id="gen-infill" data-preset-param="fill_density" class="flex-1 max-w-[200px] border border-gray-300 bg-white rounded-sm text-xs px-2 py-1.5">
+                                                <label class="w-28 text-xs tw-text-secondary flex-shrink-0" data-i18n="slicer.infill">填充密度</label>
+                                                <select id="gen-infill" data-preset-param="fill_density" class="tw-input flex-1 max-w-[200px] text-xs px-2 py-1.5">
                                                     <option value="5">5%</option><option value="10">10%</option><option value="15">15%</option><option value="20" selected>20%</option><option value="25">25%</option><option value="30">30%</option><option value="40">40%</option><option value="50">50%</option><option value="60">60%</option><option value="80">80%</option><option value="100">100%</option>
                                                 </select>
-                                                <span class="text-[11px] text-gray-400 flex-shrink-0">%</span>
+                                                <span class="text-[11px] tw-text-muted flex-shrink-0">%</span>
                                             </div>
                                         </div>
 
                                         <!-- Save button -->
                                         <div class="flex items-center gap-3">
-                                            <button id="gen-preset-save-btn" type="button" class="px-4 py-1.5 rounded-md bg-indigo-600 text-white text-xs hover:bg-indigo-700 whitespace-nowrap" data-i18n="slicer.saveCurrentConfig">保存当前配置</button>
-                                            <span id="gen-preset-save-msg" class="text-xs text-green-600 hidden" data-i18n="slicer.saved">已保存</span>
+                                            <button id="gen-preset-save-btn" type="button" class="tw-btn-primary px-4 py-1.5 text-xs whitespace-nowrap" data-i18n="slicer.saveCurrentConfig">保存当前配置</button>
+                                            <span id="gen-preset-save-msg" class="text-xs tw-text-success hidden" data-i18n="slicer.saved">已保存</span>
                                         </div>
 
                                         <!-- Saved presets list -->
-                                        <div class="border-t border-gray-200 pt-4 mt-4">
+                                        <div class="pt-4 mt-4" style="border-top: 1px solid var(--color-border);">
                                             <div class="flex justify-between items-center mb-2">
-                                                <h6 class="text-xs font-medium text-gray-700" data-i18n="slicer.presetsTable">已保存预设</h6>
+                                                <h6 class="text-xs font-medium tw-text" data-i18n="slicer.presetsTable">已保存预设</h6>
                                                 <div class="flex items-center gap-2">
-                                                    <button id="slicer-presets-refresh-btn" type="button" class="text-xs text-indigo-600 hover:text-indigo-800" data-i18n="common.refresh">刷新</button>
+                                                    <button id="slicer-presets-refresh-btn" type="button" class="text-xs tw-text-primary hover:opacity-80" data-i18n="common.refresh">刷新</button>
                                                 </div>
                                             </div>
-                                            <div class="overflow-x-auto">
-                                                <table class="min-w-full text-xs text-left border border-gray-200 rounded-md">
-                                                    <thead class="bg-gray-50 text-gray-600">
+                                            <div class="overflow-x-auto rounded-md" style="border: 1px solid var(--color-border);">
+                                                <table class="min-w-full text-xs text-left">
+                                                    <thead style="background-color: var(--color-bg); color: var(--color-text-secondary);">
                                                         <tr>
                                                             <th class="px-3 py-2 w-16" data-i18n="common.index">序号</th>
                                                             <th class="px-3 py-2" data-i18n="common.name">名称</th>
                                                             <th class="px-3 py-2 w-16 text-center" data-i18n="common.actions">操作</th>
                                                         </tr>
                                                     </thead>
-                                                    <tbody id="slicer-presets-tbody" class="bg-white divide-y divide-gray-300">
-                                                        <tr><td colspan="3" class="px-3 py-3 text-gray-400" data-i18n="slicer.noPresets">暂无预设</td></tr>
+                                                    <tbody id="slicer-presets-tbody" style="background-color: var(--color-surface);">
+                                                        <tr><td colspan="3" class="px-3 py-3 tw-text-muted" data-i18n="slicer.noPresets">暂无预设</td></tr>
                                                     </tbody>
                                                 </table>
                                             </div>
@@ -248,37 +248,37 @@
                                     <!-- 颜色绑定 -->
                             <div>
                                 <div class="flex justify-between items-center mb-2">
-                                    <h5 class="text-sm font-medium text-gray-700" data-i18n="settings.formula">计算公式</h5>
+                                    <h5 class="text-sm font-medium tw-text" data-i18n="settings.formula">计算公式</h5>
                                     <div class="flex items-center gap-2">
                                         <p id="formula-validate-msg" class="text-xs hidden"></p>
-                                        <button id="formula-validate-btn" type="button" class="text-xs text-indigo-600 hover:text-indigo-800" data-i18n="settings.validateFormula">校验公式</button>
-                                        <button id="formula-reset-btn" type="button" class="text-xs text-indigo-600 hover:text-indigo-800" data-i18n="settings.resetDefault">重置默认</button>
+                                        <button id="formula-validate-btn" type="button" class="text-xs tw-text-primary hover:opacity-80" data-i18n="settings.validateFormula">校验公式</button>
+                                        <button id="formula-reset-btn" type="button" class="text-xs tw-text-primary hover:opacity-80" data-i18n="settings.resetDefault">重置默认</button>
                                     </div>
                                 </div>
                                 <div id="formula-container" class="space-y-3">
                                     <div>
-                                        <label class="block text-xs text-gray-600" data-i18n="settings.unitCostFormula">单件成本公式（unit_cost_cny）</label>
-                                        <textarea id="cfg-unit-cost-formula" rows="2" class="mt-1 w-full border border-gray-300 rounded-sm text-xs px-2 py-1 font-mono"></textarea>
+                                        <label class="block text-xs tw-text-secondary" data-i18n="settings.unitCostFormula">单件成本公式（unit_cost_cny）</label>
+                                        <textarea id="cfg-unit-cost-formula" rows="2" class="tw-input mt-1 w-full text-xs px-2 py-1 font-mono"></textarea>
                                     </div>
                                     <div>
-                                        <label class="block text-xs text-gray-600" data-i18n="settings.totalCostFormula">总价公式（cost_cny）</label>
-                                        <textarea id="cfg-total-cost-formula" rows="2" class="mt-1 w-full border border-gray-300 rounded-sm text-xs px-2 py-1 font-mono"></textarea>
+                                        <label class="block text-xs tw-text-secondary" data-i18n="settings.totalCostFormula">总价公式（cost_cny）</label>
+                                        <textarea id="cfg-total-cost-formula" rows="2" class="tw-input mt-1 w-full text-xs px-2 py-1 font-mono"></textarea>
                                     </div>
-                                    <div class="text-[11px] text-gray-500 leading-snug" data-i18n="settings.formulaHelp">
+                                    <div class="text-[11px] tw-text-muted leading-snug" data-i18n="settings.formulaHelp">
                                         支持英文变量与中文别名；支持函数：max(), min(), abs(), round()
                                     </div>
                                     <div class="flex items-center justify-between">
-                                        <button id="formula-vars-toggle-btn" type="button" class="text-xs text-indigo-600 hover:text-indigo-800" data-i18n="settings.expandVarDict">展开变量字典</button>
+                                        <button id="formula-vars-toggle-btn" type="button" class="text-xs tw-text-primary hover:opacity-80" data-i18n="settings.expandVarDict">展开变量字典</button>
                                     </div>
                                     <div id="formula-vars-panel" class="hidden overflow-x-auto">
-                                        <table class="min-w-full text-[11px] text-left border border-gray-200 rounded-md overflow-hidden">
-                                            <thead class="bg-gray-50 text-gray-600">
+                                        <table class="min-w-full text-[11px] text-left rounded-md overflow-hidden" style="border: 1px solid var(--color-border);">
+                                            <thead style="background-color: var(--color-bg); color: var(--color-text-secondary);">
                                                 <tr>
                                                     <th class="px-2 py-1.5" data-i18n="settings.varMeaning">含义</th>
                                                     <th class="px-2 py-1.5" data-i18n="settings.varName">变量</th>
                                                 </tr>
                                             </thead>
-                                            <tbody class="bg-white divide-y divide-gray-100">
+                                            <tbody style="background-color: var(--color-surface);">
                                                 <tr><td class="px-2 py-1.5" data-i18n="formula.varEffectiveWeight">有效重量（克）</td><td class="px-2 py-1.5 font-mono">effective_weight_g</td></tr>
                                                 <tr><td class="px-2 py-1.5" data-i18n="formula.varMaterialPrice">材料单价（元/KG）</td><td class="px-2 py-1.5 font-mono">price_per_kg</td></tr>
                                                 <tr><td class="px-2 py-1.5" data-i18n="formula.varUnitTime">单件打印时间（小时）</td><td class="px-2 py-1.5 font-mono">unit_time_h</td></tr>
@@ -301,43 +301,43 @@
                                 </div>
                                 <div id="uc-tab-costs" class="uc-tab-pane hidden space-y-6">
                                     <div>
-                                        <h5 class="text-sm font-medium text-gray-700 mb-2" data-i18n="settings.costs">成本与时间参数</h5>
+                                        <h5 class="text-sm font-medium tw-text mb-2" data-i18n="settings.costs">成本与时间参数</h5>
                                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <div>
-                                        <label class="block text-xs text-gray-600" data-i18n="settings.machineHourlyRate">机台费 (元/小时)</label>
-                                        <input id="cfg-machine-hourly-rate" type="number" step="0.01" inputmode="decimal" class="mt-1 w-full border border-gray-300 rounded-sm text-xs px-2 py-1 min-h-[40px]" />
+                                        <label class="block text-xs tw-text-secondary" data-i18n="settings.machineHourlyRate">机台费 (元/小时)</label>
+                                        <input id="cfg-machine-hourly-rate" type="number" step="0.01" inputmode="decimal" class="tw-input mt-1 w-full text-xs px-2 py-1 min-h-[40px]" />
                                     </div>
                                     <div>
-                                        <label class="block text-xs text-gray-600" data-i18n="settings.setupFee">上机/调机费 (元/模型)</label>
-                                        <input id="cfg-setup-fee" type="number" step="0.01" inputmode="decimal" class="mt-1 w-full border border-gray-300 rounded-sm text-xs px-2 py-1 min-h-[40px]" />
+                                        <label class="block text-xs tw-text-secondary" data-i18n="settings.setupFee">上机/调机费 (元/模型)</label>
+                                        <input id="cfg-setup-fee" type="number" step="0.01" inputmode="decimal" class="tw-input mt-1 w-full text-xs px-2 py-1 min-h-[40px]" />
                                     </div>
                                     <div>
-                                        <label class="block text-xs text-gray-600" data-i18n="settings.minJobFee">最低起步价 (元/模型)</label>
-                                        <input id="cfg-min-job-fee" type="number" step="0.01" inputmode="decimal" class="mt-1 w-full border border-gray-300 rounded-sm text-xs px-2 py-1 min-h-[40px]" />
+                                        <label class="block text-xs tw-text-secondary" data-i18n="settings.minJobFee">最低起步价 (元/模型)</label>
+                                        <input id="cfg-min-job-fee" type="number" step="0.01" inputmode="decimal" class="tw-input mt-1 w-full text-xs px-2 py-1 min-h-[40px]" />
                                     </div>
                                     <div>
-                                        <label class="block text-xs text-gray-600" data-i18n="settings.materialWaste">材料损耗 (%)</label>
-                                        <input id="cfg-material-waste" type="number" step="0.1" inputmode="decimal" class="mt-1 w-full border border-gray-300 rounded-sm text-xs px-2 py-1 min-h-[40px]" />
+                                        <label class="block text-xs tw-text-secondary" data-i18n="settings.materialWaste">材料损耗 (%)</label>
+                                        <input id="cfg-material-waste" type="number" step="0.1" inputmode="decimal" class="tw-input mt-1 w-full text-xs px-2 py-1 min-h-[40px]" />
                                     </div>
                                     <div>
-                                        <label class="block text-xs text-gray-600" data-i18n="settings.supportPercent">支撑占比 (%)</label>
-                                        <input id="cfg-support-percent" type="number" step="0.1" inputmode="decimal" class="mt-1 w-full border border-gray-300 rounded-sm text-xs px-2 py-1 min-h-[40px]" />
+                                        <label class="block text-xs tw-text-secondary" data-i18n="settings.supportPercent">支撑占比 (%)</label>
+                                        <input id="cfg-support-percent" type="number" step="0.1" inputmode="decimal" class="tw-input mt-1 w-full text-xs px-2 py-1 min-h-[40px]" />
                                     </div>
                                     <div>
-                                        <label class="block text-xs text-gray-600" data-i18n="settings.postProcessFee">后处理费 (元/件)</label>
-                                        <input id="cfg-post-per-part" type="number" step="0.01" inputmode="decimal" class="mt-1 w-full border border-gray-300 rounded-sm text-xs px-2 py-1 min-h-[40px]" />
+                                        <label class="block text-xs tw-text-secondary" data-i18n="settings.postProcessFee">后处理费 (元/件)</label>
+                                        <input id="cfg-post-per-part" type="number" step="0.01" inputmode="decimal" class="tw-input mt-1 w-full text-xs px-2 py-1 min-h-[40px]" />
                                     </div>
                                     <div>
-                                        <label class="block text-xs text-gray-600" data-i18n="settings.timeOverhead">时间固定开销 (分钟/件)</label>
-                                        <input id="cfg-time-overhead-min" type="number" step="0.1" inputmode="decimal" class="mt-1 w-full border border-gray-300 rounded-sm text-xs px-2 py-1 min-h-[40px]" />
+                                        <label class="block text-xs tw-text-secondary" data-i18n="settings.timeOverhead">时间固定开销 (分钟/件)</label>
+                                        <input id="cfg-time-overhead-min" type="number" step="0.1" inputmode="decimal" class="tw-input mt-1 w-full text-xs px-2 py-1 min-h-[40px]" />
                                     </div>
                                     <div>
-                                        <label class="block text-xs text-gray-600" data-i18n="settings.timeVolMin">体积耗时 (分钟/cm³)</label>
-                                        <input id="cfg-time-vol-min-per-cm3" type="number" step="0.01" inputmode="decimal" class="mt-1 w-full border border-gray-300 rounded-sm text-xs px-2 py-1 min-h-[40px]" />
+                                        <label class="block text-xs tw-text-secondary" data-i18n="settings.timeVolMin">体积耗时 (分钟/cm³)</label>
+                                        <input id="cfg-time-vol-min-per-cm3" type="number" step="0.01" inputmode="decimal" class="tw-input mt-1 w-full text-xs px-2 py-1 min-h-[40px]" />
                                     </div>
                                     <div>
-                                        <label class="block text-xs text-gray-600" data-i18n="settings.supportPricePerG">支撑单价（元/克）</label>
-                                        <input id="cfg-support-price-per-g" type="number" step="0.001" inputmode="decimal" class="mt-1 w-full border border-gray-300 rounded-sm text-xs px-2 py-1 min-h-[40px]" />
+                                        <label class="block text-xs tw-text-secondary" data-i18n="settings.supportPricePerG">支撑单价（元/克）</label>
+                                        <input id="cfg-support-price-per-g" type="number" step="0.001" inputmode="decimal" class="tw-input mt-1 w-full text-xs px-2 py-1 min-h-[40px]" />
                                     </div>
                                         </div>
                                     </div>
@@ -346,87 +346,87 @@
 
                                 <div id="uc-tab-security" class="uc-tab-pane hidden space-y-6">
                                     <div>
-                                        <h5 class="text-sm font-medium text-gray-700 mb-4" data-i18n="settings.changePassword">修改密码</h5>
+                                        <h5 class="text-sm font-medium tw-text mb-4" data-i18n="settings.changePassword">修改密码</h5>
                                         <div class="max-w-sm space-y-3">
                                             <div>
-                                                <label class="block text-xs text-gray-600" data-i18n="settings.oldPassword">原密码</label>
-                                                <input id="uc-old-password" type="password" autocomplete="current-password" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md text-sm min-h-[44px]" placeholder="请输入原密码" data-i18n-placeholder="settings.enterOldPassword" />
+                                                <label class="block text-xs tw-text-secondary" data-i18n="settings.oldPassword">原密码</label>
+                                                <input id="uc-old-password" type="password" autocomplete="current-password" class="tw-input mt-1 block w-full py-2 px-3 rounded-md text-sm min-h-[44px]" placeholder="请输入原密码" data-i18n-placeholder="settings.enterOldPassword" />
                                                 <span id="uc-old-password-hint" class="form-field-hint hidden"></span>
                                             </div>
                                             <div>
-                                                <label class="block text-xs text-gray-600" data-i18n="settings.newPassword">新密码</label>
-                                                <input id="uc-new-password" type="password" autocomplete="new-password" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md text-sm min-h-[44px]" placeholder="请输入新密码（至少6位）" data-i18n-placeholder="settings.enterNewPassword" />
+                                                <label class="block text-xs tw-text-secondary" data-i18n="settings.newPassword">新密码</label>
+                                                <input id="uc-new-password" type="password" autocomplete="new-password" class="tw-input mt-1 block w-full py-2 px-3 rounded-md text-sm min-h-[44px]" placeholder="请输入新密码（至少6位）" data-i18n-placeholder="settings.enterNewPassword" />
                                                 <span id="uc-new-password-hint" class="form-field-hint hidden"></span>
                                             </div>
                                             <div>
-                                                <label class="block text-xs text-gray-600" data-i18n="settings.confirmNewPassword">确认新密码</label>
-                                                <input id="uc-confirm-password" type="password" autocomplete="new-password" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md text-sm min-h-[44px]" placeholder="请再次输入新密码" data-i18n-placeholder="settings.confirmPasswordPlaceholder" />
+                                                <label class="block text-xs tw-text-secondary" data-i18n="settings.confirmNewPassword">确认新密码</label>
+                                                <input id="uc-confirm-password" type="password" autocomplete="new-password" class="tw-input mt-1 block w-full py-2 px-3 rounded-md text-sm min-h-[44px]" placeholder="请再次输入新密码" data-i18n-placeholder="settings.confirmPasswordPlaceholder" />
                                                 <span id="uc-confirm-password-hint" class="form-field-hint hidden"></span>
                                             </div>
                                             <p id="uc-password-msg" class="text-xs hidden"></p>
-                                            <button id="uc-change-password-btn" type="button" class="w-full py-2 px-3 rounded-md bg-indigo-600 text-white text-sm hover:bg-indigo-700 min-h-[44px] active:bg-indigo-800 transition-colors" data-i18n="settings.updatePassword">更新密码</button>
+                                            <button id="uc-change-password-btn" type="button" class="tw-btn-primary w-full py-2 px-3 rounded-md text-sm min-h-[44px]" data-i18n="settings.updatePassword">更新密码</button>
                                             </div>
                                             </div>
                                             </div>
 
                                             <div id="uc-tab-brand" class="uc-tab-pane hidden space-y-4">
-                                            <p class="text-xs text-gray-500" data-i18n="settings.brandHint">定制报价单上显示的公司信息。会员专属功能。</p>
+                                            <p class="text-xs tw-text-muted" data-i18n="settings.brandHint">定制报价单上显示的公司信息。会员专属功能。</p>
 
                                             <div id="brand-member-only">
                                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl">
                                              <div>
-                                                 <label class="block text-xs text-gray-600" data-i18n="settings.brandName">公司名称</label>
-                                                 <input id="brand-name" type="text" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md text-sm" placeholder="你的公司名称" />
+                                                 <label class="block text-xs tw-text-secondary" data-i18n="settings.brandName">公司名称</label>
+                                                 <input id="brand-name" type="text" class="tw-input mt-1 block w-full py-2 px-3 rounded-md text-sm" placeholder="你的公司名称" />
                                              </div>
                                              <div>
-                                                 <label class="block text-xs text-gray-600" data-i18n="settings.brandPhone">联系电话</label>
-                                                 <input id="brand-phone" type="text" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md text-sm" placeholder="13800138000" />
+                                                 <label class="block text-xs tw-text-secondary" data-i18n="settings.brandPhone">联系电话</label>
+                                                 <input id="brand-phone" type="text" class="tw-input mt-1 block w-full py-2 px-3 rounded-md text-sm" placeholder="13800138000" />
                                              </div>
                                              <div>
-                                                 <label class="block text-xs text-gray-600" data-i18n="settings.brandContactEmail">联系邮箱</label>
-                                                 <input id="brand-email" type="email" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md text-sm" placeholder="sales@company.com" />
+                                                 <label class="block text-xs tw-text-secondary" data-i18n="settings.brandContactEmail">联系邮箱</label>
+                                                 <input id="brand-email" type="email" class="tw-input mt-1 block w-full py-2 px-3 rounded-md text-sm" placeholder="sales@company.com" />
                                              </div>
                                              <div>
-                                                 <label class="block text-xs text-gray-600" data-i18n="settings.brandAddress">公司地址</label>
-                                                 <input id="brand-address" type="text" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md text-sm" placeholder="深圳市南山区xxx" />
+                                                 <label class="block text-xs tw-text-secondary" data-i18n="settings.brandAddress">公司地址</label>
+                                                 <input id="brand-address" type="text" class="tw-input mt-1 block w-full py-2 px-3 rounded-md text-sm" placeholder="深圳市南山区xxx" />
                                              </div>
                                             </div>
 
                                             <!-- Logo upload -->
                                             <div class="mt-4">
-                                             <label class="block text-xs text-gray-600" data-i18n="settings.brandLogo">Logo</label>
+                                             <label class="block text-xs tw-text-secondary" data-i18n="settings.brandLogo">Logo</label>
                                              <div class="mt-1 flex items-center gap-4">
-                                                 <div id="brand-logo-preview" class="w-16 h-16 border border-dashed border-gray-300 rounded-md flex items-center justify-center text-gray-400 text-xs">无</div>
+                                                 <div id="brand-logo-preview" class="w-16 h-16 rounded-md flex items-center justify-center text-xs" style="border: 1px dashed var(--color-border-strong); color: var(--color-text-muted);">无</div>
                                                  <div>
                                                      <input type="file" id="brand-logo-input" accept="image/png,image/jpeg,image/svg+xml" class="hidden" />
-                                                     <button type="button" id="brand-logo-upload-btn" class="px-3 py-1.5 border border-gray-300 rounded-md text-xs text-gray-600 hover:bg-gray-50" data-i18n="common.upload">上传 Logo</button>
-                                                     <button type="button" id="brand-logo-delete-btn" class="hidden px-2 py-1.5 text-xs text-red-500 hover:text-red-700 hover:underline" data-i18n="common.delete">删除</button>
-                                                     <p class="text-[10px] text-gray-400 mt-1" data-i18n="settings.logoUploadHint">支持 PNG/JPG/SVG，最大 2MB</p>
+                                                     <button type="button" id="brand-logo-upload-btn" class="px-3 py-1.5 rounded-md text-xs" style="border: 1px solid var(--color-border-strong); color: var(--color-text-secondary);" data-i18n="common.upload">上传 Logo</button>
+                                                     <button type="button" id="brand-logo-delete-btn" class="hidden px-2 py-1.5 text-xs tw-text-danger hover:underline" data-i18n="common.delete">删除</button>
+                                                     <p class="text-[10px] tw-text-muted mt-1" data-i18n="settings.logoUploadHint">支持 PNG/JPG/SVG，最大 2MB</p>
                                                  </div>
                                              </div>
                                             </div>
 
                                             <!-- Default note -->
                                             <div class="mt-4">
-                                             <label class="block text-xs text-gray-600" data-i18n="settings.brandNote">默认报价备注</label>
-                                             <textarea id="brand-note" rows="3" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md text-sm" placeholder="付款方式、发货说明等"></textarea>
+                                             <label class="block text-xs tw-text-secondary" data-i18n="settings.brandNote">默认报价备注</label>
+                                             <textarea id="brand-note" rows="3" class="tw-input mt-1 block w-full py-2 px-3 rounded-md text-sm" placeholder="付款方式、发货说明等"></textarea>
                                             </div>
                                             </div>
 
                                             <div id="brand-upgrade-hint" class="hidden">
                                             <div class="text-center py-8">
-                                             <p class="text-sm text-gray-500" data-i18n="settings.brandUpgradeHint">升级会员解锁品牌定制功能</p>
-                                             <button type="button" onclick="document.getElementById('user-center-modal').classList.add('hidden'); document.getElementById('membership-modal')?.classList.remove('hidden');" class="mt-3 px-4 py-2 bg-amber-500 text-white text-xs rounded-md hover:bg-amber-600" data-i18n="settings.learnMembership">了解会员</button>
+                                             <p class="text-sm tw-text-muted" data-i18n="settings.brandUpgradeHint">升级会员解锁品牌定制功能</p>
+                                             <button type="button" onclick="document.getElementById('user-center-modal').classList.add('hidden'); document.getElementById('membership-modal')?.classList.remove('hidden');" class="mt-3 px-4 py-2 text-white text-xs rounded-md hover:opacity-90" style="background-color: var(--color-warning);" data-i18n="settings.learnMembership">了解会员</button>
                                             </div>
                                             </div>
                                             </div>
                                             </div>
                         </div>
-                        <div class="px-4 py-3 border-t border-gray-200 flex justify-between items-center bg-gray-50">
-                            <div id="user-center-hint" class="text-xs text-gray-500 invisible" data-i18n="settings.passwordHint">提示：修改密码后需重新登录</div>
+                        <div class="px-4 py-3 flex justify-between items-center" style="border-top: 1px solid var(--color-border); background-color: var(--color-bg);">
+                            <div id="user-center-hint" class="text-xs tw-text-muted invisible" data-i18n="settings.passwordHint">提示：修改密码后需重新登录</div>
                             <div class="flex items-center gap-4">
-                                <p id="user-center-msg" class="text-xs text-green-600 hidden" data-i18n="settings.saveSuccess">保存成功</p>
-                                <button id="user-center-save-btn" type="button" class="py-2 px-4 rounded-md bg-indigo-600 text-white text-sm hover:bg-indigo-700 min-h-[44px] active:bg-indigo-800 transition-colors" data-i18n="settings.saveSettings">保存设置</button>
+                                <p id="user-center-msg" class="text-xs tw-text-success hidden" data-i18n="settings.saveSuccess">保存成功</p>
+                                <button id="user-center-save-btn" type="button" class="tw-btn-primary py-2 px-4 rounded-md text-sm min-h-[44px]" data-i18n="settings.saveSettings">保存设置</button>
                             </div>
                         </div>
                     </div>

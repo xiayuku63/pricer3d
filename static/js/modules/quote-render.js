@@ -1039,7 +1039,7 @@ export function renderResultsTable() {
             var _orientHtml = '';
             if (item.auto_orient_score != null) {
                 _orientHtml = '<div class="mb-3 p-2 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-md">' +
-                    '<div class="text-[10px] font-semibold text-green-700 mb-1">🎯 自动摆放优化</div>' +
+                    '<div class="text-[10px] font-semibold text-green-700 mb-1">手动摆放优化</div>' +
                     '<div class="text-[10px] text-green-600">' +
                     '评分: ' + (item.auto_orient_score || 0).toFixed(1) +
                     ' · 角度: X' + ((item.euler_angles_deg && item.euler_angles_deg.x != null) ? item.euler_angles_deg.x.toFixed(1) : '-') +
@@ -1114,7 +1114,7 @@ function renderResultsCards() {
 
         if (item.status === 'success' && !item._recalculating) {
             const card = document.createElement('div');
-            card.className = 'bg-white border border-gray-200 rounded-lg p-4 shadow-sm';
+            card.className = 'tw-card p-4';
             card.setAttribute('data-card-file', item.filename);
             card.innerHTML = `
                 <div class="flex gap-3">
@@ -1180,7 +1180,7 @@ function renderResultsCards() {
             container.appendChild(card);
         } else if (item._recalculating) {
             const card = document.createElement('div');
-            card.className = 'bg-white border border-amber-200 rounded-lg p-4 shadow-sm';
+            card.className = 'tw-card p-4';
             card.setAttribute('data-card-file', item.filename);
             card.innerHTML = `
                 <div class="flex gap-3">
@@ -1194,7 +1194,7 @@ function renderResultsCards() {
             container.appendChild(card);
         } else {
             const card = document.createElement('div');
-            card.className = 'bg-white border border-red-200 rounded-lg p-4 shadow-sm';
+            card.className = 'tw-card p-4';
             card.setAttribute('data-card-file', item.filename);
             card.innerHTML = `
                 <div class="flex gap-3">

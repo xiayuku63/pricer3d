@@ -504,14 +504,13 @@ function _buildCommonRowHtml(item, ext, selectedMaterial, selectedColor, quantit
         renderedRowColors,
         cols: `<td class="px-2 py-1.5">${item.filename}</td>
                 <td class="px-2 py-1.5">${previewButtonHtml}</td>
-                <td class="px-2 py-1.5"><select data-field="_printer_model" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5 max-w-[110px]">${pmOptions}</select></td>
-                <td class="px-2 py-1.5"><select data-field="_slicer_preset_id" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5 max-w-[100px]">${presetOptions}</select></td>
-                <td class="px-2 py-1.5"><select data-field="material" class="row-edit text-[11px] border border-gray-300 rounded px-1 py-0.5">${materialOptionsHtml}</select></td>
+                <td class="px-2 py-1.5"><select data-field="_printer_model" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5 max-w-[110px] tw-bg-surface">${pmOptions}</select></td>
+                <td class="px-2 py-1.5"><select data-field="_slicer_preset_id" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5 max-w-[100px] tw-bg-surface">${presetOptions}</select></td>
+                <td class="px-2 py-1.5"><select data-field="material" class="row-edit text-[11px] border border-gray-300 rounded px-1 py-0.5 tw-bg-surface">${materialOptionsHtml}</select></td>
                 <td class="px-2 py-1.5" data-field="color">${renderedRowColors.html}</td>
-                <td class="px-2 py-1.5"><input data-field="quantity" type="number" min="1" value="${quantityValue}" class="row-edit w-14 text-[11px] border border-gray-300 rounded px-1 py-0.5" /></td>`,
+                <td class="px-2 py-1.5"><input data-field="quantity" type="number" min="1" value="${quantityValue}" class="row-edit w-14 text-[11px] border border-gray-300 rounded px-1 py-0.5 tw-bg-surface" /></td>`,
     };
 }
-
 
 // ── 卡片编辑事件处理（与表格行编辑共用逻辑） ──
 export function handleCardEditChange(event) {

@@ -84,7 +84,7 @@ import {
 } from './modules/preview.js';
 import {
     initOrientationUI, syncOrientationFromMesh,
-    centerModel, resetOrientationHandler, toggleLayFace, submitTraining,
+    centerModel, resetOrientationHandler, toggleLayFace, submitTraining, learnedAutoOrient, saveOrientationAndRequote,
 } from './modules/orientation-ui.js';
 import { initTheme } from './modules/theme.js';
 import { t, lang, toggleLang, langFlag, langLabel, initI18n } from './modules/i18n.js';
@@ -178,7 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Orientation
         layFaceBtn: $('lay-face-btn'), orientResetBtn: $('orient-reset-btn'),
         orientCenterBtn: $('orient-center-btn'), orientTrainBtn: $('orient-train-btn'),
-        orientTrainStatus: $('orient-train-status'),
+        orientTrainStatus: $('orient-train-status'), orientLearnedBtn: $('orient-learned-btn'), orientSaveBtn: $('orient-save-btn'),
 
         // User center tabs + password
         ucTabBtns: document.querySelectorAll('.uc-tab-btn'),
@@ -295,7 +295,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (dom.ucNewPassword) dom.ucNewPassword.value = '';
         if (dom.ucConfirmPassword) dom.ucConfirmPassword.value = '';
         if (dom.ucPasswordMsg) { dom.ucPasswordMsg.textContent = ''; dom.ucPasswordMsg.className = 'text-xs hidden'; }
-        const defaultTab = document.querySelector('.uc-tab-btn[data-uc-tab="materials"]');
+        const defaultTab = document.querySelector('.uc-tab-btn[data-uc-tab="print-params"]') || document.querySelector('.uc-tab-btn');
         if (defaultTab) defaultTab.click();
         dom.userCenterModal.classList.remove('hidden');
         fetchPrinterModels();
@@ -354,23 +354,20 @@ document.addEventListener('DOMContentLoaded', () => {
     // ── Slicer preset form: save-as button (direct save with auto-generated name)
     _bind(dom.genPresetSaveasBtn, 'click', saveAsNewPreset);
 
-    // ── Color dropdown helpers ──
+    // ── Color wheel helpers ──
     // The results table lives inside an .overflow-x-auto wrapper whose computed
-    // overflow-y becomes `auto` (when one axis is non-visible the visible one
-    // computes to auto), which clips the absolutely-positioned color popup. We
-    // switch it to position:fixed for dropdowns trapped in the table / cards /
-    // batch toolbar; the options-modal dropdown stays absolute.
-    function _resetColorList(list) {
-        list.style.position = '';
-        list.style.left = '';
-        list.style.right = '';
-        list.style.top = '';
-        list.style.bottom = '';
-        list.style.marginTop = '';
-        list.style.minWidth = '';
+    // overflow-y becomes `auto`, which clips absolutely-positioned popups. We
+    // switch to position:fixed for panels trapped in table / cards / batch toolbar.
+    function _resetCwPanel(panel) {
+        panel.style.position = '';
+        panel.style.left = '';
+        panel.style.right = '';
+        panel.style.top = '';
+        panel.style.bottom = '';
+        panel.style.marginTop = '';
+        panel.style.minWidth = '';
     }
     function _closeColorList(list) {
-        _resetColorList(list);
         list.classList.add('hidden');
     }
     function _closeAllColorLists(e) {
@@ -447,13 +444,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // Update trigger swatch
             const swatch = wrapper.querySelector('.color-dd-swatch');
             if (swatch) swatch.style.background = hex;
-            // Update trigger label (for full mode)
+            // Update label if present (full mode)
             const label = wrapper.querySelector('.color-dd-label');
-            const nameSpan = item.querySelector('span:nth-child(2)');
-            if (label && nameSpan) label.textContent = nameSpan.textContent;
-            // Highlight selected item
-            wrapper.querySelectorAll('.color-dd-item').forEach(el => el.classList.remove('bg-indigo-50'));
-            item.classList.add('bg-indigo-50');
+            if (label) label.textContent = hex;
             // Close dropdown
             const list = wrapper.querySelector('.color-dd-list');
             if (list) _closeColorList(list);
@@ -465,8 +458,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             // Inline (table row / card) color change: fast-path recolor only.
-            // Color does not affect slicing/price, so skip re-quote and just refresh
-            // the thumbnail (cached STL geometry -> instant) + live 3D preview mesh.
             const rowCtx = wrapper.closest('tr[data-row-file], [data-card-file]');
             if (rowCtx) {
                 (async () => {
@@ -615,6 +606,8 @@ document.addEventListener('DOMContentLoaded', () => {
     _bind(dom.orientResetBtn, 'click', resetOrientationHandler);
     _bind(dom.layFaceBtn, 'click', toggleLayFace);
     _bind(dom.orientTrainBtn, 'click', submitTraining);
+    _bind(dom.orientLearnedBtn, 'click', learnedAutoOrient);
+    _bind(dom.orientSaveBtn, 'click', saveOrientationAndRequote);
 
     // User center
     const hideUserCenter = () => { dom.userCenterModal.classList.add('hidden'); dom.userCenterMsg.classList.add('hidden'); };
@@ -691,9 +684,9 @@ document.addEventListener('DOMContentLoaded', () => {
     dom.ucTabBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             const tabId = btn.getAttribute('data-uc-tab');
-            dom.ucTabBtns.forEach(b => { b.classList.remove('text-indigo-700', 'bg-indigo-50', 'active'); b.classList.add('text-gray-600'); });
-            btn.classList.add('text-indigo-700', 'bg-indigo-50', 'active');
-            btn.classList.remove('text-gray-600');
+            dom.ucTabBtns.forEach(b => { b.classList.remove('tw-text-primary', 'tw-bg-active', 'active'); b.classList.add('tw-text-secondary'); });
+            btn.classList.add('tw-text-primary', 'tw-bg-active', 'active');
+            btn.classList.remove('tw-text-secondary');
             dom.ucTabPanes.forEach(pane => { pane.classList.add('hidden'); pane.classList.remove('block'); });
             const targetPane = document.getElementById(`uc-tab-${tabId}`);
             if (targetPane) { targetPane.classList.remove('hidden'); targetPane.classList.add('block'); }
@@ -709,14 +702,17 @@ document.addEventListener('DOMContentLoaded', () => {
     ppSubTabBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             const subTabId = btn.getAttribute('data-pp-tab');
-            ppSubTabBtns.forEach(b => { b.classList.remove('text-indigo-700', 'border-indigo-600'); b.classList.add('text-gray-500', 'border-transparent'); });
-            btn.classList.add('text-indigo-700', 'border-indigo-600');
-            btn.classList.remove('text-gray-500', 'border-transparent');
+            ppSubTabBtns.forEach(b => { b.classList.remove('tw-text-primary', 'border-primary'); b.classList.add('tw-text-muted', 'border-transparent'); });
+            btn.classList.add('tw-text-primary', 'border-primary');
+            btn.classList.remove('tw-text-muted', 'border-transparent');
             ppSubPanes.forEach(pane => { pane.classList.add('hidden'); });
             const targetPane = document.getElementById(`pp-sub-${subTabId}`);
             if (targetPane) targetPane.classList.remove('hidden');
         });
     });
+    // 初始高亮第一个子标签（材料设置）
+    const firstSubTab = document.querySelector('.pp-sub-tab-btn');
+    if (firstSubTab) firstSubTab.click();
 
     // Materials table
     if (dom.materialsTbody) {
@@ -778,15 +774,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const knownBrands = ['Generic','eSUN','Polymaker','Hatchbox','Prusament','Prusa','SUNLU','Creality','Overture','ColorFabb','MatterHackers','Bambu Lab','Anycubic','Elegoo','Jayo','Eryone','Voron'];
                 const cell = target.closest('td');
                 if (cell) {
-                    let badge = cell.querySelector('.custom-brand-badge');
+                    let badge = cell.querySelector('.combo-badge');
                     const isCustom = !knownBrands.includes(target.value.trim());
-                    if (isCustom && !badge) {
-                        badge = document.createElement('span');
-                        badge.className = 'custom-brand-badge text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded whitespace-nowrap flex-shrink-0';
-                        badge.textContent = '自定义';
-                        target.parentElement.appendChild(badge);
+                    if (isCustom && badge) {
+                        badge.classList.remove('hidden');
                     } else if (!isCustom && badge) {
-                        badge.remove();
+                        badge.classList.add('hidden');
                     }
                 }
             }
@@ -796,15 +789,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const presetTypes = Object.keys(MATERIAL_TYPE_PRESETS);
                 const cell = target.closest('td');
                 if (cell) {
-                    let badge = cell.querySelector('.custom-type-badge');
+                    let badge = cell.querySelector('.combo-badge');
                     const isCustom = !presetTypes.includes(target.value.trim());
-                    if (isCustom && !badge) {
-                        badge = document.createElement('span');
-                        badge.className = 'custom-type-badge text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded whitespace-nowrap flex-shrink-0';
-                        badge.textContent = '自定义';
-                        target.parentElement.appendChild(badge);
+                    if (isCustom && badge) {
+                        badge.classList.remove('hidden');
                     } else if (!isCustom && badge) {
-                        badge.remove();
+                        badge.classList.add('hidden');
                     }
                 }
             }
@@ -1238,7 +1228,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (dom.ucNewPassword) dom.ucNewPassword.value = '';
         if (dom.ucConfirmPassword) dom.ucConfirmPassword.value = '';
         if (dom.ucPasswordMsg) { dom.ucPasswordMsg.textContent = ''; dom.ucPasswordMsg.className = 'text-xs hidden'; }
-        const defaultTab = document.querySelector('.uc-tab-btn[data-uc-tab="materials"]');
+        const defaultTab = document.querySelector('.uc-tab-btn[data-uc-tab="print-params"]') || document.querySelector('.uc-tab-btn');
         if (defaultTab) defaultTab.click();
         dom.userCenterModal.classList.remove('hidden');
         fetchPrinterModels();

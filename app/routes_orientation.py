@@ -424,3 +424,61 @@ async def admin_train_model(
         "accuracy": round(accuracy, 4),
         "coef": coef,
     }
+
+
+async def auto_learned_orient(
+    request: Request,
+    file: UploadFile = File(...),
+    current_user=Depends(get_current_user),
+):
+    """使用自学习模型自动摆放：接收文件，返回最优朝向。
+
+    POST /api/orientation/auto-learned
+    → {euler_angles_deg: {x,y,z}, score, method_used, face_normal, fallback}
+    """
+    filename = file.filename or "unnamed"
+    _, ext = os.path.splitext(filename.lower())
+    if ext not in SUPPORTED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"不支持的文件格式: {ext}。支持: {', '.join(sorted(SUPPORTED_EXTENSIONS))}",
+        )
+
+    content = await file.read()
+    if len(content) >= MAX_FILE_SIZE_BYTES:
+        raise HTTPException(status_code=400, detail="文件大小超过限制 (100MB)")
+
+    tmp_dir = "/tmp/pricer3d_orient"
+    os.makedirs(tmp_dir, exist_ok=True)
+    tmp_path = os.path.join(tmp_dir, f"{uuid.uuid4().hex}{ext}")
+    try:
+        with open(tmp_path, "wb") as f:
+            f.write(content)
+
+        from calculator.orientation import get_best_face_for_slicing
+
+        result = get_best_face_for_slicing(tmp_path, method="learned")
+        euler = result.get("euler_angles_deg", {"x": 0, "y": 0, "z": 0})
+        face = result.get("face") or {}
+        normal = face.get("normal") if isinstance(face, dict) else None
+
+        return {
+            "status": "ok",
+            "euler_angles_deg": euler,
+            "score": result.get("score"),
+            "method_used": result.get("method_used", "learned"),
+            "fallback": result.get("fallback", False),
+            "face_normal": normal,
+            "n_candidates": result.get("n_candidates"),
+            "best_label": result.get("best_label"),
+            "prusa": result.get("prusa"),
+        }
+    except Exception as e:
+        logger.error("自动摆放(学习模型)失败 %s: %s", filename, e)
+        raise HTTPException(status_code=500, detail=f"自动摆放失败: {str(e)[:200]}")
+    finally:
+        try:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+        except OSError:
+            pass

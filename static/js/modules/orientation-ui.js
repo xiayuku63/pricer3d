@@ -6,6 +6,7 @@ import {
 import {
     renderClusters, clearClusters, setClusterHover, intersectClusters,
     placeFaceOnBed, isClusterMode,
+    showPlacementPlane, hidePlacementPlane,
 } from './layface.js';
 import {
     authToken, authFetch, quoteOptions,
@@ -50,6 +51,7 @@ export function centerModel() {
 // ── Reset ──
 export function resetOrientationHandler() {
     clearClusters();
+    hidePlacementPlane();
     window.__onLayFaceClick = null;
     const { layFaceBtn } = dom;
     if (layFaceBtn) layFaceBtn.textContent = t('orientation.autoOrient');
@@ -96,6 +98,7 @@ export async function toggleLayFace() {
             placeFaceOnBed(currentMesh, cluster.normal, 'Z');
             syncOrientationFromMesh();
             clearClusters();
+            showPlacementPlane(currentMesh, cluster.face_vertices);
             window.__onLayFaceClick = null;
             if (layFaceBtn) layFaceBtn.textContent = t('orientation.autoOrient');
             return true;
@@ -109,6 +112,7 @@ export async function toggleLayFace() {
                     placeFaceOnBed(currentMesh, c.normal, 'Z');
                     syncOrientationFromMesh();
                     clearClusters();
+                    showPlacementPlane(currentMesh, c.face_vertices);
                     window.__onLayFaceClick = null;
                     if (layFaceBtn) layFaceBtn.textContent = t('orientation.autoOrient');
                 }
@@ -181,5 +185,144 @@ export async function submitTraining() {
         setTimeout(() => {
             if (orientTrainStatus) { orientTrainStatus.classList.add('hidden'); orientTrainStatus.textContent = ''; }
         }, 5000);
+    }
+}
+
+// ── Learned Auto Orient ──
+export async function learnedAutoOrient() {
+    const { orientLearnedBtn } = dom;
+    if (!currentPreviewFilename) return;
+    const file = selectedFilesMap.get(currentPreviewFilename);
+    if (!file) return;
+
+    if (orientLearnedBtn) orientLearnedBtn.disabled = true;
+    // 退出手动摆放模式（如果有）
+    clearClusters();
+    window.__onLayFaceClick = null;
+
+    try {
+        // 先清除彩块避免干扰
+        clearClusters();
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const resp = await authFetch('/api/orientation/auto-learned', { method: 'POST', body: formData });
+        if (resp.status === 401) {
+            const { closePreviewModal } = await import('./preview.js');
+            closePreviewModal();
+            openLoginModal();
+            return;
+        }
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.detail || '智能摆放请求失败');
+
+        // 应用旋转到模型
+        const { applyOrientationRotation, fitCameraToMesh } = await import('./viewer.js');
+        // 先重置位置，避免累计偏移
+        if (currentMesh.position.z !== 0) {
+            currentMesh.position.z = 0;
+        }
+        applyOrientationRotation(data.euler_angles_deg);
+        // 再次确保贴到 Z=0 并适配相机
+        currentMesh.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(currentMesh);
+        if (box.min.z > 0.1) {
+            currentMesh.position.z -= box.min.z;
+        }
+        requestRender();
+        setTimeout(() => fitCameraToMesh(currentMesh), 50);
+
+        // 更新 state
+        const { quoteOptions } = await import('./state.js');
+        quoteOptions.orientation = data.euler_angles_deg;
+
+        if (orientLearnedBtn) {
+            const p = data.prusa;
+            let label = t('orientation.learnedSuccess');
+            if (p && p.filament_cm3) {
+                const timeMin = Math.round(p.print_time_s / 60);
+                label = `✓ ${p.filament_cm3.toFixed(1)}cm³ / ${timeMin}min`;
+            }
+            orientLearnedBtn.textContent = label;
+            setTimeout(() => {
+                orientLearnedBtn.textContent = t('orientation.autoLearn');
+            }, 2000);
+        }
+
+        console.log('智能摆放完成:', data);
+    } catch (e) {
+        console.error('智能摆放失败:', e);
+        if (orientLearnedBtn) {
+            orientLearnedBtn.textContent = t('orientation.learnedFailed');
+            setTimeout(() => {
+                orientLearnedBtn.textContent = t('orientation.autoLearn');
+            }, 3000);
+        }
+    } finally {
+        if (orientLearnedBtn) orientLearnedBtn.disabled = false;
+    }
+}
+
+// ── 保存当前方向并重新报价 ──
+export async function saveOrientationAndRequote() {
+    const { orientSaveBtn } = dom;
+    if (!currentPreviewFilename) return;
+    const file = selectedFilesMap.get(currentPreviewFilename);
+    if (!file) return;
+
+    const orient = quoteOptions.orientation || { x: 0, y: 0, z: 0 };
+    if (orientSaveBtn) {
+        orientSaveBtn.disabled = true;
+        orientSaveBtn.textContent = '报价中...';
+    }
+
+    try {
+        const { quoteSingleFileWithOptions } = await import('./quote-api.js');
+        const { mergeResultsByFilename } = await import('./quote-api.js');
+        const { renderResultsTable, recalcSummaryFromCurrentResults } = await import('./quote-render.js');
+        const { ensureThumbnailForFile } = await import('./preview.js');
+
+        const orient = quoteOptions.orientation || { x: 0, y: 0, z: 0 };
+
+        await ensureThumbnailForFile(file, quoteOptions.color, orient);
+
+        const updated = await quoteSingleFileWithOptions(file, {
+            material: quoteOptions.material,
+            color: quoteOptions.color,
+            quantity: quoteOptions.quantity || 1,
+            orient_x: orient.x,
+            orient_y: orient.y,
+            orient_z: orient.z,
+        });
+
+        mergeResultsByFilename([updated]);
+        renderResultsTable();
+        recalcSummaryFromCurrentResults();
+
+        // 先更新按钮状态，再关闭弹窗
+        if (orientSaveBtn) {
+            orientSaveBtn.textContent = '已保存 ✓';
+            orientSaveBtn.disabled = false;
+        }
+
+        // 关闭预览弹窗，回到报价结果
+        const { closePreviewModal } = await import('./preview.js');
+        closePreviewModal();
+        // 滚动到报价表格区域
+        const quoteTable = document.getElementById('results-table');
+        if (quoteTable) {
+            setTimeout(() => quoteTable.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+        }
+    } catch (e) {
+        console.error('保存方向失败:', e);
+        if (orientSaveBtn) {
+            orientSaveBtn.textContent = '保存失败';
+            setTimeout(() => {
+                orientSaveBtn.textContent = '保存当前方向并报价';
+            }, 3000);
+        }
+    } finally {
+        if (orientSaveBtn) orientSaveBtn.disabled = false;
     }
 }

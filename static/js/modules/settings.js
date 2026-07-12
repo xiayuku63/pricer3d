@@ -7,6 +7,7 @@ import {
     quoteOptions,
     authFetch, colorToObj, materialColorsArray, escapeHtml,
     renderColorDropdown, getColorsForMaterial,
+    hexToRgb, drawColorWheel,
     saveSlicerPresetSelection, loadSlicerPresetSelection,
     selectedFilesMap,
     defaultPrinterId, setDefaultPrinterId,
@@ -25,6 +26,30 @@ import { refreshOptionsSummary, normalizeResultsWithCurrentOptions, renderResult
 let dom = {};
 
 export function initSettings(d) { dom = d; }
+
+// Initialize the color wheel canvas after rendering a full-mode color wheel panel
+function _initColorWheelCanvas(container) {
+    const canvas = container.querySelector('.cw-canvas');
+    if (canvas) {
+        const hex = container.querySelector('.row-color-value')?.value || '#d1d5db';
+        const [r, g, b] = hexToRgb(hex);
+        // Approximate hue/sat from hex for the selection dot
+        let hue = 0, sat = 100;
+        // Simple heuristic: compute hue from RGB
+        const rn = r / 255, gn = g / 255, bn = b / 255;
+        const mx = Math.max(rn, gn, bn), mn = Math.min(rn, gn, bn);
+        if (mx !== mn) {
+            const d = mx - mn;
+            sat = (d / (1 - Math.abs(mx + mn - 1))) * 100;
+            let h = 0;
+            if (mx === rn) h = ((gn - bn) / d + (gn < bn ? 6 : 0)) / 6;
+            else if (mx === gn) h = ((bn - rn) / d + 2) / 6;
+            else h = ((rn - gn) / d + 4) / 6;
+            hue = h * 360;
+        }
+        drawColorWheel(canvas, hue, sat);
+    }
+}
 
 // ── Fetch from API ──
 export async function fetchUserSettings() {
@@ -101,6 +126,7 @@ export function updateDropdowns() {
         }
         const rendered = renderColorDropdown(quoteOptions.material, quoteOptions.color);
         if (optColor) optColor.innerHTML = rendered.html;
+        _initColorWheelCanvas(optColor);
         quoteOptions.color = rendered.selected;
     }
     refreshOptionsSummary();
@@ -156,6 +182,7 @@ export function refreshQuoteColorDropdowns() {
     const { optColor } = dom;
     const rendered = renderColorDropdown(quoteOptions.material, quoteOptions.color);
     if (optColor) optColor.innerHTML = rendered.html;
+    _initColorWheelCanvas(optColor);
     quoteOptions.color = rendered.selected;
 }
 
@@ -192,6 +219,29 @@ function _getTypeOptionsForRow(m, rowIdx) {
     // Always keep current row's type
     if (m.name) allTypes.add(m.name);
     return [...allTypes].sort();
+}
+
+/**
+ * Render a custom combo input (input + styled dropdown) to replace <input>+<datalist>.
+ * Supports typing to filter and clicking to select. Dropdown uses CSS variables for
+ * dark-mode compatibility.
+ * @param {string[]} opts - Array of option strings
+ * @param {string} value - Current input value
+ * @param {number|string} dataIdx - data-idx attribute value
+ * @param {string} dataField - data-field attribute value ('brand' or 'name')
+ * @returns {string} HTML string for the combo component
+ */
+function renderComboInput(opts, value, dataIdx, dataField) {
+    const escVal = escapeHtml(value);
+    const optHtml = opts.map(o =>
+        `<div class="combo-opt px-2 py-1 text-xs cursor-pointer hover:bg-gray-100 truncate" data-val="${escapeHtml(o)}" onmousedown="event.preventDefault();var p=this.closest('.combo-w');var i=p.querySelector('.combo-i');i.value=this.getAttribute('data-val');i.dispatchEvent(new Event('input',{bubbles:true}));i.dispatchEvent(new Event('change',{bubbles:true}));p.querySelector('.combo-d').classList.add('hidden');i.blur();">${escapeHtml(o)}</div>`
+    ).join('');
+            return ` \
+            <span class="combo-w relative" style="display:inline-flex;align-items:center;flex:1;min-width:0"> \
+                <input type="text" class="combo-i flex-1 min-w-0 border-gray-300 rounded-md text-xs px-2 py-1.5 tw-bg-surface" value="${escVal}" autocomplete="off" data-idx="${dataIdx}" data-field="${dataField}" onfocus="this.parentElement.querySelector('.combo-d').classList.remove('hidden')" oninput="var q=this.value.toLowerCase();var d=this.parentElement.querySelector('.combo-d');d.querySelectorAll('.combo-opt').forEach(function(o){o.classList.toggle('hidden',o.textContent.toLowerCase().indexOf(q)===-1)});d.classList.remove('hidden')" onblur="setTimeout(function(el){var dd=el.parentElement?.querySelector('.combo-d');if(dd)dd.classList.add('hidden')},150,this)"> \
+                <span class="combo-badge text-[11px] text-amber-500 leading-none flex-shrink-0 cursor-help ml-1 hidden" title="${dataField === 'brand' ? (t('material.brandCustom') || '自定义品牌') : (t('material.typeCustom') || '自定义类型')}">✦</span> \
+                <div class="combo-d hidden absolute z-50 left-0 right-0 top-full mt-0.5 border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto" style="background:var(--color-surface);color:var(--color-text);min-width:100px">${optHtml}</div> \
+            </span>`;
 }
 
 export function renderUserCenterUI() {
@@ -243,35 +293,28 @@ export function renderUserCenterUI() {
             // 构建材料类型选项
             const presetTypes = Object.keys(MATERIAL_TYPE_PRESETS);
             const isInPreset = presetTypes.includes(m.name);
-            
-            const brandCustomBadge = isCustomBrand ? `<span class="custom-brand-badge text-[11px] text-amber-500 leading-none flex-shrink-0 w-4 h-4 flex items-center justify-center rounded-full hover:bg-amber-50 cursor-help" title="${t('material.brandCustom') || '自定义品牌'}">✦</span>` : '';
-            const typeCustomBadge = !isInPreset ? `<span class="custom-type-badge text-[11px] text-amber-500 leading-none flex-shrink-0 w-4 h-4 flex items-center justify-center rounded-full hover:bg-amber-50 cursor-help" title="${t('material.typeCustom') || '自定义类型'}">✦</span>` : '';
-            
+
             return `
             <tr class="hover:bg-gray-50">
                 <td class="px-3 py-2.5">
                     <div class="flex items-center gap-1">
-                        <input type="text" list="brand-opts-${idx}" class="flex-1 min-w-0 border-gray-300 rounded-md text-xs px-2 py-1.5 material-brand-input" value="${escapeHtml(brand)}" data-idx="${idx}" data-field="brand" autocomplete="off" onmousedown="var v=this.value;this.value='';this._prev=v" onchange="this._prev=null" onblur="if(this._prev&&!this.value)this.value=this._prev;this._prev=null">
-                        <datalist id="brand-opts-${idx}">${getBrandOptions().map(b => `<option value="${b}">`).join('')}</datalist>
-                        ${brandCustomBadge}
+                        ${renderComboInput(getBrandOptions(), brand, idx, 'brand')}
                     </div>
                 </td>
                 <td class="px-3 py-2.5">
                     <div class="flex items-center gap-1">
-                        <input type="text" list="type-opts-${idx}" class="flex-1 min-w-0 border-gray-300 rounded-md text-xs px-1 py-1.5 material-type-input" value="${escapeHtml(m.name)}" data-idx="${idx}" data-field="name" autocomplete="off" onmousedown="var v=this.value;this.value='';this._prev=v" onchange="this._prev=null" onblur="if(this._prev&&!this.value)this.value=this._prev;this._prev=null">
-                        <datalist id="type-opts-${idx}">${_getTypeOptionsForRow(m, idx).map(tp => `<option value="${tp}">`).join('')}</datalist>
-                        ${typeCustomBadge}
+                        ${renderComboInput(_getTypeOptionsForRow(m, idx), m.name, idx, 'name')}
                     </div>
                 </td>
-                <td class="px-3 py-2.5"><input type="number" step="0.01" class="w-full border-gray-300 rounded-md text-xs px-2 py-1.5" value="${m.density}" data-idx="${idx}" data-field="density"></td>
-                <td class="px-3 py-2.5"><input type="number" step="0.01" class="w-full border-gray-300 rounded-md text-xs px-2 py-1.5" value="${m.price_per_kg}" data-idx="${idx}" data-field="price_per_kg"></td>
+                <td class="px-3 py-2.5"><input type="number" step="0.01" class="w-full border-gray-300 rounded-md text-xs px-2 py-1.5 tw-bg-surface" value="${m.density}" data-idx="${idx}" data-field="density"></td>
+                <td class="px-3 py-2.5"><input type="number" step="0.01" class="w-full border-gray-300 rounded-md text-xs px-2 py-1.5 tw-bg-surface" value="${m.price_per_kg}" data-idx="${idx}" data-field="price_per_kg"></td>
                 <td class="px-3 py-2.5">
                     <div class="flex flex-wrap items-center gap-1.5">
                         ${materialColorsArray(m).map(c => `<span class="w-5 h-5 rounded-sm border border-gray-400 inline-block cursor-pointer" style="background:${c.hex}" title="${escapeHtml(c.name)}" data-color-idx="${idx}" data-color-hex="${c.hex}"></span>`).join('')}
                         <button type="button" class="text-xs text-indigo-600 hover:text-indigo-800 edit-colors-btn ml-1" data-idx="${idx}">${t('common.edit')}</button>
                     </div>
                 </td>
-                <td class="px-3 py-2.5 text-center"><button type="button" class="text-xs text-red-500 hover:text-red-700 delete-material-btn" data-idx="${idx}">${t('common.delete')}</button></td>
+                <td class="px-3 py-2.5 text-center"><button type="button" class="text-xs tw-text-danger hover:tw-text-danger delete-material-btn" data-idx="${idx}">${t('common.delete')}</button></td>
             </tr>
         `}).join('');
 
@@ -358,6 +401,7 @@ export function renderUserCenterUI() {
                 const matName = defaultMaterialSel.value;
                 const rendered = renderColorDropdown(matName, '');
                 colorDropdownContainer.innerHTML = rendered.html;
+                _initColorWheelCanvas(colorDropdownContainer);
                 colorDropdownContainer.setAttribute('data-selected-color', rendered.selected || '');
             }
         });
@@ -369,6 +413,7 @@ export function renderUserCenterUI() {
         const matName = defaultMaterial || (MATERIAL_OPTIONS[0] ? MATERIAL_OPTIONS[0].name : '');
         const rendered = renderColorDropdown(matName, defaultColor || '');
         colorDropdownContainer.innerHTML = rendered.html;
+        _initColorWheelCanvas(colorDropdownContainer);
         // Store the selected color in a hidden data attribute for save
         colorDropdownContainer.setAttribute('data-selected-color', rendered.selected || '');
     }
@@ -380,6 +425,7 @@ export function renderUserCenterUI() {
             if (colorDropdownContainer) {
                 const rendered = renderColorDropdown(matName, '');
                 colorDropdownContainer.innerHTML = rendered.html;
+                _initColorWheelCanvas(colorDropdownContainer);
                 colorDropdownContainer.setAttribute('data-selected-color', rendered.selected || '');
             }
         });
@@ -388,20 +434,18 @@ export function renderUserCenterUI() {
     // Handle color selection in user center (delegated event)
     if (colorDropdownContainer) {
         colorDropdownContainer.addEventListener('click', (e) => {
-            const item = e.target.closest('.color-dd-item');
-            if (item) {
-                const hex = item.getAttribute('data-color-hex');
+            const swatch = e.target.closest('.cw-swatch');
+            if (swatch) {
+                const hex = swatch.getAttribute('data-color-hex');
                 if (hex) {
                     colorDropdownContainer.setAttribute('data-selected-color', hex);
                     // Sync model page color
                     quoteOptions.color = hex;
-                    // Update batch color dropdown swatch
+                    // Update batch color dropdown trigger swatch
                     const batchColorContainer = document.getElementById('batch-color-dropdown');
                     if (batchColorContainer) {
-                        const batchSwatch = batchColorContainer.querySelector('.color-dd-swatch');
+                        const batchSwatch = batchColorContainer.querySelector('.cw-trigger .cw-swatch');
                         if (batchSwatch) batchSwatch.style.background = hex;
-                        const batchLabel = batchColorContainer.querySelector('.color-dd-label');
-                        if (batchLabel) batchLabel.textContent = hex;
                         const batchValueInput = batchColorContainer.querySelector('.row-color-value');
                         if (batchValueInput) batchValueInput.value = hex;
                     }
@@ -497,14 +541,182 @@ export function openColorEditor(materialIdx) {
             </div>
         `).join('');
     }
-    const picker = document.getElementById('color-editor-picker');
-    if (picker) picker.value = '#6366f1';
-    const hexDisplay = document.getElementById('color-editor-hex');
-    if (hexDisplay) hexDisplay.textContent = '#6366f1';
+    // Initialize color wheel with default indigo color
+    const defaultHex = '#6366f1';
+    _initColorEditorWheel(defaultHex);
     const nameInput = document.getElementById('color-editor-name');
     if (nameInput) nameInput.value = '';
     const modal = document.getElementById('color-editor-modal');
     if (modal) modal.classList.remove('hidden');
+
+    // Bind canvas events (rebind on each open to avoid stale references)
+    _bindColorEditorEvents();
+}
+
+function _bindColorEditorEvents() {
+    const canvas = document.getElementById('color-editor-canvas');
+    if (!canvas) return;
+    // Remove old listeners by clone & replace to prevent duplicate bindings
+    const newCanvas = canvas.cloneNode(true);
+    canvas.parentNode.replaceChild(newCanvas, canvas);
+
+    // Redraw wheel on the new canvas (the clone lost the drawn content)
+    const curHex = document.getElementById('color-editor-hex')?.textContent || '#6366f1';
+    const [r, g, b] = hexToRgb(curHex);
+    let hue = 0, sat = 100;
+    const rn = r / 255, gn = g / 255, bn = b / 255;
+    const mx = Math.max(rn, gn, bn), mn = Math.min(rn, gn, bn);
+    if (mx !== mn) {
+        const d = mx - mn;
+        sat = (d / (1 - Math.abs(mx + mn - 1))) * 100;
+        let h = 0;
+        if (mx === rn) h = ((gn - bn) / d + (gn < bn ? 6 : 0)) / 6;
+        else if (mx === gn) h = ((bn - rn) / d + 2) / 6;
+        else h = ((rn - gn) / d + 4) / 6;
+        hue = h * 360;
+    }
+    _colorEditorWheelState = { hue, sat };
+    drawColorWheel(newCanvas, hue, sat);
+
+    let ceDrag = false;
+    newCanvas.addEventListener('mousedown', (e) => {
+        ceDrag = true;
+        _colorEditorPickHueSat(e.clientX, e.clientY);
+    });
+    document.addEventListener('mousemove', (e) => {
+        if (!ceDrag) return;
+        _colorEditorPickHueSat(e.clientX, e.clientY);
+    });
+    document.addEventListener('mouseup', () => { ceDrag = false; });
+
+    // Monochrome swatch clicks
+    const monoRow = document.getElementById('color-editor-mono');
+    if (monoRow) {
+        monoRow.addEventListener('click', (e) => {
+            const swatch = e.target.closest('.ce-swatch');
+            if (!swatch) return;
+            const hex = swatch.getAttribute('data-color-hex');
+            if (!hex) return;
+            document.getElementById('color-editor-swatch').style.background = hex;
+            document.getElementById('color-editor-hex').textContent = hex;
+            monoRow.querySelectorAll('.ce-swatch').forEach(s => s.classList.remove('ring-2', 'ring-indigo-500'));
+            swatch.classList.add('ring-2', 'ring-indigo-500');
+        });
+    }
+}
+
+// ── Color editor wheel helpers ──
+let _colorEditorWheelState = { hue: 0, sat: 100 };
+
+function _initColorEditorWheel(hex) {
+    const canvas = document.getElementById('color-editor-canvas');
+    if (!canvas) return;
+    const [r, g, b] = hexToRgb(hex);
+    let hue = 0, sat = 100;
+    const rn = r / 255, gn = g / 255, bn = b / 255;
+    const mx = Math.max(rn, gn, bn), mn = Math.min(rn, gn, bn);
+    if (mx !== mn) {
+        const d = mx - mn;
+        sat = (d / (1 - Math.abs(mx + mn - 1))) * 100;
+        let h = 0;
+        if (mx === rn) h = ((gn - bn) / d + (gn < bn ? 6 : 0)) / 6;
+        else if (mx === gn) h = ((bn - rn) / d + 2) / 6;
+        else h = ((rn - gn) / d + 4) / 6;
+        hue = h * 360;
+    }
+    _colorEditorWheelState = { hue, sat };
+    drawColorWheel(canvas, hue, sat);
+    _colorEditorUpdatePreview(hex);
+    _colorEditorUpdateMonochrome(hue, sat, hex);
+}
+
+function _colorEditorUpdatePreview(hex) {
+    const swatch = document.getElementById('color-editor-swatch');
+    if (swatch) swatch.style.background = hex;
+    const hexLabel = document.getElementById('color-editor-hex');
+    if (hexLabel) hexLabel.textContent = hex;
+}
+
+function _colorEditorUpdateMonochrome(hue, sat, pickHex) {
+    const monoRow = document.getElementById('color-editor-mono');
+    if (!monoRow) return;
+    const count = 10;
+    const shades = [];
+    for (let i = 0; i < count; i++) {
+        const t = i / (count - 1);
+        const l = 10 + t * 82;
+        const s2 = sat * (1 - t * 0.5);
+        const [r2, g2, b2] = (() => {
+            const h2 = hue / 360; const s3 = s2 / 100; const l2 = l / 100;
+            if (s3 === 0) { const v = Math.round(l2 * 255); return [v, v, v]; }
+            const hue2rgb = (p, q, t) => {
+                if (t < 0) t += 1;
+                if (t > 1) t -= 1;
+                if (t < 1/6) return p + (q - p) * 6 * t;
+                if (t < 1/2) return q;
+                if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+                return p;
+            };
+            const q = l2 < 0.5 ? l2 * (1 + s3) : l2 + s3 - l2 * s3;
+            const p2 = 2 * l2 - q;
+            return [
+                Math.round(hue2rgb(p2, q, h2 + 1/3) * 255),
+                Math.round(hue2rgb(p2, q, h2) * 255),
+                Math.round(hue2rgb(p2, q, h2 - 1/3) * 255)
+            ];
+        })();
+        const sh = '#' + [r2, g2, b2].map(x => Math.max(0, Math.min(255, Math.round(x))).toString(16).padStart(2, '0')).join('');
+        shades.push(sh);
+    }
+    monoRow.innerHTML = shades.map(sh =>
+        `<button type="button" class="ce-swatch w-7 h-7 rounded-md border border-gray-300 hover:border-indigo-400 hover:shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 flex-shrink-0${sh === pickHex ? ' ring-2 ring-indigo-500' : ''}" style="background:${sh}" data-color-hex="${sh}" title="${sh}"></button>`
+    ).join('');
+}
+
+function _colorEditorPickHueSat(clientX, clientY) {
+    const canvas = document.getElementById('color-editor-canvas');
+    if (!canvas) return;
+    const result = (() => {
+        const rect = canvas.getBoundingClientRect();
+        const x = (clientX - rect.left) * (canvas.width / rect.width);
+        const y = (clientY - rect.top) * (canvas.height / rect.height);
+        const cx = canvas.width / 2, cy = canvas.height / 2;
+        const radius = Math.min(cx, cy) - 2;
+        const dx = x - cx, dy = y - cy;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist > radius) return null;
+        let angle = Math.atan2(dy, dx);
+        if (angle < 0) angle += Math.PI * 2;
+        return { hue: (angle / (Math.PI * 2)) * 360, sat: (dist / radius) * 100 };
+    })();
+    if (!result) return;
+    const { hue, sat } = result;
+    _colorEditorWheelState = { hue, sat };
+    drawColorWheel(canvas, hue, sat);
+    // Compute hex
+    const [r, g, b] = (() => {
+        const h = hue / 360; const s = sat / 100;
+        if (s === 0) { const v = Math.round(128); return [v, v, v]; }
+        const hue2rgb = (p, q, t) => {
+            if (t < 0) t += 1;
+            if (t > 1) t -= 1;
+            if (t < 1/6) return p + (q - p) * 6 * t;
+            if (t < 1/2) return q;
+            if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+            return p;
+        };
+        const l = 50 / 100;
+        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        const p = 2 * l - q;
+        return [
+            Math.round(hue2rgb(p, q, h + 1/3) * 255),
+            Math.round(hue2rgb(p, q, h) * 255),
+            Math.round(hue2rgb(p, q, h - 1/3) * 255)
+        ];
+    })();
+    const hex = '#' + [r, g, b].map(x => Math.max(0, Math.min(255, Math.round(x))).toString(16).padStart(2, '0')).join('');
+    _colorEditorUpdatePreview(hex);
+    _colorEditorUpdateMonochrome(hue, sat, hex);
 }
 
 export function closeColorEditor() {
@@ -516,7 +728,7 @@ export function closeColorEditor() {
 export function addColorToMaterial() {
     const m = MATERIAL_OPTIONS[_colorEditMaterialIdx];
     if (!m) return;
-    const hex = document.getElementById('color-editor-picker')?.value;
+    const hex = document.getElementById('color-editor-hex')?.textContent;
     if (!hex) return;
     if (!m.colors || !Array.isArray(m.colors)) m.colors = [];
     const existing = materialColorsArray(m);

@@ -1,130 +1,130 @@
             <div id="login-modal" class="hidden fixed inset-0 z-50">
-                <div id="login-backdrop" class="absolute inset-0 bg-[#0d1117]/70 backdrop-blur-sm"></div>
+                <div id="login-backdrop" class="absolute inset-0" style="background-color: var(--color-overlay-dark); backdrop-filter: blur(4px);"></div>
                 <div class="relative z-10 h-full w-full flex items-center justify-center p-4">
-                    <div class="w-full max-w-[340px] bg-white rounded-xl shadow-2xl overflow-hidden">
+                    <div class="w-full max-w-[340px] tw-card shadow-2xl overflow-hidden" style="border-radius: var(--radius-xl);">
                         <!-- Header -->
                         <div class="pt-8 pb-4 text-center">
-                            <div class="mx-auto w-12 h-12 rounded-full bg-indigo-600 flex items-center justify-center mb-3">
+                            <div class="mx-auto w-12 h-12 rounded-full flex items-center justify-center mb-3" style="background-color: var(--color-primary);">
                                 <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                                 </svg>
                             </div>
-                            <h2 id="login-view-title" class="text-xl font-semibold text-gray-900">登录 Pricer3D</h2>
-                            <p id="login-view-subtitle" class="text-sm text-gray-500 mt-1">3D 打印自动报价系统</p>
+                            <h2 id="login-view-title" class="text-xl font-semibold tw-text-heading">登录 Pricer3D</h2>
+                            <p id="login-view-subtitle" class="text-sm tw-text-muted mt-1">3D 打印自动报价系统</p>
                         </div>
 
                         <!-- Success banner -->
-                        <div id="login-success" class="hidden mx-6 mb-3 px-3 py-2 bg-green-50 border border-green-200 rounded-md text-xs text-green-700"></div>
+                        <div id="login-success" class="hidden mx-6 mb-3 px-3 py-2 rounded-md text-xs" style="background-color: var(--color-success-bg); border: 1px solid var(--color-success-border); color: var(--color-success-text);"></div>
 
                         <!-- Error banner -->
-                        <div id="login-error" class="hidden mx-6 mb-3 px-3 py-2 bg-red-50 border border-red-200 rounded-md text-xs text-red-700"></div>
+                        <div id="login-error" class="hidden mx-6 mb-3 px-3 py-2 rounded-md text-xs" style="background-color: var(--color-danger-bg); border: 1px solid var(--color-danger-border); color: var(--color-danger-text);"></div>
 
                         <!-- ═══ VIEW: Login ═══ -->
                         <form id="login-view" class="px-6 pb-6 space-y-3.5" method="POST" action="#">
                             <div>
-                                <label for="login-username" class="block text-xs font-medium text-gray-700 mb-1">用户名 / 邮箱 / 手机号</label>
+                                <label for="login-username" class="block text-xs font-medium tw-text mb-1">用户名 / 邮箱 / 手机号</label>
                                 <input id="login-username" type="text" name="username" autocomplete="username"
-                                    class="block w-full px-3 py-2.5 sm:py-[7px] text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-shadow placeholder:text-gray-400 min-h-[44px]"
+                                    class="tw-input block w-full px-3 py-2.5 sm:py-[7px] text-sm min-h-[44px]"
                                     placeholder="请输入账号" />
-                                <p id="login-username-err" class="hidden text-[11px] text-red-500 mt-0.5"></p>
+                                <p id="login-username-err" class="hidden text-[11px] tw-text-danger mt-0.5"></p>
                             </div>
                             <div>
                                 <div class="flex justify-between items-baseline mb-1">
-                                    <label for="login-password" class="text-xs font-medium text-gray-700">密码</label>
-                                    <button type="button" id="forgot-password-link" class="text-[11px] text-indigo-600 hover:text-indigo-800 hover:underline bg-transparent border-0 cursor-pointer py-2 px-1 min-h-[44px] flex items-center active:text-indigo-900">忘记密码？</button>
+                                    <label for="login-password" class="text-xs font-medium tw-text">密码</label>
+                                    <button type="button" id="forgot-password-link" class="text-[11px] tw-text-primary hover:underline bg-transparent border-0 cursor-pointer py-2 px-1 min-h-[44px] flex items-center">忘记密码？</button>
                                 </div>
                                 <input id="login-password" type="password" name="password" autocomplete="current-password"
-                                    class="block w-full px-3 py-2.5 sm:py-[7px] text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-shadow placeholder:text-gray-400 min-h-[44px]"
+                                    class="tw-input block w-full px-3 py-2.5 sm:py-[7px] text-sm min-h-[44px]"
                                     placeholder="请输入密码" />
-                                <p id="login-password-err" class="hidden text-[11px] text-red-500 mt-0.5"></p>
+                                <p id="login-password-err" class="hidden text-[11px] tw-text-danger mt-0.5"></p>
                             </div>
                             <div>
-                                <label for="login-captcha-code" class="block text-xs font-medium text-gray-700 mb-1">验证码</label>
+                                <label for="login-captcha-code" class="block text-xs font-medium tw-text mb-1">验证码</label>
                                 <div class="flex gap-2">
                                     <input id="login-captcha-code" type="text" inputmode="numeric" maxlength="4" autocomplete="off" autocapitalize="off" spellcheck="false"
-                                        class="flex-1 px-3 py-2.5 sm:py-[7px] text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-shadow placeholder:text-gray-400 min-h-[44px]"
+                                        class="tw-input flex-1 px-3 py-2.5 sm:py-[7px] text-sm min-h-[44px]"
                                         placeholder="4 位验证码" />
                                     <img id="login-captcha-img" alt="验证码" title="点击刷新"
-                                        class="h-[44px] w-[110px] sm:h-[38px] sm:w-[100px] border border-gray-200 rounded-md bg-gray-50 cursor-pointer hover:border-gray-300 object-contain" />
+                                        class="h-[44px] w-[110px] sm:h-[38px] sm:w-[100px] rounded-md cursor-pointer object-contain" style="border: 1px solid var(--color-border); background-color: var(--color-bg);" />
                                 </div>
-                                <p id="login-captcha-err" class="hidden text-[11px] text-red-500 mt-0.5"></p>
+                                <p id="login-captcha-err" class="hidden text-[11px] tw-text-danger mt-0.5"></p>
                             </div>
                             <label class="flex items-start gap-2 cursor-pointer">
-                                <input id="login-remember-me" type="checkbox" class="mt-0.5 w-3.5 h-3.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked />
-                                <span class="text-[11px] text-gray-500 leading-relaxed">保持登录状态 30 天</span>
+                                <input id="login-remember-me" type="checkbox" class="mt-0.5 w-3.5 h-3.5 rounded" style="border-color: var(--color-border-strong); color: var(--color-primary);" checked />
+                                <span class="text-[11px] tw-text-muted leading-relaxed">保持登录状态 30 天</span>
                             </label>
                             <label class="flex items-start gap-2 cursor-pointer">
-                                <input id="login-accept-legal" type="checkbox" class="mt-0.5 w-3.5 h-3.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
-                                <span class="text-[11px] text-gray-500 leading-relaxed">
+                                <input id="login-accept-legal" type="checkbox" class="mt-0.5 w-3.5 h-3.5 rounded" style="border-color: var(--color-border-strong); color: var(--color-primary);" />
+                                <span class="text-[11px] tw-text-muted leading-relaxed">
                                     我已阅读并同意
-                                    <a href="/legal/terms" target="_blank" rel="noopener" class="text-indigo-600 hover:underline">《用户协议》</a>
+                                    <a href="/legal/terms" target="_blank" rel="noopener" class="tw-text-primary hover:underline">《用户协议》</a>
                                     和
-                                    <a href="/legal/privacy" target="_blank" rel="noopener" class="text-indigo-600 hover:underline">《隐私政策》</a>
+                                    <a href="/legal/privacy" target="_blank" rel="noopener" class="tw-text-primary hover:underline">《隐私政策》</a>
                                 </span>
                             </label>
                             <button id="login-submit-btn" type="submit"
-                                class="w-full py-3 sm:py-[7px] rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-h-[44px]">
+                                class="tw-btn-primary w-full py-3 sm:py-[7px] rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]">
                                 登 录
                             </button>
-                            <p class="text-center text-xs text-gray-500 pt-2">
+                            <p class="text-center text-xs tw-text-muted pt-2">
                                 还没有账号？
-                                <a href="/register" class="text-indigo-600 hover:text-indigo-800 hover:underline font-medium">立即注册</a>
+                                <a href="/register" class="tw-text-primary hover:underline font-medium">立即注册</a>
                             </p>
                         </form>
 
                         <!-- ═══ VIEW: Forgot Password – Step 1 (email + captcha) ═══ -->
                         <div id="reset-request-view" class="hidden px-6 pb-6 space-y-3.5">
-                            <p class="text-xs text-gray-500">请输入注册邮箱，我们将发送验证码。</p>
+                            <p class="text-xs tw-text-muted">请输入注册邮箱，我们将发送验证码。</p>
                             <div>
-                                <label for="reset-email" class="block text-xs font-medium text-gray-700 mb-1">注册邮箱</label>
+                                <label for="reset-email" class="block text-xs font-medium tw-text mb-1">注册邮箱</label>
                                 <input id="reset-email" type="email" autocomplete="email"
-                                    class="block w-full px-3 py-[7px] text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-shadow placeholder:text-gray-400"
+                                    class="tw-input block w-full px-3 py-[7px] text-sm"
                                     placeholder="请输入注册时使用的邮箱" />
-                                <p id="reset-email-err" class="hidden text-[11px] text-red-500 mt-0.5"></p>
+                                <p id="reset-email-err" class="hidden text-[11px] tw-text-danger mt-0.5"></p>
                             </div>
                             <div>
-                                <label for="reset-request-captcha" class="block text-xs font-medium text-gray-700 mb-1">验证码</label>
+                                <label for="reset-request-captcha" class="block text-xs font-medium tw-text mb-1">验证码</label>
                                 <div class="flex gap-2">
                                     <input id="reset-request-captcha" type="text" inputmode="numeric" maxlength="4" autocomplete="off" autocapitalize="off" spellcheck="false"
-                                        class="flex-1 px-3 py-[7px] text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-shadow placeholder:text-gray-400"
+                                        class="tw-input flex-1 px-3 py-[7px] text-sm"
                                         placeholder="4 位验证码" />
                                     <img id="reset-request-captcha-img" alt="验证码" title="点击刷新"
-                                        class="h-[38px] w-[100px] border border-gray-200 rounded-md bg-gray-50 cursor-pointer hover:border-gray-300 object-contain" />
+                                        class="h-[38px] w-[100px] rounded-md cursor-pointer object-contain" style="border: 1px solid var(--color-border); background-color: var(--color-bg);" />
                                 </div>
-                                <p id="reset-request-captcha-err" class="hidden text-[11px] text-red-500 mt-0.5"></p>
+                                <p id="reset-request-captcha-err" class="hidden text-[11px] tw-text-danger mt-0.5"></p>
                             </div>
                             <button id="reset-request-submit-btn" type="button"
-                                class="w-full py-[7px] rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                class="tw-btn-primary w-full py-[7px] rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
                                 发送验证码
                             </button>
-                            <p class="text-center text-xs text-gray-500 pt-2">
-                                <button type="button" id="reset-back-to-login" class="text-indigo-600 hover:text-indigo-800 hover:underline bg-transparent border-0 cursor-pointer font-medium">← 返回登录</button>
+                            <p class="text-center text-xs tw-text-muted pt-2">
+                                <button type="button" id="reset-back-to-login" class="tw-text-primary hover:underline bg-transparent border-0 cursor-pointer font-medium">← 返回登录</button>
                             </p>
                         </div>
 
                         <!-- ═══ VIEW: Forgot Password – Step 2 (code + new password) ═══ -->
                         <div id="reset-confirm-view" class="hidden px-6 pb-6 space-y-3.5">
-                            <p class="text-xs text-gray-500">验证码已发送至 <strong id="reset-confirm-email-display" class="text-gray-700"></strong></p>
+                            <p class="text-xs tw-text-muted">验证码已发送至 <strong id="reset-confirm-email-display" class="tw-text"></strong></p>
                             <div>
-                                <label for="reset-code" class="block text-xs font-medium text-gray-700 mb-1">验证码</label>
+                                <label for="reset-code" class="block text-xs font-medium tw-text mb-1">验证码</label>
                                 <input id="reset-code" type="text" maxlength="10" autocomplete="off" autocapitalize="off" spellcheck="false"
-                                    class="block w-full px-3 py-[7px] text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-shadow placeholder:text-gray-400"
+                                    class="tw-input block w-full px-3 py-[7px] text-sm"
                                     placeholder="请输入邮件中的验证码" />
-                                <p id="reset-code-err" class="hidden text-[11px] text-red-500 mt-0.5"></p>
+                                <p id="reset-code-err" class="hidden text-[11px] tw-text-danger mt-0.5"></p>
                             </div>
                             <div>
-                                <label for="reset-new-password" class="block text-xs font-medium text-gray-700 mb-1">新密码</label>
+                                <label for="reset-new-password" class="block text-xs font-medium tw-text mb-1">新密码</label>
                                 <input id="reset-new-password" type="password" autocomplete="new-password"
-                                    class="block w-full px-3 py-[7px] text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-shadow placeholder:text-gray-400"
+                                    class="tw-input block w-full px-3 py-[7px] text-sm"
                                     placeholder="至少 6 位，包含字母和数字" />
-                                <p id="reset-new-password-err" class="hidden text-[11px] text-red-500 mt-0.5"></p>
+                                <p id="reset-new-password-err" class="hidden text-[11px] tw-text-danger mt-0.5"></p>
                             </div>
                             <button id="reset-confirm-submit-btn" type="button"
-                                class="w-full py-[7px] rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                class="tw-btn-primary w-full py-[7px] rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
                                 确认重置密码
                             </button>
-                            <p class="text-center text-xs text-gray-500 pt-2">
-                                <button type="button" id="reset-confirm-back" class="text-indigo-600 hover:text-indigo-800 hover:underline bg-transparent border-0 cursor-pointer font-medium">← 返回登录</button>
+                            <p class="text-center text-xs tw-text-muted pt-2">
+                                <button type="button" id="reset-confirm-back" class="tw-text-primary hover:underline bg-transparent border-0 cursor-pointer font-medium">← 返回登录</button>
                             </p>
                         </div>
                     </div>
