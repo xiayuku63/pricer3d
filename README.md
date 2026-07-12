@@ -63,7 +63,7 @@ docker compose -f docker-compose.prod.yml up -d
 open http://localhost:5000
 ```
 
-首次构建会自动下载并安装 **PrusaSlicer v2.9.6**（从 GitHub Release 下载 `.deb` 包）。
+首次构建会自动下载并安装 **PrusaSlicer v2.8.1**（从 GitHub Release 下载 AppImage）。
 
 ### 本地开发
 
@@ -76,8 +76,8 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
 # 安装 PrusaSlicer CLI
-# Linux:  apt install prusa-slicer
-# Windows: 下载 PrusaSlicer-2.9.6-setup.exe 并安装，程序会自动检测
+# Linux: 下载 PrusaSlicer AppImage 并放到 PATH 中
+# Windows: 下载 PrusaSlicer 并安装，程序会自动检测
 
 # 启动开发服务器
 python main.py
@@ -166,7 +166,7 @@ pricer3d/
 
 - **后端**: Python 3.12 + FastAPI + SQLAlchemy + SQLite
 - **前端**: Vanilla JS (ES modules) + Three.js + Tailwind CSS
-- **切片**: PrusaSlicer v2.9.6 CLI（精确估算时间/耗材）
+- **切片**: PrusaSlicer v2.8.1 CLI（AppImage，精确估算时间/耗材）
 - **部署**: Docker + Nginx + Certbot
 - **CI/CD**: GitHub Actions（Ruff + mypy + pytest + Docker Build + SSH Deploy）
 
@@ -200,10 +200,10 @@ pricer3d/
 
 ## PrusaSlicer 集成
 
-系统集成 **PrusaSlicer v2.9.6** CLI 进行精确的 G-code 切片估算：
+系统集成 **PrusaSlicer** CLI 进行精确的 G-code 切片估算：
 
-- **Docker 部署**：构建时自动从 GitHub Release 下载安装
-- **Linux 本地**：`apt install prusa-slicer` 或指定 `PRUSA_EXECUTABLE`
+- **Docker 部署**：构建时自动从 GitHub Release 下载安装 **v2.8.1 AppImage**
+- **Linux 本地**：下载 PrusaSlicer AppImage 或 `apt install prusa-slicer`
 - **Windows 本地**：运行 `deploy/start_windows.ps1` 自动检测/静默安装
 
 在用户设置中开启"使用 PrusaSlicer 精确估算"后，报价时会调用 PrusaSlicer 切片，获取精确的打印时间和耗材用量。
