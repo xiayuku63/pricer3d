@@ -10,9 +10,10 @@ slice time by generating a temporary combined INI file.
 import os
 import re
 import logging
-import tempfile
-import subprocess
+import shlex
 import shutil
+import subprocess
+import tempfile
 from functools import lru_cache
 from typing import Optional
 
@@ -57,11 +58,17 @@ def prusa_executable() -> Optional[str]:
     import sys as _sys
 
     _env = os.getenv("PRUSA_EXECUTABLE", "").strip()
-    if _env and os.path.isfile(_env):
-        return _env
+    if _env:
+        if _env.startswith("wsl ") or _env.startswith("wsl.exe "):
+            return _env  # WSL passthrough: "wsl prusa-slicer" or "wsl.exe prusa-slicer"
+        if os.path.isfile(_env):
+            return _env
     _env_file = _env_file_prusa_executable().strip()
-    if _env_file and os.path.isfile(_env_file):
-        return _env_file
+    if _env_file:
+        if _env_file.startswith("wsl ") or _env_file.startswith("wsl.exe "):
+            return _env_file
+        if os.path.isfile(_env_file):
+            return _env_file
     # Linux: apt installs to /usr/bin/prusa-slicer
     if _sys.platform != "win32":
         _p = "/usr/bin/prusa-slicer"
@@ -94,8 +101,18 @@ def prusa_executable_diagnostics() -> dict:
         diag["found"] = True
         diag["path"] = exe
         try:
-            out = subprocess.check_output([exe, "--help"], stderr=subprocess.STDOUT, timeout=10)
-            diag["version"] = out.decode("utf-8", errors="replace").split("\n")[0].strip()
+            cmd = shlex.split(exe) if (" " in exe or "\t" in exe) else [exe]
+            out = subprocess.check_output(cmd + ["--help"], stderr=subprocess.STDOUT, timeout=10, shell=False)
+            lines = out.decode("utf-8", errors="replace").split("\n")
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                if "based on Slic3r" in line or "PrusaSlicer-" in line:
+                    diag["version"] = line
+                    break
+            if not diag["version"]:
+                diag["version"] = lines[0].strip() if lines[0].strip() else "OK"
         except Exception as e:
             diag["version"] = f"error: {e}"
     return diag
@@ -447,7 +464,7 @@ def run_prusa_slice(
         import sys as _sys
 
         if _sys.platform == "win32":
-            raise RuntimeError("PrusaSlicer not found on Windows - install PrusaSlicer or set PRUSA_EXECUTABLE")
+            raise RuntimeError("PrusaSlicer not found on Windows - install PrusaSlicer, set PRUSA_EXECUTABLE=wsl prusa-slicer, or run: wsl -d Ubuntu apt-get install prusa-slicer")
         raise RuntimeError("PrusaSlicer not found - install: apt-get install prusa-slicer")
 
     out_dir = os.path.dirname(output_gcode_path)
@@ -469,7 +486,6 @@ def run_prusa_slice(
 
     preset_label = "系统默认"
     if printer_profile_path:
-        # Derive printer name from profile filename
         base = os.path.basename(printer_profile_path)
         preset_label = f"{os.path.splitext(base)[0]} 系统默认"
     if slicer_preset and slicer_preset.get("name"):
@@ -480,6 +496,7 @@ def run_prusa_slice(
         "--ignore-nonexistent-config",
         "--load",
         config_path,
+        "--headless",
         "--export-gcode",
         "--output",
         output_gcode_path,
