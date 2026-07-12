@@ -493,8 +493,7 @@ def run_prusa_slice(
     if slicer_preset and slicer_preset.get("name"):
         preset_label = str(slicer_preset["name"])
 
-    cmd = [
-        exe,
+    cmd = shlex.split(exe) + [
         "--ignore-nonexistent-config",
         "--load",
         config_path,
