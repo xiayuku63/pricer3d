@@ -95,8 +95,10 @@ def create_app() -> FastAPI:
     from .routes_billing import (
         billing_plans, billing_checkout, billing_orders, billing_mock_complete, billing_webhook,
     )
-    from .routes_quote import get_quote, validate_formula, quote_history, delete_quote_history, clear_quote_history, export_quote_history, export_quote_pdf, export_pdf_inline
-    from .routes_zip_quote import zip_quote, zip_preview, download_zip_model, download_zip_template
+    from .routes.quote import get_quote, validate_formula
+    from .routes.zip_quote import zip_quote, zip_preview, download_zip_model, download_zip_template
+    from .services.history import quote_history, delete_quote_history, clear_quote_history
+    from .services.export import export_quote_history, export_quote_pdf, export_pdf_inline
     from .routes_orientation import optimize_orientation, list_stable_faces, list_coplanar_clusters, train_sample, model_status, admin_train_model, auto_learned_orient
     from .routes_pages import (
         index, register_page, legal_terms, legal_privacy, admin_users_page,

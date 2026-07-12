@@ -279,13 +279,27 @@ def _resolve_zip_defaults(current_user: dict, file: Optional[UploadFile], sessio
         if not fname.endswith(".zip"):
             raise HTTPException(status_code=400, detail="请上传 .zip 压缩文件")
 
-        content = file.read() if not file.seekable() else file.file.read()
-        if hasattr(file.file, 'seek'):
+        content = b""
+        if hasattr(file, "file") and file.file is not None:
             try:
-                file.file.seek(0)
-                content = file.read()
+                content = file.file.read()
             except Exception:
-                pass
+                content = b""
+            if hasattr(file.file, "seek"):
+                try:
+                    file.file.seek(0)
+                except Exception:
+                    pass
+        if not content:
+            try:
+                maybe = file.read()
+                if hasattr(maybe, "__await__"):
+                    raise HTTPException(status_code=500, detail="ZIP ????????????????")
+                content = maybe or b""
+            except HTTPException:
+                raise
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"ZIP ??????: {e}")
 
         if len(content) >= MAX_ZIP_SIZE_BYTES:
             raise HTTPException(status_code=400, detail=f"ZIP 文件必须小于 {MAX_ZIP_SIZE_BYTES // (1024*1024)}MB")

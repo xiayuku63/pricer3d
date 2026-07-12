@@ -31,8 +31,11 @@
                                     </button>
                                     <button id="lay-face-btn" type="button" title="点击模型面片手动选择摆放面" class="w-full py-2 px-3 rounded-lg text-white text-xs font-semibold shadow-sm min-h-[40px] transition-all active:scale-[0.98] flex items-center gap-2" style="background: linear-gradient(to right, var(--color-warning-400), var(--color-danger));">
                                         <svg class="w-4 h-4 flex-shrink-0"><use href="/static/partials/preview-icons.svg#icon-hand"></use></svg>
-                                        <span>手动摆放</span>
+                                        <span data-orientation-label>手动摆放</span>
                                     </button>
+                                    <p id="lay-face-hint" aria-live="polite" class="hidden rounded-lg px-2.5 py-2 text-[11px] leading-4" style="background-color: rgba(59, 130, 246, 0.08); color: var(--color-primary); border: 1px solid rgba(59, 130, 246, 0.18);">
+                                        请选择一个要贴合打印平台的底面
+                                    </p>
                                     <div class="flex gap-1.5">
                                         <button id="orient-center-btn" type="button" title="将模型移至打印平台中央" class="flex-1 py-2 px-2 rounded-lg min-h-[40px] transition-all active:scale-[0.98] flex items-center justify-center gap-1.5" style="border: 1px solid var(--color-border-strong); color: var(--color-text);">
                                             <svg class="w-4 h-4 flex-shrink-0"><use href="/static/partials/preview-icons.svg#icon-center"></use></svg>

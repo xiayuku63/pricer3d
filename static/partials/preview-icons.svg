@@ -1,0 +1,42 @@
+<!-- 预览侧栏图标集 — stroke 风格 24×24，与现有 close 图标一致 -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <!-- 智能摆放 — 魔法棒/自动 -->
+  <symbol id="icon-smart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14.5 3l1.5 3 3 1.5-3 1.5-1.5 3-1.5-3-3-1.5 3-1.5z"/>
+    <path d="M9 7l-6 6"/>
+    <path d="M10 12l-7 7"/>
+  </symbol>
+
+  <!-- 手动摆放 — 鼠标点选 -->
+  <symbol id="icon-hand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h2"/>
+    <path d="M10 12V2a1 1 0 012 0v10"/>
+    <path d="M12 11V7a1 1 0 012 0v6"/>
+    <path d="M14 12V8a1 1 0 012 0v6"/>
+    <path d="M8 12V5a1 1 0 012 0v7"/>
+  </symbol>
+
+  <!-- 模型居中 — 十字瞄准 -->
+  <symbol id="icon-center" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="3"/>
+    <path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>
+  </symbol>
+
+  <!-- 重置方向 — 旋转回退 -->
+  <symbol id="icon-reset" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M1 4v6h6"/>
+    <path d="M3.51 15a9 9 0 102.13-9.36L1 10"/>
+  </symbol>
+
+  <!-- 标记最优 — 星标/旗帜 -->
+  <symbol id="icon-star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+  </symbol>
+
+  <!-- 保存报价 — 下载/钱袋 -->
+  <symbol id="icon-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+    <polyline points="7 10 12 15 17 10"/>
+    <line x1="12" y1="15" x2="12" y2="3"/>
+  </symbol>
+</svg>

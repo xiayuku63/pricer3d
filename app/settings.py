@@ -15,14 +15,14 @@ class Settings(BaseSettings):
 
     # ── Environment ──
     app_env: str = "development"
-    allowed_origins: str = "https://www.pricer3d.top,https://pricer3d.top,http://localhost:3000,http://127.0.0.1:3000"
+    allowed_origins: str = "https://www.pricer3d.top,https://pricer3d.top,http://localhost:5000,http://127.0.0.1:5000,http://localhost:3000,http://127.0.0.1:3000"
 
     # ── Secrets (required in production) ──
     jwt_secret_key: str = ""
     payment_webhook_secret: str = ""
 
     # ── Database ──
-    db_path: str = "app.db"
+    db_path: str = "/app/data/app.db"
 
     # ── Uploads / Outputs ──
     uploads_dir: str = "uploads"

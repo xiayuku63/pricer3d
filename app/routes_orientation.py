@@ -146,7 +146,7 @@ async def list_coplanar_clusters(
         if not isinstance(mesh, trimesh.Trimesh) or mesh.vertices.shape[0] == 0:
             return {"filename": filename, "clusters": []}
 
-        clusters = cluster_coplanar_faces(mesh)
+        clusters = cluster_coplanar_faces(mesh, include_upward_faces=True)
         return {"filename": filename, "clusters": clusters}
     except Exception as e:
         logger.error("共面聚类分析失败 %s: %s", filename, e)
@@ -205,7 +205,7 @@ async def train_sample(
         )
 
         # Step 1: coplanar 聚类 → 候选面列表
-        clusters = cluster_coplanar_faces(mesh)
+        clusters = cluster_coplanar_faces(mesh, include_upward_faces=True)
         if not clusters:
             # 无候选面时回退到全局特征 (兼容旧格式)
             logger.info("无 coplanar 候选面，写全局特征")

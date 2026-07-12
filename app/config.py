@@ -6,6 +6,7 @@ This module re-exports them for backward compatibility.
 
 import re
 from .settings import get_settings
+from .material_seed import DEFAULT_COLOR_PALETTE, DEFAULT_MATERIALS as SEEDED_DEFAULT_MATERIALS
 
 # ── Compiled patterns ──
 EMAIL_PATTERN = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,255}$")
@@ -86,28 +87,9 @@ MAX_ZIP_SIZE_BYTES = 1024 * 1024 * 1024
 # 免费用户累计模型总数限制（不限制单次数量，会员无限制）
 FREE_TOTAL_MODEL_LIMIT = 10
 
-DEFAULT_COLORS = [
-    {"name": "白色", "hex": "#ffffff"},
-    {"name": "黑色", "hex": "#000000"},
-    {"name": "灰色", "hex": "#808080"},
-    {"name": "红色", "hex": "#dc2626"},
-    {"name": "蓝色", "hex": "#2563eb"},
-    {"name": "绿色", "hex": "#16a34a"},
-    {"name": "黄色", "hex": "#ca8a04"},
-    {"name": "橙色", "hex": "#ea580c"},
-    {"name": "紫色", "hex": "#9333ea"},
-    {"name": "粉色", "hex": "#db2777"},
-]
-DEFAULT_MATERIALS = [
-    {"name": "PLA", "brand": "Generic", "density": 1.24, "price_per_kg": 80.0, "colors": DEFAULT_COLORS},
-    {"name": "PLA+", "brand": "Generic", "density": 1.24, "price_per_kg": 90.0, "colors": DEFAULT_COLORS},
-    {"name": "PETG", "brand": "Generic", "density": 1.27, "price_per_kg": 100.0, "colors": DEFAULT_COLORS},
-    {"name": "ABS", "brand": "Generic", "density": 1.04, "price_per_kg": 95.0, "colors": DEFAULT_COLORS},
-    {"name": "ASA", "brand": "Generic", "density": 1.07, "price_per_kg": 120.0, "colors": DEFAULT_COLORS},
-    {"name": "TPU", "brand": "Generic", "density": 1.21, "price_per_kg": 160.0, "colors": DEFAULT_COLORS},
-    {"name": "PA", "brand": "Generic", "density": 1.14, "price_per_kg": 200.0, "colors": DEFAULT_COLORS},
-    {"name": "PC", "brand": "Generic", "density": 1.20, "price_per_kg": 180.0, "colors": DEFAULT_COLORS},
-]
+DEFAULT_COLORS = list(DEFAULT_COLOR_PALETTE)
+DEFAULT_MATERIALS = list(SEEDED_DEFAULT_MATERIALS)
+
 DEFAULT_UNIT_COST_FORMULA = "((effective_weight_g * (price_per_kg / 1000.0)) + (unit_time_h * machine_hourly_rate_cny) + post_process_fee_per_part_cny) + support_cost_per_part_cny"
 DEFAULT_TOTAL_COST_FORMULA = "max((unit_cost_cny * quantity) + setup_fee_cny, min_job_fee_cny)"
 DEFAULT_PRICING_CONFIG = {

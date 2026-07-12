@@ -95,9 +95,10 @@ export const MATERIAL_TYPE_PRESETS = {
 
 /** 获取所有支持的品牌列表 */
 const MAJOR_BRANDS = [
-    'Generic', 'eSUN', 'Polymaker', 'Hatchbox', 'Prusament', 'Prusa',
-    'SUNLU', 'Creality', 'Overture', 'ColorFabb', 'MatterHackers',
-    'Bambu Lab', 'Anycubic', 'Elegoo', 'Jayo', 'Eryone', 'Voron',
+    '??', 'Bambu Lab', 'eSUN', 'Polymaker', 'Sunlu', 'Creality', 'Prusament',
+    'OVERTURE', 'Hatchbox', 'ELEGOO', 'Anycubic', 'QIDI TECH', 'Flashforge',
+    'ColorFabb', 'Fiberlogy', 'FormFutura', 'Raise3D', 'MatterHackers',
+    'BASF Forward AM', 'Colorful Cloud', 'Generic', '??', 'Prusa', 'Voron',
 ];
 
 /** 获取品牌列表（MATERIAL_OPTIONS 中已有的品牌 + MAJOR_BRANDS） */
@@ -124,13 +125,13 @@ export function getUsedBrandOptions() {
         const b = (m.brand || 'Generic').trim();
         if (b && !seen.has(b)) { seen.add(b); brands.push(b); }
     }
-    return brands;
+    return brands.sort((a, b) => a.localeCompare(b, 'zh-Hans-CN', { sensitivity: 'base', numeric: true }));
 }
 
 /** 按品牌筛选材料；brand 为空时返回全部 */
 export function getMaterialsByBrand(brand) {
-    if (!brand) return MATERIAL_OPTIONS;
-    return MATERIAL_OPTIONS.filter(m => (m.brand || 'Generic').trim() === brand);
+    const items = !brand ? MATERIAL_OPTIONS : MATERIAL_OPTIONS.filter(m => (m.brand || 'Generic').trim() === brand);
+    return items.slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'zh-Hans-CN', { sensitivity: 'base', numeric: true }));
 }
 export let COLOR_OPTIONS = DEFAULT_COLORS.map(c => ({...c}));
 
@@ -512,11 +513,11 @@ export function renderColorDropdown(name, selectedColor, compact) {
 
     if (compact) {
         const html = '<div class="color-dd-wrapper relative inline-block">'
-            + '<button type="button" class="color-dd-trigger flex items-center gap-1 px-1.5 py-0.5 border border-gray-400 rounded text-[11px] tw-bg-surface tw-text hover:border-gray-400 min-w-[36px]">'
-            + '<span class="color-dd-swatch w-3.5 h-3.5 rounded-sm border border-gray-400 flex-shrink-0" style="background:' + safeHex + '"></span>'
-            + '<svg class="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>'
-            + '</button>'
-            + '<div class="color-dd-list hidden absolute z-50 left-0 mt-1 tw-bg-surface border border-gray-200 rounded-md shadow-lg overflow-y-auto min-w-[140px]" style="max-height:360px;">'
+                + '<button type="button" class="color-dd-trigger flex items-center gap-1 px-2 py-1 border rounded text-[11px] tw-card tw-text hover:border-gray-400 min-w-[36px]" style="border-color: var(--color-border-strong);">'
+                + '<span class="color-dd-swatch w-3.5 h-3.5 rounded-sm border border-gray-400 flex-shrink-0" style="background:' + safeHex + '"></span>'
+                + '<svg class="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>'
+                + '</button>'
+                + '<div class="color-dd-list hidden absolute z-50 left-0 mt-1 tw-bg-surface border border-gray-200 rounded-md shadow-lg overflow-y-auto min-w-[140px]" style="max-height:360px;">'
             + listItems
             + '</div>'
             + '<input type="hidden" class="row-color-value" value="' + safeHex + '">'

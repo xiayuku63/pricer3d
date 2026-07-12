@@ -55,7 +55,7 @@ cp .env.example .env.prod
 docker compose -f docker-compose.prod.yml up -d
 
 # 访问
-open http://localhost
+open http://localhost:5000
 ```
 
 ### 本地开发
@@ -72,7 +72,7 @@ pip install -r requirements.txt
 python main.py
 
 # 访问
-open http://localhost:5001
+open http://localhost:5000
 ```
 
 ## 📁 项目结构
@@ -159,3 +159,8 @@ MIT License
 
 - GitHub: [@xiayuku63](https://github.com/xiayuku63)
 - 项目地址: https://github.com/xiayuku63/pricer3d
+
+
+## Windows PrusaSlicer
+
+On Windows local deployments, `deploy/start_windows.ps1` now auto-detects or silently installs PrusaSlicer from `PrusaSlicer-2.9.6-setup.exe` and persists `PRUSA_EXECUTABLE` into `.env`. This prevents redeploys from falling back when the slicer is missing.

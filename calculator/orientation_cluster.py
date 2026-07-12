@@ -20,6 +20,7 @@ COPLANAR_ANGLE_TOLERANCE_DEG = 3.0
 COPLANAR_ANGLE_TOLERANCE_RAD = math.radians(COPLANAR_ANGLE_TOLERANCE_DEG)
 COPLANAR_COS_THRESHOLD = math.cos(COPLANAR_ANGLE_TOLERANCE_RAD)
 MIN_COPLANAR_AREA_MM2 = 10.0
+MAX_RETURN_CLUSTERS = 64
 
 
 def _clean_value(v: float) -> float:
@@ -273,7 +274,10 @@ def _build_hull_coplanar_planes(conv_hull, exact_eps: float = 1e-3):
     return np.array(plane_normals), np.array(plane_offsets)
 
 
-def cluster_coplanar_faces(mesh: trimesh.Trimesh) -> list[dict]:
+def cluster_coplanar_faces(
+    mesh: trimesh.Trimesh,
+    include_upward_faces: bool = False,
+) -> list[dict]:
     """Cluster mesh triangles into coplanar groups usable as print-bed contact faces.
 
     Algorithm (inspired by PrusaSlicer Lay on Face):
@@ -494,8 +498,9 @@ def cluster_coplanar_faces(mesh: trimesh.Trimesh) -> list[dict]:
                     continue
 
             # ── 过滤B: 法向量方向过滤 ──
-            # 朝上面 (normal.z > 0.1) 需翻转180°才可作底面, 实际摆放不合理 → 过滤
-            if float(cn[2]) > NORMAL_Z_MAX:
+            # 自动朝向时默认仍跳过朝上的面，避免候选过多；
+            # 但手动摆放需要把这类外表面也暴露给前端供用户点选。
+            if (not include_upward_faces) and float(cn[2]) > NORMAL_Z_MAX:
                 logger.debug(
                     f"过滤朝上面[B-法向朝上]: area={mc['area']:.1f}mm², "
                     f"normal_z={float(cn[2]):.3f}, threshold={NORMAL_Z_MAX}"
@@ -614,4 +619,4 @@ def cluster_coplanar_faces(mesh: trimesh.Trimesh) -> list[dict]:
         })
 
     result.sort(key=lambda c: c["area"], reverse=True)
-    return result[:20]
+    return result[:MAX_RETURN_CLUSTERS]

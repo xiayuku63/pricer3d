@@ -211,8 +211,18 @@ export function openPreviewModal(onFaceClickCb) {
     applyOrientationRotation(quoteOptions.orientation || { x: 0, y: 0, z: 0 });
     setupFaceClickHandler(onFaceClickCb);
     if (viewCube) viewCube.classList.remove('hidden');
-    // 重置按钮文字（避免上次操作遗留下的状态）
-    if (layFaceBtn) layFaceBtn.textContent = t('orientation.autoOrient');
+    if (dom.layFaceHint) {
+        dom.layFaceHint.textContent = t('orientation.pickFaceHint');
+        dom.layFaceHint.classList.add('hidden');
+    }
+    // Reset labels without removing the button icons.
+    if (layFaceBtn) {
+        const label = layFaceBtn.querySelector('[data-orientation-label]');
+        if (label) label.textContent = t('orientation.autoOrient');
+        else layFaceBtn.textContent = t('orientation.autoOrient');
+        layFaceBtn.disabled = false;
+        layFaceBtn.setAttribute('aria-pressed', 'false');
+    }
     if (orientSaveBtn) { orientSaveBtn.textContent = '保存当前方向并报价'; orientSaveBtn.disabled = false; }
     if (orientLearnedBtn) { orientLearnedBtn.textContent = t('orientation.autoLearn'); orientLearnedBtn.disabled = false; }
 }
@@ -220,10 +230,19 @@ export function openPreviewModal(onFaceClickCb) {
 export function closePreviewModal() {
     const { previewModal, viewCube, layFaceBtn } = dom;
     setupFaceClickHandler(null);
-    clearClusters();
-    hidePlacementPlane();
-    window.__onLayFaceClick = null;
-    if (layFaceBtn) layFaceBtn.textContent = t('orientation.autoOrient');
+    import('./orientation-ui.js').then(m => m.cleanupLayFaceMode()).catch(() => {
+        clearClusters();
+        hidePlacementPlane();
+        window.__onLayFaceClick = null;
+    });
+    if (dom.layFaceHint) dom.layFaceHint.classList.add('hidden');
+    if (layFaceBtn) {
+        const label = layFaceBtn.querySelector('[data-orientation-label]');
+        if (label) label.textContent = t('orientation.autoOrient');
+        else layFaceBtn.textContent = t('orientation.autoOrient');
+        layFaceBtn.disabled = false;
+        layFaceBtn.setAttribute('aria-pressed', 'false');
+    }
     if (previewModal) previewModal.classList.add('hidden');
     if (viewCube) viewCube.classList.add('hidden');
 }

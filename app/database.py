@@ -69,6 +69,9 @@ def init_db() -> None:
         _safe_add_column(conn, "quote_history", "infill", "INTEGER")
         _safe_add_column(conn, "quote_history", "brand", "TEXT")
         _safe_add_column(conn, "quote_history", "cost_breakdown", "TEXT")
+        _safe_add_column(conn, "quote_history", "slicer_fallback", "INTEGER")
+        _safe_add_column(conn, "quote_history", "slicer_error", "TEXT")
+        _safe_add_column(conn, "quote_history", "slicer_estimated_time_s", "REAL")
         conn.commit()
 
     # Step 3: Seed membership plans if empty
