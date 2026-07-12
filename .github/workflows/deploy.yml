@@ -2,7 +2,7 @@ name: Deploy to Alibaba Cloud
 
 on:
   push:
-    branches: [master]
+    branches: [main]
   workflow_dispatch:
 
 env:
@@ -22,18 +22,22 @@ jobs:
         with:
           host: ${{ env.SERVER_HOST }}
           username: ${{ env.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
           password: ${{ secrets.SERVER_PASSWORD }}
+          fingerprint: ${{ secrets.SERVER_HOST_FINGERPRINT }}
           script: |
             set -euo pipefail
 
             # Clone or pull latest code
             if [ -d "${{ env.DEPLOY_PATH }}" ]; then
               cd ${{ env.DEPLOY_PATH }}
-              git pull origin master
+              git pull origin main
             else
               git clone https://github.com/xiayuku63/pricer3d.git ${{ env.DEPLOY_PATH }}
               cd ${{ env.DEPLOY_PATH }}
             fi
+
+            # Switch to main branch
 
             # Ensure .env.prod exists
             if [ ! -f .env.prod ]; then
