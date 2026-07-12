@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "pricer3d",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["main.py"],
+      "port": 5000,
+      "autoPort": true
+    }
+  ]
+}

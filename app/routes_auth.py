@@ -335,11 +335,11 @@ async def admin_login(request: Request):
     from .auth import get_password_hash, verify_password
 
     # --- P0 security fix: admin-login only allowed in development ---
-    if os.environ.get("APP_ENV", "").lower() != "development":
+    if IS_PRODUCTION:
         raise HTTPException(status_code=403, detail="ADMIN_LOGIN_DEV_ONLY")
 
     admin_username = "admin"
-    admin_password = "admin"
+    admin_password = "admin123"
 
     user = get_user_by_username(admin_username)
     if not user:

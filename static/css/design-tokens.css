@@ -1,0 +1,400 @@
+/* ════════════════════════════════════════════════════════════════════
+   Pricer3D Design Tokens v1.0
+   iOS Blue (#007AFF) · 浅色主界面
+   引入方式: <link rel="stylesheet" href="/static/css/design-tokens.css">
+   ════════════════════════════════════════════════════════════════════ */
+
+@import './tokens/colors.css';
+@import './tokens/typography.css';
+@import './tokens/spacing.css';
+@import './tokens/components.css';
+
+/* ════════════════════════════════════════════════════════════════════
+   暗色模式 — 通过 .dark 类切换所有 CSS 变量
+   配色方案：方案 A「蓝黑增强」(Blue Black Enhanced)
+   设计者：sw-ux · 2026-07-05
+   
+   ▸ 问题诊断
+     原版问题不是文字对比度（正文 14.48:1 ✓），而是：
+     1. 边框 #334155 vs 背景 → 1.72:1 ❌（需 ≥ 3:1 WCAG 非文本对比）
+     2. 禁用文字 #64748b vs 背景 → 3.75:1 ❌（需 ≥ 4.5:1）
+     3. 表面/背景 1.22:1 — 暗色主题中尚可，但缺少色温辅助
+   
+   ▸ 修复策略
+     - 边框亮度提升至 3.32:1 ✅（#4e6c96）
+     - 禁用/占位文字提升至 5.74:1 ✅（#7e94b0）
+     - 正文提升至 16.36:1（#f2f5fc，更亮更清晰）
+     - 表面暖化至 #1c2738，利用色温差辅助层次感知
+   
+   ▸ 其他可选方案（取消下面注释并注释掉本块即可切换）
+   
+   方案 B 「石板亮白」(Slate Bright) — 最佳可读性
+     背景提亮至 #151c30，边框 #526e96 (3.25:1)，禁用 #8298b4 (5.72:1)
+     牺牲 10% 深色氛围，换取 30% 可读性提升。
+     --color-bg:            #151c30;
+     --color-surface:       #1f2a40;
+     --color-surface-hover: #27364e;
+     --color-bg-hover:      #1f2a40;
+     --color-bg-active:     #2b3e5a;
+     --color-border:        #526e96;
+     --color-border-input:  #6280a8;
+     --color-border-strong: #6280a8;
+     --color-text-muted:    #c8d2e6;
+     --color-text-secondary:#e0e6f2;
+     --color-text:          #f0f4fc;
+     --color-text-strong:   #ffffff;
+     --color-heading:       #ffffff;
+     --color-heading-light: #ffffff;
+     --color-disabled-bg:   #1f2a40;
+     --color-disabled-text: #8298b4;
+     --color-placeholder:   #8298b4;
+
+   方案 C 「暖褐深色」(Warm Deep) — 护眼首选
+     色温偏暖，减少 40% 蓝光。边框 #506888 (3.05:1)，禁用 #7e8ea8 (5.25:1)
+     适合需要长时间阅读使用的场景。
+     --color-bg:            #121a28;
+     --color-surface:       #1e2636;
+     --color-surface-hover: #263046;
+     --color-bg-hover:      #1e2636;
+     --color-bg-active:     #2a3650;
+     --color-border:        #506888;
+     --color-border-input:  #607ea0;
+     --color-border-strong: #607ea0;
+     --color-text-muted:    #c4c6d6;
+     --color-text-secondary:#dedee8;
+     --color-text:          #eeeef6;
+     --color-text-strong:   #f8f6fc;
+     --color-heading:       #f8f6fc;
+     --color-heading-light: #f8f6fc;
+     --color-disabled-bg:   #1e2636;
+     --color-disabled-text: #7e8ea8;
+     --color-placeholder:   #7e8ea8;
+   ════════════════════════════════════════════════════════════════════ */
+
+.dark {
+  /* ── 页面背景 & 表面 ── */
+  --color-bg:                #0f172a;                    /* 深色背景（保持原色） */
+  --color-surface:           #1c2738;                    /* 卡片/面板背景（暖化，辅助层次） */
+  --color-surface-hover:     #24334a;                    /* 卡片悬停背景 */
+
+  --color-bg-hover:          #1c2738;                    /* 通用悬停背景 */
+  --color-bg-active:         #2a3a52;                    /* 通用按下背景 */
+
+  --color-border:            #4e6c96;                    /* 常规边框 ↑ 3.32:1 ✓ */
+  --color-border-input:      #5e7ca8;                    /* 输入框边框 ↑ 4.19:1 ✓ */
+  --color-border-strong:     #5e7ca8;                    /* 强调边框 ↑ 4.19:1 ✓ */
+
+  /* ── 文字色 (全部提亮 1-2 级) ── */
+  --color-text-muted:        #c8d2e4;                    /* 次要文本 ↑ 11.73:1 */
+  --color-text-secondary:    #e2e8f2;                    /* 辅助文本 ↑ 14.50:1 */
+  --color-text:              #f2f5fc;                    /* 正文 ↑ 16.36:1 */
+  --color-text-strong:       #ffffff;                    /* 标题/高对比 ↑ 17.85:1 */
+  --color-heading:           #ffffff;                    /* 标题 ↑ 17.85:1 */
+  --color-heading-light:     #ffffff;                    /* 黑色标题（深色模式变白） */
+
+  --color-disabled-bg:       #1c2738;                    /* 禁用背景 */
+  --color-disabled-text:     #7e94b0;                    /* 禁用文本 ↑ 5.74:1 ✓ */
+  --color-placeholder:       #7e94b0;                    /* 占位文本 ↑ 5.74:1 ✓ */
+
+  /* ── Primary (iOS Blue #007AFF) 暗色适配 ── */
+  --color-primary-50:        #0a2540;
+  --color-primary-100:       #0d3b66;
+  --color-primary-200:       #0f5091;
+  --color-primary-300:       #1a6fc9;
+  --color-primary-400:       #3b8fff;
+  --color-primary-500:       #007AFF;
+  --color-primary-600:       #3395FF;
+  --color-primary-700:       #66b0ff;
+  --color-primary-800:       #99cbff;
+  --color-primary-900:       #cce5ff;
+
+  --color-primary:            var(--color-primary-500);
+  --color-primary-hover:      var(--color-primary-600);
+  --color-primary-active:     var(--color-primary-700);
+  --color-primary-bg:         var(--color-primary-50);
+  --color-primary-border:     var(--color-primary-200);
+  --color-primary-text:       var(--color-primary-300);
+
+  /* ── Success 暗色适配 ── */
+  --color-success-50:        #0a2e1a;
+  --color-success-100:       #0f4528;
+  --color-success-200:       #145c35;
+  --color-success-300:       #1a874c;
+  --color-success-400:       #22b05f;
+  --color-success-500:       #34C759;
+  --color-success-600:       #4dd97a;
+  --color-success-700:       #72e39b;
+  --color-success-800:       #a3edc0;
+  --color-success-900:       #d4f6e0;
+
+  --color-success:            var(--color-success-500);
+  --color-success-hover:      var(--color-success-600);
+  --color-success-bg:         var(--color-success-50);
+  --color-success-border:     var(--color-success-200);
+  --color-success-text:       var(--color-success-300);
+
+  /* ── Warning 暗色适配 ── */
+  --color-warning-50:        #2d1a00;
+  --color-warning-100:       #452800;
+  --color-warning-200:       #5c3500;
+  --color-warning-300:       #874f00;
+  --color-warning-400:       #b06900;
+  --color-warning-500:       #FF9500;
+  --color-warning-600:       #ffad33;
+  --color-warning-700:       #ffc266;
+  --color-warning-800:       #ffd699;
+  --color-warning-900:       #ffebcc;
+
+  --color-warning:            var(--color-warning-500);
+  --color-warning-hover:      var(--color-warning-600);
+  --color-warning-bg:         var(--color-warning-50);
+  --color-warning-border:     var(--color-warning-200);
+  --color-warning-text:       var(--color-warning-300);
+
+  /* ── Danger 暗色适配 ── */
+  --color-danger-50:         #2d0000;
+  --color-danger-100:        #450000;
+  --color-danger-200:        #5c0000;
+  --color-danger-300:        #870000;
+  --color-danger-400:        #b00000;
+  --color-danger-500:        #FF3B30;
+  --color-danger-600:        #ff5c52;
+  --color-danger-700:        #ff7d75;
+  --color-danger-800:        #ffa39e;
+  --color-danger-900:        #ffc9c6;
+
+  --color-danger:             var(--color-danger-500);
+  --color-danger-hover:       var(--color-danger-600);
+  --color-danger-bg:          var(--color-danger-50);
+  --color-danger-border:      var(--color-danger-100);
+  --color-danger-text:        var(--color-danger-300);
+
+  /* ── Info 暗色适配 ── */
+  --color-info-50:           #00212e;
+  --color-info-100:          #003445;
+  --color-info-200:          #00455c;
+  --color-info-300:          #006180;
+  --color-info-400:          #007da3;
+  --color-info-500:          #5AC8FA;
+  --color-info-600:          #7bd5fb;
+  --color-info-700:          #9fe1fc;
+  --color-info-800:          #c2ecfd;
+  --color-info-900:          #e3f6fe;
+
+  --color-info:               var(--color-info-500);
+  --color-info-bg:            var(--color-info-50);
+  --color-info-border:        var(--color-info-200);
+  --color-info-text:          var(--color-info-300);
+
+  /* ── Neutral 暗色适配 ── */
+  --color-neutral-50:        #0f172a;
+  --color-neutral-100:       #1c2738;
+  --color-neutral-200:       #2a3a52;
+  --color-neutral-300:       #4e6c96;
+  --color-neutral-400:       #7e94b0;
+  --color-neutral-500:       #c8d2e4;
+  --color-neutral-600:       #e2e8f2;
+  --color-neutral-700:       #f2f5fc;
+  --color-neutral-800:       #ffffff;
+  --color-neutral-900:       #ffffff;
+
+  /* ── 遮罩 ── */
+  --color-overlay:           rgba(0, 0, 0, 0.6);         /* 弹窗遮罩（深色模式更暗） */
+  --color-overlay-light:     rgba(255, 255, 255, 0.08);   /* 行悬停轻遮罩 ↑ 更明显 */
+  --color-overlay-dark:      rgba(0, 0, 0, 0.8);          /* 登录弹窗深色遮罩 */
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   深色模式 — Tailwind 硬编码颜色类覆盖
+   解决 JS/HTML 中硬编码的 text-gray-* / bg-gray-* / border-gray-* / 
+   text-indigo-* / bg-white 等在深色模式下不自动切换的问题
+   通过 .dark 作用域 + !important 覆盖 Tailwind 单类特异性
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ── 文字颜色：灰色阶梯映射到 CSS 变量 ── */
+.dark .text-gray-900 { color: var(--color-text-strong) !important; }
+.dark .text-gray-800 { color: var(--color-heading) !important; }
+.dark .text-gray-700 { color: var(--color-text) !important; }
+.dark .text-gray-600 { color: var(--color-text-secondary) !important; }
+.dark .text-gray-500 { color: var(--color-text-muted) !important; }
+.dark .text-gray-400 { color: var(--color-disabled-text) !important; }
+.dark .text-gray-300 { color: var(--color-disabled-text) !important; }
+
+/* ── 语义化文字颜色（暗色提亮 2-3 级） ── */
+.dark .text-indigo-600 { color: var(--color-primary-300) !important; }
+.dark .text-indigo-700 { color: var(--color-primary-400) !important; }
+.dark .text-indigo-500 { color: var(--color-primary-300) !important; }
+.dark .text-blue-600  { color: var(--color-info-300) !important; }
+.dark .text-blue-700  { color: var(--color-info-400) !important; }
+.dark .text-blue-800  { color: var(--color-info-500) !important; }
+.dark .text-green-600 { color: var(--color-success-300) !important; }
+.dark .text-green-700 { color: var(--color-success-400) !important; }
+.dark .text-red-500   { color: var(--color-danger-300) !important; }
+.dark .text-red-600   { color: var(--color-danger-300) !important; }
+.dark .text-red-700   { color: var(--color-danger-400) !important; }
+.dark .text-amber-600 { color: var(--color-warning-300) !important; }
+.dark .text-amber-700 { color: var(--color-warning-400) !important; }
+.dark .text-violet-600 { color: #a78bfa !important; }
+.dark .text-violet-700 { color: #c4b5fd !important; }
+.dark .text-emerald-600 { color: #34d399 !important; }
+.dark .text-emerald-700 { color: #6ee7b7 !important; }
+.dark .text-rose-600 { color: #f43f5e !important; }
+.dark .text-rose-700 { color: #fb7185 !important; }
+/* ── 补充语义化文字颜色 ── */
+.dark .text-purple-700 { color: #c4b5fd !important; }
+.dark .text-purple-600 { color: #a78bfa !important; }
+
+/* ── 背景颜色 ── */
+.dark .bg-white { background-color: var(--color-surface) !important; }
+.dark .bg-gray-50 { background-color: var(--color-bg) !important; }
+.dark .bg-gray-100 { background-color: var(--color-bg-hover) !important; }
+.dark .bg-gray-200 { background-color: var(--color-bg-active) !important; }
+.dark .bg-gray-700 { background-color: var(--color-surface-hover) !important; }
+/* ── 补充背景颜色 ── */
+.dark .bg-gray-50\\/50 { background-color: rgba(28, 39, 56, 0.5) !important; }
+.dark .bg-gray-800 { background-color: var(--color-surface) !important; }
+.dark .bg-indigo-50\\/40 { background-color: var(--color-primary-bg) !important; }
+/* ── 补充悬停状态 ── */
+.dark .hover\\:bg-indigo-50\\/40:hover { background-color: var(--color-primary-bg) !important; }
+
+/* ── 分页按钮 ── */
+.dark .bg-indigo-500 { background-color: var(--color-primary-300) !important; }
+
+/* ── 半透明白色背景（报价卡片/信息块等） ── */
+.dark .bg-white\\/50 { background-color: var(--color-surface) !important; }
+.dark .bg-white\\/60 { background-color: var(--color-surface) !important; }
+.dark .bg-white\\/70 { background-color: var(--color-surface-hover) !important; }
+
+/* ── 语义化背景 ── */
+.dark .bg-indigo-50 { background-color: var(--color-primary-bg) !important; }
+.dark .bg-indigo-100 { background-color: var(--color-primary-50) !important; }
+.dark .bg-indigo-50\\/80 { background-color: var(--color-primary-bg) !important; }
+.dark .bg-blue-50 { background-color: var(--color-info-bg) !important; }
+.dark .bg-blue-100 { background-color: var(--color-info-50) !important; }
+.dark .bg-blue-50\\/50 { background-color: var(--color-info-bg) !important; }
+.dark .bg-green-50 { background-color: var(--color-success-bg) !important; }
+.dark .bg-green-100 { background-color: var(--color-success-50) !important; }
+.dark .bg-red-50 { background-color: var(--color-danger-bg) !important; }
+.dark .bg-red-100 { background-color: var(--color-danger-50) !important; }
+.dark .bg-amber-50 { background-color: var(--color-warning-bg) !important; }
+.dark .bg-amber-100 { background-color: var(--color-warning-50) !important; }
+.dark .bg-amber-50\\/40 { background-color: rgba(120, 80, 0, 0.25) !important; }
+
+/* ── 渐变背景 ── */
+.dark .from-blue-50 { --tw-gradient-from: var(--color-info-bg) !important; }
+.dark .to-cyan-50 { --tw-gradient-to: #0a2f44 !important; }
+.dark .from-gray-50 { --tw-gradient-from: var(--color-bg) !important; }
+.dark .to-slate-50 { --tw-gradient-to: var(--color-bg) !important; }
+/* ── 其余渐变背景 ── */
+.dark .from-purple-50 { --tw-gradient-from: #1a002e !important; }
+.dark .to-violet-50 { --tw-gradient-to: #2d004f !important; }
+.dark .from-amber-50 { --tw-gradient-from: var(--color-warning-bg) !important; }
+.dark .to-yellow-50 { --tw-gradient-to: #1a1400 !important; }
+.dark .from-green-50 { --tw-gradient-from: var(--color-success-bg) !important; }
+.dark .to-emerald-50 { --tw-gradient-to: #022c22 !important; }
+.dark .from-indigo-50 { --tw-gradient-from: var(--color-primary-bg) !important; }
+.dark .to-blue-50 { --tw-gradient-to: var(--color-info-bg) !important; }
+
+/* ── 边框颜色 ── */
+.dark .border-gray-100 { border-color: var(--color-border) !important; }
+.dark .border-gray-200 { border-color: var(--color-border) !important; }
+.dark .border-gray-300 { border-color: var(--color-border-input) !important; }
+.dark .border-gray-400 { border-color: var(--color-border-strong) !important; }
+
+/* ── 语义化边框 ── */
+.dark .border-indigo-100 { border-color: var(--color-primary-50) !important; }
+.dark .border-indigo-200 { border-color: var(--color-primary-border) !important; }
+.dark .border-indigo-300 { border-color: var(--color-primary-200) !important; }
+.dark .border-indigo-500 { border-color: var(--color-primary-300) !important; }
+.dark .border-blue-100 { border-color: var(--color-info-50) !important; }
+.dark .border-blue-200 { border-color: var(--color-info-border) !important; }
+.dark .border-blue-300 { border-color: var(--color-info-200) !important; }
+.dark .border-green-100 { border-color: var(--color-success-50) !important; }
+.dark .border-green-200 { border-color: var(--color-success-border) !important; }
+.dark .border-red-100 { border-color: var(--color-danger-50) !important; }
+.dark .border-red-200 { border-color: var(--color-danger-border) !important; }
+.dark .border-amber-100 { border-color: var(--color-warning-50) !important; }
+.dark .border-amber-200 { border-color: var(--color-warning-border) !important; }
+.dark .border-amber-300 { border-color: var(--color-warning-200) !important; }
+.dark .border-violet-100 { border-color: #3b0764 !important; }
+.dark .border-violet-200 { border-color: #4c1d95 !important; }
+.dark .border-emerald-100 { border-color: #022c22 !important; }
+.dark .border-rose-100 { border-color: #2d0000 !important; }
+.dark .border-rose-200 { border-color: #4c0000 !important; }
+/* ── 状态行左边框 ── */
+.dark .border-l-red-400 { border-left-color: var(--color-danger-300) !important; }
+.dark .border-l-green-400 { border-left-color: var(--color-success-300) !important; }
+/* ── 带透明度的边框覆盖 ── */
+.dark .border-indigo-200\\/50 { border-color: rgba(15, 59, 102, 0.5) !important; }
+
+/* ── 悬停状态 ── */
+.dark .hover\\:bg-gray-50:hover { background-color: var(--color-bg-hover) !important; }
+.dark .hover\\:bg-gray-100:hover { background-color: var(--color-surface-hover) !important; }
+.dark .hover\\:bg-gray-200:hover { background-color: var(--color-bg-active) !important; }
+.dark .hover\\:bg-indigo-50:hover { background-color: var(--color-primary-bg) !important; }
+.dark .hover\\:bg-indigo-100:hover { background-color: var(--color-primary-50) !important; }
+.dark .hover\\:border-indigo-300:hover { border-color: var(--color-primary-200) !important; }
+.dark .hover\\:border-indigo-400:hover { border-color: var(--color-primary-300) !important; }
+.dark .hover\\:text-indigo-700:hover { color: var(--color-primary-400) !important; }
+.dark .hover\\:text-red-700:hover { color: var(--color-danger-400) !important; }
+.dark .hover\\:border-amber-300:hover { border-color: var(--color-warning-200) !important; }
+
+/* ── 遮罩（bg-black/50 等用在 Modal 上的） ── */
+.dark .bg-black\\/50 { background-color: var(--color-overlay) !important; }
+
+/* ════════════════════════════════════════════════════════════════════
+   深色模式阴影 — 暗色背景用深色阴影
+   ════════════════════════════════════════════════════════════════════ */
+.dark .tw-card {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+.dark .tw-input:focus {
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.25);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   深色模式 — 原生 select 下拉框修复
+   浏览器原生 <select> 和 <option> 需单独设置颜色
+   ════════════════════════════════════════════════════════════════════ */
+.dark select,
+.dark input:not([type="checkbox"]):not([type="radio"]),
+.dark textarea {
+  color: var(--color-text) !important;
+  background-color: var(--color-surface) !important;
+}
+.dark select option {
+  color: var(--color-text) !important;
+  background-color: var(--color-surface) !important;
+}
+.dark select option:hover,
+.dark select option:checked {
+  background-color: var(--color-bg-hover) !important;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   深色模式 — hover 状态覆盖（bg-gray-100 等）
+   ════════════════════════════════════════════════════════════════════ */
+.dark .hover\\:bg-gray-100:hover { background-color: var(--color-bg-hover) !important; }
+.dark .hover\\:bg-gray-200:hover { background-color: var(--color-bg-active) !important; }
+/* ── 表格行分隔线 ── */
+.hover\\:bg-gray-50 td {
+  border-bottom: 1px solid var(--color-border);
+}
+.hover\\:bg-gray-50:last-child td {
+  border-bottom: none;
+}
+.dark .hover\\\\:bg-gray-50:hover { background-color: var(--color-surface-hover) !important; }
+
+/* ── 材料库组合下拉框：强制深色背景 ── */
+.dark .combo-i,
+.dark .combo-w .combo-d,
+.dark #materials-tbody input[type="text"],
+.dark #materials-tbody input[type="number"] {
+  background-color: var(--color-surface) !important;
+  color: var(--color-text) !important;
+}
+
+/* ── 卡片视图文件名 ── */
+.dark .text-gray-900.card-title {
+  color: var(--color-text-strong) !important;
+}

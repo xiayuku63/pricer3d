@@ -13,8 +13,14 @@
 import * as THREE from 'three';
 import { currentMeshCenterOffset, fitCameraToMesh, scene } from './viewer.js';
 
-// Unified white highlight color for BambuSlicer-style oval overlays
-const FACE_COLORS = 0xffffff;
+// Default: gray-white translucent. Hover: bright cyan.
+const FACE_FILL_COLOR = 0xf3f4f6;
+const FACE_HOVER_COLOR = 0x22d3ee;
+const FACE_OUTLINE_COLOR = 0x9ca3af;
+const FACE_OUTLINE_HOVER_COLOR = 0x0891b2;
+const FACE_OVAL_SHRINK = 0.68;
+const FACE_OVAL_MAX_RADIUS = 22;
+const FACE_OVAL_MIN_RADIUS = 4;
 
 let clusterOverlays = [];       // 高亮 Mesh 数组
 let clusterClickCallback = null; // 点击回调
@@ -129,8 +135,9 @@ function _buildPlaceablePlaneVisual(mesh, minX, maxX, minY, maxY) {
         polygonOffsetUnits: -2,
     });
     const topMesh = new THREE.Mesh(geoTop, matTop);
-    topMesh.position.set(cx, cy, 0);
-    topMesh.rotation.x = -Math.PI / 2;
+    // PlaneGeometry is already in the XY plane, the same plane as the bed.
+    // Keep it horizontal and lift it slightly to prevent z-fighting.
+    topMesh.position.set(cx, cy, 0.02);
     _placeablePlaneGroup.add(topMesh);
 
     // Z- 侧（空白侧）—— 半透明蓝色
@@ -143,8 +150,7 @@ function _buildPlaceablePlaneVisual(mesh, minX, maxX, minY, maxY) {
         polygonOffsetUnits: -2,
     });
     const bottomMesh = new THREE.Mesh(geoBottom, matBottom);
-    bottomMesh.position.set(cx, cy, 0);
-    bottomMesh.rotation.x = -Math.PI / 2;
+    bottomMesh.position.set(cx, cy, -0.02);
     _placeablePlaneGroup.add(bottomMesh);
 
     // 绿色边框
@@ -156,8 +162,7 @@ function _buildPlaceablePlaneVisual(mesh, minX, maxX, minY, maxY) {
         polygonOffsetUnits: -2,
     });
     const borderLine = new THREE.LineSegments(edgesGeo, lineMat);
-    borderLine.position.set(cx, cy, 0);
-    borderLine.rotation.x = -Math.PI / 2;
+    borderLine.position.set(cx, cy, 0.04);
     _placeablePlaneGroup.add(borderLine);
 
     // Z+ 方向箭头（绿色朝上）
@@ -248,7 +253,8 @@ function _buildEllipseOverlay(flatVerts, normalArr, clusterIndex) {
     const e1x = Math.cos(theta), e1y = Math.sin(theta);   // major axis (2D)
     const e2x = -e1y,       e2y = e1x;                     // minor axis (2D)
 
-    // Semi-axes = max projection magnitude along each principal axis (bounds all points)
+    // Semi-axes from the face footprint, then shrink inward so the oval
+    // reads as an in-face placement marker instead of covering the whole face.
     let semi1 = 0, semi2 = 0;
     for (const q of p2) {
         const dx = q[0] - mx, dy = q[1] - my;
@@ -257,7 +263,10 @@ function _buildEllipseOverlay(flatVerts, normalArr, clusterIndex) {
         if (proj1 > semi1) semi1 = proj1;
         if (proj2 > semi2) semi2 = proj2;
     }
-    semi1 *= 1.08; semi2 *= 1.08;   // small padding so the oval clearly surrounds the face
+    semi1 = Math.min(semi1 * FACE_OVAL_SHRINK, FACE_OVAL_MAX_RADIUS);
+    semi2 = Math.min(semi2 * FACE_OVAL_SHRINK, FACE_OVAL_MAX_RADIUS);
+    semi1 = Math.max(semi1, FACE_OVAL_MIN_RADIUS);
+    semi2 = Math.max(semi2, FACE_OVAL_MIN_RADIUS);
     if (semi1 < 1e-4 || semi2 < 1e-4) return null;
 
     // Map 2D principal axes back to 3D
@@ -284,15 +293,13 @@ function _buildEllipseOverlay(flatVerts, normalArr, clusterIndex) {
     geo.setIndex(indices);
     geo.computeVertexNormals();
 
-    const mat = new THREE.MeshStandardMaterial({
-        color: FACE_COLORS,
+    const mat = new THREE.MeshBasicMaterial({
+        color: FACE_FILL_COLOR,
         transparent: true,
-        opacity: 0.85,
+        opacity: 0.34,
         side: THREE.DoubleSide,
         depthTest: true,
         depthWrite: false,
-        metalness: 0.0,
-        roughness: 0.6,
         polygonOffset: true,
         polygonOffsetFactor: -1,
         polygonOffsetUnits: -1,
@@ -306,7 +313,7 @@ function _buildEllipseOverlay(flatVerts, normalArr, clusterIndex) {
     mesh.renderOrder = 1;
 
     // Offset along the face normal to avoid z-fighting
-    const off = n.clone().multiplyScalar(0.3);
+    const off = n.clone().multiplyScalar(0.8);
     mesh.position.copy(off);
 
     // Crisp outline (LineLoop) — improves visibility of the white fill on light models
@@ -323,7 +330,7 @@ function _buildEllipseOverlay(flatVerts, normalArr, clusterIndex) {
     const lineGeo = new THREE.BufferGeometry();
     lineGeo.setAttribute('position', new THREE.Float32BufferAttribute(outlinePts, 3));
     const lineMat = new THREE.LineBasicMaterial({
-        color: FACE_COLORS, transparent: true, opacity: 0.9,
+        color: FACE_OUTLINE_COLOR, transparent: true, opacity: 0.68,
         depthTest: true, depthWrite: false,
         polygonOffset: true,
         polygonOffsetFactor: -1,
@@ -379,6 +386,7 @@ export function renderClusters(parent, clusters, onClick, onHover) {
         clusterHighlightGroup.add(overlay.mesh);
         if (overlay.outline) clusterHighlightGroup.add(overlay.outline);
         clusterOverlays.push(overlay.mesh);
+        setClusterHover(clusterOverlays.length - 1, false);
     });
 
     clusterMode = true;
@@ -413,13 +421,23 @@ export function setClusterHover(index, active) {
     const o = clusterOverlays[index];
     if (!o || !o.material) return;
     if (active) {
-        o.material.opacity = 0.85;
-        o.material.emissiveIntensity = 1.2;
-        if (o.userData && o.userData.outline) o.userData.outline.material.opacity = 1.0;
+        o.material.color.setHex(FACE_HOVER_COLOR);
+        o.material.opacity = 0.92;
+        if (o.userData && o.userData.outline) {
+            o.userData.outline.material.color.setHex(FACE_OUTLINE_HOVER_COLOR);
+            o.userData.outline.material.opacity = 1.0;
+        }
     } else {
-        o.material.opacity = 0.35;
-        o.material.emissiveIntensity = 0.2;
-        if (o.userData && o.userData.outline) o.userData.outline.material.opacity = 0.6;
+        o.material.color.setHex(FACE_FILL_COLOR);
+        o.material.opacity = 0.34;
+        if (o.userData && o.userData.outline) {
+            o.userData.outline.material.color.setHex(FACE_OUTLINE_COLOR);
+            o.userData.outline.material.opacity = 0.68;
+        }
+    }
+    o.material.needsUpdate = true;
+    if (o.userData && o.userData.outline && o.userData.outline.material) {
+        o.userData.outline.material.needsUpdate = true;
     }
 }
 
@@ -428,11 +446,19 @@ export function setClusterHover(index, active) {
  * @param {THREE.Raycaster} raycaster
  * @returns {{ index: number, mesh: THREE.Mesh } | null}
  */
-export function intersectClusters(raycaster) {
+export function intersectClusters(raycaster, occluder = null) {
     if (!clusterMode || clusterOverlays.length === 0) return null;
     const intersects = raycaster.intersectObjects(clusterOverlays, false);
     if (intersects.length > 0) {
-        const obj = intersects[0].object;
+        const hit = intersects[0];
+        // A ray can still intersect an overlay on the back of an opaque model.
+        // Ignore it when the model is closer than the overlay so hover/click
+        // behavior matches what the user can actually see.
+        if (occluder) {
+            const modelHit = raycaster.intersectObject(occluder, false)[0];
+            if (modelHit && modelHit.distance < hit.distance - 0.01) return null;
+        }
+        const obj = hit.object;
         if (obj.userData && obj.userData.isClusterOverlay) {
             return { index: obj.userData.clusterIndex, mesh: obj };
         }
@@ -453,22 +479,64 @@ export function isClusterMode() {
  * @param {Array} normal - [nx, ny, nz] 面的法向量
  * @param {string} upAxis - 'Z' (Three.js Z-up) 或 'Y' (Three.js Y-up)
  */
-export function placeFaceOnBed(mesh, normal, upAxis = 'Z') {
+function _getFaceWorldMinZ(mesh, faceVertices) {
+    if (!mesh || !Array.isArray(faceVertices) || faceVertices.length < 3) return null;
+
+    const co = currentMeshCenterOffset || new THREE.Vector3(0, 0, 0);
+    let sinkZ = 0;
+    if (mesh.geometry) {
+        mesh.geometry.computeBoundingBox();
+        sinkZ = mesh.geometry.boundingBox.getCenter(new THREE.Vector3()).z;
+    }
+
+    let minZ = Infinity;
+    const point = new THREE.Vector3();
+    for (const vertex of faceVertices) {
+        if (!Array.isArray(vertex) || vertex.length < 3) continue;
+        point.set(vertex[0] - co.x, vertex[1] - co.y, vertex[2] - co.z + sinkZ);
+        point.applyMatrix4(mesh.matrixWorld);
+        if (Number.isFinite(point.z)) minZ = Math.min(minZ, point.z);
+    }
+    return Number.isFinite(minZ) ? minZ : null;
+}
+
+export function placeFaceOnBed(mesh, normal, upAxis = 'Z', faceVertices = null) {
     if (!mesh) return;
 
     const n = new THREE.Vector3(normal[0], normal[1], normal[2]).normalize();
-
-    // -normal 应对齐到 Z+（Three.js Z-up 约定）
-    const targetDir = n.clone().negate();
     const up = new THREE.Vector3(0, 0, 1);
 
-    const targetQuat = new THREE.Quaternion().setFromUnitVectors(targetDir, up);
-    mesh.quaternion.copy(targetQuat);
+    // STL files may contain inverted face winding. Test both normal directions
+    // and retain the one that places the selected face closest to the model's
+    // actual bottom, rather than trusting the normal sign blindly.
+    const directions = [n.clone().negate(), n.clone()];
+    let bestQuat = null;
+    let bestGap = Infinity;
+    for (const direction of directions) {
+        const candidateQuat = new THREE.Quaternion().setFromUnitVectors(direction, up);
+        mesh.quaternion.copy(candidateQuat);
+        mesh.updateMatrixWorld(true);
+        const modelBox = new THREE.Box3().setFromObject(mesh);
+        const faceMinZ = _getFaceWorldMinZ(mesh, faceVertices);
+        const gap = faceMinZ === null ? 0 : Math.max(0, faceMinZ - modelBox.min.z);
+        if (gap < bestGap) {
+            bestGap = gap;
+            bestQuat = candidateQuat;
+        }
+    }
+    mesh.quaternion.copy(bestQuat || new THREE.Quaternion());
 
-    // 贴合到底板 Z=0，确保模型全部位于可放置平面（Z=0）的 Z+ 一侧
+    // Pin the chosen face itself to Z=0. Falling back to the overall bounding
+    // box keeps placement safe when face vertices are unavailable.
     mesh.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(mesh);
-    mesh.position.z -= box.min.z;
+    const faceMinZ = _getFaceWorldMinZ(mesh, faceVertices);
+    mesh.position.z -= faceMinZ === null ? box.min.z : faceMinZ;
+
+    // A malformed/non-planar face must never leave any model geometry below bed.
+    mesh.updateMatrixWorld(true);
+    const settledBox = new THREE.Box3().setFromObject(mesh);
+    if (settledBox.min.z < -0.001) mesh.position.z -= settledBox.min.z;
 
     // X/Y 居中到热床中心（与 orientation-ui.js centerModel() 逻辑一致）
     mesh.updateMatrixWorld(true);

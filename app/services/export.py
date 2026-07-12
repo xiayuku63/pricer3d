@@ -7,12 +7,12 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-from fastapi import HTTPException, Request
+from fastapi import Depends, HTTPException, Request
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
 from app.db import get_db_session
-from app.deps import get_membership_effective, is_member_user
+from app.deps import get_current_user, get_membership_effective, is_member_user
 from app.models_orm import QuoteHistory, User
 
 logger = logging.getLogger(__name__)
@@ -79,7 +79,7 @@ async def export_quote_history(
     material: Optional[str],
     date_from: Optional[str],
     date_to: Optional[str],
-    current_user: dict,
+    current_user: dict = Depends(get_current_user),
 ):
     """Export quote history as CSV or XLSX file download."""
     if not is_member_user(current_user):
@@ -96,6 +96,7 @@ async def export_quote_history(
         with get_db_session() as db:
             query = _build_export_query(db, uid, material, date_from, date_to)
             rows = query.all()
+            export_rows = [_row_to_export_list(r) for r in rows]
 
         if not rows:
             raise HTTPException(status_code=404, detail="没有符合条件的报价记录可导出")
@@ -108,8 +109,8 @@ async def export_quote_history(
             buf.write("\ufeff")
             writer = csv.writer(buf)
             writer.writerow(headers)
-            for r in rows:
-                writer.writerow(_row_to_export_list(r))
+            for row_values in export_rows:
+                writer.writerow(row_values)
             buf.seek(0)
             filename = f"quote_history_{timestamp}.csv"
             return StreamingResponse(
@@ -142,14 +143,14 @@ async def export_quote_history(
                 cell.alignment = Alignment(horizontal="center")
                 cell.border = thin_border
 
-            for row_idx, r in enumerate(rows, 2):
-                for col_idx, val in enumerate(_row_to_export_list(r), 1):
+            for row_idx, row_values in enumerate(export_rows, 2):
+                for col_idx, val in enumerate(row_values, 1):
                     cell = ws.cell(row=row_idx, column=col_idx, value=val)
                     cell.border = thin_border
 
             for col_idx, (_, title) in enumerate(_EXPORT_COLUMNS, 1):
                 max_len = len(title) * 2
-                for row in ws.iter_rows(min_row=2, max_row=min(len(rows) + 1, 102), min_col=col_idx, max_col=col_idx):
+                for row in ws.iter_rows(min_row=2, max_row=min(len(export_rows) + 1, 102), min_col=col_idx, max_col=col_idx):
                     for cell in row:
                         if cell.value is not None:
                             val_len = len(str(cell.value))
@@ -176,29 +177,29 @@ async def export_quote_history(
 async def export_quote_pdf(
     request: Request,
     ids: str,
-    current_user: dict,
+    current_user: dict = Depends(get_current_user),
 ):
     """Export selected quote history items as a branded PDF quote."""
     from app.config import MEMBER_DISCOUNT_PERCENT
     from app.services.pdf import generate_pdf_quote
 
     if not is_member_user(current_user):
-        raise HTTPException(status_code=403, detail="PDF报价单导出功能仅限会员使用")
+        raise HTTPException(status_code=403, detail="PDF?????????????")
 
     uid = int(current_user["id"])
 
     if not ids or not ids.strip():
-        raise HTTPException(status_code=400, detail="请提供报价记录ID (ids参数)")
+        raise HTTPException(status_code=400, detail="???????ID (ids??)")
 
     try:
         id_list = [int(x.strip()) for x in ids.split(",") if x.strip()]
     except ValueError:
-        raise HTTPException(status_code=400, detail="ids参数格式不正确，应为逗号分隔的数字")
+        raise HTTPException(status_code=400, detail="ids?????????????????")
 
     if not id_list:
-        raise HTTPException(status_code=400, detail="请至少提供一个报价记录ID")
+        raise HTTPException(status_code=400, detail="???????????ID")
     if len(id_list) > 100:
-        raise HTTPException(status_code=400, detail="单次最多导出100条记录")
+        raise HTTPException(status_code=400, detail="??????100???")
 
     try:
         with get_db_session() as db:
@@ -216,28 +217,27 @@ async def export_quote_pdf(
                 .order_by(QuoteHistory.id.asc())
                 .all()
             )
+            items = []
+            for r in rows:
+                items.append({
+                    "filename": r.filename or "",
+                    "material": r.material or "",
+                    "color": r.color or "",
+                    "quantity": int(r.quantity or 1),
+                    "volume_cm3": round(float(r.volume_cm3 or 0), 2),
+                    "weight_g": round(float(r.weight_g or 0), 2),
+                    "estimated_time_h": round(float(r.estimated_time_h or 0), 2),
+                    "cost_cny": round(float(r.cost_cny or 0), 2),
+                    "printer_model": r.printer_model or "",
+                    "nozzle_diameter": round(float(r.nozzle_diameter), 2) if r.nozzle_diameter is not None else "",
+                    "layer_height": round(float(r.layer_height), 2) if r.layer_height is not None else 0,
+                    "wall_count": int(r.wall_count) if r.wall_count is not None else 0,
+                    "infill_percent": int(r.infill) if r.infill is not None else 0,
+                    "brand": r.brand or "",
+                })
 
-        if not rows:
-            raise HTTPException(status_code=404, detail="未找到指定的报价记录")
-
-        items = []
-        for r in rows:
-            items.append({
-                "filename": r.filename or "",
-                "material": r.material or "",
-                "color": r.color or "",
-                "quantity": int(r.quantity or 1),
-                "volume_cm3": round(float(r.volume_cm3 or 0), 2),
-                "weight_g": round(float(r.weight_g or 0), 2),
-                "estimated_time_h": round(float(r.estimated_time_h or 0), 2),
-                "cost_cny": round(float(r.cost_cny or 0), 2),
-                "printer_model": r.printer_model or "",
-                "nozzle_diameter": round(float(r.nozzle_diameter), 2) if r.nozzle_diameter is not None else "",
-                "layer_height": round(float(r.layer_height), 2) if r.layer_height is not None else 0,
-                "wall_count": int(r.wall_count) if r.wall_count is not None else 0,
-                "infill_percent": int(r.infill) if r.infill is not None else 0,
-                "brand": r.brand or "",
-            })
+        if not items:
+            raise HTTPException(status_code=404, detail="??????????")
 
         membership_level, _ = get_membership_effective(current_user)
         discount_pct = 0.0
@@ -259,7 +259,7 @@ async def export_quote_pdf(
         timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         filename = f"quote_{timestamp}.pdf"
 
-        logger.info(f"用户 {uid} 导出PDF报价单，包含 {len(items)} 个项目")
+        logger.info(f"?? {uid} ??PDF?????? {len(items)} ???")
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",
@@ -272,8 +272,8 @@ async def export_quote_pdf(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"导出PDF报价单失败: user_id={uid} error={str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"PDF导出失败: {str(e)}")
+        logger.error(f"??PDF?????: user_id={uid} error={str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"PDF????: {str(e)}")
 
 
 class PdfInlineItem(BaseModel):
@@ -303,7 +303,7 @@ class PdfInlineRequest(BaseModel):
 async def export_pdf_inline(
     payload: PdfInlineRequest,
     request: Request,
-    current_user: dict,
+    current_user: dict = Depends(get_current_user),
 ):
     """POST /api/quote/export-pdf-inline — 从当前页面结果直接生成PDF（不查DB）"""
     from app.config import MEMBER_DISCOUNT_PERCENT

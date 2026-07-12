@@ -1,8 +1,8 @@
             <!-- 用户中心弹窗 -->
-            <div id="user-center-modal" class="hidden fixed inset-0 z-50">
+            <div id="user-center-modal" class="hidden fixed inset-0 z-[70]">
                 <div id="user-center-backdrop" class="absolute inset-0" style="background-color: var(--color-overlay);"></div>
                 <div class="relative z-10 h-full w-full flex items-center justify-center p-4">
-                    <div class="w-full max-w-5xl tw-card shadow-xl overflow-hidden flex flex-col h-[85vh]" style="border-radius: var(--radius-lg);">
+                    <div class="w-full max-w-5xl tw-card shadow-xl overflow-hidden flex flex-col h-[85vh] max-h-[85vh] min-h-0" style="border-radius: var(--radius-lg);">
                         <div class="px-4 py-3 flex items-center justify-between" style="border-bottom: 1px solid var(--color-border);">
                             <h4 class="text-sm font-semibold tw-text-strong" data-i18n="settings.title">用户中心</h4>
                             <div class="flex items-center gap-2">
@@ -18,7 +18,7 @@
                                 <button id="user-center-close-btn" type="button" class="tw-text-muted hover:tw-text" data-i18n="common.close">关闭</button>
                             </div>
                         </div>
-                        <div class="flex flex-1 overflow-hidden min-h-[500px]">
+                        <div class="flex flex-1 overflow-hidden min-h-0">
                             <!-- 左侧导航 -->
                             <div class="w-48" style="background-color: var(--color-bg); border-right: 1px solid var(--color-border); padding: 0.5rem; display: flex; flex-direction: column; gap: 0.25rem; overflow-y: auto;">
                                 <button type="button" data-uc-tab="print-params" class="uc-tab-btn w-full text-left px-3 py-2 rounded-md text-sm font-medium tw-text-secondary hover:bg-gray-100" data-i18n="settings.printParams">打印参数</button>
@@ -29,7 +29,7 @@
                             </div>
                             
                             <!-- 右侧内容区 -->
-                            <div class="flex-1 p-6 overflow-y-auto tw-card relative min-h-[500px]" style="border-radius: 0;">
+                            <div class="flex-1 p-6 overflow-y-auto relative min-h-0" style="border-radius: 0; background-color: var(--color-surface);">
                                 <div id="uc-tab-print-params" class="uc-tab-pane block">
                                     <!-- Sub-tab bar -->
                                     <div class="flex gap-1 mb-4" style="border-bottom: 1px solid var(--color-border);">

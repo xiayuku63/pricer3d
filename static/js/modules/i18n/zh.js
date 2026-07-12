@@ -48,6 +48,7 @@ export default {
 
   // ── App ──
   'app.title': '3D打印件自动报价系统',
+  'app.clock': '实时时钟',
 
   // ── Auth / 认证 ──
   'auth.login': '登录',
@@ -468,6 +469,8 @@ export default {
   'orientation.autoOrient': '手动摆放',
   'orientation.autoPlace': '智能摆放',
   'orientation.exit': '退出摆放模式',
+  'orientation.analyzing': '正在分析可放置面...',
+  'orientation.pickFaceHint': '请选择一个要贴合打印平台的底面',
   'orientation.noFace': '无可用摆放面',
   'orientation.analyzeError': '分析失败',
   'orientation.requestFailedLogin': '请求失败，请登录后重试',

@@ -1,9 +1,15 @@
 """pricer3d — 3D Printing Parts Automated Quoting System."""
 
+import os
+
 from app import create_app
 
 app = create_app()
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+
+    host = os.getenv("UVICORN_HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", os.getenv("UVICORN_PORT", "5000")))
+    reload_ = os.getenv("UVICORN_RELOAD", "true").lower() in {"1", "true", "yes", "on"}
+    uvicorn.run("main:app", host=host, port=port, reload=reload_)

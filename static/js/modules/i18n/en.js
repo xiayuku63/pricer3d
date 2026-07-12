@@ -53,6 +53,7 @@ export default {
 
   // ── App ──
   'app.title': '3D Print Auto Quoting System',
+  'app.clock': 'Live Clock',
 
   // ── Auth ──
   'auth.login': 'Login',
@@ -473,6 +474,8 @@ export default {
   'orientation.autoOrient': 'Manual Place',
   'orientation.autoPlace': '🎯 Auto Orient',
   'orientation.exit': '🔙 Exit Lay Mode',
+  'orientation.analyzing': 'Analyzing surfaces...',
+  'orientation.pickFaceHint': 'Select a face to place onto the print bed',
   'orientation.noFace': 'No surface available',
   'orientation.analyzeError': 'Analysis failed',
   'orientation.requestFailedLogin': 'Request failed, please login and retry',

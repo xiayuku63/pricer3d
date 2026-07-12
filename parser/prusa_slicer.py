@@ -13,31 +13,74 @@ import logging
 import tempfile
 import subprocess
 import shutil
+from functools import lru_cache
 from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+
+@lru_cache(maxsize=1)
+def _env_file_prusa_executable() -> str:
+    """Best-effort read of PRUSA_EXECUTABLE from the project .env file."""
+    root = os.path.dirname(os.path.dirname(__file__))
+    env_path = os.path.join(root, '.env')
+    if not os.path.isfile(env_path):
+        return ''
+    try:
+        with open(env_path, 'r', encoding='utf-8') as f:
+            for raw_line in f:
+                line = raw_line.strip()
+                if not line or line.startswith('#') or '=' not in line:
+                    continue
+                key, value = line.split('=', 1)
+                if key.strip() != 'PRUSA_EXECUTABLE':
+                    continue
+                value = value.strip().strip('"').strip("'")
+                return value
+    except Exception:
+        return ''
+    return ''
+
 # ── Executable discovery ──
 
 def prusa_executable() -> Optional[str]:
-    """Return path to prusa-slicer binary, or None if not installed."""
-    candidates = [
-        shutil.which("prusa-slicer"),
-        shutil.which("prusa-slicer-console"),
-        shutil.which("prusaslicer"),
-        shutil.which("prusaslicer-console"),
-        # Linux
-        "/usr/bin/prusa-slicer",
+    """Return path to prusa-slicer binary, or None if not installed.
+
+    Strategy:
+    1. Respect explicit ``PRUSA_EXECUTABLE`` if set.
+    2. Linux (Docker): directly check ``/usr/bin/prusa-slicer`` (apt install).
+    3. Fall back to ``shutil.which()`` for PATH-based lookup.
+    4. Check well-known Windows install paths.
+    """
+    import sys as _sys
+    _env = os.getenv("PRUSA_EXECUTABLE", "").strip()
+    if _env and os.path.isfile(_env):
+        return _env
+    _env_file = _env_file_prusa_executable().strip()
+    if _env_file and os.path.isfile(_env_file):
+        return _env_file
+    # Linux: apt installs to /usr/bin/prusa-slicer
+    if _sys.platform != "win32":
+        _p = "/usr/bin/prusa-slicer"
+        if os.path.isfile(_p):
+            return _p
+    # PATH-based lookup
+    for _name in ("prusa-slicer", "prusa-slicer-console", "prusaslicer", "prusaslicer-console"):
+        _c = shutil.which(_name)
+        if _c:
+            return _c
+    # Well-known paths
+    for _p in (
         "/usr/local/bin/prusa-slicer",
         "/snap/bin/prusa-slicer",
-        # Windows
         "C:/Program Files/Prusa3D/PrusaSlicer/prusa-slicer-console.exe",
         "C:/Program Files/Prusa3D/PrusaSlicer/prusa-slicer.exe",
         "C:/Program Files (x86)/Prusa3D/PrusaSlicer/prusa-slicer-console.exe",
-    ]
-    for candidate in candidates:
-        if candidate and os.path.isfile(candidate) and os.access(candidate, os.X_OK):
-            return candidate
+        os.path.expandvars(r"%LOCALAPPDATA%/Programs/PrusaSlicer/prusa-slicer-console.exe"),
+        os.path.expandvars(r"%LOCALAPPDATA%/Programs/PrusaSlicer/prusa-slicer.exe"),
+    ):
+        if os.path.isfile(_p):
+            return _p
     return None
 
 
@@ -107,7 +150,6 @@ def _load_system_ini() -> str:
     with open(_SYSTEM_INI_PATH, "r", encoding="utf-8") as f:
         return f.read()
 
-
 def _parse_ini_sections(content: str) -> dict[str, dict[str, str]]:
     """Parse INI content into {section_name: {key: value}} dict.
 
@@ -138,10 +180,18 @@ def _parse_ini_sections(content: str) -> dict[str, dict[str, str]]:
 
 
 def _write_ini_sections(sections: dict[str, dict[str, str]]) -> str:
-    """Serialize sections dict back to INI string with proper section headers."""
+    """Serialize sections dict back to INI string with proper section headers.
+
+    CRITICAL: Strip profile name suffixes so PrusaSlicer CLI activates the
+    settings directly.  ``[print:0.20mm_Standard]`` → ``[print]``.
+    Without this, PrusaSlicer treats the sections as named profile
+    *definitions* (added to its library) rather than active config,
+    and silently uses its own built-in defaults.
+    """
     lines = []
     for sec_name, settings in sections.items():
-        lines.append(f"[{sec_name}]")
+        base_type = sec_name.split(":")[0] if ":" in sec_name else sec_name
+        lines.append(f"[{base_type}]")
         for key in sorted(settings):
             lines.append(f"{key} = {settings[key]}")
         lines.append("")
@@ -210,6 +260,8 @@ def generate_slice_config(
     printer_profile_path: Optional[str] = None,
     top_shell_layers: Optional[int] = None,
     bottom_shell_layers: Optional[int] = None,
+    hotend_temp: Optional[int] = None,
+    bed_temp: Optional[int] = None,
 ) -> str:
     """
     Generate a combined PrusaSlicer INI config file for a quote request.
@@ -272,29 +324,68 @@ def generate_slice_config(
         ps["top_shell_layers"] = str(top_shell_layers) if top_shell_layers is not None else str(max(3, min(perimeters + 2, 10)))
         ps["bottom_shell_layers"] = str(bottom_shell_layers) if bottom_shell_layers is not None else str(max(3, min(perimeters + 2, 10)))
 
-    # ── Apply filament density into the filament section ──
+    # ── Ensure fill_pattern is compatible with fill_density ──
+    # PrusaSlicer rejects many patterns at 100% density.
+    # Define known-compatible patterns and force "alignedrectilinear" for
+    # ALL fill pattern fields when infill >= 99%.
+    _FILL_100_SAFE = frozenset({
+        "rectilinear", "alignedrectilinear",
+    })
+    if infill_percent >= 99:
+        _safe_pattern = "alignedrectilinear"
+        # PrusaSlicer 2.7.x checks ALL fill pattern keys at 100% density —
+        # if any single key is set to an incompatible pattern, slicing fails.
+        for _field in ("fill_pattern", "sparse_infill_pattern", "solid_fill_pattern",
+                       "top_fill_pattern", "bottom_fill_pattern"):
+            _cur = ps.get(_field, "grid")
+            if _cur not in _FILL_100_SAFE:
+                ps[_field] = _safe_pattern
+                logger.info(
+                    "PrusaSlicer config: override %s '%s' -> '%s' for %d%% infill",
+                    _field, _cur, _safe_pattern, infill_percent,
+                )
+            elif _field not in ps:
+                ps[_field] = _cur
+    else:
+        for _field in ("fill_pattern", "sparse_infill_pattern"):
+            ps.setdefault(_field, "grid")
+
+    # ── Apply filament density and temperature into the filament section ──
     for sec_name in sections:
         if sec_name.startswith("filament:"):
             sections[sec_name]["filament_density"] = str(material_density)
+            if hotend_temp is not None:
+                sections[sec_name]["temperature"] = str(hotend_temp)
+                sections[sec_name]["first_layer_temperature"] = str(hotend_temp)
+            if bed_temp is not None:
+                sections[sec_name]["bed_temperature"] = str(bed_temp)
+                sections[sec_name]["first_layer_bed_temperature"] = str(bed_temp)
             break
 
-    # ── Write temp config in flat format (PrusaSlicer --load requires flat key=value) ──
+    # ── Write temp config FLAT (no section headers, deduplicated) ──
+    # CRITICAL: PrusaSlicer 2.7.x CLI --load ONLY accepts flat key=value.
+    # Any [section] header causes the ENTIRE file to be ignored.
+    # Additionally, duplicate key names (same key appearing twice) causes
+    # PrusaSlicer to reject the entire config with:
+    #   "Error while reading config file: duplicate key name"
+    #
+    # We merge all section contents into ONE ordered dict, writing in
+    # machine → filament → print priority order (last writer wins).
+    # The [preset] section (metadata only) is dropped.
+    flat_config: dict[str, str] = {}
+    section_order_prefix = ["machine:", "filament:", "print:"]
+    for prefix in section_order_prefix:
+        for sec_name, sec_settings in sections.items():
+            if not sec_name.startswith(prefix):
+                continue
+            for key in sorted(sec_settings):
+                flat_config[key] = sec_settings[key]  # later keys override earlier
     fd, path = tempfile.mkstemp(suffix=".ini", prefix="prc3d_")
     with os.fdopen(fd, "w") as f:
-        f.write("; Generated by pricer3d — combined slice config\n")
+        f.write("; Generated by pricer3d — combined slice config (flat, deduplicated)\n")
         f.write(f"; layer_height={layer_height} infill={infill_percent}% perimeters={perimeters} density={material_density}\n\n")
-        # Flatten all sections into single flat key=value output, deduplicating keys.
-        # Sections are written in REVERSE order so that user preset settings
-        # (added last in the dict) take precedence over base config settings.
-        written: set[str] = set()
-        for sec_name, sec_settings in reversed(list(sections.items())):
-            f.write(f"; --- {sec_name} ---\n")
-            for key in sorted(sec_settings):
-                if key in written:
-                    continue
-                written.add(key)
-                f.write(f"{key} = {sec_settings[key]}\n")
-            f.write("\n")
+        for key in sorted(flat_config):
+            f.write(f"{key} = {flat_config[key]}\n")
 
     total_settings = sum(len(s) for s in sections.values())
     logger.info(f"PrusaSlicer config: {len(sections)} sections, {total_settings} settings → {path}")
@@ -318,6 +409,8 @@ def run_prusa_slice(
     printer_profile_path: Optional[str] = None,
     top_shell_layers: Optional[int] = None,
     bottom_shell_layers: Optional[int] = None,
+    hotend_temp: Optional[int] = None,
+    bed_temp: Optional[int] = None,
 ) -> dict:
     """
     Run PrusaSlicer headless. Merges system/user/quote config into temp INI.
@@ -328,7 +421,10 @@ def run_prusa_slice(
     """
     exe = prusa_executable()
     if not exe:
-        raise RuntimeError("PrusaSlicer not found — install: apt-get install prusa-slicer")
+        import sys as _sys
+        if _sys.platform == "win32":
+            raise RuntimeError("PrusaSlicer not found on Windows - install PrusaSlicer or set PRUSA_EXECUTABLE")
+        raise RuntimeError("PrusaSlicer not found - install: apt-get install prusa-slicer")
 
     out_dir = os.path.dirname(output_gcode_path)
     if out_dir:
@@ -343,6 +439,8 @@ def run_prusa_slice(
         printer_profile_path=printer_profile_path,
         top_shell_layers=top_shell_layers,
         bottom_shell_layers=bottom_shell_layers,
+        hotend_temp=hotend_temp,
+        bed_temp=bed_temp,
     )
 
     preset_label = "系统默认"
@@ -458,91 +556,100 @@ def generate_prusa_config(
     top_shell_layers: int = 5,
     bottom_shell_layers: int = 5,
     brim_width: int = 0,
-    material_density: float = 1.24,
-    bed_width: float = 256,
-    bed_depth: float = 256,
-    max_print_height_mm: float = 256,
-    max_speed: float = 500,
-    max_acceleration: float = 10000,
-    jerk_limit: float = 0.04,
+    nozzle_diameter: float = 0.4,
+    filament_diameter: float = 1.75,
+    filament_density: float = 1.24,
+    filament_type: str = "PLA",
+    bed_size_x: int = 256,
+    bed_size_y: int = 256,
+    max_print_height: int = 256,
+    printer_profile_path: Optional[str] = None,
 ) -> str:
+    """Generate a downloadable PrusaSlicer config for a given preset snapshot.
+
+    Unlike generate_slice_config() which writes a temp file for CLI use,
+    this function returns a human-readable .ini string the user can load
+    in PrusaSlicer GUI.
     """
-    Generate a PrusaSlicer-compatible INI config snippet.
-    Uses system default as base, overrides with given params.
-    Returns path to temporary config file.
-    """
-    fd, path = tempfile.mkstemp(suffix=".ini", prefix="prusa_gen_")
-    with os.fdopen(fd, "w") as f:
-        f.write(f"""; Generated PrusaSlicer config — pricer3d
-[print:custom]
-layer_height = {layer_height}
-first_layer_height = {round(min(layer_height * 1.75, 0.35), 2)}
-fill_density = {infill_percent}%
-perimeters = {perimeters}
-top_shell_layers = {top_shell_layers}
-bottom_shell_layers = {bottom_shell_layers}
-brim_width = {brim_width}
-nozzle_diameter = 0.4
-filament_diameter = 1.75
-filament_density = {material_density}
-filament_type = PLA
-temperature = 220
-first_layer_temperature = 220
-bed_temperature = 55
-first_layer_bed_temperature = 55
-perimeter_speed = 250
-external_perimeter_speed = 200
-infill_speed = 250
-solid_infill_speed = 250
-top_solid_infill_speed = 200
-travel_speed = 500
-first_layer_speed = 45
-default_acceleration = 6000
-perimeter_acceleration = 5000
-infill_acceleration = 10000
-external_perimeter_acceleration = 4000
-bridge_acceleration = 5000
-first_layer_acceleration = 2000
-travel_acceleration = 10000
-machine_max_acceleration_x = 12000
-machine_max_acceleration_y = 12000
-machine_max_acceleration_z = 1500
-machine_max_acceleration_e = 5000
-machine_max_acceleration_extruding = 12000
-machine_max_feedrate_x = 500
-machine_max_feedrate_y = 500
-machine_max_feedrate_z = 30
-machine_max_feedrate_e = 30
-machine_max_jerk_x = 9
-machine_max_jerk_y = 9
-machine_max_jerk_z = 3
-machine_max_jerk_e = 3
-retract_length = 0.8
-retract_speed = 30
-deretract_speed = 30
-retract_before_travel = 1.5
-retract_lift = 0.4
-max_volumetric_speed = 0
-cooling = 1
-fan_always_on = 1
-max_fan_speed = 100
-min_fan_speed = 35
-bridge_fan_speed = 100
-disable_fan_first_layers = 1
-fan_below_layer_time = 60
-slowdown_below_layer_time = 10
-min_print_speed = 25
-resolution = 0.0125
-extrusion_multiplier = 0.98
-bed_shape = 0x0,{int(bed_width)}x0,{int(bed_width)}x{int(bed_depth)},0x{int(bed_depth)}
-max_print_height = {int(max_print_height_mm)}
-machine_max_feedrate_x = {int(max_speed)}
-machine_max_feedrate_y = {int(max_speed)}
-machine_max_acceleration_x = {int(max_acceleration)}
-machine_max_acceleration_y = {int(max_acceleration)}
-machine_max_jerk_x = {jerk_limit}
-machine_max_jerk_y = {jerk_limit}
-min_layer_height = 0.08
-max_layer_height = 0.32
-""")
-    return path
+    # Load base config from printer profile or system default
+    ini_content = ""
+    if printer_profile_path and os.path.exists(printer_profile_path):
+        with open(printer_profile_path, "r", encoding="utf-8") as f:
+            ini_content = f.read()
+    if not ini_content:
+        try:
+            ini_content = _load_system_ini()
+        except Exception:
+            ini_content = ""
+
+    sections = _parse_ini_sections(ini_content)
+
+    # Find or create print section
+    print_sec = None
+    for sn in sections:
+        if sn.startswith("print:"):
+            print_sec = sn
+            break
+    if print_sec is None:
+        print_sec = "print:custom"
+        sections[print_sec] = {}
+
+    ps = sections[print_sec]
+    ps["layer_height"] = str(layer_height)
+    ps["first_layer_height"] = str(round(min(layer_height * 1.75, 0.35), 2))
+    ps["fill_density"] = f"{infill_percent}%"
+    ps["sparse_infill_density"] = f"{infill_percent}%"
+    ps["perimeters"] = str(perimeters)
+    ps["wall_loops"] = str(perimeters)
+    ps["top_shell_layers"] = str(top_shell_layers)
+    ps["bottom_shell_layers"] = str(bottom_shell_layers)
+    ps["brim_width"] = str(brim_width)
+
+    # Ensure fill_pattern compatibility with 100% infill
+    _FILL_100_SAFE = frozenset({
+        "rectilinear", "alignedrectilinear",
+    })
+    if infill_percent >= 99:
+        _safe_pattern = "alignedrectilinear"
+        for _field in ("fill_pattern", "sparse_infill_pattern", "solid_fill_pattern",
+                       "top_fill_pattern", "bottom_fill_pattern"):
+            _cur = ps.get(_field, "grid")
+            if _cur not in _FILL_100_SAFE:
+                ps[_field] = _safe_pattern
+            elif _field not in ps:
+                ps[_field] = _cur
+    else:
+        ps.setdefault("fill_pattern", "grid")
+        ps.setdefault("sparse_infill_pattern", ps.get("fill_pattern", "grid"))
+
+    # Filament section
+    fil_sec = None
+    for sn in sections:
+        if sn.startswith("filament:"):
+            fil_sec = sn
+            break
+    if fil_sec is None:
+        fil_sec = "filament:custom"
+        sections[fil_sec] = {}
+
+    fs = sections[fil_sec]
+    fs["filament_diameter"] = str(filament_diameter)
+    fs["filament_density"] = str(filament_density)
+    fs["filament_type"] = filament_type
+
+    # Machine section
+    mac_sec = None
+    for sn in sections:
+        if sn.startswith("machine:"):
+            mac_sec = sn
+            break
+    if mac_sec is None:
+        mac_sec = "machine:custom"
+        sections[mac_sec] = {}
+
+    ms = sections[mac_sec]
+    ms["nozzle_diameter"] = str(nozzle_diameter)
+    ms["bed_size"] = f"{bed_size_x},{bed_size_y}"
+    ms["max_print_height"] = str(max_print_height)
+
+    return _write_ini_sections(sections)

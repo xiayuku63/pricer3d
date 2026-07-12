@@ -76,3 +76,6 @@ class QuoteHistoryItem(BaseModel):
     infill: Optional[int] = None
     brand: Optional[str] = None
     cost_breakdown: Optional[dict] = None
+    slicer_fallback: Optional[bool] = None
+    slicer_error: Optional[str] = None
+    slicer_estimated_time_s: Optional[float] = None

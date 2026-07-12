@@ -1,0 +1,150 @@
+/* ════════════════════════════════════════════════════════════════════
+   Pricer3D Design Tokens — Colors
+   ════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ══════════════════════════════════════════════════════════════════
+     1. 色板 — Primary (iOS Blue #007AFF)
+     ══════════════════════════════════════════════════════════════════ */
+  --color-primary-50:   #E8F2FF;
+  --color-primary-100:  #C8E0FF;
+  --color-primary-200:  #A3CBFF;
+  --color-primary-300:  #7AB5FF;
+  --color-primary-400:  #4D9AFF;
+  --color-primary-500:  #007AFF;
+  --color-primary-600:  #0062CC;
+  --color-primary-700:  #004999;
+  --color-primary-800:  #003173;
+  --color-primary-900:  #001A3D;
+
+  /* 语义别名 */
+  --color-primary:         var(--color-primary-500);
+  --color-primary-hover:   var(--color-primary-600);
+  --color-primary-active:  var(--color-primary-700);
+  --color-primary-bg:      var(--color-primary-50);
+  --color-primary-border:  var(--color-primary-200);
+  --color-primary-text:    var(--color-primary-700);
+
+  /* ══════════════════════════════════════════════════════════════════
+     2. 色板 — Success (Green #34C759)
+     ══════════════════════════════════════════════════════════════════ */
+  --color-success-50:   #EBF9F0;
+  --color-success-100:  #C8F0D5;
+  --color-success-200:  #A3E3B9;
+  --color-success-300:  #7AD59B;
+  --color-success-400:  #55C77E;
+  --color-success-500:  #34C759;
+  --color-success-600:  #28A745;
+  --color-success-700:  #1E7E34;
+  --color-success-800:  #145522;
+  --color-success-900:  #0A2B11;
+
+  --color-success:        var(--color-success-500);
+  --color-success-hover:  var(--color-success-600);
+  --color-success-bg:     var(--color-success-50);
+  --color-success-border: var(--color-success-200);
+  --color-success-text:   var(--color-success-700);
+
+  /* ══════════════════════════════════════════════════════════════════
+     3. 色板 — Warning (Orange #FF9500)
+     ══════════════════════════════════════════════════════════════════ */
+  --color-warning-50:   #FFF3E0;
+  --color-warning-100:  #FFE0B2;
+  --color-warning-200:  #FFCC80;
+  --color-warning-300:  #FFB74D;
+  --color-warning-400:  #FFA726;
+  --color-warning-500:  #FF9500;
+  --color-warning-600:  #F57C00;
+  --color-warning-700:  #E65100;
+  --color-warning-800:  #BF360C;
+  --color-warning-900:  #871F00;
+
+  --color-warning:        var(--color-warning-500);
+  --color-warning-hover:  var(--color-warning-600);
+  --color-warning-bg:     var(--color-warning-50);
+  --color-warning-border: var(--color-warning-200);
+  --color-warning-text:   var(--color-warning-700);
+
+  /* ══════════════════════════════════════════════════════════════════
+     4. 色板 — Danger (Red #FF3B30)
+     ══════════════════════════════════════════════════════════════════ */
+  --color-danger-50:   #FFEBEE;
+  --color-danger-100:  #FFCDD2;
+  --color-danger-200:  #EF9A9A;
+  --color-danger-300:  #E57373;
+  --color-danger-400:  #EF5350;
+  --color-danger-500:  #FF3B30;
+  --color-danger-600:  #D32F2F;
+  --color-danger-700:  #B71C1C;
+  --color-danger-800:  #8B0000;
+  --color-danger-900:  #4A0000;
+
+  --color-danger:         var(--color-danger-500);
+  --color-danger-hover:   var(--color-danger-600);
+  --color-danger-bg:      var(--color-danger-50);
+  --color-danger-border:  var(--color-danger-100);
+  --color-danger-text:    var(--color-danger-700);
+
+  /* ══════════════════════════════════════════════════════════════════
+     5. 色板 — Info (Cyan #5AC8FA)
+     ══════════════════════════════════════════════════════════════════ */
+  --color-info-50:   #E4F0F5;
+  --color-info-100:  #BDD8E6;
+  --color-info-200:  #93BFD3;
+  --color-info-300:  #6BA6C2;
+  --color-info-400:  #4691B3;
+  --color-info-500:  #5AC8FA;
+  --color-info-600:  #00A2E8;
+  --color-info-700:  #007A9E;
+  --color-info-800:  #00526A;
+  --color-info-900:  #002938;
+
+  --color-info:         var(--color-info-500);
+  --color-info-bg:      var(--color-info-50);
+  --color-info-border:  var(--color-info-200);
+  --color-info-text:    var(--color-info-700);
+
+  /* ══════════════════════════════════════════════════════════════════
+     6. 色板 — Neutral (iOS Gray)
+     ══════════════════════════════════════════════════════════════════ */
+  --color-neutral-50:   #F2F2F7;
+  --color-neutral-100:  #E5E5EA;
+  --color-neutral-200:  #D1D1D6;
+  --color-neutral-300:  #C7C7CC;
+  --color-neutral-400:  #AEAEB2;
+  --color-neutral-500:  #8E8E93;
+  --color-neutral-600:  #636366;
+  --color-neutral-700:  #3A3A3C;
+  --color-neutral-800:  #1C1C1E;
+  --color-neutral-900:  #000000;
+
+  /* 页面级语义别名 */
+  --color-bg:                #F5F5F7;                    /* Apple-like app canvas */
+  --color-surface:           rgba(255, 255, 255, 0.82); /* 卡片/面板背景 */
+  --color-surface-hover:     rgba(255, 255, 255, 0.92); /* 卡片悬停背景 */
+
+  --color-bg-hover:          rgba(255, 255, 255, 0.72);  /* 通用悬停背景 */
+  --color-bg-active:         #EAEAEE;                    /* 通用按下背景 */
+
+  --color-border:            rgba(15, 23, 42, 0.08);     /* 常规边框 */
+  --color-border-input:      rgba(15, 23, 42, 0.12);     /* 输入框边框 */
+  --color-border-strong:     rgba(15, 23, 42, 0.16);     /* 强调边框 */
+
+  --color-text-muted:        var(--color-neutral-500);   /* 次要文本 #8E8E93 */
+  --color-text-secondary:    var(--color-neutral-600);   /* 辅助文本 #636366 */
+  --color-text:              var(--color-neutral-700);   /* 正文 #3A3A3C */
+  --color-text-strong:       var(--color-neutral-800);   /* 标题/高对比 #1C1C1E */
+  --color-heading:           var(--color-neutral-800);   /* 标题 */
+  --color-heading-light:     var(--color-neutral-900);   /* 黑色标题（极少用） */
+
+  --color-disabled-bg:       var(--color-neutral-100);   /* 禁用背景 */
+  --color-disabled-text:     var(--color-neutral-400);   /* 禁用文本 */
+  --color-placeholder:       var(--color-neutral-300);   /* 占位文本 */
+
+  /* ══════════════════════════════════════════════════════════════════
+     7. 覆盖/遮罩层
+     ══════════════════════════════════════════════════════════════════ */
+  --color-overlay:           rgba(15, 23, 42, 0.22);     /* 弹窗遮罩 */
+  --color-overlay-light:     rgba(15, 23, 42, 0.05);     /* 行悬停轻遮罩 */
+  --color-overlay-dark:      rgba(13, 17, 23, 0.62);     /* 登录弹窗深色遮罩 */
+}

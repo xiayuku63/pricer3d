@@ -145,6 +145,9 @@ class QuoteHistory(Base):
     infill = Column(Integer)
     brand = Column(String(40))
     cost_breakdown = Column(Text)
+    slicer_fallback = Column(Integer, default=0)
+    slicer_error = Column(Text, nullable=True)
+    slicer_estimated_time_s = Column(Float, nullable=True)
 
 
 class PaymentOrder(Base):

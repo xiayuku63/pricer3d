@@ -6,15 +6,17 @@ from typing import Optional
 
 from fastapi import HTTPException, Request
 
+from fastapi import Depends
+
 from app.audit import write_audit_event
 from app.db import get_db_session
-from app.deps import get_membership_effective, is_member_user
+from app.deps import get_current_user, get_membership_effective, is_member_user
 from app.models_orm import QuoteHistory
 
 logger = logging.getLogger(__name__)
 
 
-def quote_history(limit: int = 20, offset: int = 0, current_user: dict = None):
+def quote_history(limit: int = 20, offset: int = 0, current_user=Depends(get_current_user)):
     """Get quote history for current user."""
     safe_limit = max(1, min(int(limit), 100))
     safe_offset = max(0, int(offset))
@@ -59,7 +61,7 @@ def quote_history(limit: int = 20, offset: int = 0, current_user: dict = None):
     return {"items": items, "total": total, "limit": safe_limit, "offset": safe_offset}
 
 
-def delete_quote_history(id: int, request: Request, current_user: dict = None):
+def delete_quote_history(id: int, request: Request, current_user=Depends(get_current_user)):
     """Delete a single quote history record by id."""
     uid = int(current_user["id"])
     try:
@@ -86,7 +88,7 @@ def delete_quote_history(id: int, request: Request, current_user: dict = None):
         raise HTTPException(status_code=500, detail=f"删除失败: {str(e)}")
 
 
-def clear_quote_history(request: Request, current_user: dict = None):
+def clear_quote_history(request: Request, current_user=Depends(get_current_user)):
     """Delete all quote history records for the current user."""
     uid = int(current_user["id"])
     try:

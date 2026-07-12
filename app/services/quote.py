@@ -7,6 +7,7 @@ persistence. It is intentionally decoupled from HTTP request handling.
 import asyncio
 import json
 import logging
+import os
 import re
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -135,7 +136,7 @@ async def build_quote_payload(
                     _process_single_file_sync,
                     file, material, layer_height, infill, quantity, color,
                     user_materials, pricing_config, slicer_preset, wall_count, current_user,
-                    auto_orient, orient_x, orient_y, orient_z,
+                    auto_orient, orient_x, orient_y, orient_z, applied_orientation,
                 )
             except Exception as e:
                 fname = file.filename or "unknown"
@@ -220,13 +221,54 @@ def _process_single_file_sync(
     orient_x: Optional[float] = None,
     orient_y: Optional[float] = None,
     orient_z: Optional[float] = None,
+    applied_orientation: Optional[dict] = None,
 ):
-    """Synchronous wrapper for process_single_file — runs in thread pool."""
+    """Synchronous wrapper for process_single_file — runs in thread pool.
+
+    Resolves printer data from the app layer and passes it to the
+    calculator layer (keeping calculator free of ``from app`` imports).
+    """
+    # Build printer bed resolver + speed params from app layer
+    printer_model_id = pricing_config.get("printer_model") if pricing_config else None
+    printer_bed_resolver = None
+    speed_params_override = None
+    printer_profile_path = None
+    if printer_model_id:
+        try:
+            from app.printers import resolve_printer, PRINTER_MODELS
+            pm = resolve_printer(str(printer_model_id))
+            if pm:
+                printer_bed_resolver = {printer_model_id: pm}
+                printer_profile_path = os.path.join(
+                    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                    pm["profile"],
+                ) if pm.get("profile") else None
+
+            # Look up DB speed params
+            _base_printer_id = pm["id"] if pm else str(printer_model_id)
+            from app.db import get_db_session
+            from app.models_orm import PrinterParam
+            with get_db_session() as _db:
+                pp = _db.query(PrinterParam).filter(
+                    PrinterParam.printer_id == _base_printer_id
+                ).first()
+                if pp and pp.speed_enabled:
+                    speed_params_override = {
+                        "max_speed": float(pp.max_speed or 500),
+                        "max_acceleration": float(pp.max_acceleration or 10000),
+                        "jerk_limit": float(pp.jerk_limit or 0.04),
+                    }
+        except Exception:
+            logger.warning(f"Failed to resolve printer {printer_model_id} for dimension check")
+
     return asyncio.run(
         process_single_file(
             file, material, layer_height, infill, quantity, color,
             user_materials, pricing_config, slicer_preset, perimeters, current_user,
-            auto_orient, orient_x, orient_y, orient_z,
+            auto_orient, orient_x, orient_y, orient_z, applied_orientation,
+            printer_bed_resolver=printer_bed_resolver,
+            speed_params_override=speed_params_override,
+            printer_profile_path=printer_profile_path,
         )
     )
 
