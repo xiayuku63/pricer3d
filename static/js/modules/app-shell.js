@@ -84,9 +84,39 @@ export function initColorDropdownUI({ quoteOptions, currentResults, selectedFile
             });
             if (wasHidden) {
                 list.classList.remove('hidden');
+                // Reset "more colors" when opening
+                const extra = wrapper.querySelector('.color-dd-extra');
+                if (extra) extra.classList.add('hidden');
+                const toggleMore = wrapper.querySelector('.color-dd-toggle-more');
+                if (toggleMore) {
+                    const chevron = toggleMore.querySelector('svg');
+                    if (chevron) chevron.style.transform = '';
+                }
                 positionColorList(trigger, list, wrapper);
             } else {
                 closeColorList(list);
+            }
+            return;
+        }
+
+        const toggleMore = e.target.closest('.color-dd-toggle-more');
+        if (toggleMore) {
+            e.stopPropagation();
+            const wrapper = toggleMore.closest('.color-dd-wrapper');
+            if (!wrapper) return;
+            const extra = wrapper.querySelector('.color-dd-extra');
+            if (!extra) return;
+            const isOpen = !extra.classList.contains('hidden');
+            if (isOpen) {
+                extra.classList.add('hidden');
+                const chevron = toggleMore.querySelector('svg');
+                if (chevron) chevron.style.transform = '';
+            } else {
+                extra.classList.remove('hidden');
+                const chevron = toggleMore.querySelector('svg');
+                if (chevron) chevron.style.transform = 'rotate(180deg)';
+                const list = wrapper.querySelector('.color-dd-list');
+                if (list) positionColorList(wrapper.querySelector('.color-dd-trigger'), list, wrapper);
             }
             return;
         }
@@ -104,8 +134,27 @@ export function initColorDropdownUI({ quoteOptions, currentResults, selectedFile
         if (swatch) swatch.style.background = hex;
         const label = wrapper.querySelector('.color-dd-label');
         if (label) label.textContent = hex;
+        // Close list after selecting
         const list = wrapper.querySelector('.color-dd-list');
         if (list) closeColorList(list);
+
+        // Reset "more colors" for next open
+        const extra = wrapper.querySelector('.color-dd-extra');
+        if (extra) extra.classList.add('hidden');
+        const toggleMore = wrapper.querySelector('.color-dd-toggle-more');
+        if (toggleMore) {
+            const chevron = toggleMore.querySelector('svg');
+            if (chevron) chevron.style.transform = '';
+        }
+
+        // If "more colors" was open, reset it for next open
+        const extraSection = wrapper.querySelector('.color-dd-extra');
+        if (extraSection) extraSection.classList.add('hidden');
+        const toggleMore = wrapper.querySelector('.color-dd-toggle-more');
+        if (toggleMore) {
+            toggleMore.querySelector('.color-dd-extra-hidden')?.classList.remove('hidden');
+            toggleMore.querySelector('.color-dd-extra-visible')?.classList.add('hidden');
+        }
 
         if (wrapper.closest('#options-modal')) {
             quoteOptions.color = hex;
