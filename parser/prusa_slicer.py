@@ -60,20 +60,34 @@ def prusa_executable() -> Optional[str]:
     _env = os.getenv("PRUSA_EXECUTABLE", "").strip()
     if _env:
         if _env.startswith("wsl ") or _env.startswith("wsl.exe "):
-            return _env  # WSL passthrough: "wsl prusa-slicer" or "wsl.exe prusa-slicer"
-        if os.path.isfile(_env):
+            # WSL passthrough is only valid on Windows
+            if _sys.platform == "win32":
+                return _env  # WSL passthrough: "wsl prusa-slicer" or "wsl.exe prusa-slicer"
+            logger.warning(
+                "PRUSA_EXECUTABLE='%s' but platform is '%s' — ignoring, will auto-detect",
+                _env, _sys.platform,
+            )
+            _env = ""  # fall through to auto-detection
+        elif os.path.isfile(_env):
             return _env
     _env_file = _env_file_prusa_executable().strip()
     if _env_file:
         if _env_file.startswith("wsl ") or _env_file.startswith("wsl.exe "):
-            return _env_file
-        if os.path.isfile(_env_file):
+            if _sys.platform == "win32":
+                return _env_file
+            logger.warning("Ignoring WSL path from .env file on %s platform", _sys.platform)
+            _env_file = ""
+        elif os.path.isfile(_env_file):
             return _env_file
     # Linux: apt installs to /usr/bin/prusa-slicer
     if _sys.platform != "win32":
         _p = "/usr/bin/prusa-slicer"
         if os.path.isfile(_p):
             return _p
+    # Docker: AppImage installed at /usr/local/bin/prusa-slicer
+    _p_docker = "/usr/local/bin/prusa-slicer"
+    if os.path.isfile(_p_docker):
+        return _p_docker
     # PATH-based lookup
     for _name in ("prusa-slicer", "prusa-slicer-console", "prusaslicer", "prusaslicer-console"):
         _c = shutil.which(_name)
@@ -81,7 +95,6 @@ def prusa_executable() -> Optional[str]:
             return _c
     # Well-known paths
     for _p in (
-        "/usr/local/bin/prusa-slicer",
         "/snap/bin/prusa-slicer",
         "C:/Program Files/Prusa3D/PrusaSlicer/prusa-slicer-console.exe",
         "C:/Program Files/Prusa3D/PrusaSlicer/prusa-slicer.exe",
@@ -493,32 +506,76 @@ def run_prusa_slice(
     if slicer_preset and slicer_preset.get("name"):
         preset_label = str(slicer_preset["name"])
 
-    cmd = shlex.split(exe) + [
+    # ── Detect WSL passthrough and translate paths ──
+    cmd_parts = shlex.split(exe)
+    _is_wsl = cmd_parts and cmd_parts[0] in ("wsl", "wsl.exe")
+
+    def _wsl_path(p: str) -> str:
+        """Translate a Windows path to a WSL path (/mnt/c/...)."""
+        if not _is_wsl:
+            return p
+        import sys as _sys
+
+        if _sys.platform == "win32":
+            # Resolve relative paths against the project root
+            p = os.path.abspath(p)
+            # Convert D:\... to /mnt/d/...
+            p = p.replace("\\", "/")
+            if len(p) >= 2 and p[1] == ":":
+                drive = p[0].lower()
+                return f"/mnt/{drive}{p[2:]}"
+        return p
+
+    cmd = cmd_parts + [
         "--ignore-nonexistent-config",
         "--load",
-        config_path,
-        "--headless",
+        _wsl_path(config_path),
+    ]
+    # WSL prusa-slicer (2.8.x) does not support --headless
+    if not _is_wsl:
+        cmd.append("--headless")
+    cmd.extend([
         "--export-gcode",
         "--output",
-        output_gcode_path,
-    ]
+        _wsl_path(output_gcode_path),
+    ])
     if enable_supports:
         cmd.append("--support-material")
         cmd.append("--support-material-style=organic")
-    cmd.append(model_path)
+    cmd.append(_wsl_path(model_path))
 
     logger.info(
         f"PrusaSlicer: preset={preset_label} model={os.path.basename(model_path)} profile={printer_profile_path or 'none'}"
     )
+    logger.debug(f"PrusaSlicer command: {' '.join(cmd)}")
 
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=_SLICE_TIMEOUT)
-        stdout = (proc.stdout or "").strip()
-        stderr = (proc.stderr or "").strip()
+        # WSL stderr may contain UTF-16LE proxy warnings mixed with
+        # UTF-8 program output → read as bytes, decode robustly
+        proc = subprocess.run(cmd, capture_output=True, text=False, timeout=_SLICE_TIMEOUT)
+
+        def _safe_decode(data: bytes) -> str:
+            if not data:
+                return ""
+            try:
+                return data.decode("utf-8")
+            except UnicodeDecodeError:
+                # Strip null bytes (from WSL UTF-16LE proxy warnings)
+                # then decode remaining ASCII/UTF-8 content
+                return data.replace(b"\x00", b"").decode("utf-8", errors="replace").strip()
+
+        stdout = _safe_decode(proc.stdout).strip()
+        stderr = _safe_decode(proc.stderr).strip()
 
         if proc.returncode != 0 and not os.path.exists(output_gcode_path):
-            error_msg = stderr or stdout or f"exit code {proc.returncode}"
-            raise RuntimeError(f"PrusaSlicer failed: {error_msg[:200]}")
+            # Check WSL path variant if using WSL
+            if _is_wsl and not os.path.exists(output_gcode_path):
+                _wsl_alt = _wsl_path(output_gcode_path)
+                if os.path.exists(_wsl_alt):
+                    output_gcode_path = _wsl_alt
+            if not os.path.exists(output_gcode_path):
+                error_msg = stderr or stdout or f"exit code {proc.returncode}"
+                raise RuntimeError(f"PrusaSlicer failed: {error_msg[:400]}")
 
         if stderr:
             logger.debug(f"PrusaSlicer stderr: {stderr[:200]}")

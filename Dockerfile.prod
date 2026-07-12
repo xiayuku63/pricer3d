@@ -6,7 +6,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     wget \
     logrotate \
+    libfuse2t64 \
     && rm -rf /var/lib/apt/lists/*
+
+# Force AppImage extraction mode — FUSE mount does not work inside Docker
+ENV APPIMAGE_EXTRACT_AND_RUN=1
 
 # Install PrusaSlicer CLI from GitHub Release AppImage
 # Note: Prusa3D stopped shipping Linux AppImage starting from v2.9.3,
