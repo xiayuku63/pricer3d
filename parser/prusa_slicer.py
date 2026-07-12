@@ -65,7 +65,8 @@ def prusa_executable() -> Optional[str]:
                 return _env  # WSL passthrough: "wsl prusa-slicer" or "wsl.exe prusa-slicer"
             logger.warning(
                 "PRUSA_EXECUTABLE='%s' but platform is '%s' — ignoring, will auto-detect",
-                _env, _sys.platform,
+                _env,
+                _sys.platform,
             )
             _env = ""  # fall through to auto-detection
         elif os.path.isfile(_env):
@@ -534,11 +535,13 @@ def run_prusa_slice(
     # WSL prusa-slicer (2.8.x) does not support --headless
     if not _is_wsl:
         cmd.append("--headless")
-    cmd.extend([
-        "--export-gcode",
-        "--output",
-        _wsl_path(output_gcode_path),
-    ])
+    cmd.extend(
+        [
+            "--export-gcode",
+            "--output",
+            _wsl_path(output_gcode_path),
+        ]
+    )
     if enable_supports:
         cmd.append("--support-material")
         cmd.append("--support-material-style=organic")
