@@ -64,14 +64,14 @@ const DEFAULT_COLORS = [
 ];
 
 export let MATERIAL_OPTIONS = [
-    { name: "PLA", brand: "Generic", density: 1.24, price_per_kg: 69.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
-    { name: "PLA+", brand: "Generic", density: 1.24, price_per_kg: 75.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
-    { name: "PETG", brand: "Generic", density: 1.27, price_per_kg: 100.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
-    { name: "ABS", brand: "Generic", density: 1.04, price_per_kg: 85.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
-    { name: "ASA", brand: "Generic", density: 1.07, price_per_kg: 120.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
-    { name: "TPU", brand: "Generic", density: 1.21, price_per_kg: 130.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
-    { name: "PA", brand: "Generic", density: 1.14, price_per_kg: 200.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
-    { name: "PC", brand: "Generic", density: 1.20, price_per_kg: 180.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
+    { name: "PLA", brand: "Generic", density: 1.24, price_per_kg: 59.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
+    { name: "PLA+", brand: "Generic", density: 1.24, price_per_kg: 64.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
+    { name: "PETG", brand: "Generic", density: 1.27, price_per_kg: 85.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
+    { name: "ABS", brand: "Generic", density: 1.04, price_per_kg: 72.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
+    { name: "ASA", brand: "Generic", density: 1.07, price_per_kg: 102.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
+    { name: "TPU", brand: "Generic", density: 1.21, price_per_kg: 111.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
+    { name: "PA", brand: "Generic", density: 1.14, price_per_kg: 170.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
+    { name: "PC", brand: "Generic", density: 1.20, price_per_kg: 153.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
 ];
 
 /** 材料类型预设（密度 + 参考单价） */
