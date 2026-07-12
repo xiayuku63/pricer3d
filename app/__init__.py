@@ -40,6 +40,18 @@ async def lifespan(app: FastAPI):
         logger.warning("startup: failed to restore rate limiter state: %s", e)
     logger.info("pricer3d startup complete, env=%s", APP_ENV)
 
+    # Log PrusaSlicer availability for diagnostics
+    try:
+        from parser.prusa_slicer import prusa_executable_diagnostics
+
+        diag = prusa_executable_diagnostics()
+        if diag["found"]:
+            logger.info("PrusaSlicer: found path=%s version=%s", diag["path"], str(diag.get("version", "?")))
+        else:
+            logger.warning("PrusaSlicer: NOT FOUND — falling back to formula estimation")
+    except Exception as e:
+        logger.warning("PrusaSlicer diagnostics error: %s", e)
+
     yield  # App runs here
 
     # Shutdown
