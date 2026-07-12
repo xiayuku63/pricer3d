@@ -151,7 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ═══════════════════════════════════════════════
 
     // Auth - form events are wired by _wireLoginForm() in auth.js init
-    _bind(dom.openLoginBtn, 'click', openLoginModal);
+    _bind(dom.openLoginBtn, 'click', () => openLoginModal(dom));
 
     // Language switcher
     const langSwitchBtn = document.getElementById('lang-switch-btn');
