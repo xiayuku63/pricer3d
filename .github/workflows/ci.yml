@@ -119,7 +119,7 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}  # xiayuku63
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: ${{ secrets.DEPLOY_PORT || 22 }}
-          script_stop: true
+          timeout: 600s
           command_timeout: 10m
           script: |
             set -euo pipefail
