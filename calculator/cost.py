@@ -511,6 +511,9 @@ async def process_single_file(
     perimeters: Optional[int] = None,
     current_user: Optional[dict] = None,
     auto_orient: bool = False,
+    orient_x: Optional[float] = None,
+    orient_y: Optional[float] = None,
+    orient_z: Optional[float] = None,
 ):
     from app.config import SUPPORTED_EXTENSIONS, MAX_FILE_SIZE_BYTES
     from app.utils import _sanitize_filename_component, _user_base_dir, _date_folder_utc
@@ -547,6 +550,30 @@ async def process_single_file(
         model_saved_path = os.path.join(uploads_day_dir, saved_name)
         with open(model_saved_path, "wb") as f:
             f.write(bytes(file_content))
+
+        # ── 应用用户指定的朝向 (orient_x/y/z) ──
+        if any(v is not None for v in [orient_x, orient_y, orient_z]):
+            try:
+                import trimesh as _tm
+                import numpy as _np
+                mobj = _tm.load(model_saved_path, force="mesh")
+                if isinstance(mobj, _tm.Scene):
+                    mobj = _tm.util.concatenate(mobj.dump())
+                if isinstance(mobj, _tm.Trimesh) and mobj.vertices.shape[0] > 0:
+                    rx = _np.deg2rad(orient_x or 0)
+                    ry = _np.deg2rad(orient_y or 0)
+                    rz = _np.deg2rad(orient_z or 0)
+                    from scipy.spatial.transform import Rotation as _R
+                    r = _R.from_euler("xyz", [rx, ry, rz])
+                    Rmat = _np.eye(4)
+                    Rmat[:3, :3] = r.as_matrix()
+                    mobj.apply_transform(Rmat)
+                    mobj.export(model_saved_path)
+                    logger.info("应用指定朝向: x=%.1f y=%.1f z=%.1f", orient_x or 0, orient_y or 0, orient_z or 0)
+                    # 已手动旋转，关掉后续 auto_orient 避免双重摆放
+                    auto_orient = False
+            except Exception as _e:
+                logger.warning("应用朝向失败: %s", _e)
 
         volume, surface_area, dimensions = calculate_geometry(model_saved_path)
         if volume == 0:

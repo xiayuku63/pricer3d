@@ -73,3 +73,84 @@ def init_orm() -> None:
     """Create all tables from ORM models. Safe to call repeatedly."""
     from . import models_orm  # noqa — ensure models are registered
     Base.metadata.create_all(bind=engine)
+
+
+# ── Timestamp TypeDecorators ──
+# SQLite stores timestamps as strings, but we want proper datetime/float
+# in Python. These TypeDecorators convert transparently at the ORM layer
+# without altering the database schema.
+
+import datetime as _dt
+from sqlalchemy.types import TypeDecorator, DateTime, Float
+
+
+class UTCDateTime(TypeDecorator):
+    """Read/write ISO-8601 strings as timezone-aware datetime objects.
+
+    impl=DateTime(timezone=True) causes SQLAlchemy to bind the Python type
+    correctly while keeping the column as TEXT in the DB. The process_result_value
+    hook ensures datetime objects are always tz-aware.
+    """
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        if isinstance(value, str):
+            try:
+                return _dt.datetime.fromisoformat(value)
+            except ValueError:
+                try:
+                    return _dt.datetime.fromtimestamp(float(value), tz=_dt.timezone.utc)
+                except (ValueError, TypeError):
+                    return value  # last resort
+        if isinstance(value, (int, float)):
+            return _dt.datetime.fromtimestamp(value, tz=_dt.timezone.utc)
+        if hasattr(value, "isoformat"):
+            return value
+        return value
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        if isinstance(value, _dt.datetime):
+            if value.tzinfo is None:
+                return value.replace(tzinfo=_dt.timezone.utc)
+            return value
+        if isinstance(value, str):
+            try:
+                dt = _dt.datetime.fromisoformat(value)
+            except ValueError:
+                return value
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=_dt.timezone.utc)
+            return dt
+        return value
+
+
+class UnixTimestamp(TypeDecorator):
+    """Read/write Unix epoch floats as Python float.
+
+    impl=Float keeps the DB column as REAL; process_bind/result handle
+    string→float conversion transparently.
+    """
+    impl = Float
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str):
+            try:
+                return float(value)
+            except ValueError:
+                return float(_dt.datetime.fromisoformat(value).timestamp())
+        return float(value)
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        return float(value)

@@ -1,14 +1,14 @@
             <!-- ZIP 上传预览确认弹窗 -->
             <div id="zip-preview-modal" class="hidden fixed inset-0 z-50">
-                <div id="zip-preview-backdrop" class="absolute inset-0 bg-black/50"></div>
+                <div id="zip-preview-backdrop" class="absolute inset-0" style="background-color: var(--color-overlay);"></div>
                 <div class="relative z-10 h-full w-full flex items-end sm:items-center justify-center p-0 sm:p-4">
-                    <div id="zip-preview-panel" class="w-full sm:max-w-2xl bg-white rounded-t-2xl sm:rounded-lg sm:shadow-xl overflow-hidden max-h-[90dvh] sm:max-h-[90vh] flex flex-col transform translate-y-full sm:translate-y-0 transition-transform duration-300 ease-out">
-                        <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
+                    <div id="zip-preview-panel" class="w-full sm:max-w-2xl tw-card rounded-t-2xl sm:rounded-lg sm:shadow-xl overflow-hidden max-h-[90dvh] sm:max-h-[90vh] flex flex-col transform translate-y-full sm:translate-y-0 transition-transform duration-300 ease-out">
+                        <div class="px-4 py-3 flex items-center justify-between flex-shrink-0" style="border-bottom: 1px solid var(--color-border);">
                             <div class="flex items-center gap-2">
-                                <div class="w-8 h-1 bg-gray-300 rounded-full sm:hidden mx-auto mb-1 absolute left-1/2 -translate-x-1/2 top-2"></div>
-                                <h4 class="text-base sm:text-sm font-semibold text-gray-800" data-i18n="zipPreview.title">ZIP 文件预览</h4>
+                                <div class="w-8 h-1 rounded-full sm:hidden mx-auto mb-1 absolute left-1/2 -translate-x-1/2 top-2" style="background-color: var(--color-neutral-300);"></div>
+                                <h4 class="text-base sm:text-sm font-semibold tw-text-strong" data-i18n="zipPreview.title">ZIP 文件预览</h4>
                             </div>
-                            <button id="zip-preview-close-btn" type="button" class="text-gray-500 hover:text-gray-700 min-h-[44px] min-w-[44px] flex items-center justify-center" data-i18n="common.close">关闭</button>
+                            <button id="zip-preview-close-btn" type="button" class="tw-text-muted hover:tw-text min-h-[44px] min-w-[44px] flex items-center justify-center" data-i18n="common.close">关闭</button>
                         </div>
                         <div class="p-4 space-y-4 overflow-y-auto flex-1 overscroll-contain">
                             <!-- 匹配摘要 -->
@@ -18,56 +18,54 @@
 
                             <!-- 清单中有但无对应模型 (BOM only) -->
                             <div id="zip-preview-bom-only" class="hidden">
-                                <h5 class="text-sm font-semibold text-red-700 mb-1.5 flex items-center gap-1">
-                                    <span class="inline-block w-2 h-2 rounded-full bg-red-500"></span>
+                                <h5 class="text-sm font-semibold mb-1.5 flex items-center gap-1" style="color: var(--color-danger-text);">
+                                    <span class="inline-block w-2 h-2 rounded-full" style="background-color: var(--color-danger);"></span>
                                     <span data-i18n="zipPreview.bomOnlyTitle">清单中有但无对应模型</span>
-                                    <span id="zip-preview-bom-count" class="text-xs font-normal text-red-500"></span>
+                                    <span id="zip-preview-bom-count" class="text-xs font-normal" style="color: var(--color-danger);"></span>
                                 </h5>
-                                <div class="bg-red-50 border border-red-200 rounded-lg overflow-hidden">
+                                <div class="rounded-lg overflow-hidden" style="background-color: var(--color-danger-bg); border: 1px solid var(--color-danger-border);">
                                     <table class="w-full text-xs">
-                                        <thead class="bg-red-100 text-red-800">
+                                        <thead style="background-color: var(--color-danger-100); color: var(--color-danger-text);">
                                             <tr>
                                                 <th class="px-3 py-1.5 text-left" data-i18n="quote.filename">文件名</th>
                                                 <th class="px-3 py-1.5 text-left" data-i18n="zipPreview.reason">原因</th>
                                             </tr>
                                         </thead>
-                                        <tbody id="zip-preview-bom-body" class="divide-y divide-red-100">
-                                        </tbody>
+                                        <tbody id="zip-preview-bom-body"></tbody>
                                     </table>
                                 </div>
                             </div>
 
                             <!-- 模型不在清单中 (model only) -->
                             <div id="zip-preview-model-only" class="hidden">
-                                <h5 class="text-sm font-semibold text-amber-700 mb-1.5 flex items-center gap-1">
-                                    <span class="inline-block w-2 h-2 rounded-full bg-amber-500"></span>
+                                <h5 class="text-sm font-semibold mb-1.5 flex items-center gap-1" style="color: var(--color-warning-text);">
+                                    <span class="inline-block w-2 h-2 rounded-full" style="background-color: var(--color-warning);"></span>
                                     <span data-i18n="zipPreview.modelOnlyTitle">模型不在清单中</span>
-                                    <span id="zip-preview-model-count" class="text-xs font-normal text-amber-500"></span>
+                                    <span id="zip-preview-model-count" class="text-xs font-normal" style="color: var(--color-warning);"></span>
                                 </h5>
-                                <div class="bg-amber-50 border border-amber-200 rounded-lg overflow-hidden">
+                                <div class="rounded-lg overflow-hidden" style="background-color: var(--color-warning-bg); border: 1px solid var(--color-warning-border);">
                                     <table class="w-full text-xs">
-                                        <thead class="bg-amber-100 text-amber-800">
+                                        <thead style="background-color: var(--color-warning-100); color: var(--color-warning-text);">
                                             <tr>
                                                 <th class="px-3 py-1.5 text-left" data-i18n="quote.filename">文件名</th>
                                                 <th class="px-3 py-1.5 text-left" data-i18n="zipPreview.reason">原因</th>
                                             </tr>
                                         </thead>
-                                        <tbody id="zip-preview-model-body" class="divide-y divide-amber-100">
-                                        </tbody>
+                                        <tbody id="zip-preview-model-body"></tbody>
                                     </table>
                                 </div>
                             </div>
 
                             <!-- 已匹配列表 (matched) -->
                             <div id="zip-preview-matched" class="hidden">
-                                <h5 class="text-sm font-semibold text-green-700 mb-1.5 flex items-center gap-1">
-                                    <span class="inline-block w-2 h-2 rounded-full bg-green-500"></span>
+                                <h5 class="text-sm font-semibold mb-1.5 flex items-center gap-1" style="color: var(--color-success-text);">
+                                    <span class="inline-block w-2 h-2 rounded-full" style="background-color: var(--color-success);"></span>
                                     <span data-i18n="zipPreview.matchedTitle">已匹配</span>
-                                    <span id="zip-preview-matched-count" class="text-xs font-normal text-green-500"></span>
+                                    <span id="zip-preview-matched-count" class="text-xs font-normal" style="color: var(--color-success);"></span>
                                 </h5>
-                                <div class="bg-green-50 border border-green-200 rounded-lg overflow-hidden">
+                                <div class="rounded-lg overflow-hidden" style="background-color: var(--color-success-bg); border: 1px solid var(--color-success-border);">
                                     <table class="w-full text-xs">
-                                        <thead class="bg-green-100 text-green-800">
+                                        <thead style="background-color: var(--color-success-100); color: var(--color-success-text);">
                                             <tr>
                                                 <th class="px-3 py-1.5 text-left" data-i18n="quote.filename">文件名</th>
                                                 <th class="px-3 py-1.5 text-left" data-i18n="quote.material">材料</th>
@@ -75,16 +73,15 @@
                                                 <th class="px-3 py-1.5 text-left" data-i18n="quote.quantity">数量</th>
                                             </tr>
                                         </thead>
-                                        <tbody id="zip-preview-matched-body" class="divide-y divide-green-100">
-                                        </tbody>
+                                        <tbody id="zip-preview-matched-body"></tbody>
                                     </table>
                                 </div>
                             </div>
                         </div>
                         <!-- 底部按钮 -->
-                        <div class="px-6 pt-4 pb-5 border-t border-gray-200 flex items-center justify-end gap-3 flex-shrink-0">
-                            <button id="zip-preview-cancel-btn" type="button" class="px-4 py-2.5 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 min-h-[44px]" data-i18n="common.cancel">取消</button>
-                            <button id="zip-preview-confirm-btn" type="button" class="px-5 py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 min-h-[44px]" data-i18n="zipPreview.confirmSlice">确认切片</button>
+                        <div class="px-6 pt-4 pb-5 flex items-center justify-end gap-3 flex-shrink-0" style="border-top: 1px solid var(--color-border);">
+                            <button id="zip-preview-cancel-btn" type="button" class="px-4 py-2.5 rounded-lg text-sm font-medium min-h-[44px]" style="border: 1px solid var(--color-border-strong); color: var(--color-text);" data-i18n="common.cancel">取消</button>
+                            <button id="zip-preview-confirm-btn" type="button" class="tw-btn-primary px-5 py-2.5 rounded-lg text-sm font-medium min-h-[44px]" data-i18n="zipPreview.confirmSlice">确认切片</button>
                         </div>
                     </div>
                 </div>
@@ -92,19 +89,19 @@
 
 <!-- 离开确认弹窗 -->
 <div id="leave-confirm-modal" class="hidden fixed inset-0 z-[60]">
-    <div class="absolute inset-0 bg-black/50"></div>
+    <div class="absolute inset-0" style="background-color: var(--color-overlay);"></div>
     <div class="relative z-10 h-full w-full flex items-end sm:items-center justify-center p-0 sm:p-4">
-        <div class="w-full sm:max-w-sm bg-white rounded-t-2xl sm:rounded-lg sm:shadow-xl overflow-hidden">
+        <div class="w-full sm:max-w-sm tw-card rounded-t-2xl sm:rounded-lg sm:shadow-xl overflow-hidden">
             <div class="px-6 pt-5 pb-2 text-center">
-                <div class="mx-auto w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mb-3">
-                    <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+                <div class="mx-auto w-12 h-12 rounded-full flex items-center justify-center mb-3" style="background-color: var(--color-warning-bg);">
+                    <svg class="w-6 h-6" style="color: var(--color-warning);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
                 </div>
-                <h4 class="text-base font-semibold text-gray-800 mb-1">确认离开？</h4>
-                <p class="text-sm text-gray-500">您有未保存的文件，离开后将丢失</p>
+                <h4 class="text-base font-semibold tw-text-strong mb-1">确认离开？</h4>
+                <p class="text-sm tw-text-muted">您有未保存的文件，离开后将丢失</p>
             </div>
             <div class="px-6 pt-3 pb-5 flex items-center gap-3">
-                <button id="leave-confirm-cancel" type="button" class="flex-1 px-4 py-2.5 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50">取消</button>
-                <button id="leave-confirm-ok" type="button" class="flex-1 px-4 py-2.5 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700">确认离开</button>
+                <button id="leave-confirm-cancel" type="button" class="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium" style="border: 1px solid var(--color-border-strong); color: var(--color-text);">取消</button>
+                <button id="leave-confirm-ok" type="button" class="tw-btn-danger flex-1 px-4 py-2.5 rounded-lg text-sm font-medium">确认离开</button>
             </div>
         </div>
     </div>

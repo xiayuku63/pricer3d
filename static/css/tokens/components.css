@@ -1,0 +1,351 @@
+/* ════════════════════════════════════════════════════════════════════
+   Pricer3D Design Tokens — Component Classes
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ── 全局主题过渡动画 ── */
+body,
+.tw-card,
+.tw-input,
+button,
+input,
+select,
+textarea,
+[style*="background-color"],
+[style*="background"],
+.bg-white,
+.bg-gray-50,
+.bg-gray-100,
+.bg-gray-200 {
+  transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease, backdrop-filter 0.25s ease;
+}
+
+body {
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  background:
+    radial-gradient(circle at top left, rgba(0, 122, 255, 0.10), transparent 26%),
+    radial-gradient(circle at top right, rgba(90, 200, 250, 0.12), transparent 22%),
+    linear-gradient(180deg, #fbfbfd 0%, #f5f5f7 40%, #f2f2f7 100%);
+}
+
+/* ── 按钮风格预设 ── */
+.tw-btn-primary {
+  background-color: var(--color-primary) !important;
+  color: #FFFFFF !important;
+  border-radius: var(--radius-lg) !important;
+  font-weight: var(--weight-medium) !important;
+  box-shadow: 0 10px 24px rgba(0, 122, 255, 0.22);
+  transition: background-color var(--transition-fast) !important;
+}
+.tw-btn-primary:hover {
+  background-color: var(--color-primary-hover) !important;
+  transform: translateY(-1px);
+}
+.tw-btn-primary:active {
+  background-color: var(--color-primary-active) !important;
+  transform: translateY(0);
+}
+
+.tw-btn-secondary {
+  background-color: rgba(255, 255, 255, 0.68) !important;
+  color: var(--color-primary) !important;
+  border: 1px solid rgba(0, 122, 255, 0.16) !important;
+  border-radius: var(--radius-lg) !important;
+  font-weight: var(--weight-medium) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  transition: background-color var(--transition-fast) !important;
+}
+.tw-btn-secondary:hover {
+  background-color: rgba(255, 255, 255, 0.86) !important;
+}
+
+.tw-btn-danger {
+  background-color: var(--color-danger) !important;
+  color: #FFFFFF !important;
+  border-radius: var(--radius-lg) !important;
+  font-weight: var(--weight-medium) !important;
+  box-shadow: 0 10px 24px rgba(255, 59, 48, 0.18);
+  transition: background-color var(--transition-fast) !important;
+}
+.tw-btn-danger:hover {
+  background-color: var(--color-danger-hover) !important;
+  transform: translateY(-1px);
+}
+
+/* ── 卡片风格 ── */
+.tw-card {
+  background-color: var(--color-surface);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+/* ── 输入框 Focus 环 ── */
+.tw-input {
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-lg);
+  background-color: rgba(255, 255, 255, 0.74);
+  color: var(--color-text);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+.tw-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  background-color: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.14);
+}
+
+/* ── 徽章风格 ── */
+.tw-badge-success {
+  background-color: var(--color-success-bg);
+  color: var(--color-success-text);
+  border: 1px solid var(--color-success-border);
+  border-radius: var(--radius-full);
+  padding: 1px 6px;
+  font-size: var(--text-tiny);
+  font-weight: var(--weight-medium);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.tw-badge-failed {
+  background-color: var(--color-danger-bg);
+  color: var(--color-danger-text);
+  border: 1px solid var(--color-danger-border);
+  border-radius: var(--radius-full);
+  padding: 1px 6px;
+  font-size: var(--text-tiny);
+  font-weight: var(--weight-medium);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.tw-badge-pending {
+  background-color: var(--color-warning-bg);
+  color: var(--color-warning-text);
+  border: 1px solid var(--color-warning-border);
+  border-radius: var(--radius-full);
+  padding: 1px 6px;
+  font-size: var(--text-tiny);
+  font-weight: var(--weight-medium);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ── 状态行 ── */
+.tw-row-success {
+  border-left: 3px solid var(--color-success) !important;
+}
+.tw-row-failed {
+  border-left: 3px solid var(--color-danger) !important;
+}
+.tw-row-pending {
+  border-left: 3px solid var(--color-warning) !important;
+}
+.tw-row-selected {
+  background-color: color-mix(in srgb, var(--color-primary-50) 60%, transparent) !important;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-primary) 30%, transparent) !important;
+}
+
+/* ── 文本预设 ── */
+.tw-text-primary {
+  color: var(--color-primary) !important;
+}
+.tw-text-success {
+  color: var(--color-success) !important;
+}
+.tw-text-warning {
+  color: var(--color-warning) !important;
+}
+.tw-text-danger {
+  color: var(--color-danger) !important;
+}
+.tw-text-muted {
+  color: var(--color-text-muted) !important;
+}
+.tw-text-heading {
+  color: var(--color-heading) !important;
+}
+.tw-text-strong {
+  color: var(--color-text-strong) !important;
+}
+.tw-text {
+  color: var(--color-text) !important;
+}
+.tw-text-secondary {
+  color: var(--color-text-secondary) !important;
+}
+
+/* ── 背景与交互状态预设 ── */
+.tw-bg-hover {
+  background-color: var(--color-bg-hover) !important;
+}
+.tw-bg-active {
+  background-color: var(--color-bg-active) !important;
+}
+.tw-bg-surface {
+  background-color: var(--color-surface) !important;
+}
+.tw-bg-primary {
+  background-color: var(--color-primary-bg) !important;
+}
+
+/* ── iOS 风格导航项 / 幽灵按钮 ── */
+.tw-btn-ghost {
+  background-color: transparent !important;
+  color: var(--color-text) !important;
+  border-radius: var(--radius-lg) !important;
+  transition: background-color var(--transition-fast) !important;
+}
+.tw-btn-ghost:hover {
+  background-color: rgba(255, 255, 255, 0.7) !important;
+}
+.tw-btn-ghost:active {
+  background-color: var(--color-bg-active) !important;
+}
+
+.apple-shell {
+  position: relative;
+}
+
+.apple-shell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.08));
+}
+
+.apple-hero {
+  position: relative;
+  z-index: 10;
+  overflow: visible;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.78), rgba(244, 247, 255, 0.74));
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow: var(--shadow-md);
+}
+
+.apple-hero::after {
+  content: '';
+  position: absolute;
+  inset: auto -12% -45% auto;
+  width: 280px;
+  height: 280px;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(0, 122, 255, 0.18) 0%, rgba(0, 122, 255, 0.05) 36%, transparent 68%);
+  pointer-events: none;
+}
+
+.apple-metric {
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  border-radius: 18px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.apple-toolbar {
+  background: linear-gradient(180deg, rgba(248, 250, 255, 0.92), rgba(240, 244, 252, 0.84));
+  border: 1px solid rgba(0, 122, 255, 0.12);
+  border-radius: 18px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+
+.apple-upload-zone {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 249, 252, 0.86));
+  border-radius: 24px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.apple-table-wrap {
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.apple-kicker {
+  letter-spacing: 0.08em;
+}
+
+.apple-muted-pill {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+.dark body {
+  background:
+    radial-gradient(circle at top left, rgba(59, 143, 255, 0.16), transparent 22%),
+    radial-gradient(circle at top right, rgba(0, 122, 255, 0.12), transparent 18%),
+    linear-gradient(180deg, #0f172a 0%, #101827 38%, #0b1220 100%);
+}
+
+.dark .apple-hero,
+.dark .apple-metric,
+.dark .apple-toolbar,
+.dark .apple-upload-zone,
+.dark .apple-table-wrap,
+.dark .apple-muted-pill {
+  border-color: rgba(94, 124, 168, 0.34);
+}
+
+#user-center-modal {
+  isolation: isolate;
+}
+
+#user-center-modal > .relative {
+  overflow: hidden;
+}
+
+#user-center-modal .max-w-5xl {
+  position: relative;
+  z-index: 1;
+}
+
+#user-center-modal .flex.flex-1.overflow-hidden {
+  min-height: 0;
+}
+
+#user-center-modal .flex-1.overflow-y-auto {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* ── 表格行/表头悬停 ── */
+.tw-hover-row {
+  transition: background-color var(--transition-fast) !important;
+}
+.tw-hover-row:hover {
+  background-color: var(--color-bg-hover) !important;
+}
+
+/* ── 全局禁用文本选择（App-like 体验） ── */
+body, button, a, label, span, div, p, h1, h2, h3, h4, h5, h6, li, td, th, nav, header, footer, section, article, aside, figcaption, strong, em, small {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* 保留可编辑区域、输入框、代码区的文本选择 */
+input, textarea, select, [contenteditable="true"], code, pre, .allow-select {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
+/* ── 变量字典表格文字颜色 ── */
+#formula-vars-panel td {
+  color: var(--color-text);
+}
+
+/* ── 报价表格文字颜色 ── */
+table.min-w-full.text-\\[11px\\] tbody td {
+  color: var(--color-text);
+}

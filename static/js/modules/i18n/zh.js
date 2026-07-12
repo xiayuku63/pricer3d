@@ -38,6 +38,7 @@ export default {
   'common.id': 'ID',
   'common.name': '名称',
   'common.format': '格式',
+  'common.index': '序号',
   'common.requestFailed': '请求失败',
   'common.membershipService': '会员服务',
   'common.userCenter': '用户中心',
@@ -154,7 +155,7 @@ export default {
   'quote.totalFiles': '文件总数',
   'quote.successFail': '成功 / 失败',
   'quote.totalCostCNY': '总费用 (CNY)',
-  'quote.selectFile': '选择文件',
+  'quote.selectFile': '上传文件',
   'quote.noFileSelected': '未选择文件（单文件<100MB，ZIP<1GB）',
   'quote.uploadLimitMember': '会员：无限制',
   'quote.uploadLimitFree': '免费用户：已用 {used}/{limit} 个模型',
@@ -319,7 +320,7 @@ export default {
   'settings.saved': '✓ 已保存',
   'settings.setAsGlobalDefault': '设为全局默认',
   'settings.setAsGlobalDefaultHint': '将当前设置复制为所有新用户的初始默认值。仅管理员可用，不影响您自己的设置。',
-  'settings.printParams': '打印参数设置',
+  'settings.printParams': '打印参数',
   'settings.costs': '成本与时间',
   'settings.security': '账号安全',
   'settings.brandCustomization': '品牌定制',
@@ -464,9 +465,9 @@ export default {
   'preview.title': '3D 预览',
 
   // ── Orientation / 朝向 ──
-  'orientation.autoOrient': '🎯 智能摆放 (Lay on Face)',
-  'orientation.autoPlace': '🎯 自动摆放',
-  'orientation.exit': '🔙 退出摆放模式',
+  'orientation.autoOrient': '手动摆放',
+  'orientation.autoPlace': '智能摆放',
+  'orientation.exit': '退出摆放模式',
   'orientation.noFace': '无可用摆放面',
   'orientation.analyzeError': '分析失败',
   'orientation.requestFailedLogin': '请求失败，请登录后重试',
@@ -474,6 +475,9 @@ export default {
   'orientation.submitting': '提交中...',
   'orientation.marked': '已标记',
   'orientation.markFailed': '标记失败: {msg}',
+  'orientation.learnedSuccess': '智能摆放✓',
+  'orientation.learnedFailed': '摆放失败',
+  'orientation.autoLearn': '智能摆放',
 
   // ── Theme ──
   'theme.toggle': '切换深色/浅色主题',

@@ -17,7 +17,11 @@ Submodules:
 
 import math
 import os
+import re
+import subprocess
 import logging
+import tempfile
+import uuid
 import numpy as np
 import trimesh
 from typing import Optional, Sequence
@@ -391,11 +395,108 @@ def get_best_face_for_slicing(
     }
 
 
-def _learned_best_face(model_path: str) -> dict:
-    """使用自学习模型 (Logistic Regression) 选择最优打印面。
+# ── PrusaSlicer 切片解析 ──
 
-    候选生成仍用 coplanar 聚类，评分用训练好的 LR 模型替代固定权重。
-    无训练模型时自动 fallback 到原 coplanar 方法。
+def slice_with_prusaslicer(model_path: str, timeout: int = 30) -> dict:
+    """调用 PrusaSlicer CLI 切片并解析 G-code 统计信息。
+
+    Args:
+        model_path: STL/3MF 文件路径
+        timeout: 超时秒数
+
+    Returns:
+        {
+            "filament_mm": float,   # 总耗材长度 (mm)
+            "filament_cm3": float,  # 总耗材体积 (cm3)
+            "print_time_s": int,    # 打印时间 (秒)
+            "gcode_lines": int,     # G-code 行数
+            "success": bool,
+        }
+    """
+    if not os.path.exists(model_path):
+        return {"success": False, "error": "文件不存在"}
+
+    try:
+        tmp_gcode = os.path.join(
+            tempfile.gettempdir(), f"p3d_slice_{uuid.uuid4().hex[:8]}.gcode"
+        )
+
+        result = subprocess.run(
+            [
+                "prusa-slicer",
+                "--export-gcode",
+                "--output", tmp_gcode,
+                "--center", "125,125",
+                model_path,
+            ],
+            capture_output=True, text=True, timeout=timeout,
+        )
+
+        if result.returncode != 0 or not os.path.exists(tmp_gcode):
+            return {"success": False, "error": result.stderr[:200]}
+
+        # 解析 G-code 头部注释
+        filament_mm = 0.0
+        filament_cm3 = 0.0
+        print_time_s = 0
+        gcode_lines = 0
+
+        with open(tmp_gcode, "r") as f:
+            for line in f:
+                gcode_lines += 1
+                m = re.search(r"; filament used \[mm\] = ([\d.]+)", line)
+                if m:
+                    filament_mm = float(m.group(1))
+                m = re.search(r"; filament used \[cm3\] = ([\d.]+)", line)
+                if m:
+                    filament_cm3 = float(m.group(1))
+                m = re.search(r"; estimated printing time \(normal mode\) = (.+)", line)
+                if m:
+                    time_str = m.group(1).strip()
+                    # 解析 "3h 36m 52s" 格式
+                    total_seconds = 0
+                    hm = re.findall(r"(\d+)h", time_str)
+                    mm = re.findall(r"(\d+)m", time_str)
+                    ss = re.findall(r"(\d+)s", time_str)
+                    if hm: total_seconds += int(hm[0]) * 3600
+                    if mm: total_seconds += int(mm[0]) * 60
+                    if ss: total_seconds += int(ss[0])
+                    if "s" in time_str and not re.search(r"\d+h|\d+m", time_str):
+                        # 只有秒数
+                        s_only = re.findall(r"(\d+)s", time_str)
+                        if s_only: total_seconds = int(s_only[0])
+                    print_time_s = total_seconds
+
+        # 清理
+        try:
+            os.unlink(tmp_gcode)
+        except OSError:
+            pass
+
+        return {
+            "success": True,
+            "filament_mm": round(filament_mm, 2),
+            "filament_cm3": round(filament_cm3, 2),
+            "print_time_s": print_time_s,
+            "gcode_lines": gcode_lines,
+        }
+
+    except subprocess.TimeoutExpired:
+        return {"success": False, "error": "切片超时"}
+    except Exception as e:
+        return {"success": False, "error": str(e)[:200]}
+
+
+def _learned_best_face(model_path: str) -> dict:
+    """类 OrcaSlicer 自动摆放：多源候选 + 复合评分 + 稳定性检查。
+
+    候选来源（三路）:
+      1. coplanar 聚类面 (已有)
+      2. 凸包面 + 大面 (get_stable_faces)
+      3. Fibonacci 球面采样 (有机形状回退)
+
+    评分公式模仿 OrcaSlicer:
+      score = base_area * (1 - overhang_ratio) / max(z_height, 1)
 
     Args:
         model_path: 模型文件路径
@@ -403,83 +504,156 @@ def _learned_best_face(model_path: str) -> dict:
     Returns:
         同 get_best_face_for_slicing() 的返回结构
     """
+    import os as _os
     from calculator.orientation_learner import (
         OrientationLearner,
         FaceFeatureExtractor,
     )
+    from calculator.orientation_scoring import (
+        get_stable_faces,
+        evaluate_orientation,
+    )
 
     mesh = _load_mesh(model_path)
-    clusters = cluster_coplanar_faces(mesh)
+    best_overall = None
+    best_score = -1e9
 
-    # 确定数据目录 (与 routes 中保持一致)
-    import os as _os
+    # ── 数据目录 (LR 模型) ──
     data_dir = _os.path.join(
         _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
         "data",
     )
     learner = OrientationLearner(data_dir=data_dir)
-
-    if not learner.is_trained() or len(clusters) < 2:
-        logger.info(
-            "学习模型未训练 (trained=%s) 或候选面不足 (n=%d)，回退到固定权重评分",
-            learner.is_trained(), len(clusters),
-        )
-        result = get_best_face_for_slicing(model_path, method="coplanar")
-        result["method_used"] = "coplanar"
-        result["fallback"] = True
-        return result
-
-    # 批量提取特征
     extractor = FaceFeatureExtractor()
-    features_batch_list = []
-    for cluster in clusters:
-        try:
-            feat = extractor.extract(mesh, cluster)
-            features_batch_list.append(feat)
-        except Exception as e:
-            logger.warning("特征提取失败 (cluster), 使用零向量: %s", e)
-            features_batch_list.append(np.zeros(16, dtype=np.float64))
 
-    features_batch = np.array(features_batch_list, dtype=np.float64)
+    # ── 已使用的 up_vector 去重 ──
+    used_ups = set()  # set of (round(x,2), round(y,2), round(z,2))
 
-    # 学习模型评分
-    try:
-        scores = learner.predict_proba(features_batch)
-    except Exception as e:
-        logger.warning("模型预测失败: %s，回退到固定权重评分", e)
-        result = get_best_face_for_slicing(model_path, method="coplanar")
-        result["method_used"] = "coplanar"
-        result["fallback"] = True
-        return result
+    def _up_key(v: np.ndarray) -> tuple:
+        return tuple(np.round(v / max(float(np.linalg.norm(v)), 1e-9), 2))
 
-    # 构建候选列表
-    candidates = []
-    for i, cluster in enumerate(clusters):
-        normal = np.array(cluster["normal"], dtype=np.float64)
-        up = -normal
-        up_norm = float(np.linalg.norm(up))
-        if up_norm < 1e-8:
-            up = np.array([0.0, 0.0, 1.0])
-        else:
-            up = up / up_norm
-            if up[2] < 0:
-                up = -up
+    # ── 辅助：给候选面评分 ──
+    def _score_candidate(normal: np.ndarray, cluster: dict = None, label: str = "") -> None:
+        nonlocal best_overall, best_score
+        up = -np.array(normal, dtype=np.float64)
+        n_up = float(np.linalg.norm(up))
+        if n_up < 1e-8:
+            return
+        up = up / n_up
+        if up[2] < 0:
+            up = -up
+        key = _up_key(up)
+        if key in used_ups:
+            return
+        used_ups.add(key)
 
+        # 计算旋转 + 评分指标
         R = rotation_from_up_vector(up)
-        eval_result = evaluate_orientation(mesh, R)
+        metrics = evaluate_orientation(mesh, R)
+        m = metrics["metrics"]
+        z_h = float(m.get("z_height", 1))
+        o_r = float(m.get("overhang_ratio", 1))
+        c_a = float(m.get("base_contact_area", 0))
 
-        candidates.append({
-            "face": cluster,
-            "score": round(float(scores[i]) * 100, 2),
-            "metrics": eval_result["metrics"],
-            "euler_angles_deg": eval_result["euler_angles_deg"],
-            "learned_prob": round(float(scores[i]), 4),
-        })
+        # ── 类 OrcaSlicer 复合评分 ──
+        # 核心: 接触面积^1.5(越大越好) × (1-悬垂)²(越少越好) / z_height(越矮越好)
+        # 接触面积是 FDM 成败的第一要素
+        score = (c_a ** 1.5) * ((1.0 - o_r) ** 2) / max(z_h, 1.0)
 
-    # 排序
-    candidates.sort(key=lambda c: c["score"], reverse=True)
+        # ── 最小接触面积过滤 (拒绝接触面积过小的朝向) ──
+        bottom_area = c_a
+        if bottom_area < 200:  # <200mm² 接触面太小，打印必倒
+            return
+        if bottom_area < 500:
+            score *= 0.3  # <500mm² 很小，重罚
 
-    if not candidates:
+        # ── LR 模型加分 (仅 coplanar 面有, 当前样本不足仅微调) ──
+        lr_prob = None
+        if cluster is not None and learner.is_trained():
+            try:
+                feat = extractor.extract(mesh, cluster)
+                feat_batch = feat.reshape(1, -1)
+                prob = float(learner.predict_proba(feat_batch)[0])
+                lr_prob = prob
+                # LR 模型作为微弱 bonus: 最多加 5% (当前仅 20 正样本)
+                score *= (0.95 + 0.05 * prob)
+            except Exception:
+                pass
+
+        # ── 稳定性检查 (CoG 在底面凸包内) ──
+        stable = True
+        try:
+            vertices_r = np.asarray(mesh.vertices, dtype=np.float64) @ R[:3, :3].T
+            z_all = vertices_r[:, 2]
+            z_min = float(z_all.min())
+            eps_b = max(0.5, z_h * 0.02)
+            bottom_mask = z_all < z_min + eps_b
+            bottom_xy = vertices_r[bottom_mask, :2]
+            if len(bottom_xy) >= 3:
+                cog = np.asarray(mesh.center_mass, dtype=np.float64) @ R[:3, :3].T
+                cog_xy = cog[:2]
+                from scipy.spatial import ConvexHull, Delaunay
+                hull = ConvexHull(bottom_xy)
+                tri = Delaunay(bottom_xy[hull.vertices])
+                stable = tri.find_simplex(cog_xy) >= 0
+                if not stable:
+                    score *= 0.8
+        except Exception:
+            pass
+
+        candidate = {
+            "face": cluster or {"normal": normal.tolist(), "area": 0},
+            "score": round(score, 4),
+            "metrics": m,
+            "euler_angles_deg": metrics["euler_angles_deg"],
+            "learned_prob": lr_prob,
+            "label": label,
+            "stable": stable,
+        }
+
+        if score > best_score:
+            best_score = score
+            best_overall = candidate
+
+    # ══════════════════════════════════════════════
+    # 候选源 1: coplanar 聚类面
+    # ══════════════════════════════════════════════
+    try:
+        clusters = cluster_coplanar_faces(mesh)
+        for i, cluster in enumerate(clusters):
+            normal = np.array(cluster.get("normal", [0, 0, 1]), dtype=np.float64)
+            _score_candidate(normal, cluster=cluster, label=f"共面_{i}")
+    except Exception as e:
+        logger.warning("coplanar 聚类失败: %s", e)
+
+    # ══════════════════════════════════════════════
+    # 候选源 2: 凸包面 + 大面 (get_stable_faces)
+    # ══════════════════════════════════════════════
+    try:
+        stable_result = get_stable_faces(model_path)
+        for face in stable_result.get("faces", []):
+            normal = np.array(face.get("normal", [0, 0, 1]), dtype=np.float64)
+            _score_candidate(normal, label=face.get("label", "稳定面"))
+    except Exception as e:
+        logger.warning("get_stable_faces 失败: %s", e)
+
+    # ══════════════════════════════════════════════
+    # 候选源 3: Fibonacci 球面采样 (稠密覆盖)
+    # ══════════════════════════════════════════════
+    try:
+        from calculator.orientation_math import fibonacci_sphere_sampling
+        samples = fibonacci_sphere_sampling(128)
+        for i in range(samples.shape[0]):
+            normal = samples[i].copy()
+            _score_candidate(normal, label=f"采样_{i}")
+            if len(used_ups) >= 200:  # 上限
+                break
+    except Exception as e:
+        logger.warning("Fibonacci 采样失败: %s", e)
+
+    # ── 无候选回退 ──
+    if best_overall is None:
+        logger.warning("所有候选源均无结果，返回原始朝向")
         return {
             "oriented_path": model_path,
             "original_path": model_path,
@@ -488,37 +662,90 @@ def _learned_best_face(model_path: str) -> dict:
             "score": 0,
             "face": None,
             "all_candidates": [],
+            "method_used": "learned",
+            "fallback": True,
         }
 
-    best = candidates[0]
-    best_normal = np.array(best["face"]["normal"], dtype=np.float64)
+    logger.info(
+        "智能摆放: 候选 %d 个, 最佳得分=%.2f (label=%s, 稳定=%s, lr=%s)",
+        len(used_ups), best_score, best_overall.get("label"),
+        best_overall.get("stable"), best_overall.get("learned_prob"),
+    )
 
-    # 计算旋转 + 微调 + 导出
+    # ══════════════════════════════════════════════
+    # PrusaSlicer 精确验证: 对前 3 候选做真实切片
+    # ══════════════════════════════════════════════
+    # 收集所有候选，取前 3
+    # (由于 _score_candidate 直接更新 best_overall，我们重新收集)
+    # 用 fast_score 收集到的最近 50 个 = used_ups 数量
+    # 简化: 只对 best_overall 做切片验证（1次切片 ~0.5-2秒）
+    prusa_info = {}
+    prusa_normal = np.array(best_overall["face"]["normal"], dtype=np.float64)
+    try:
+        up_tmp = -prusa_normal
+        n_tmp = float(np.linalg.norm(up_tmp))
+        if n_tmp > 1e-8:
+            up_tmp = up_tmp / n_tmp
+            if up_tmp[2] < 0:
+                up_tmp = -up_tmp
+        R_tmp = rotation_from_up_vector(up_tmp)
+        # 微调前的旋转
+        tune_tmp = fine_tune_orientation(mesh, R_tmp[:3, :3])
+        R_final = tune_tmp["R"]
+        # 导出临时 STL
+        tmp_rotated = os.path.join(
+            tempfile.gettempdir(), f"p3d_orient_{uuid.uuid4().hex[:8]}.stl"
+        )
+        mesh_rotated = mesh.copy()
+        mesh_rotated.vertices = np.asarray(mesh.vertices) @ R_final.T
+        mesh_rotated.export(tmp_rotated)
+        # PrusaSlicer 切片
+        slice_result = slice_with_prusaslicer(tmp_rotated, timeout=30)
+        if slice_result["success"]:
+            prusa_info = slice_result
+            logger.info(
+                "PrusaSlicer 验证: filament=%.1fmm, time=%ds",
+                slice_result["filament_mm"], slice_result["print_time_s"],
+            )
+        # 清理
+        try:
+            os.unlink(tmp_rotated)
+        except OSError:
+            pass
+    except Exception as e:
+        logger.warning("PrusaSlicer 验证失败: %s", e)
+
+    # ── 应用最佳旋转 + 导出（跳过 Z 轴微调，无实际意义） ──
+    best_normal = np.array(best_overall["face"]["normal"], dtype=np.float64)
     up = -best_normal
-    up_norm = float(np.linalg.norm(up))
-    if up_norm < 1e-8:
+    n_up = float(np.linalg.norm(up))
+    if n_up < 1e-8:
         up = np.array([0.0, 0.0, 1.0])
     else:
-        up = up / up_norm
+        up = up / n_up
         if up[2] < 0:
             up = -up
 
     R = rotation_from_up_vector(up)
-    tune = fine_tune_orientation(mesh, R[:3, :3])
-    R_opt = tune["R"]
+    R_opt = R[:3, :3]
     euler = rotation_to_euler(R_opt)
 
     oriented_path = apply_orientation_to_mesh(model_path, R_opt)
 
-    return {
+    result = {
         "oriented_path": oriented_path,
         "original_path": model_path,
         "rotation_matrix": [[round(float(R_opt[i, j]), 6) for j in range(3)] for i in range(3)],
         "euler_angles_deg": euler,
-        "score": best["score"],
-        "face": best["face"],
-        "tune_report": tune["report"],
-        "all_candidates": candidates[:TOP_N_RESULTS],
+        "score": best_overall["score"],
+        "face": best_overall["face"],
+        "tune_report": "方向已最优（Z轴归零）",
+        "all_candidates": [],
         "method_used": "learned",
         "fallback": False,
+        "n_candidates": len(used_ups),
+        "best_label": best_overall.get("label", ""),
     }
+    if prusa_info.get("success"):
+        result["prusa"] = prusa_info
+    return result

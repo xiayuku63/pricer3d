@@ -218,30 +218,30 @@ async def admin_list_audit(
             .limit(safe_limit)
             .all()
         )
-    items = []
-    for row in rows:
-        detail = {}
-        try:
-            detail = json.loads(row.detail_json or "{}")
-            if not isinstance(detail, dict):
-                detail = {"_": detail}
-        except Exception:
+        items = []
+        for row in rows:
             detail = {}
-        items.append(
-            {
-                "id": row.id,
-                "created_at": row.created_at,
-                "user_id": row.user_id,
-                "username": row.username,
-                "action": row.action,
-                "ip": row.ip,
-                "method": row.method,
-                "path": row.path,
-                "request_id": row.request_id,
-                "idempotency_key": row.idempotency_key,
-                "detail": detail,
-            }
-        )
+            try:
+                detail = json.loads(row.detail_json or "{}")
+                if not isinstance(detail, dict):
+                    detail = {"_": detail}
+            except Exception:
+                detail = {}
+            items.append(
+                {
+                    "id": row.id,
+                    "created_at": row.created_at,
+                    "user_id": row.user_id,
+                    "username": row.username,
+                    "action": row.action,
+                    "ip": row.ip,
+                    "method": row.method,
+                    "path": row.path,
+                    "request_id": row.request_id,
+                    "idempotency_key": row.idempotency_key,
+                    "detail": detail,
+                }
+            )
     return {"total": total or 0, "limit": safe_limit, "offset": safe_offset, "items": items}
 
 
@@ -259,7 +259,6 @@ async def admin_cleanup(request: Request, current_user=Depends(get_current_user)
     now = time.time()
     from .config import LOGIN_FAILED_WINDOW_SECONDS
     cutoff_audit = datetime.now(timezone.utc) - timedelta(days=max(1, AUDIT_RETENTION_DAYS))
-    cutoff_audit_iso = cutoff_audit.isoformat()
     deleted = {"verification_codes": 0, "idempotency_responses": 0, "login_failures": 0, "audit_events": 0}
     with get_db_session() as db:
         # Delete expired/used verification codes
@@ -299,7 +298,7 @@ async def admin_cleanup(request: Request, current_user=Depends(get_current_user)
         # Delete old audit events
         count = (
             db.query(AuditEvent)
-            .filter(AuditEvent.created_at < cutoff_audit_iso)
+            .filter(AuditEvent.created_at < cutoff_audit)
             .delete(synchronize_session=False)
         )
         deleted["audit_events"] = count

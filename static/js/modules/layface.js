@@ -11,7 +11,7 @@
  */
 
 import * as THREE from 'three';
-import { currentMeshCenterOffset, fitCameraToMesh } from './viewer.js';
+import { currentMeshCenterOffset, fitCameraToMesh, scene } from './viewer.js';
 
 // Unified white highlight color for BambuSlicer-style oval overlays
 const FACE_COLORS = 0xffffff;
@@ -20,6 +20,173 @@ let clusterOverlays = [];       // 高亮 Mesh 数组
 let clusterClickCallback = null; // 点击回调
 let clusterHighlightGroup = null;
 let clusterMode = false;        // 当前是否处于 Cluster 模式
+
+// ── 可放置平面（placeable plane）视觉 ──
+let _placeablePlaneGroup = null;
+
+// 偏移常量（单位：mm）
+const PLANE_OUTER_OFFSET = 3;   // 外置偏移
+const PLANE_PARALLEL_OFFSET = 2; // 平面平行方向偏移
+const PLANE_TOTAL_OFFSET = PLANE_OUTER_OFFSET + PLANE_PARALLEL_OFFSET; // 5mm
+
+/**
+ * 在打印底板 Z=0 处创建高亮可放置平面
+ * 平面大小基于点击选中的面簇顶点投影到 Z=0 的区域，加上偏移量
+ *
+ * @param {THREE.Object3D} mesh - 已放置的模型
+ * @param {Array} faceVertices - 面簇顶点 [[x,y,z], ...]（模型局部坐标）
+ *
+ * 规则：
+ *  - 模型主体只能位于平面 Z+ 一侧
+ *  - 平面根据实际贴合面的投影最大区域，外置偏移 3mm + 平行偏移 2mm
+ *  - Z+ 侧（模型侧）绿色标记，Z- 侧（空白侧）蓝色标记
+ */
+function _createPlaceablePlane(mesh, faceVertices) {
+    _removePlaceablePlane();
+    if (!mesh) return;
+    if (!faceVertices || faceVertices.length < 3) {
+        // 降级：用模型包围盒
+        mesh.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(mesh);
+        return _createPlaneFromBox(mesh, box);
+    }
+
+    // 面簇顶点来自后端 API（原始 STL 坐标），需先转换到 mesh 局部坐标
+    // （减去中心化偏移 + 加上下沉偏移），再通过 worldMatrix 变换到世界坐标
+    // 此逻辑必须与 renderClusters() 中的顶点变换保持一致
+    mesh.updateMatrixWorld(true);
+    const worldMatrix = mesh.matrixWorld;
+    const tmp = new THREE.Vector3();
+
+    // 计算 sinkZ（与 renderClusters 一致）
+    const co = currentMeshCenterOffset || new THREE.Vector3(0, 0, 0);
+    let sinkZ = 0;
+    if (mesh.geometry) {
+        mesh.geometry.computeBoundingBox();
+        sinkZ = mesh.geometry.boundingBox.getCenter(new THREE.Vector3()).z;
+    }
+
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+
+    for (const v of faceVertices) {
+        // Step 1: 原始坐标 → mesh 局部坐标（与 renderClusters 一致）
+        tmp.set(v[0] - co.x, v[1] - co.y, v[2] - co.z + sinkZ);
+        // Step 2: 局部坐标 → 世界坐标
+        tmp.applyMatrix4(worldMatrix);
+        // 投影到 Z=0（只取 XY）
+        if (tmp.x < minX) minX = tmp.x;
+        if (tmp.x > maxX) maxX = tmp.x;
+        if (tmp.y < minY) minY = tmp.y;
+        if (tmp.y > maxY) maxY = tmp.y;
+    }
+
+    // 若顶点投影后落在 Z<0，强制推回模型
+    mesh.updateMatrixWorld(true);
+    const meshBox = new THREE.Box3().setFromObject(mesh);
+    if (meshBox.min.z < 0) {
+        mesh.position.z -= meshBox.min.z;
+        mesh.updateMatrixWorld(true);
+    }
+
+    _buildPlaceablePlaneVisual(mesh, minX, maxX, minY, maxY);
+}
+
+/**
+ * 降级方案：基于模型世界包围盒构建可放置平面
+ */
+function _createPlaneFromBox(mesh, box) {
+    const min = box.min;
+    const max = box.max;
+    if (min.z < 0) {
+        mesh.position.z -= min.z;
+        mesh.updateMatrixWorld(true);
+        box.setFromObject(mesh);
+    }
+    _buildPlaceablePlaneVisual(mesh, min.x, max.x, min.y, max.y);
+}
+
+/**
+ * 构建可放置平面视觉元素
+ */
+function _buildPlaceablePlaneVisual(mesh, minX, maxX, minY, maxY) {
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    const halfW = (maxX - minX) / 2;
+    const halfH = (maxY - minY) / 2;
+    const planeW = (halfW + PLANE_TOTAL_OFFSET) * 2;
+    const planeH = (halfH + PLANE_TOTAL_OFFSET) * 2;
+
+    _placeablePlaneGroup = new THREE.Group();
+
+    // Z+ 侧（模型侧）—— 半透明绿色
+    const geoTop = new THREE.PlaneGeometry(planeW, planeH);
+    const matTop = new THREE.MeshBasicMaterial({
+        color: 0x4ade80, transparent: true, opacity: 0.15,
+        side: THREE.FrontSide, depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -2,
+        polygonOffsetUnits: -2,
+    });
+    const topMesh = new THREE.Mesh(geoTop, matTop);
+    topMesh.position.set(cx, cy, 0);
+    topMesh.rotation.x = -Math.PI / 2;
+    _placeablePlaneGroup.add(topMesh);
+
+    // Z- 侧（空白侧）—— 半透明蓝色
+    const geoBottom = new THREE.PlaneGeometry(planeW, planeH);
+    const matBottom = new THREE.MeshBasicMaterial({
+        color: 0x60a5fa, transparent: true, opacity: 0.10,
+        side: THREE.BackSide, depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -2,
+        polygonOffsetUnits: -2,
+    });
+    const bottomMesh = new THREE.Mesh(geoBottom, matBottom);
+    bottomMesh.position.set(cx, cy, 0);
+    bottomMesh.rotation.x = -Math.PI / 2;
+    _placeablePlaneGroup.add(bottomMesh);
+
+    // 绿色边框
+    const edgesGeo = new THREE.EdgesGeometry(geoTop);
+    const lineMat = new THREE.LineBasicMaterial({
+        color: 0x4ade80, transparent: true, opacity: 0.35,
+        polygonOffset: true,
+        polygonOffsetFactor: -2,
+        polygonOffsetUnits: -2,
+    });
+    const borderLine = new THREE.LineSegments(edgesGeo, lineMat);
+    borderLine.position.set(cx, cy, 0);
+    borderLine.rotation.x = -Math.PI / 2;
+    _placeablePlaneGroup.add(borderLine);
+
+    // Z+ 方向箭头（绿色朝上）
+    const arrowPos = new THREE.Vector3(cx, cy - halfH - PLANE_TOTAL_OFFSET - 6, 0);
+    _placeablePlaneGroup.add(new THREE.ArrowHelper(
+        new THREE.Vector3(0, 0, 1), arrowPos, 8, 0x22c55e, 3, 2));
+    // Z- 方向箭头（蓝色朝下）
+    _placeablePlaneGroup.add(new THREE.ArrowHelper(
+        new THREE.Vector3(0, 0, -1), arrowPos.clone().add(new THREE.Vector3(0, -6, 0)),
+        5, 0x60a5fa, 2, 1.5));
+
+    scene.add(_placeablePlaneGroup);
+}
+
+function _removePlaceablePlane() {
+    if (_placeablePlaneGroup) {
+        _placeablePlaneGroup.traverse(child => {
+            if (child.geometry) child.geometry.dispose();
+            if (child.material) child.material.dispose();
+        });
+        scene.remove(_placeablePlaneGroup);
+        _placeablePlaneGroup = null;
+    }
+}
+
+export function showPlacementPlane(mesh, faceVertices) { _createPlaceablePlane(mesh, faceVertices); }
+export function hidePlacementPlane() { _removePlaceablePlane(); }
+export function hasPlacementPlane() { return _placeablePlaneGroup !== null; }
+window.__cleanupPlaceablePlane = hidePlacementPlane;
 
 /**
  * Build a BambuSlicer-style ellipse overlay for one face cluster.
@@ -126,6 +293,9 @@ function _buildEllipseOverlay(flatVerts, normalArr, clusterIndex) {
         depthWrite: false,
         metalness: 0.0,
         roughness: 0.6,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -1,
     });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.userData = {
@@ -155,6 +325,9 @@ function _buildEllipseOverlay(flatVerts, normalArr, clusterIndex) {
     const lineMat = new THREE.LineBasicMaterial({
         color: FACE_COLORS, transparent: true, opacity: 0.9,
         depthTest: true, depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -1,
     });
     const outline = new THREE.LineLoop(lineGeo, lineMat);
     mesh.userData.outline = outline;
@@ -216,6 +389,9 @@ export function renderClusters(parent, clusters, onClick, onHover) {
  * 清除所有面簇高亮
  */
 export function clearClusters() {
+    // 同时清理可放置平面
+    _removePlaceablePlane();
+
     if (clusterHighlightGroup && clusterHighlightGroup.parent) {
         clusterHighlightGroup.traverse(child => {
             if (child.geometry) child.geometry.dispose();
@@ -289,7 +465,7 @@ export function placeFaceOnBed(mesh, normal, upAxis = 'Z') {
     const targetQuat = new THREE.Quaternion().setFromUnitVectors(targetDir, up);
     mesh.quaternion.copy(targetQuat);
 
-    // 贴合到底板 Z=0
+    // 贴合到底板 Z=0，确保模型全部位于可放置平面（Z=0）的 Z+ 一侧
     mesh.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(mesh);
     mesh.position.z -= box.min.z;

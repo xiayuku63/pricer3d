@@ -1,38 +1,64 @@
             <!-- 3D 预览弹窗 -->
             <div id="preview-modal" class="hidden fixed inset-0 z-50">
-                <div id="preview-backdrop" class="absolute inset-0 bg-black/50"></div>
+                <div id="preview-backdrop" class="absolute inset-0" style="background-color: var(--color-overlay);"></div>
                 <div class="relative z-10 h-full w-full flex items-center justify-center p-4">
-                    <div class="w-full max-w-5xl bg-white rounded-lg shadow-xl overflow-hidden">
-                        <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-                            <h4 class="text-sm font-semibold text-gray-800">模型在线预览</h4>
-                            <button id="preview-close-btn" type="button" class="text-gray-500 hover:text-gray-700">关闭</button>
+                    <div class="w-full max-w-5xl tw-card shadow-xl overflow-hidden" style="border-radius: var(--radius-lg);">
+                        <div class="px-4 py-3 flex items-center justify-between" style="border-bottom: 1px solid var(--color-border);">
+                            <h4 class="text-sm font-semibold tw-text-strong">模型在线预览</h4>
+                            <button id="preview-close-btn" type="button" class="p-1.5 rounded-lg hover:bg-gray-100 tw-text-muted hover:tw-text transition-colors" aria-label="关闭预览">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
                         </div>
                         <div class="flex flex-col md:flex-row">
-                            <div id="preview-container" class="relative w-full md:w-3/4 h-[50vh] sm:h-[55vh] md:h-[70vh] bg-white">
-                                <div id="preview-placeholder" class="absolute inset-0 flex items-center justify-center text-sm text-gray-500 pointer-events-none">加载中...</div>
+                            <div id="preview-container" class="relative w-full md:w-3/4 h-[50vh] sm:h-[55vh] md:h-[70vh] tw-card" style="border-radius: 0;">
+                                <div id="preview-placeholder" class="absolute inset-0 flex items-center justify-center text-sm tw-text-muted pointer-events-none">加载中...</div>
                                 <!-- 视角切换 Cube -->
-                                <div id="view-cube" class="hidden absolute bottom-3 left-3 z-20 grid grid-cols-3 gap-1.5 sm:gap-1">
-                                    <button data-view="front"  class="view-cube-btn w-10 h-10 sm:w-9 sm:h-9 rounded text-xs sm:text-[9px] font-bold bg-white border border-gray-300 text-gray-700 hover:bg-blue-50 hover:border-blue-400 shadow-sm transition-colors">前</button>
-                                    <button data-view="top"    class="view-cube-btn w-10 h-10 sm:w-9 sm:h-9 rounded text-xs sm:text-[9px] font-bold bg-white border border-gray-300 text-gray-700 hover:bg-blue-50 hover:border-blue-400 shadow-sm transition-colors">上</button>
-                                    <button data-view="left"   class="view-cube-btn w-10 h-10 sm:w-9 sm:h-9 rounded text-xs sm:text-[9px] font-bold bg-white border border-gray-300 text-gray-700 hover:bg-blue-50 hover:border-blue-400 shadow-sm transition-colors">左</button>
-                                    <button data-view="back"   class="view-cube-btn w-10 h-10 sm:w-9 sm:h-9 rounded text-xs sm:text-[9px] font-bold bg-white border border-gray-300 text-gray-700 hover:bg-blue-50 hover:border-blue-400 shadow-sm transition-colors">后</button>
-                                    <button data-view="bottom" class="view-cube-btn w-10 h-10 sm:w-9 sm:h-9 rounded text-xs sm:text-[9px] font-bold bg-white border border-gray-300 text-gray-700 hover:bg-blue-50 hover:border-blue-400 shadow-sm transition-colors">下</button>
-                                    <button data-view="right"  class="view-cube-btn w-10 h-10 sm:w-9 sm:h-9 rounded text-xs sm:text-[9px] font-bold bg-white border border-gray-300 text-gray-700 hover:bg-blue-50 hover:border-blue-400 shadow-sm transition-colors">右</button>
+                                <div id="view-cube" class="hidden absolute bottom-3 left-3 z-30 grid grid-cols-3 gap-1">
+                                    <button data-view="front"  class="view-cube-btn w-9 h-9 rounded text-[10px] font-bold tw-card border shadow-sm transition-colors backdrop-blur-sm" style="border-color: var(--color-border-strong); color: var(--color-text);">前</button>
+                                    <button data-view="top"    class="view-cube-btn w-9 h-9 rounded text-[10px] font-bold tw-card border shadow-sm transition-colors backdrop-blur-sm" style="border-color: var(--color-border-strong); color: var(--color-text);">上</button>
+                                    <button data-view="left"   class="view-cube-btn w-9 h-9 rounded text-[10px] font-bold tw-card border shadow-sm transition-colors backdrop-blur-sm" style="border-color: var(--color-border-strong); color: var(--color-text);">左</button>
+                                    <button data-view="back"   class="view-cube-btn w-9 h-9 rounded text-[10px] font-bold tw-card border shadow-sm transition-colors backdrop-blur-sm" style="border-color: var(--color-border-strong); color: var(--color-text);">后</button>
+                                    <button data-view="bottom" class="view-cube-btn w-9 h-9 rounded text-[10px] font-bold tw-card border shadow-sm transition-colors backdrop-blur-sm" style="border-color: var(--color-border-strong); color: var(--color-text);">下</button>
+                                    <button data-view="right"  class="view-cube-btn w-9 h-9 rounded text-[10px] font-bold tw-card border shadow-sm transition-colors backdrop-blur-sm" style="border-color: var(--color-border-strong); color: var(--color-text);">右</button>
                                 </div>
                             </div>
-                            <div class="w-full md:w-1/4 p-4 bg-gray-50 border-t md:border-t-0 md:border-l border-gray-200 flex flex-col gap-3">
-                                <div class="text-xs font-semibold text-gray-700 uppercase tracking-wide">🎯 智能摆放</div>
-                                <p class="text-xs text-gray-500 leading-relaxed hidden sm:block">上传模型后，点击下方按钮高亮可摆放底面，点击面片自动贴合到打印底板。</p>
-                                <div class="flex flex-col gap-2 mt-2">
-                                      <button id="lay-face-btn" type="button" class="w-full py-3 sm:py-2 px-3 rounded-md bg-gradient-to-r from-orange-400 to-rose-500 text-white text-xs font-semibold hover:from-orange-500 hover:to-rose-600 shadow-sm min-h-[44px]">🎯 智能摆放 (Lay on Face)</button>
-                                     <button id="orient-center-btn" type="button" class="w-full py-3 sm:py-2 px-3 rounded-md border border-gray-300 text-gray-700 text-xs hover:bg-gray-100 min-h-[44px]">📐 模型居中</button>
-                                     <button id="orient-reset-btn" type="button" class="w-full py-3 sm:py-2 px-3 rounded-md border border-gray-300 text-gray-700 text-xs hover:bg-gray-100 min-h-[44px]">重置方向</button>
-                                     <button id="orient-train-btn" type="button" class="w-full py-3 sm:py-2 px-3 rounded-md border border-amber-300 text-amber-700 text-xs hover:bg-amber-50 min-h-[44px]">标记为最优方向</button>
-                                     <p id="orient-train-status" class="hidden text-xs text-green-600 text-center"></p>
-                                 </div>
+                            <div class="w-full md:w-1/4 p-3 flex flex-col gap-2" style="background-color: var(--color-bg); border-top: 1px solid var(--color-border); md:border-t-0; md:border-left: 1px solid var(--color-border);">
+                                <div class="text-[11px] font-semibold tw-text-muted uppercase tracking-wider">方向调整</div>
+                                <div class="flex flex-col gap-1.5">
+                                    <button id="orient-learned-btn" type="button" title="自动选择最优打印面" class="w-full py-2 px-3 rounded-lg text-white text-xs font-semibold shadow-sm min-h-[40px] transition-all active:scale-[0.98] flex items-center gap-2" style="background: linear-gradient(to right, var(--color-success-400), var(--color-success));">
+                                        <svg class="w-4 h-4 flex-shrink-0"><use href="/static/partials/preview-icons.svg#icon-smart"></use></svg>
+                                        <span>智能摆放</span>
+                                    </button>
+                                    <button id="lay-face-btn" type="button" title="点击模型面片手动选择摆放面" class="w-full py-2 px-3 rounded-lg text-white text-xs font-semibold shadow-sm min-h-[40px] transition-all active:scale-[0.98] flex items-center gap-2" style="background: linear-gradient(to right, var(--color-warning-400), var(--color-danger));">
+                                        <svg class="w-4 h-4 flex-shrink-0"><use href="/static/partials/preview-icons.svg#icon-hand"></use></svg>
+                                        <span>手动摆放</span>
+                                    </button>
+                                    <div class="flex gap-1.5">
+                                        <button id="orient-center-btn" type="button" title="将模型移至打印平台中央" class="flex-1 py-2 px-2 rounded-lg min-h-[40px] transition-all active:scale-[0.98] flex items-center justify-center gap-1.5" style="border: 1px solid var(--color-border-strong); color: var(--color-text);">
+                                            <svg class="w-4 h-4 flex-shrink-0"><use href="/static/partials/preview-icons.svg#icon-center"></use></svg>
+                                            <span>模型居中</span>
+                                        </button>
+                                        <button id="orient-reset-btn" type="button" title="恢复模型原始朝向" class="flex-1 py-2 px-2 rounded-lg min-h-[40px] transition-all active:scale-[0.98] flex items-center justify-center gap-1.5" style="border: 1px solid var(--color-border-strong); color: var(--color-text);">
+                                            <svg class="w-4 h-4 flex-shrink-0"><use href="/static/partials/preview-icons.svg#icon-reset"></use></svg>
+                                            <span>重置方向</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="my-2" style="border-top: 1px solid var(--color-border);"></div>
+                                <div class="text-[11px] font-semibold tw-text-muted uppercase tracking-wider">操作</div>
+                                <div class="flex flex-col gap-1.5">
+                                    <button id="orient-train-btn" type="button" title="标记当前方向为训练样本" class="w-full py-2 px-3 rounded-lg border border-dashed min-h-[40px] transition-all active:scale-[0.98] flex items-center justify-center gap-2" style="border-color: var(--color-warning-300); color: var(--color-warning-600); font-size: 0.75rem; font-weight: 500;">
+                                        <svg class="w-4 h-4 flex-shrink-0"><use href="/static/partials/preview-icons.svg#icon-star"></use></svg>
+                                        <span>标记为最优方向</span>
+                                    </button>
+                                    <button id="orient-save-btn" type="button" title="保存方向并重新切片报价" class="w-full py-2 px-3 rounded-lg text-white text-xs font-semibold shadow-sm min-h-[40px] transition-all active:scale-[0.98] flex items-center justify-center gap-2" style="background: linear-gradient(to right, var(--color-primary-400), var(--color-primary));">
+                                        <svg class="w-4 h-4 flex-shrink-0"><use href="/static/partials/preview-icons.svg#icon-save"></use></svg>
+                                        <span>保存当前方向并报价</span>
+                                    </button>
+                                    <p id="orient-train-status" class="hidden text-xs tw-text-success text-center"></p>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-
