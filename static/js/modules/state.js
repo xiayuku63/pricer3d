@@ -501,6 +501,7 @@ export function renderColorDropdown(name, selectedColor, compact) {
     const safe = match || normColors[0];
     const safeHex = safe.hex || '#d1d5db';
 
+    // unused but keep for reference
     const listItems = normColors.map(c => {
         const hex = c.hex || '#d1d5db';
         return '<button type="button" class="color-dd-item flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-gray-50 border-b border-gray-100 last:border-0 text-left'
@@ -511,6 +512,40 @@ export function renderColorDropdown(name, selectedColor, compact) {
             + '</button>';
     }).join('');
 
+    const MAX_VISIBLE = 5;
+    const visibleItems = normColors.slice(0, MAX_VISIBLE);
+    const extraItems = normColors.slice(MAX_VISIBLE);
+    const hasExtra = extraItems.length > 0;
+
+    const visibleHtml = visibleItems.map(c => {
+        const hex = c.hex || '#d1d5db';
+        return '<button type="button" class="color-dd-item flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-gray-50 border-b border-gray-100 last:border-0 text-left'
+            + (c.hex === safeHex ? ' bg-indigo-50' : '')
+            + '" data-color-hex="' + hex + '">'
+            + '<span class="w-5 h-5 rounded-sm border border-gray-400 flex-shrink-0" style="background:' + hex + '"></span>'
+            + '<span class="flex-1 font-mono text-xs tw-text-secondary">' + hex + '</span>'
+            + '</button>';
+    }).join('');
+
+    const extraHtml = hasExtra
+        ? '<div class="color-dd-extra hidden">'
+            + extraItems.map(c => {
+                const hex = c.hex || '#d1d5db';
+                return '<button type="button" class="color-dd-item flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-gray-50 border-b border-gray-100 last:border-0 text-left'
+                    + (c.hex === safeHex ? ' bg-indigo-50' : '')
+                    + '" data-color-hex="' + hex + '">'
+                    + '<span class="w-5 h-5 rounded-sm border border-gray-400 flex-shrink-0" style="background:' + hex + '"></span>'
+                    + '<span class="flex-1 font-mono text-xs tw-text-secondary">' + hex + '</span>'
+                    + '</button>';
+            }).join('')
+            + '<button type="button" class="color-dd-toggle-more flex items-center gap-2 w-full px-3 py-2 text-xs text-indigo-600 hover:bg-gray-50 font-medium text-left hover:text-indigo-700">'
+            + '<svg class="w-3 h-3 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>'
+            + '<span>更多颜色 (' + extraItems.length + ')</span></button>'
+            + '</div>'
+        : '';
+
+    const combinedListHtml = visibleHtml + extraHtml;
+
     if (compact) {
         const html = '<div class="color-dd-wrapper relative inline-block">'
                 + '<button type="button" class="color-dd-trigger flex items-center gap-1 px-2 py-1 border rounded text-[11px] tw-card tw-text hover:border-gray-400 min-w-[36px]" style="border-color: var(--color-border-strong);">'
@@ -518,7 +553,7 @@ export function renderColorDropdown(name, selectedColor, compact) {
                 + '<svg class="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>'
                 + '</button>'
                 + '<div class="color-dd-list hidden absolute z-50 left-0 mt-1 tw-bg-surface border border-gray-200 rounded-md shadow-lg overflow-y-auto min-w-[140px]" style="max-height:360px;">'
-            + listItems
+            + combinedListHtml
             + '</div>'
             + '<input type="hidden" class="row-color-value" value="' + safeHex + '">'
             + '</div>';
@@ -532,7 +567,7 @@ export function renderColorDropdown(name, selectedColor, compact) {
         + '<svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>'
         + '</button>'
         + '<div class="color-dd-list hidden absolute z-50 left-0 right-0 mt-1 tw-bg-surface border border-gray-200 rounded-md shadow-lg overflow-y-auto" style="max-height:360px;">'
-        + listItems
+        + combinedListHtml
         + '</div>'
         + '<input type="hidden" class="row-color-value" value="' + safeHex + '">'
         + '</div>';
