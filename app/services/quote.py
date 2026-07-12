@@ -25,7 +25,7 @@ from app.config import (
 from app.db import get_db_session
 from app.deps import get_membership_effective, is_member_user
 from app.models_orm import QuoteHistory, User
-from calculator.cost import FORMULA_ALIAS_TO_CANONICAL, process_single_file
+from calculator.cost import process_single_file
 
 logger = logging.getLogger(__name__)
 
@@ -83,12 +83,19 @@ async def build_quote_payload(
     # 免费用户累计模型总数限制（不限制单次数量）
     if not is_member_user(current_user):
         with get_db_session() as db:
-            existing_count = db.query(sqlfunc.count(QuoteHistory.id)).filter(
-                QuoteHistory.user_id == current_user["id"],
-                QuoteHistory.status == "success",
-            ).scalar() or 0
+            existing_count = (
+                db.query(sqlfunc.count(QuoteHistory.id))
+                .filter(
+                    QuoteHistory.user_id == current_user["id"],
+                    QuoteHistory.status == "success",
+                )
+                .scalar()
+                or 0
+            )
         if existing_count >= FREE_TOTAL_MODEL_LIMIT:
-            raise HTTPException(status_code=400, detail=f"免费用户最多累计 {FREE_TOTAL_MODEL_LIMIT} 个模型，升级会员无限制")
+            raise HTTPException(
+                status_code=400, detail=f"免费用户最多累计 {FREE_TOTAL_MODEL_LIMIT} 个模型，升级会员无限制"
+            )
 
     with get_db_session() as db:
         row = db.query(User.materials, User.pricing_config).filter(User.id == current_user["id"]).first()
@@ -104,7 +111,9 @@ async def build_quote_payload(
     if material not in material_names:
         raise HTTPException(status_code=400, detail="材料参数不合法")
 
-    selected_material = next((m for m in user_materials if isinstance(m, dict) and str(m.get("name")) == material), None)
+    selected_material = next(
+        (m for m in user_materials if isinstance(m, dict) and str(m.get("name")) == material), None
+    )
     allowed_colors = []
     if selected_material:
         raw_colors = selected_material.get("colors", [])
@@ -134,9 +143,21 @@ async def build_quote_payload(
             try:
                 return await asyncio.to_thread(
                     _process_single_file_sync,
-                    file, material, layer_height, infill, quantity, color,
-                    user_materials, pricing_config, slicer_preset, wall_count, current_user,
-                    auto_orient, orient_x, orient_y, orient_z, applied_orientation,
+                    file,
+                    material,
+                    layer_height,
+                    infill,
+                    quantity,
+                    color,
+                    user_materials,
+                    pricing_config,
+                    slicer_preset,
+                    wall_count,
+                    current_user,
+                    auto_orient,
+                    orient_x,
+                    orient_y,
+                    orient_z,
                 )
             except Exception as e:
                 fname = file.filename or "unknown"
@@ -145,7 +166,9 @@ async def build_quote_payload(
                     "filename": fname,
                     "status": "failed",
                     "error": f"INTERNAL_ERROR: {str(e)}",
-                    "cost_cny": 0, "weight_g": 0, "estimated_time_h": 0,
+                    "cost_cny": 0,
+                    "weight_g": 0,
+                    "estimated_time_h": 0,
                 }
 
     tasks = [process_one(f) for f in files]
@@ -221,7 +244,6 @@ def _process_single_file_sync(
     orient_x: Optional[float] = None,
     orient_y: Optional[float] = None,
     orient_z: Optional[float] = None,
-    applied_orientation: Optional[dict] = None,
 ):
     """Synchronous wrapper for process_single_file — runs in thread pool.
 
@@ -235,23 +257,27 @@ def _process_single_file_sync(
     printer_profile_path = None
     if printer_model_id:
         try:
-            from app.printers import resolve_printer, PRINTER_MODELS
+            from app.printers import resolve_printer
+
             pm = resolve_printer(str(printer_model_id))
             if pm:
                 printer_bed_resolver = {printer_model_id: pm}
-                printer_profile_path = os.path.join(
-                    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-                    pm["profile"],
-                ) if pm.get("profile") else None
+                printer_profile_path = (
+                    os.path.join(
+                        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                        pm["profile"],
+                    )
+                    if pm.get("profile")
+                    else None
+                )
 
             # Look up DB speed params
             _base_printer_id = pm["id"] if pm else str(printer_model_id)
             from app.db import get_db_session
             from app.models_orm import PrinterParam
+
             with get_db_session() as _db:
-                pp = _db.query(PrinterParam).filter(
-                    PrinterParam.printer_id == _base_printer_id
-                ).first()
+                pp = _db.query(PrinterParam).filter(PrinterParam.printer_id == _base_printer_id).first()
                 if pp and pp.speed_enabled:
                     speed_params_override = {
                         "max_speed": float(pp.max_speed or 500),
@@ -263,9 +289,21 @@ def _process_single_file_sync(
 
     return asyncio.run(
         process_single_file(
-            file, material, layer_height, infill, quantity, color,
-            user_materials, pricing_config, slicer_preset, perimeters, current_user,
-            auto_orient, orient_x, orient_y, orient_z, applied_orientation,
+            file,
+            material,
+            layer_height,
+            infill,
+            quantity,
+            color,
+            user_materials,
+            pricing_config,
+            slicer_preset,
+            perimeters,
+            current_user,
+            auto_orient,
+            orient_x,
+            orient_y,
+            orient_z,
             printer_bed_resolver=printer_bed_resolver,
             speed_params_override=speed_params_override,
             printer_profile_path=printer_profile_path,
@@ -292,11 +330,12 @@ def save_quote_history(user_id: int, results: list) -> None:
                 except (ValueError, TypeError):
                     pass
 
-            m = re.match(r'^(.+?)_(\d{2})$', raw_pm) if raw_pm else None
+            m = re.match(r"^(.+?)_(\d{2})$", raw_pm) if raw_pm else None
             if m:
                 printer_model = m.group(1)
                 try:
                     from app.printers import PRINTER_MODELS
+
                     for pm_def in PRINTER_MODELS:
                         if pm_def["id"] == printer_model:
                             printer_model = pm_def["name"]
@@ -310,6 +349,7 @@ def save_quote_history(user_id: int, results: list) -> None:
                 if printer_model:
                     try:
                         from app.printers import PRINTER_MODELS, resolve_printer
+
                         rp = resolve_printer(printer_model)
                         if rp:
                             printer_model = rp.get("name", printer_model)

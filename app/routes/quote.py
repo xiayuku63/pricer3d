@@ -10,14 +10,7 @@ from fastapi import Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel, Field
 
 from app.deps import get_current_user
-from app.services.export import (
-    PdfInlineRequest,
-    export_pdf_inline,
-    export_quote_history,
-    export_quote_pdf,
-)
-from app.services.quote import build_quote_payload, save_quote_history
-from app.services.history import delete_quote_history, clear_quote_history, quote_history
+from app.services.quote import build_quote_payload
 from calculator.cost import FORMULA_ALIAS_TO_CANONICAL, validate_formula_expression
 
 logger = logging.getLogger(__name__)

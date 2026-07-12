@@ -2,7 +2,6 @@
 
 import math
 import numpy as np
-from typing import Union
 
 
 def fibonacci_sphere_sampling(n: int) -> np.ndarray:
@@ -22,11 +21,14 @@ def rodrigues_rotation(axis: np.ndarray, angle: float) -> np.ndarray:
     if axis_norm < 1e-12:
         return np.eye(3)
     axis = axis / axis_norm
-    K = np.array([
-        [0.0, -axis[2], axis[1]],
-        [axis[2], 0.0, -axis[0]],
-        [-axis[1], axis[0], 0.0],
-    ], dtype=np.float64)
+    K = np.array(
+        [
+            [0.0, -axis[2], axis[1]],
+            [axis[2], 0.0, -axis[0]],
+            [-axis[1], axis[0], 0.0],
+        ],
+        dtype=np.float64,
+    )
     c = math.cos(angle)
     s = math.sin(angle)
     R = np.eye(3, dtype=np.float64) + s * K + (1.0 - c) * (K @ K)

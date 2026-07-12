@@ -40,11 +40,13 @@ async def preview_as_glb(file: UploadFile = File(...)):
             tmp_stl = f"/tmp/p3d_glb_{uuid.uuid4().hex}.stl"
             result = subprocess.run(
                 ["prusa-slicer", "--export-stl", "--output", tmp_stl, tmp],
-                capture_output=True, text=True, timeout=120,
+                capture_output=True,
+                text=True,
+                timeout=120,
             )
             if result.returncode != 0 or not os.path.exists(tmp_stl):
                 logger.warning("STEP→STL preview conversion failed: %s", result.stderr[:200])
-                raise HTTPException(500, f"STEP 文件转换失败")
+                raise HTTPException(500, "STEP 文件转换失败")
             load_path = tmp_stl
 
         mesh = trimesh.load(load_path, force="mesh")

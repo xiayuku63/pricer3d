@@ -1,14 +1,14 @@
 """app/printers.py 打印机模块测试 — 覆盖 resolve_printer、_nozzle_suffix、PRINTER_MODELS 数据完整性。"""
 
-import sys, os, re
+import sys
+import os
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-import pytest
 from app.printers import (
     PRINTER_MODELS,
     resolve_printer,
     _nozzle_suffix,
-    _resolve_user_printer,
 )
 
 

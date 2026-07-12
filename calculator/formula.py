@@ -56,9 +56,7 @@ FORMULA_CANONICAL_VARS = {
 # ── Default formula strings ──
 
 DEFAULT_UNIT_COST_FORMULA = (
-    "material_cost_cny + machine_cost_cny"
-    " + post_process_fee_per_part_cny"
-    " + support_cost_per_part_cny"
+    "material_cost_cny + machine_cost_cny + post_process_fee_per_part_cny + support_cost_per_part_cny"
 )
 DEFAULT_TOTAL_COST_FORMULA = "max(subtotal_cny, min_job_fee_cny)"
 

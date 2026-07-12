@@ -7,7 +7,7 @@ Endpoints:
 
 import logging
 from datetime import datetime, timezone
-from typing import Optional, List
+from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
@@ -81,6 +81,7 @@ class TodoOut(BaseModel):
 # Helpers
 # ──────────────────────────────────────────────
 
+
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -113,17 +114,13 @@ def _serialize_category(row) -> dict:
 # Category endpoints
 # ──────────────────────────────────────────────
 
+
 @router.get("/api/categories")
 async def list_categories(current_user=Depends(get_current_user)):
     """获取当前用户的所有分类"""
     uid = current_user["id"]
     with get_db_session() as db:
-        rows = (
-            db.query(Category)
-            .filter(Category.user_id == uid)
-            .order_by(Category.created_at.asc())
-            .all()
-        )
+        rows = db.query(Category).filter(Category.user_id == uid).order_by(Category.created_at.asc()).all()
         data = [_serialize_category(r) for r in rows]
     return success_response(data)
 
@@ -135,11 +132,7 @@ async def create_category(body: CategoryCreate, current_user=Depends(get_current
     now = _now_iso()
     with get_db_session() as db:
         # 检查同名分类
-        existing = (
-            db.query(Category)
-            .filter(Category.user_id == uid, Category.name == body.name)
-            .first()
-        )
+        existing = db.query(Category).filter(Category.user_id == uid, Category.name == body.name).first()
         if existing:
             raise ConflictError("同名分类已存在")
         cat = Category(name=body.name, user_id=uid, created_at=now)
@@ -180,9 +173,7 @@ async def delete_category(category_id: int, current_user=Depends(get_current_use
         if not cat:
             raise NotFoundError("分类不存在")
         # 将属于该分类的 todo 的 category_id 置空
-        db.query(Todo).filter(Todo.category_id == category_id, Todo.user_id == uid).update(
-            {Todo.category_id: None}
-        )
+        db.query(Todo).filter(Todo.category_id == category_id, Todo.user_id == uid).update({Todo.category_id: None})
         db.delete(cat)
         db.flush()
     return success_response({"deleted_id": category_id})
@@ -191,6 +182,7 @@ async def delete_category(category_id: int, current_user=Depends(get_current_use
 # ──────────────────────────────────────────────
 # Todo CRUD endpoints
 # ──────────────────────────────────────────────
+
 
 @router.get("/api/todos")
 async def list_todos(

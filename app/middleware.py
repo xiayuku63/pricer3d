@@ -44,7 +44,9 @@ async def security_middleware(request: Request, call_next):
             log_request(logger, method, path, 429, 0, client_ip, request.state.request_id)
             return resp
     if path == "/api/auth/verify/send" and method == "POST":
-        if not rate_limiter.is_allowed(f"verify_send_ip:{client_ip}", VERIFY_SEND_RATE_LIMIT_PER_10MIN, window_seconds=600):
+        if not rate_limiter.is_allowed(
+            f"verify_send_ip:{client_ip}", VERIFY_SEND_RATE_LIMIT_PER_10MIN, window_seconds=600
+        ):
             resp = error_response(42900, "请求过于频繁，请稍后再试", 429)
             resp.headers["X-Request-ID"] = request.state.request_id
             log_request(logger, method, path, 429, 0, client_ip, request.state.request_id)

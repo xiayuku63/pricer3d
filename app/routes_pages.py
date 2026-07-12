@@ -17,11 +17,19 @@ async def index():
     """Assemble index.html from partials."""
     partials_dir = "static/partials"
     order = [
-        "head", "page-shell", "login-modal", "membership-modal",
-        "options-modal", "user-center-modal", "quote-history-modal",
-        "preview-modal", "orient-modal", "color-editor-modal",
+        "head",
+        "page-shell",
+        "login-modal",
+        "membership-modal",
+        "options-modal",
+        "user-center-modal",
+        "quote-history-modal",
+        "preview-modal",
+        "orient-modal",
+        "color-editor-modal",
         "zip-preview-modal",
-        "scripts", "closing",
+        "scripts",
+        "closing",
     ]
     parts = []
     for name in order:
@@ -380,6 +388,7 @@ def pay_mock(order_no: str = ""):
 
 def healthz():
     import shutil
+
     disk = shutil.disk_usage(".")
     return {
         "status": "ok",
@@ -391,9 +400,11 @@ def healthz():
 
 def readyz():
     import shutil
+
     try:
         from .db import get_db_session
         from .models_orm import User as UserORM
+
         with get_db_session() as db:
             user_count = db.query(UserORM).count()
         disk = shutil.disk_usage(".")
@@ -411,7 +422,6 @@ def readyz():
 
 def version():
     """Return application version and deploy time from VERSION file."""
-    import os
     version_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "VERSION")
     result = {"version": "unknown", "deployed_at": None, "env": APP_ENV}
     try:
@@ -431,8 +441,8 @@ def version():
 
 def printer_params_page():
     """打印机参数管理页面"""
-    from fastapi.responses import HTMLResponse
     import os
+
     html_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "html", "printer_params.html")
     with open(html_path, "r", encoding="utf-8") as f:
         return HTMLResponse(f.read())
@@ -440,8 +450,8 @@ def printer_params_page():
 
 def materials_page():
     """材料管理页面"""
-    from fastapi.responses import HTMLResponse
     import os
+
     html_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "html", "materials.html")
     with open(html_path, "r", encoding="utf-8") as f:
         return HTMLResponse(f.read())
@@ -449,8 +459,8 @@ def materials_page():
 
 def quote_page():
     """报价计算页面（带材料选择器）"""
-    from fastapi.responses import HTMLResponse
     import os
+
     html_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "html", "quote.html")
     with open(html_path, "r", encoding="utf-8") as f:
         return HTMLResponse(f.read())

@@ -17,7 +17,7 @@ import logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [cleanup] %(message)s")
 logger = logging.getLogger("cleanup")
 
-GCODE_RETENTION_SECONDS = 7 * 24 * 3600    # 7 days
+GCODE_RETENTION_SECONDS = 7 * 24 * 3600  # 7 days
 UPLOAD_RETENTION_SECONDS = 30 * 24 * 3600  # 30 days
 DRY_RUN = os.getenv("CLEANUP_DRY_RUN", "").strip().lower() in ("1", "true", "yes")
 

@@ -1,8 +1,6 @@
 """Printer preset API routes."""
 
-import json
 import logging
-from typing import Optional
 
 from fastapi import Request, Depends, HTTPException
 from fastapi.responses import PlainTextResponse
@@ -52,8 +50,9 @@ async def api_get_printer_preset(preset_id: int, current_user=Depends(get_curren
         raise HTTPException(status_code=500, detail=f"INTERNAL_ERROR: {str(e)}")
 
 
-async def api_create_printer_preset(payload: PrinterPresetRequest, request: Request,
-                                     current_user=Depends(get_current_user)):
+async def api_create_printer_preset(
+    payload: PrinterPresetRequest, request: Request, current_user=Depends(get_current_user)
+):
     try:
         preset = upsert_printer_preset(
             int(current_user["id"]),
@@ -78,8 +77,7 @@ async def api_create_printer_preset(payload: PrinterPresetRequest, request: Requ
         raise HTTPException(status_code=500, detail=f"INTERNAL_ERROR: {str(e)}")
 
 
-async def api_delete_printer_preset(preset_id: int, request: Request,
-                                     current_user=Depends(get_current_user)):
+async def api_delete_printer_preset(preset_id: int, request: Request, current_user=Depends(get_current_user)):
     try:
         ok = delete_printer_preset(int(current_user["id"]), int(preset_id))
         if not ok:
@@ -98,15 +96,16 @@ async def api_delete_printer_preset(preset_id: int, request: Request,
         raise HTTPException(status_code=500, detail=f"INTERNAL_ERROR: {str(e)}")
 
 
-async def api_download_printer_profile(preset_id: int,
-                                        current_user=Depends(get_current_user)):
+async def api_download_printer_profile(preset_id: int, current_user=Depends(get_current_user)):
     try:
         profile = download_printer_profile(int(current_user["id"]), int(preset_id))
         if not profile:
             raise HTTPException(status_code=404, detail="预设不存在或无权限")
-        return PlainTextResponse(profile.decode("utf-8", errors="replace"),
-                                  media_type="text/plain",
-                                  headers={"Content-Disposition": f"attachment; filename=printer_{preset_id}.ini"})
+        return PlainTextResponse(
+            profile.decode("utf-8", errors="replace"),
+            media_type="text/plain",
+            headers={"Content-Disposition": f"attachment; filename=printer_{preset_id}.ini"},
+        )
     except HTTPException:
         raise
     except Exception as e:

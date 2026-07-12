@@ -6,9 +6,15 @@ use these models + get_session(); existing code continues unchanged.
 
 from datetime import datetime, timezone
 from sqlalchemy import (
-    Column, Integer, String, Float, Text, Boolean, DateTime, ForeignKey, Index, UniqueConstraint,
+    Column,
+    Integer,
+    String,
+    Float,
+    Text,
+    ForeignKey,
+    Index,
+    UniqueConstraint,
 )
-from sqlalchemy.orm import relationship
 
 from .db import Base
 
@@ -45,12 +51,12 @@ class User(Base):
     default_color = Column(String)
     default_brand = Column(String)
     # 品牌定制字段
-    brand_name = Column(String)           # 公司/品牌名称
-    brand_logo_url = Column(String)       # Logo 文件 URL
-    brand_phone = Column(String)          # 联系电话
+    brand_name = Column(String)  # 公司/品牌名称
+    brand_logo_url = Column(String)  # Logo 文件 URL
+    brand_phone = Column(String)  # 联系电话
     brand_contact_email = Column(String)  # 报价联系邮箱（区别于账户邮箱）
-    brand_address = Column(String)        # 公司地址
-    brand_note = Column(Text)             # 默认报价备注/条款
+    brand_address = Column(String)  # 公司地址
+    brand_note = Column(Text)  # 默认报价备注/条款
 
 
 class PrinterPreset(Base):
@@ -63,13 +69,11 @@ class PrinterPreset(Base):
     bed_depth = Column(Float, nullable=False, default=256)
     bed_height = Column(Float, nullable=False, default=256)
     nozzle = Column(Float, nullable=False, default=0.4)
-    nozzles = Column(Text, nullable=False, default='[0.4]')
+    nozzles = Column(Text, nullable=False, default="[0.4]")
     profile_b64 = Column(Text, nullable=False)
     created_at = Column(String, nullable=False)
 
-    __table_args__ = (
-        UniqueConstraint("user_id", "name"),
-    )
+    __table_args__ = (UniqueConstraint("user_id", "name"),)
 
 
 class SlicerPreset(Base):
@@ -82,9 +86,7 @@ class SlicerPreset(Base):
     content_b64 = Column(Text, nullable=False)
     created_at = Column(String, nullable=False)
 
-    __table_args__ = (
-        UniqueConstraint("user_id", "name"),
-    )
+    __table_args__ = (UniqueConstraint("user_id", "name"),)
 
 
 class VerificationCode(Base):
@@ -99,9 +101,7 @@ class VerificationCode(Base):
     used_at = Column(String)
     attempts = Column(Integer, default=0)
 
-    __table_args__ = (
-        Index("idx_vc_target", "channel", "target"),
-    )
+    __table_args__ = (Index("idx_vc_target", "channel", "target"),)
 
 
 class AuditEvent(Base):
@@ -178,9 +178,7 @@ class MembershipPlan(Base):
     active = Column(Integer, default=1)
     created_at = Column(String)
 
-    __table_args__ = (
-        Index("idx_mp_active", "active"),
-    )
+    __table_args__ = (Index("idx_mp_active", "active"),)
 
 
 class LoginFailure(Base):
@@ -208,9 +206,7 @@ class IdempotencyResponse(Base):
     status_code = Column(Integer)
     response_json = Column(Text)
 
-    __table_args__ = (
-        UniqueConstraint("user_id", "method", "path", "idem_key"),
-    )
+    __table_args__ = (UniqueConstraint("user_id", "method", "path", "idem_key"),)
 
 
 class AppDefault(Base):
@@ -271,6 +267,7 @@ class Todo(Base):
 
 class PrinterParam(Base):
     """打印机高级参数（速度、加速度、抖动限制）"""
+
     __tablename__ = "printer_params"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -283,13 +280,12 @@ class PrinterParam(Base):
     created_at = Column(String, nullable=False)
     updated_at = Column(String, nullable=False)
 
-    __table_args__ = (
-        UniqueConstraint("printer_id", "nozzle"),
-    )
+    __table_args__ = (UniqueConstraint("printer_id", "nozzle"),)
 
 
 class MaterialBrand(Base):
     """材料品牌"""
+
     __tablename__ = "material_brands"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -303,6 +299,7 @@ class MaterialBrand(Base):
 
 class MaterialType(Base):
     """材料类型"""
+
     __tablename__ = "material_types"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -317,6 +314,7 @@ class MaterialType(Base):
 
 class Material(Base):
     """具体材料（品牌+类型+参数）"""
+
     __tablename__ = "materials"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -336,6 +334,4 @@ class Material(Base):
     created_at = Column(String, nullable=False)
     updated_at = Column(String, nullable=False)
 
-    __table_args__ = (
-        UniqueConstraint("brand_id", "type_id", "name"),
-    )
+    __table_args__ = (UniqueConstraint("brand_id", "type_id", "name"),)

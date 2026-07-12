@@ -1,7 +1,6 @@
 """Database backup utilities."""
 
 import os
-import shutil
 import time
 import logging
 from datetime import datetime, timezone
@@ -32,6 +31,7 @@ def create_backup() -> dict:
 
     # Use SQLite backup API for safe copy
     import sqlite3
+
     src = sqlite3.connect(DB_PATH)
     dst = sqlite3.connect(backup_path)
     src.backup(dst)
@@ -59,12 +59,14 @@ def list_backups() -> list[dict]:
         fpath = os.path.join(BACKUP_DIR, fname)
         try:
             stat = os.stat(fpath)
-            backups.append({
-                "name": fname,
-                "path": fpath,
-                "size_bytes": stat.st_size,
-                "mtime_iso": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
-            })
+            backups.append(
+                {
+                    "name": fname,
+                    "path": fpath,
+                    "size_bytes": stat.st_size,
+                    "mtime_iso": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
+                }
+            )
         except OSError:
             continue
     backups.sort(key=lambda b: b["mtime_iso"], reverse=True)

@@ -1,7 +1,7 @@
 """Unified error handling — consistent {code, message, data} responses."""
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import Request, HTTPException
 from fastapi.responses import JSONResponse
@@ -13,8 +13,10 @@ logger = logging.getLogger("pricer3d")
 
 # ── Custom exceptions ──
 
+
 class AppError(HTTPException):
     """Application-level error with code and message."""
+
     def __init__(self, code: int, message: str, status_code: int = 400):
         super().__init__(status_code=status_code, detail=message)
         self.code = code
@@ -63,6 +65,7 @@ class ServiceUnavailableError(AppError):
 
 # ── Response helpers ──
 
+
 def success_response(data: Any = None, message: str = "ok") -> JSONResponse:
     """Wrap a successful response in {code: 0, message, data}."""
     return JSONResponse(
@@ -80,6 +83,7 @@ def error_response(code: int, message: str, status_code: int = 400) -> JSONRespo
 
 
 # ── Exception handlers ──
+
 
 def register_exception_handlers(app):
     """Register global exception handlers on the FastAPI app."""
@@ -140,6 +144,7 @@ def register_exception_handlers(app):
         )
         # Don't leak internal details in production
         from .config import IS_PRODUCTION
+
         message = "服务器内部错误" if IS_PRODUCTION else f"服务器内部错误: {str(exc)}"
         return error_response(
             code=50000,

@@ -9,11 +9,9 @@ NOTE: This module no longer imports from ``app.*``. All app-layer dependencies
 """
 
 import os
-import json
 import logging
 import shutil
 import tempfile
-import time
 import uuid
 from typing import Dict, List, Optional
 
@@ -48,21 +46,8 @@ logger = logging.getLogger(__name__)
 # ═══════════════════════════════════════════════════════════════════
 
 # From calculator.formula
-from calculator.formula import (
-    FORMULA_ALIAS_TO_CANONICAL as FORMULA_ALIAS_TO_CANONICAL,
-    FORMULA_CANONICAL_VARS as FORMULA_CANONICAL_VARS,
-    DEFAULT_UNIT_COST_FORMULA as DEFAULT_UNIT_COST_FORMULA,
-    DEFAULT_TOTAL_COST_FORMULA as DEFAULT_TOTAL_COST_FORMULA,
-    safe_eval_formula as safe_eval_formula,
-    with_formula_aliases as with_formula_aliases,
-    validate_formula_expression as validate_formula_expression,
-)
 
 # From calculator.pricing
-from calculator.pricing import (
-    DEFAULT_MATERIALS as DEFAULT_MATERIALS,
-    DEFAULT_PRICING_CONFIG as DEFAULT_PRICING_CONFIG,
-)
 
 __all__ = [
     # Pure functions (re-exports)
@@ -90,6 +75,7 @@ __all__ = [
 # ═══════════════════════════════════════════════════════════════════
 # Printer param resolution helper (standalone, no app deps)
 # ═══════════════════════════════════════════════════════════════════
+
 
 def resolve_printer_params(
     printer_model_id: str,
@@ -151,6 +137,7 @@ def _check_model_vs_printer_bed(
 # Core cost calculation (no app deps)
 # ═══════════════════════════════════════════════════════════════════
 
+
 def calculate_cost(
     volume_mm3: float,
     surface_area_mm2: float,
@@ -168,9 +155,9 @@ def calculate_cost(
     top_shell_layers: Optional[int] = None,
     bottom_shell_layers: Optional[int] = None,
     model_dimensions: Optional[dict] = None,
-    _resolved_printer: Optional[dict] = None,        # pre-resolved printer info
-    _speed_params: Optional[dict] = None,              # pre-resolved speed params
-    _printer_profile_path: Optional[str] = None,       # pre-resolved profile path
+    _resolved_printer: Optional[dict] = None,  # pre-resolved printer info
+    _speed_params: Optional[dict] = None,  # pre-resolved speed params
+    _printer_profile_path: Optional[str] = None,  # pre-resolved profile path
 ):
     """Calculate cost for a single model from geometry + material + config.
 
@@ -196,7 +183,6 @@ def calculate_cost(
     min_job_fee = float(cfg.get("min_job_fee_cny") or 0.0)
 
     base_unit_cost = material_cost + machine_cost + post_per_part
-    difficulty_multiplier = 1.0
 
     # ── 自动朝向优化 (Lay on Face) ──
     orientation_info: dict = {}
@@ -207,7 +193,8 @@ def calculate_cost(
 
             _learned_model = os.path.join(
                 os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                "data", "orientation_model.pkl",
+                "data",
+                "orientation_model.pkl",
             )
             _orient_method = "learned" if os.path.exists(_learned_model) else "coplanar"
             orient_result = get_best_face_for_slicing(model_path, method=_orient_method)
@@ -224,8 +211,7 @@ def calculate_cost(
                     "auto_orient_score": orient_result.get("score"),
                     "euler_angles_deg": orient_result.get("euler_angles_deg"),
                     "selected_face_area": (
-                        orient_result.get("face", {}).get("area")
-                        if orient_result.get("face") else None
+                        orient_result.get("face", {}).get("area") if orient_result.get("face") else None
                     ),
                     "tune_report": orient_result.get("tune_report"),
                 }
@@ -241,7 +227,7 @@ def calculate_cost(
     except Exception:
         use_prusaslicer = str(raw_prusa or "").strip().lower() in {"1", "true", "yes", "y", "on"}
 
-    support_mode = str(cfg.get("support_mode") or "diff").strip().lower() or "diff"
+    str(cfg.get("support_mode") or "diff").strip().lower() or "diff"
 
     slicer_time_s = None
     slicer_filament_g_per_part = None
@@ -262,6 +248,7 @@ def calculate_cost(
             _tmp_3mf_stl = None
             if model_path.lower().endswith(".3mf"):
                 from parser.geometry import _extract_geometry_from_3mf
+
                 _tmp_3mf_stl = _extract_geometry_from_3mf(model_path)
                 if _tmp_3mf_stl:
                     actual_slice_path = _tmp_3mf_stl
@@ -269,7 +256,9 @@ def calculate_cost(
 
             # Use pre-resolved printer profile path if available
             _printer_profile = _printer_profile_path
-            logger.info(f"PrusaSlicer params: _printer_profile={_printer_profile!r} _resolved_printer={_resolved_printer.get('name') if _resolved_printer else None}")
+            logger.info(
+                f"PrusaSlicer params: _printer_profile={_printer_profile!r} _resolved_printer={_resolved_printer.get('name') if _resolved_printer else None}"
+            )
 
             # Pre-check model height vs printer max_print_height
             _printer_max_z = None
@@ -306,7 +295,8 @@ def calculate_cost(
                     speed_kwargs["jerk_limit"] = float(_speed_params["jerk_limit"])
 
             stats = run_prusa_slice(
-                actual_slice_path, output_gcode,
+                actual_slice_path,
+                output_gcode,
                 layer_height=layer_height_mm,
                 infill_percent=infill_percent,
                 perimeters=perimeters or 3,
@@ -423,8 +413,7 @@ def calculate_cost(
         "slicer_fallback": bool(use_prusaslicer and (slicer_time_s is None or slicer_time_s <= 0)),
         "slicer_error": slicer_error_msg,
         "slicer_filament_g_per_part": (
-            round(float(slicer_filament_g_per_part), 3)
-            if slicer_filament_g_per_part is not None else None
+            round(float(slicer_filament_g_per_part), 3) if slicer_filament_g_per_part is not None else None
         ),
         "slicer_preset_used": preset_used,
         "slicer_estimated_time_s": int(slicer_time_s) if slicer_time_s is not None else None,
@@ -439,6 +428,7 @@ def calculate_cost(
 
     # ── G-code analysis ──
     from calculator.gcode_utils import analyze_gcode_output
+
     gcode_summary = None
     if prusaslicer_used and output_gcode and os.path.exists(output_gcode):
         gcode_summary = analyze_gcode_output(output_gcode)
@@ -467,6 +457,7 @@ def calculate_cost(
 # ═══════════════════════════════════════════════════════════════════
 # File-processing orchestration
 # ═══════════════════════════════════════════════════════════════════
+
 
 async def process_single_file(
     file: UploadFile,
@@ -528,7 +519,7 @@ async def process_single_file(
         return {
             "filename": filename,
             "status": "failed",
-            "error": f"文件大小必须小于 {max_file_size // (1024*1024)}MB",
+            "error": f"文件大小必须小于 {max_file_size // (1024 * 1024)}MB",
         }
 
     try:
@@ -536,12 +527,16 @@ async def process_single_file(
         if current_user:
             user_folder = f"user_{current_user['id']}_{current_user['username']}"
             uploads_day_dir = os.path.join(
-                "data", "uploads", user_folder,
+                "data",
+                "uploads",
+                user_folder,
                 _date_folder_utc(),
                 f"{uuid.uuid4().hex[:8]}_{os.path.splitext(os.path.basename(filename))[0]}",
             )
             os.makedirs(uploads_day_dir, exist_ok=True)
-            saved_name = f"{uuid.uuid4().hex[:8]}_{_sanitize_filename(os.path.splitext(os.path.basename(filename))[0])}{ext}"
+            saved_name = (
+                f"{uuid.uuid4().hex[:8]}_{_sanitize_filename(os.path.splitext(os.path.basename(filename))[0])}{ext}"
+            )
             model_saved_path = os.path.join(uploads_day_dir, saved_name)
         else:
             # Anonymous: use temp
@@ -604,8 +599,7 @@ async def process_single_file(
                     "filename": filename,
                     "status": "failed",
                     "error": (
-                        f"模型尺寸 ({dx}×{dy}×{dz}mm) 超出打印机 "
-                        f"{_printer_bed['name']} 的打印范围 ({bw}×{bd}×{bh}mm)"
+                        f"模型尺寸 ({dx}×{dy}×{dz}mm) 超出打印机 {_printer_bed['name']} 的打印范围 ({bw}×{bd}×{bh}mm)"
                     ),
                     "volume_cm3": round(volume / 1000, 2),
                     "surface_area_cm2": round(surface_area / 100, 2),
@@ -629,24 +623,26 @@ async def process_single_file(
             pricing_config["_printer_jerk_limit"] = _speed_params.get("jerk_limit", 0.04)
 
         # ── Calculate cost ──
-        unit_cost, model_weight_g, unit_print_time_h, total_cost, effective_weight_g, total_print_time_h, breakdown = calculate_cost(
-            volume,
-            surface_area,
-            material,
-            layer_height,
-            infill,
-            user_materials,
-            pricing_config,
-            quantity,
-            model_path=model_saved_path,
-            slicer_preset=slicer_preset,
-            perimeters=perimeters,
-            current_user=current_user,
-            auto_orient=auto_orient,
-            model_dimensions=dimensions,
-            _resolved_printer=_printer_bed,
-            _speed_params=_speed_params,
-            _printer_profile_path=_printer_profile,
+        unit_cost, model_weight_g, unit_print_time_h, total_cost, effective_weight_g, total_print_time_h, breakdown = (
+            calculate_cost(
+                volume,
+                surface_area,
+                material,
+                layer_height,
+                infill,
+                user_materials,
+                pricing_config,
+                quantity,
+                model_path=model_saved_path,
+                slicer_preset=slicer_preset,
+                perimeters=perimeters,
+                current_user=current_user,
+                auto_orient=auto_orient,
+                model_dimensions=dimensions,
+                _resolved_printer=_printer_bed,
+                _speed_params=_speed_params,
+                _printer_profile_path=_printer_profile,
+            )
         )
 
         # ── Build result ──
@@ -735,13 +731,26 @@ def process_single_file_sync(
 ):
     """Synchronous wrapper for process_single_file — used in thread pool."""
     import asyncio
+
     # This is a thin sync adapter. The actual deps are resolved upstream
     # in app/services/quote.py before calling.
     return asyncio.run(
         process_single_file(
-            file, material, layer_height, infill, quantity, color,
-            user_materials, pricing_config, slicer_preset, perimeters,
-            current_user, auto_orient, orient_x, orient_y, orient_z,
+            file,
+            material,
+            layer_height,
+            infill,
+            quantity,
+            color,
+            user_materials,
+            pricing_config,
+            slicer_preset,
+            perimeters,
+            current_user,
+            auto_orient,
+            orient_x,
+            orient_y,
+            orient_z,
         )
     )
 
@@ -755,6 +764,7 @@ def _apply_manual_orientation(path: str, orient_x, orient_y, orient_z):
     """Apply manual Euler-angle rotation to a mesh file in-place."""
     try:
         import trimesh as _tm
+
         mobj = _tm.load(path, force="mesh")
         if isinstance(mobj, _tm.Scene):
             mobj = _tm.util.concatenate(mobj.dump())
@@ -763,6 +773,7 @@ def _apply_manual_orientation(path: str, orient_x, orient_y, orient_z):
             ry = np.deg2rad(orient_y or 0)
             rz = np.deg2rad(orient_z or 0)
             from scipy.spatial.transform import Rotation as _R
+
             r = _R.from_euler("xyz", [rx, ry, rz])
             Rmat = np.eye(4)
             Rmat[:3, :3] = r.as_matrix()
@@ -774,7 +785,7 @@ def _apply_manual_orientation(path: str, orient_x, orient_y, orient_z):
 
 def _sanitize_filename(stem: str, fallback: str = "model", max_len: int = 40) -> str:
     """Sanitize a filename stem (replaces unsafe chars)."""
-    safe = re.sub(r'[^a-zA-Z0-9_\-.()\u4e00-\u9fff]', '_', stem)
+    safe = re.sub(r"[^a-zA-Z0-9_\-.()\u4e00-\u9fff]", "_", stem)
     safe = safe[:max_len]
     return safe if safe.strip("._-") else fallback
 
@@ -782,7 +793,8 @@ def _sanitize_filename(stem: str, fallback: str = "model", max_len: int = 40) ->
 def _date_folder_utc() -> str:
     """Return UTC date folder path: YYYY/MM/DD."""
     from datetime import datetime, timezone
+
     return datetime.now(timezone.utc).strftime("%Y/%m/%d")
 
 
-import re
+import re  # noqa: E402

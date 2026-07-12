@@ -7,7 +7,6 @@ import logging
 from typing import Optional
 
 from fastapi import Depends, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import StreamingResponse
 
 from app.deps import get_current_user
 from app.services.zip_quote import (

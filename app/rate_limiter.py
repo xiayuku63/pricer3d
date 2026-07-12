@@ -8,6 +8,7 @@ from collections import defaultdict, deque
 
 _logger = logging.getLogger(__name__)
 
+
 class PersistentRateLimiter:
     """Hybrid rate limiter: fast in-memory check + optional DB persistence."""
 
@@ -41,6 +42,7 @@ class PersistentRateLimiter:
         try:
             from .db import get_db_session
             from .models_orm import RateLimitState
+
             with get_db_session() as db:
                 existing = db.query(RateLimitState).filter(RateLimitState.rate_key == key[:200]).first()
                 bucket_json = f'{{"count":{count},"limit":{limit},"window":{window}}}'
@@ -63,6 +65,7 @@ class PersistentRateLimiter:
         try:
             from .db import get_db_session
             from .models_orm import RateLimitState
+
             now = time.time()
             with get_db_session() as db:
                 rows = db.query(RateLimitState).all()
@@ -71,6 +74,7 @@ class PersistentRateLimiter:
                 for rate_key, bucket_json in row_data:
                     try:
                         import json
+
                         data = json.loads(bucket_json)
                         count = int(data.get("count", 0))
                         if count > 0:
@@ -86,7 +90,7 @@ class PersistentRateLimiter:
 
     def get_state(self, key: str) -> dict:
         """Get current state for a key (for monitoring)."""
-        now = time.time()
+        time.time()
         with self._lock:
             bucket = self._buckets.get(key, deque())
             return {"key": key, "count": len(bucket), "pending": list(bucket)[:10]}

@@ -1,8 +1,6 @@
 """Application settings — loaded from env vars via pydantic-settings."""
 
-import re
 from typing import Optional
-from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -95,19 +93,11 @@ class Settings(BaseSettings):
 
     @property
     def parsed_origins(self) -> list[str]:
-        return [
-            o.strip()
-            for o in self.allowed_origins.split(",")
-            if o.strip()
-        ]
+        return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
 
     @property
     def parsed_admin_usernames(self) -> set[str]:
-        return {
-            x.strip().lower()
-            for x in self.admin_usernames.split(",")
-            if x.strip()
-        }
+        return {x.strip().lower() for x in self.admin_usernames.split(",") if x.strip()}
 
     def _validate_secrets(self) -> None:
         """In production, require secrets to be set. Call at startup."""

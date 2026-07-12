@@ -141,7 +141,7 @@ def fine_tune_orientation(
         "R": best_R,
         "angle": round(best_angle, 1),
         "metrics": best_metrics,
-        "report": "，" .join(report_parts) if "".join(report_parts) else "方向已最优",
+        "report": "，".join(report_parts) if "".join(report_parts) else "方向已最优",
     }
 
 
@@ -150,8 +150,10 @@ def evaluate_orientation(mesh: trimesh.Trimesh, rotation: np.ndarray) -> dict:
     rotated_points = mesh.vertices @ rotation[:3, :3].T + rotation[:3, 3]
     rotated_faces = mesh.faces
     rotated = trimesh.Trimesh(
-        vertices=rotated_points, faces=rotated_faces,
-        process=False, validate=False,
+        vertices=rotated_points,
+        faces=rotated_faces,
+        process=False,
+        validate=False,
     )
     rotated.remove_unreferenced_vertices()
 
@@ -177,9 +179,7 @@ def evaluate_orientation(mesh: trimesh.Trimesh, rotation: np.ndarray) -> dict:
     if np.any(overhang_mask):
         centroids = rotated.triangles_center[overhang_mask]
         heights = centroids[:, 2]
-        support_volume = float(np.sum(
-            face_areas[overhang_mask] * np.maximum(heights, 0.0)
-        )) * 0.3
+        support_volume = float(np.sum(face_areas[overhang_mask] * np.maximum(heights, 0.0))) * 0.3
 
     xy_area = float(np.sum(face_areas * np.abs(dot_z)))
 
@@ -206,11 +206,7 @@ def evaluate_orientation(mesh: trimesh.Trimesh, rotation: np.ndarray) -> dict:
     max_contact = total_area * 0.5
     adhesion_score = min(100.0, contact_area / max(max_contact, 1e-9) * 100.0)
 
-    overall = (
-        support_score * SUPPORT_WEIGHT
-        + time_score * TIME_WEIGHT
-        + adhesion_score * ADHESION_WEIGHT
-    )
+    overall = support_score * SUPPORT_WEIGHT + time_score * TIME_WEIGHT + adhesion_score * ADHESION_WEIGHT
 
     return {
         "score": round(overall, 2),
@@ -242,11 +238,14 @@ def get_stable_faces(model_path: str) -> dict:
     ext = os.path.splitext(model_path)[1].lower()
     if ext in (".stp", ".step"):
         import tempfile as _tempfile
+
         fd, _tmp = _tempfile.mkstemp(suffix=".stl", prefix="p3d_stable_")
         os.close(fd)
         result = subprocess.run(
             ["prusa-slicer", "--export-stl", "--output", _tmp, model_path],
-            capture_output=True, text=True, timeout=120,
+            capture_output=True,
+            text=True,
+            timeout=120,
         )
         if result.returncode != 0 or not os.path.exists(_tmp):
             if _tmp and os.path.exists(_tmp):
@@ -271,7 +270,7 @@ def get_stable_faces(model_path: str) -> dict:
     if not isinstance(mesh, trimesh.Trimesh) or mesh.vertices.shape[0] == 0:
         return {"faces": []}
 
-    if not hasattr(mesh, 'face_normals') or mesh.face_normals is None or len(mesh.face_normals) == 0:
+    if not hasattr(mesh, "face_normals") or mesh.face_normals is None or len(mesh.face_normals) == 0:
         mesh = trimesh.Trimesh(vertices=mesh.vertices, faces=mesh.faces, process=True, validate=True)
 
     used_up_keys = set()
@@ -292,19 +291,21 @@ def get_stable_faces(model_path: str) -> dict:
         R = rotation_from_up_vector(up)
         metrics_result = evaluate_orientation(mesh, R)
         vertices = [[round(float(v[0]), 6), round(float(v[1]), 6), round(float(v[2]), 6)] for v in face_vertices]
-        faces_result.append({
-            "face_index": int(face_idx),
-            "normal": normal.tolist(),
-            "area": round(float(area), 4),
-            "up_vector": up.tolist(),
-            "label": label,
-            "vertices": vertices,
-            "metrics": {
-                "contact_area": round(metrics_result["metrics"]["base_contact_area"], 2),
-                "overhang_ratio": round(metrics_result["metrics"]["overhang_ratio"], 4),
-                "z_height": round(metrics_result["metrics"]["z_height"], 2),
+        faces_result.append(
+            {
+                "face_index": int(face_idx),
+                "normal": normal.tolist(),
+                "area": round(float(area), 4),
+                "up_vector": up.tolist(),
+                "label": label,
+                "vertices": vertices,
+                "metrics": {
+                    "contact_area": round(metrics_result["metrics"]["base_contact_area"], 2),
+                    "overhang_ratio": round(metrics_result["metrics"]["overhang_ratio"], 4),
+                    "z_height": round(metrics_result["metrics"]["z_height"], 2),
+                },
             }
-        })
+        )
 
     try:
         areas = mesh.area_faces
@@ -371,30 +372,35 @@ def get_stable_faces(model_path: str) -> dict:
                 y_min = float(bot[:, 1].min())
                 y_max = float(bot[:, 1].max())
                 z_plane = z_min
-                fv = np.array([
-                    [x_min, y_min, z_plane],
-                    [x_max, y_min, z_plane],
-                    [x_max, y_max, z_plane],
-                    [x_min, y_max, z_plane],
-                ], dtype=float)
+                fv = np.array(
+                    [
+                        [x_min, y_min, z_plane],
+                        [x_max, y_min, z_plane],
+                        [x_max, y_max, z_plane],
+                        [x_min, y_max, z_plane],
+                    ],
+                    dtype=float,
+                )
                 fv_orig = fv @ R[:3, :3]
                 normal_rot = np.array([0.0, 0.0, -1.0])
                 normal_orig = normal_rot @ R[:3, :3]
                 poly_area = (x_max - x_min) * (y_max - y_min)
                 verts_list = [[round(float(v[0]), 6), round(float(v[1]), 6), round(float(v[2]), 6)] for v in fv_orig]
-                faces_result.append({
-                    "face_index": -1,
-                    "normal": normal_orig.tolist(),
-                    "area": round(poly_area, 4),
-                    "up_vector": up.tolist(),
-                    "label": "采样面_{}".format(len(faces_result) + 1),
-                    "vertices": verts_list,
-                    "metrics": {
-                        "contact_area": round(poly_area, 2),
-                        "overhang_ratio": 0.0,
-                        "z_height": round(z_range, 2),
+                faces_result.append(
+                    {
+                        "face_index": -1,
+                        "normal": normal_orig.tolist(),
+                        "area": round(poly_area, 4),
+                        "up_vector": up.tolist(),
+                        "label": "采样面_{}".format(len(faces_result) + 1),
+                        "vertices": verts_list,
+                        "metrics": {
+                            "contact_area": round(poly_area, 2),
+                            "overhang_ratio": 0.0,
+                            "z_height": round(z_range, 2),
+                        },
                     }
-                })
+                )
             except Exception as e:
                 logger.debug("Fibonacci fallback face %d failed: %s", i, e)
                 continue

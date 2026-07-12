@@ -9,8 +9,11 @@ PRINTER_MODELS = [
     {
         "id": "bambu_a1_mini",
         "name": "Bambu Lab A1 Mini",
-        "bed_width": 180, "bed_depth": 180, "bed_height": 180,
-        "nozzle": 0.4, "nozzles": [0.2, 0.4, 0.6],
+        "bed_width": 180,
+        "bed_depth": 180,
+        "bed_height": 180,
+        "nozzle": 0.4,
+        "nozzles": [0.2, 0.4, 0.6],
         "icon": "🖨️",
         "profile": "profiles/prusa/printers/bambu_a1_mini.ini",
     },
@@ -18,8 +21,11 @@ PRINTER_MODELS = [
     {
         "id": "bambu_a1",
         "name": "Bambu Lab A1",
-        "bed_width": 256, "bed_depth": 256, "bed_height": 256,
-        "nozzle": 0.4, "nozzles": [0.2, 0.4, 0.6, 0.8],
+        "bed_width": 256,
+        "bed_depth": 256,
+        "bed_height": 256,
+        "nozzle": 0.4,
+        "nozzles": [0.2, 0.4, 0.6, 0.8],
         "icon": "🖨️",
         "profile": "profiles/prusa/printers/bambu_a1.ini",
     },
@@ -27,8 +33,11 @@ PRINTER_MODELS = [
     {
         "id": "bambu_p1p",
         "name": "Bambu Lab P1P",
-        "bed_width": 256, "bed_depth": 256, "bed_height": 256,
-        "nozzle": 0.4, "nozzles": [0.2, 0.4, 0.6, 0.8],
+        "bed_width": 256,
+        "bed_depth": 256,
+        "bed_height": 256,
+        "nozzle": 0.4,
+        "nozzles": [0.2, 0.4, 0.6, 0.8],
         "icon": "🖨️",
         "profile": "profiles/prusa/printers/bambu_p1p.ini",
     },
@@ -36,8 +45,11 @@ PRINTER_MODELS = [
     {
         "id": "bambu_p1s",
         "name": "Bambu Lab P1S",
-        "bed_width": 256, "bed_depth": 256, "bed_height": 256,
-        "nozzle": 0.4, "nozzles": [0.2, 0.4, 0.6, 0.8],
+        "bed_width": 256,
+        "bed_depth": 256,
+        "bed_height": 256,
+        "nozzle": 0.4,
+        "nozzles": [0.2, 0.4, 0.6, 0.8],
         "icon": "🖨️",
         "profile": "profiles/prusa/printers/bambu_p1s.ini",
     },
@@ -45,8 +57,11 @@ PRINTER_MODELS = [
     {
         "id": "bambu_x1c",
         "name": "Bambu Lab X1C",
-        "bed_width": 256, "bed_depth": 256, "bed_height": 256,
-        "nozzle": 0.4, "nozzles": [0.2, 0.4, 0.6, 0.8],
+        "bed_width": 256,
+        "bed_depth": 256,
+        "bed_height": 256,
+        "nozzle": 0.4,
+        "nozzles": [0.2, 0.4, 0.6, 0.8],
         "icon": "🖨️",
         "profile": "profiles/prusa/printers/bambu_x1c.ini",
     },
@@ -54,18 +69,23 @@ PRINTER_MODELS = [
     {
         "id": "bambu_x1e",
         "name": "Bambu Lab X1E",
-        "bed_width": 256, "bed_depth": 256, "bed_height": 256,
-        "nozzle": 0.4, "nozzles": [0.2, 0.4, 0.6, 0.8],
+        "bed_width": 256,
+        "bed_depth": 256,
+        "bed_height": 256,
+        "nozzle": 0.4,
+        "nozzles": [0.2, 0.4, 0.6, 0.8],
         "icon": "🖨️",
         "profile": "profiles/prusa/printers/bambu_x1e.ini",
     },
-
     # ── Bambu Lab P2S (256×256×256mm CoreXY enclosed 2nd-Gen) ──
     {
         "id": "bambu_p2s",
         "name": "Bambu Lab P2S",
-        "bed_width": 256, "bed_depth": 256, "bed_height": 256,
-        "nozzle": 0.4, "nozzles": [0.2, 0.4, 0.6, 0.8],
+        "bed_width": 256,
+        "bed_depth": 256,
+        "bed_height": 256,
+        "nozzle": 0.4,
+        "nozzles": [0.2, 0.4, 0.6, 0.8],
         "icon": "🖨️",
         "profile": "profiles/prusa/printers/bambu_p1s.ini",
     },
@@ -73,8 +93,11 @@ PRINTER_MODELS = [
     {
         "id": "bambu_h2d",
         "name": "Bambu Lab H2D",
-        "bed_width": 350, "bed_depth": 320, "bed_height": 325,
-        "nozzle": 0.4, "nozzles": [0.2, 0.4, 0.6, 0.8],
+        "bed_width": 350,
+        "bed_depth": 320,
+        "bed_height": 325,
+        "nozzle": 0.4,
+        "nozzles": [0.2, 0.4, 0.6, 0.8],
         "icon": "🖨️",
         "profile": "profiles/prusa/printers/bambu_x1c.ini",
     },
@@ -82,8 +105,11 @@ PRINTER_MODELS = [
     {
         "id": "bambu_h2d_pro",
         "name": "Bambu Lab H2D Pro",
-        "bed_width": 350, "bed_depth": 320, "bed_height": 325,
-        "nozzle": 0.4, "nozzles": [0.2, 0.4, 0.6, 0.8],
+        "bed_width": 350,
+        "bed_depth": 320,
+        "bed_height": 325,
+        "nozzle": 0.4,
+        "nozzles": [0.2, 0.4, 0.6, 0.8],
         "icon": "🖨️",
         "profile": "profiles/prusa/printers/bambu_x1c.ini",
     },
@@ -91,18 +117,23 @@ PRINTER_MODELS = [
     {
         "id": "bambu_x2d",
         "name": "Bambu Lab X2D",
-        "bed_width": 256, "bed_depth": 256, "bed_height": 260,
-        "nozzle": 0.4, "nozzles": [0.2, 0.4, 0.6, 0.8],
+        "bed_width": 256,
+        "bed_depth": 256,
+        "bed_height": 260,
+        "nozzle": 0.4,
+        "nozzles": [0.2, 0.4, 0.6, 0.8],
         "icon": "🖨️",
         "profile": "profiles/prusa/printers/bambu_x1c.ini",
     },
-
     # ── Creality K1 (220×220×250mm CoreXY enclosed) ──
     {
         "id": "creality_k1",
         "name": "Creality K1",
-        "bed_width": 220, "bed_depth": 220, "bed_height": 250,
-        "nozzle": 0.4, "nozzles": [0.4, 0.6, 0.8],
+        "bed_width": 220,
+        "bed_depth": 220,
+        "bed_height": 250,
+        "nozzle": 0.4,
+        "nozzles": [0.4, 0.6, 0.8],
         "icon": "🖨️",
         "profile": "profiles/prusa/printers/bambu_a1.ini",
     },
@@ -110,8 +141,11 @@ PRINTER_MODELS = [
     {
         "id": "creality_k1c",
         "name": "Creality K1C",
-        "bed_width": 220, "bed_depth": 220, "bed_height": 250,
-        "nozzle": 0.4, "nozzles": [0.4, 0.6, 0.8],
+        "bed_width": 220,
+        "bed_depth": 220,
+        "bed_height": 250,
+        "nozzle": 0.4,
+        "nozzles": [0.4, 0.6, 0.8],
         "icon": "🖨️",
         "profile": "profiles/prusa/printers/bambu_a1.ini",
     },
@@ -119,8 +153,11 @@ PRINTER_MODELS = [
     {
         "id": "creality_k1_max",
         "name": "Creality K1 Max",
-        "bed_width": 300, "bed_depth": 300, "bed_height": 300,
-        "nozzle": 0.4, "nozzles": [0.4, 0.6, 0.8],
+        "bed_width": 300,
+        "bed_depth": 300,
+        "bed_height": 300,
+        "nozzle": 0.4,
+        "nozzles": [0.4, 0.6, 0.8],
         "icon": "🖨️",
         "profile": "profiles/prusa/printers/bambu_a1.ini",
     },
@@ -128,8 +165,11 @@ PRINTER_MODELS = [
     {
         "id": "creality_k1_se",
         "name": "Creality K1 SE",
-        "bed_width": 220, "bed_depth": 220, "bed_height": 250,
-        "nozzle": 0.4, "nozzles": [0.4, 0.6, 0.8],
+        "bed_width": 220,
+        "bed_depth": 220,
+        "bed_height": 250,
+        "nozzle": 0.4,
+        "nozzles": [0.4, 0.6, 0.8],
         "icon": "🖨️",
         "profile": "profiles/prusa/printers/bambu_a1.ini",
     },
@@ -137,18 +177,23 @@ PRINTER_MODELS = [
     {
         "id": "creality_k2_plus",
         "name": "Creality K2 Plus",
-        "bed_width": 350, "bed_depth": 350, "bed_height": 350,
-        "nozzle": 0.4, "nozzles": [0.4, 0.6, 0.8],
+        "bed_width": 350,
+        "bed_depth": 350,
+        "bed_height": 350,
+        "nozzle": 0.4,
+        "nozzles": [0.4, 0.6, 0.8],
         "icon": "🖨️",
         "profile": "profiles/prusa/printers/bambu_a1.ini",
     },
-
     # ── Voron V2 (250×250×250mm CoreXY) ──
     {
         "id": "voron_v2_250",
         "name": "Voron V2",
-        "bed_width": 250, "bed_depth": 250, "bed_height": 250,
-        "nozzle": 0.4, "nozzles": [0.4],
+        "bed_width": 250,
+        "bed_depth": 250,
+        "bed_height": 250,
+        "nozzle": 0.4,
+        "nozzles": [0.4],
         "icon": "🖨️",
         "profile": "profiles/prusa/printers/voron_v2_250.ini",
     },
@@ -156,8 +201,11 @@ PRINTER_MODELS = [
     {
         "id": "prusa_mk4",
         "name": "Prusa MK4",
-        "bed_width": 250, "bed_depth": 210, "bed_height": 220,
-        "nozzle": 0.4, "nozzles": [0.4],
+        "bed_width": 250,
+        "bed_depth": 210,
+        "bed_height": 220,
+        "nozzle": 0.4,
+        "nozzles": [0.4],
         "icon": "🖨️",
         "profile": "profiles/prusa/printers/prusa_mk4.ini",
     },
@@ -166,7 +214,7 @@ PRINTER_MODELS = [
 
 def resolve_printer(printer_id: str, nozzle: float | None = None) -> dict | None:
     """Resolve a printer model by its compound id (e.g. 'bambu_a1_04') or by model+nozzle pair.
-    
+
     Handles both built-in (bambu_a1_04) and user presets (user_3_04).
     """
     # ── User presets: "user_3_04" or "user_3" ──
@@ -192,8 +240,9 @@ def _resolve_user_printer(printer_id: str, nozzle: float | None = None) -> dict 
     """Resolve user printer preset by compound id like 'user_3_04'."""
     import re
     from .printer_presets import get_printer_preset_by_id
+
     # Parse: user_{preset_id} or user_{preset_id}_{nozzle_suffix}
-    m = re.match(r'^user_(\d+)(?:_(\d+))?$', printer_id)
+    m = re.match(r"^user_(\d+)(?:_(\d+))?$", printer_id)
     if not m:
         return None
     preset_id = int(m.group(1))
@@ -203,10 +252,16 @@ def _resolve_user_printer(printer_id: str, nozzle: float | None = None) -> dict 
         return None
     nz = float(nozzle_suffix) / 10.0 if nozzle_suffix else (nozzle if nozzle is not None else preset["nozzle"])
     # Generate temp profile file
-    import tempfile, os
+    import tempfile
+    import os
+
     fd, path = tempfile.mkstemp(suffix=".ini", prefix="prc3d_user_printer_")
     with os.fdopen(fd, "w") as f:
-        f.write(preset["profile"].decode("utf-8", errors="replace") if isinstance(preset["profile"], bytes) else str(preset["profile"]))
+        f.write(
+            preset["profile"].decode("utf-8", errors="replace")
+            if isinstance(preset["profile"], bytes)
+            else str(preset["profile"])
+        )
     return {
         "id": f"user_{preset['id']}",
         "name": preset["name"],

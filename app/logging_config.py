@@ -3,7 +3,6 @@
 import os
 import logging
 import logging.handlers
-from datetime import datetime, timezone
 
 
 LOG_DIR = os.getenv("LOG_DIR", "logs").strip() or "logs"
@@ -33,8 +32,8 @@ def setup_logging() -> logging.Logger:
     )
     access_handler.setLevel(logging.INFO)
     access_fmt = logging.Formatter(
-        '%(asctime)s | %(levelname)-5s | %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S',
+        "%(asctime)s | %(levelname)-5s | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
     access_handler.setFormatter(access_fmt)
 
@@ -48,8 +47,8 @@ def setup_logging() -> logging.Logger:
     )
     error_handler.setLevel(logging.WARNING)
     error_fmt = logging.Formatter(
-        '%(asctime)s | %(levelname)-5s | %(pathname)s:%(lineno)d | %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S',
+        "%(asctime)s | %(levelname)-5s | %(pathname)s:%(lineno)d | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
     error_handler.setFormatter(error_fmt)
 
@@ -65,11 +64,24 @@ def setup_logging() -> logging.Logger:
     return logger
 
 
-def log_request(logger: logging.Logger, method: str, path: str, status: int, duration_ms: float, client_ip: str, request_id: str = "-") -> None:
+def log_request(
+    logger: logging.Logger,
+    method: str,
+    path: str,
+    status: int,
+    duration_ms: float,
+    client_ip: str,
+    request_id: str = "-",
+) -> None:
     """Log a single HTTP request in structured format."""
     logger.info(
         "ip=%s method=%s path=%s status=%d duration_ms=%.2f rid=%s",
-        client_ip, method, path, status, duration_ms, request_id,
+        client_ip,
+        method,
+        path,
+        status,
+        duration_ms,
+        request_id,
     )
 
 

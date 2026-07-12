@@ -2,7 +2,7 @@
 
 from typing import Optional
 from pydantic import BaseModel, Field, field_validator
-from ..config import USERNAME_PATTERN, EMAIL_PATTERN, PHONE_PATTERN, PASSWORD_MIN_LENGTH
+from ..config import USERNAME_PATTERN, PASSWORD_MIN_LENGTH
 
 
 class LoginRequest(BaseModel):

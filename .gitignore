@@ -20,3 +20,18 @@ build/
 venv/venv11/Lib/site-packages/pip/
 venv/
 venv11/
+
+# Node
+node_modules/
+
+# Tools
+PrusaSlicer-*.exe
+
+# Debug artifacts
+.playwright-cli/
+.workbuddy/
+test_*.png
+test_dropdown.js
+temp_script.py
+fix_dropdown.py
+nul

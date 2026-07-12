@@ -47,7 +47,7 @@ def get_session() -> Session:
         db.close()
 
 
-from contextlib import contextmanager
+from contextlib import contextmanager  # noqa: E402
 
 
 @contextmanager
@@ -72,6 +72,7 @@ def get_db_session():
 def init_orm() -> None:
     """Create all tables from ORM models. Safe to call repeatedly."""
     from . import models_orm  # noqa — ensure models are registered
+
     Base.metadata.create_all(bind=engine)
 
 
@@ -80,8 +81,8 @@ def init_orm() -> None:
 # in Python. These TypeDecorators convert transparently at the ORM layer
 # without altering the database schema.
 
-import datetime as _dt
-from sqlalchemy.types import TypeDecorator, DateTime, Float
+import datetime as _dt  # noqa: E402
+from sqlalchemy.types import TypeDecorator, DateTime, Float  # noqa: E402
 
 
 class UTCDateTime(TypeDecorator):
@@ -91,6 +92,7 @@ class UTCDateTime(TypeDecorator):
     correctly while keeping the column as TEXT in the DB. The process_result_value
     hook ensures datetime objects are always tz-aware.
     """
+
     impl = DateTime(timezone=True)
     cache_ok = True
 
@@ -135,6 +137,7 @@ class UnixTimestamp(TypeDecorator):
     impl=Float keeps the DB column as REAL; process_bind/result handle
     string→float conversion transparently.
     """
+
     impl = Float
     cache_ok = True
 

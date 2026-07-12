@@ -73,9 +73,9 @@ AUDIT_RETENTION_DAYS = _settings.audit_retention_days
 QUOTE_CONCURRENCY = _settings.quote_concurrency
 
 # ── 朝向学习配置 ──
-ORIENT_LEARNING_AUTO_RETRAIN = True       # 是否自动重训
-ORIENT_LEARNING_MIN_NEW_SAMPLES = 10      # 新样本数阈值
-ORIENT_LEARNING_MIN_POSITIVE = 3          # 最少正样本数
+ORIENT_LEARNING_AUTO_RETRAIN = True  # 是否自动重训
+ORIENT_LEARNING_MIN_NEW_SAMPLES = 10  # 新样本数阈值
+ORIENT_LEARNING_MIN_POSITIVE = 3  # 最少正样本数
 
 ADMIN_USERNAMES = _settings.parsed_admin_usernames
 

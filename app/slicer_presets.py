@@ -47,12 +47,7 @@ def list_slicer_presets(user_id: int) -> list[dict]:
     if uid <= 0:
         return []
     with get_db_session() as db:
-        rows = (
-            db.query(SlicerPreset)
-            .filter(SlicerPreset.user_id == uid)
-            .order_by(SlicerPreset.id.desc())
-            .all()
-        )
+        rows = db.query(SlicerPreset).filter(SlicerPreset.user_id == uid).order_by(SlicerPreset.id.desc()).all()
         out = []
         for r in rows or []:
             out.append(
@@ -93,11 +88,7 @@ def get_slicer_preset_by_id(user_id: int, preset_id: int) -> Optional[dict]:
     if uid <= 0 or pid <= 0:
         return None
     with get_db_session() as db:
-        row = (
-            db.query(SlicerPreset)
-            .filter(SlicerPreset.id == pid, SlicerPreset.user_id == uid)
-            .first()
-        )
+        row = db.query(SlicerPreset).filter(SlicerPreset.id == pid, SlicerPreset.user_id == uid).first()
         if not row:
             return None
         try:
@@ -127,11 +118,7 @@ def upsert_slicer_preset(user_id: int, name: str, ext: str, content: bytes) -> d
     created_at = datetime.now(timezone.utc).isoformat()
     b64 = base64.b64encode(raw).decode("ascii")
     with get_db_session() as db:
-        existing = (
-            db.query(SlicerPreset)
-            .filter(SlicerPreset.user_id == uid, SlicerPreset.name == preset_name)
-            .first()
-        )
+        existing = db.query(SlicerPreset).filter(SlicerPreset.user_id == uid, SlicerPreset.name == preset_name).first()
         if existing:
             existing.ext = safe_ext
             existing.content_b64 = b64

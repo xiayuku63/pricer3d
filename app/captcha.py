@@ -11,7 +11,7 @@ from typing import Optional
 
 from fastapi import HTTPException
 
-from .config import JWT_SECRET_KEY, CAPTCHA_MAX_ATTEMPTS, CAPTCHA_TTL_SECONDS
+from .config import JWT_SECRET_KEY, CAPTCHA_MAX_ATTEMPTS
 
 _logger = logging.getLogger(__name__)
 
@@ -169,7 +169,9 @@ def captcha_svg_fallback(text: str) -> str:
         x2 = rnd.randint(0, width)
         y2 = rnd.randint(0, height)
         alpha = rnd.uniform(0.08, 0.18)
-        lines.append(f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="#64748b" stroke-opacity="{alpha:.2f}" stroke-width="1"/>')
+        lines.append(
+            f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="#64748b" stroke-opacity="{alpha:.2f}" stroke-width="1"/>'
+        )
     chars = []
     for idx, ch in enumerate(text):
         x = int(start_x + idx * char_step + rnd.randint(-1, 1))
@@ -182,10 +184,7 @@ def captcha_svg_fallback(text: str) -> str:
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">'
         f'<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="{bg1}"/><stop offset="100%" stop-color="{bg2}"/></linearGradient></defs>'
-        f'<rect width="{width}" height="{height}" rx="8" fill="url(#g)"/>'
-        + "".join(lines)
-        + "".join(chars)
-        + "</svg>"
+        f'<rect width="{width}" height="{height}" rx="8" fill="url(#g)"/>' + "".join(lines) + "".join(chars) + "</svg>"
     )
 
 

@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 
-from .config import ALLOWED_ORIGINS, IS_PRODUCTION, APP_ENV
+from .config import ALLOWED_ORIGINS, APP_ENV
 from .middleware import security_middleware
 from .logging_config import setup_logging
 from .errors import register_exception_handlers
@@ -34,6 +34,7 @@ async def lifespan(app: FastAPI):
     # Restore rate limit state from DB
     try:
         from .middleware import rate_limiter
+
         rate_limiter.restore_state()
     except Exception as e:
         logger.warning("startup: failed to restore rate limiter state: %s", e)
@@ -70,45 +71,95 @@ def create_app() -> FastAPI:
 
     # ─── register routes ───
     from .routes_auth import (
-        get_captcha, get_captcha_image, send_verify_code, confirm_verify_code,
-        check_register_exists, register, login, admin_login, auth_me,
-        password_reset_request, password_reset_confirm,
+        get_captcha,
+        get_captcha_image,
+        send_verify_code,
+        confirm_verify_code,
+        check_register_exists,
+        register,
+        login,
+        admin_login,
+        auth_me,
+        password_reset_request,
+        password_reset_confirm,
     )
     from .routes_user import (
-        get_user_settings, update_user_settings, change_password,
-        export_user_settings, import_user_settings, reset_user_section,
-        get_brand_settings, update_brand_settings, upload_brand_logo, delete_brand_logo,
+        get_user_settings,
+        update_user_settings,
+        change_password,
+        export_user_settings,
+        import_user_settings,
+        reset_user_section,
+        get_brand_settings,
+        update_brand_settings,
+        upload_brand_logo,
+        delete_brand_logo,
     )
     from .routes_slicer import (
-        api_list_slicer_presets, api_get_slicer_preset, api_generate_slicer_preset, api_upsert_slicer_preset,
-        api_download_slicer_preset, api_delete_slicer_preset, api_list_printers,
+        api_list_slicer_presets,
+        api_get_slicer_preset,
+        api_generate_slicer_preset,
+        api_upsert_slicer_preset,
+        api_download_slicer_preset,
+        api_delete_slicer_preset,
+        api_list_printers,
     )
     from .routes_printer import (
-        api_list_printer_presets, api_get_printer_preset, api_create_printer_preset,
-        api_delete_printer_preset, api_download_printer_profile,
+        api_list_printer_presets,
+        api_get_printer_preset,
+        api_create_printer_preset,
+        api_delete_printer_preset,
+        api_download_printer_profile,
     )
     from .routes_admin import (
-        admin_get_defaults, admin_set_defaults_from_me, admin_list_users,
-        admin_update_user_membership, admin_list_audit, admin_metrics, admin_cleanup,
-        admin_backup_create, admin_backup_list, admin_backup_cleanup,
+        admin_get_defaults,
+        admin_set_defaults_from_me,
+        admin_list_users,
+        admin_update_user_membership,
+        admin_list_audit,
+        admin_metrics,
+        admin_cleanup,
+        admin_backup_create,
+        admin_backup_list,
+        admin_backup_cleanup,
     )
     from .routes_billing import (
-        billing_plans, billing_checkout, billing_orders, billing_mock_complete, billing_webhook,
+        billing_plans,
+        billing_checkout,
+        billing_orders,
+        billing_mock_complete,
+        billing_webhook,
     )
     from .routes.quote import get_quote, validate_formula
     from .routes.zip_quote import zip_quote, zip_preview, download_zip_model, download_zip_template
     from .services.history import quote_history, delete_quote_history, clear_quote_history
     from .services.export import export_quote_history, export_quote_pdf, export_pdf_inline
-    from .routes_orientation import optimize_orientation, list_stable_faces, list_coplanar_clusters, train_sample, model_status, admin_train_model, auto_learned_orient
-    from .routes_pages import (
-        index, register_page, legal_terms, legal_privacy, admin_users_page,
-        pay_mock, healthz, readyz, version,
-        printer_params_page, materials_page, quote_page,
+    from .routes_orientation import (
+        optimize_orientation,
+        list_stable_faces,
+        list_coplanar_clusters,
+        train_sample,
+        model_status,
+        admin_train_model,
+        auto_learned_orient,
     )
-    from .schemas.auth import TokenResponse, CaptchaResponse
-    from .schemas.quote import QuoteResponse, FormulaValidateRequest, QuoteHistoryItem
+    from .routes_pages import (
+        index,
+        register_page,
+        legal_terms,
+        legal_privacy,
+        admin_users_page,
+        pay_mock,
+        healthz,
+        readyz,
+        version,
+        printer_params_page,
+        materials_page,
+        quote_page,
+    )
+    from .schemas.quote import QuoteResponse, QuoteHistoryItem
     from .schemas.common import PaginatedData
-    from .schemas.user import MembershipPlan, BillingOrder
+    from .schemas.user import BillingOrder
 
     # auth
     app.get("/api/auth/captcha")(get_captcha)
@@ -190,18 +241,22 @@ def create_app() -> FastAPI:
 
     # preview
     from .routes_preview import router as preview_router
+
     app.include_router(preview_router)
 
     # printer params
     from .routes_printer_params import router as printer_params_router
+
     app.include_router(printer_params_router)
 
     # materials
     from .routes_materials import router as materials_router
+
     app.include_router(materials_router)
 
     # todo
     from .todo_api import router as todo_router
+
     app.include_router(todo_router)
 
     # orientation
@@ -215,9 +270,16 @@ def create_app() -> FastAPI:
 
     # todo
     from .routes_todo import (
-        list_categories, create_category, delete_category,
-        list_todos, get_todo, create_todo, update_todo, delete_todo,
+        list_categories,
+        create_category,
+        delete_category,
+        list_todos,
+        get_todo,
+        create_todo,
+        update_todo,
+        delete_todo,
     )
+
     app.get("/api/categories")(list_categories)
     app.post("/api/categories")(create_category)
     app.delete("/api/categories/{category_id}")(delete_category)

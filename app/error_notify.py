@@ -2,7 +2,6 @@
 
 import os
 import logging
-from collections import defaultdict, deque
 import threading
 import time
 
@@ -34,6 +33,7 @@ class ErrorNotifier:
         try:
             import urllib.request
             import json
+
             payload = {
                 "type": error_type,
                 "message": message[:500],

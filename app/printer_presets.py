@@ -21,12 +21,7 @@ def list_printer_presets(user_id: int) -> list[dict]:
     if uid <= 0:
         return []
     with get_db_session() as db:
-        rows = (
-            db.query(PrinterPreset)
-            .filter(PrinterPreset.user_id == uid)
-            .order_by(PrinterPreset.id.desc())
-            .all()
-        )
+        rows = db.query(PrinterPreset).filter(PrinterPreset.user_id == uid).order_by(PrinterPreset.id.desc()).all()
     out = []
     for r in rows or []:
         try:
@@ -34,16 +29,18 @@ def list_printer_presets(user_id: int) -> list[dict]:
         except Exception as e:
             _logger.debug("printer_presets: failed to parse nozzles JSON for preset id=%s: %s", r.id, e)
             nozzles = [0.4]
-        out.append({
-            "id": int(r.id),
-            "name": str(r.name or ""),
-            "bed_width": float(r.bed_width),
-            "bed_depth": float(r.bed_depth),
-            "bed_height": float(r.bed_height),
-            "nozzle": float(r.nozzle),
-            "nozzles": nozzles,
-            "created_at": str(r.created_at or ""),
-        })
+        out.append(
+            {
+                "id": int(r.id),
+                "name": str(r.name or ""),
+                "bed_width": float(r.bed_width),
+                "bed_depth": float(r.bed_depth),
+                "bed_height": float(r.bed_height),
+                "nozzle": float(r.nozzle),
+                "nozzles": nozzles,
+                "created_at": str(r.created_at or ""),
+            }
+        )
     return out
 
 
@@ -53,11 +50,7 @@ def get_printer_preset_by_id(user_id: int, preset_id: int) -> Optional[dict]:
     if uid <= 0 or pid <= 0:
         return None
     with get_db_session() as db:
-        row = (
-            db.query(PrinterPreset)
-            .filter(PrinterPreset.id == pid, PrinterPreset.user_id == uid)
-            .first()
-        )
+        row = db.query(PrinterPreset).filter(PrinterPreset.id == pid, PrinterPreset.user_id == uid).first()
     if not row:
         return None
     try:
@@ -83,9 +76,14 @@ def get_printer_preset_by_id(user_id: int, preset_id: int) -> Optional[dict]:
     }
 
 
-def _generate_printer_profile(bed_width: float, bed_depth: float, bed_height: float,
-                               nozzle: float = 0.4, acceleration: int = 10000,
-                               speed: int = 250) -> str:
+def _generate_printer_profile(
+    bed_width: float,
+    bed_depth: float,
+    bed_height: float,
+    nozzle: float = 0.4,
+    acceleration: int = 10000,
+    speed: int = 250,
+) -> str:
     """Generate INI content for a printer profile."""
     return f"""# {int(bed_width)}x{int(bed_depth)}x{int(bed_height)}mm printer profile
 bed_shape = 0x0,{int(bed_width)}x0,{int(bed_width)}x{int(bed_depth)},0x{int(bed_depth)}
@@ -129,8 +127,9 @@ first_layer_height = 0.35
 """
 
 
-def upsert_printer_preset(user_id: int, name: str, bed_width: float, bed_depth: float,
-                           bed_height: float, nozzle: float, nozzles: list[float]) -> dict:
+def upsert_printer_preset(
+    user_id: int, name: str, bed_width: float, bed_depth: float, bed_height: float, nozzle: float, nozzles: list[float]
+) -> dict:
     uid = int(user_id or 0)
     if uid <= 0:
         raise HTTPException(status_code=401, detail="未登录")
@@ -152,9 +151,7 @@ def upsert_printer_preset(user_id: int, name: str, bed_width: float, bed_depth: 
 
     with get_db_session() as db:
         existing = (
-            db.query(PrinterPreset)
-            .filter(PrinterPreset.user_id == uid, PrinterPreset.name == preset_name)
-            .first()
+            db.query(PrinterPreset).filter(PrinterPreset.user_id == uid, PrinterPreset.name == preset_name).first()
         )
         if existing:
             existing.bed_width = bw

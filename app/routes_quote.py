@@ -1,22 +1,32 @@
 """Quote route and formula validation."""
 
 import asyncio
-import concurrent.futures
 import json
 import logging
 import re
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import Depends, FastAPI, UploadFile, File, Form, HTTPException, Request
+from fastapi import Depends, UploadFile, File, Form, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from .config import DEFAULT_MATERIALS, DEFAULT_PRICING_CONFIG, MAX_FILES_PER_REQUEST, QUOTE_CONCURRENCY, FREE_TOTAL_MODEL_LIMIT
+from .config import (
+    DEFAULT_MATERIALS,
+    DEFAULT_PRICING_CONFIG,
+    MAX_FILES_PER_REQUEST,
+    QUOTE_CONCURRENCY,
+    FREE_TOTAL_MODEL_LIMIT,
+)
 from .db import get_db_session
 from .models_orm import User, QuoteHistory
 from .deps import get_current_user, get_membership_effective
-from .audit import write_audit_event, get_idempotency_key_from_request, try_get_idempotent_response, save_idempotent_response
+from .audit import (
+    write_audit_event,
+    get_idempotency_key_from_request,
+    try_get_idempotent_response,
+    save_idempotent_response,
+)
 from .slicer_presets import get_slicer_preset_by_id
 from calculator.cost import (
     validate_formula_expression,
@@ -47,6 +57,7 @@ async def get_quote(
 ):
     logger.warning("ROUTE_DEBUG auto_orient=%s type=%s", auto_orient, type(auto_orient).__name__)
     from .config import MEMBER_DISCOUNT_PERCENT
+
     try:
         idem_key = get_idempotency_key_from_request(request)
         if idem_key:
@@ -69,14 +80,22 @@ async def get_quote(
         # 免费用户累计模型总数限制（不限制单次数量）
         from .deps import is_member_user
         from sqlalchemy import func as sqlfunc
+
         if not is_member_user(current_user):
             with get_db_session() as db:
-                existing_count = db.query(sqlfunc.count(QuoteHistory.id)).filter(
-                    QuoteHistory.user_id == current_user["id"],
-                    QuoteHistory.status == "success",
-                ).scalar() or 0
+                existing_count = (
+                    db.query(sqlfunc.count(QuoteHistory.id))
+                    .filter(
+                        QuoteHistory.user_id == current_user["id"],
+                        QuoteHistory.status == "success",
+                    )
+                    .scalar()
+                    or 0
+                )
             if existing_count >= FREE_TOTAL_MODEL_LIMIT:
-                raise HTTPException(status_code=400, detail=f"免费用户最多累计 {FREE_TOTAL_MODEL_LIMIT} 个模型，升级会员无限制")
+                raise HTTPException(
+                    status_code=400, detail=f"免费用户最多累计 {FREE_TOTAL_MODEL_LIMIT} 个模型，升级会员无限制"
+                )
 
         with get_db_session() as db:
             row = db.query(User.materials, User.pricing_config).filter(User.id == current_user["id"]).first()
@@ -92,7 +111,9 @@ async def get_quote(
         if material not in material_names:
             raise HTTPException(status_code=400, detail="材料参数不合法")
 
-        selected_material = next((m for m in user_materials if isinstance(m, dict) and str(m.get("name")) == material), None)
+        selected_material = next(
+            (m for m in user_materials if isinstance(m, dict) and str(m.get("name")) == material), None
+        )
         allowed_colors = []
         if selected_material:
             raw_colors = selected_material.get("colors", [])
@@ -126,9 +147,21 @@ async def get_quote(
                 try:
                     return await asyncio.to_thread(
                         _process_single_file_sync,
-                        file, material, layer_height, infill, quantity, color,
-                        user_materials, pricing_config, slicer_preset, wall_count, current_user,
-                        auto_orient, orient_x, orient_y, orient_z,
+                        file,
+                        material,
+                        layer_height,
+                        infill,
+                        quantity,
+                        color,
+                        user_materials,
+                        pricing_config,
+                        slicer_preset,
+                        wall_count,
+                        current_user,
+                        auto_orient,
+                        orient_x,
+                        orient_y,
+                        orient_z,
                     )
                 except Exception as e:
                     fname = file.filename or "unknown"
@@ -137,7 +170,9 @@ async def get_quote(
                         "filename": fname,
                         "status": "failed",
                         "error": f"INTERNAL_ERROR: {str(e)}",
-                        "cost_cny": 0, "weight_g": 0, "estimated_time_h": 0,
+                        "cost_cny": 0,
+                        "weight_g": 0,
+                        "estimated_time_h": 0,
                     }
 
         tasks = [process_one(f) for f in files]
@@ -247,17 +282,32 @@ def _process_single_file_sync(
     resources if the coroutine left pending tasks.
     """
     import asyncio
+
     return asyncio.run(
         process_single_file(
-            file, material, layer_height, infill, quantity, color,
-            user_materials, pricing_config, slicer_preset, perimeters, current_user,
-            auto_orient, orient_x, orient_y, orient_z,
+            file,
+            material,
+            layer_height,
+            infill,
+            quantity,
+            color,
+            user_materials,
+            pricing_config,
+            slicer_preset,
+            perimeters,
+            current_user,
+            auto_orient,
+            orient_x,
+            orient_y,
+            orient_z,
         )
     )
+
 
 def _save_quote_history(user_id: int, results: list) -> None:
     """Save quote results to history table."""
     from datetime import datetime, timezone
+
     now = datetime.now(timezone.utc).isoformat()
     with get_db_session() as db:
         for item in results:
@@ -278,12 +328,13 @@ def _save_quote_history(user_id: int, results: list) -> None:
                     pass
 
             # 从复合ID(bambu_a1_04)提取裸模型ID，喷嘴直径作为fallback
-            m = re.match(r'^(.+?)_(\d{2})$', raw_pm) if raw_pm else None
+            m = re.match(r"^(.+?)_(\d{2})$", raw_pm) if raw_pm else None
             if m:
                 printer_model = m.group(1)  # bambu_a1
                 # 查找打印机显示名称
                 try:
                     from app.printers import PRINTER_MODELS
+
                     for pm_def in PRINTER_MODELS:
                         if pm_def["id"] == printer_model:
                             printer_model = pm_def["name"]
@@ -298,6 +349,7 @@ def _save_quote_history(user_id: int, results: list) -> None:
                 if printer_model:
                     try:
                         from app.printers import PRINTER_MODELS, resolve_printer
+
                         rp = resolve_printer(printer_model)
                         if rp:
                             printer_model = rp.get("name", printer_model)
@@ -358,7 +410,9 @@ def _save_quote_history(user_id: int, results: list) -> None:
                 cost_breakdown=cost_breakdown_str,
                 slicer_fallback=int(bool((breakdown or {}).get("slicer_fallback"))) if breakdown else 0,
                 slicer_error=(breakdown or {}).get("slicer_error") if breakdown else None,
-                slicer_estimated_time_s=float((breakdown or {}).get("slicer_estimated_time_s", 0) or 0) if (breakdown or {}).get("slicer_estimated_time_s") else None,
+                slicer_estimated_time_s=float((breakdown or {}).get("slicer_estimated_time_s", 0) or 0)
+                if (breakdown or {}).get("slicer_estimated_time_s")
+                else None,
             )
             db.add(entry)
 
@@ -368,10 +422,14 @@ async def delete_quote_history(id: int, request: Request, current_user=Depends(g
     uid = int(current_user["id"])
     try:
         with get_db_session() as db:
-            row = db.query(QuoteHistory).filter(
-                QuoteHistory.id == int(id),
-                QuoteHistory.user_id == uid,
-            ).first()
+            row = (
+                db.query(QuoteHistory)
+                .filter(
+                    QuoteHistory.id == int(id),
+                    QuoteHistory.user_id == uid,
+                )
+                .first()
+            )
             if row is None:
                 raise HTTPException(status_code=404, detail="报价记录不存在或无权限删除")
             db.delete(row)
@@ -414,6 +472,7 @@ async def quote_history(limit: int = 20, offset: int = 0, current_user=Depends(g
     safe_limit = max(1, min(int(limit), 100))
     safe_offset = max(0, int(offset))
     from .deps import is_member_user
+
     if not is_member_user(current_user):
         safe_limit = min(safe_limit, 10)
     uid = int(current_user["id"])
@@ -429,29 +488,31 @@ async def quote_history(limit: int = 20, offset: int = 0, current_user=Depends(g
         )
         items = []
         for r in rows:
-            items.append({
-                "id": r.id,
-                "filename": r.filename,
-                "material": r.material,
-                "color": r.color,
-                "quantity": r.quantity,
-                "volume_cm3": round(float(r.volume_cm3 or 0), 2),
-                "weight_g": round(float(r.weight_g or 0), 2),
-                "estimated_time_h": round(float(r.estimated_time_h or 0), 2),
-                "cost_cny": round(float(r.cost_cny or 0), 2),
-                "dimensions": r.dimensions,
-                "status": r.status,
-                "error_msg": r.error_msg,
-                "created_at": r.created_at,
-                "printer_model": r.printer_model,
-                "slicer_preset_id": r.slicer_preset_id,
-                "nozzle_diameter": round(float(r.nozzle_diameter), 2) if r.nozzle_diameter is not None else None,
-                "layer_height": round(float(r.layer_height), 2) if r.layer_height is not None else None,
-                "wall_count": r.wall_count,
-                "infill": r.infill,
-                "brand": r.brand,
-                "cost_breakdown": json.loads(r.cost_breakdown) if r.cost_breakdown else None,
-            })
+            items.append(
+                {
+                    "id": r.id,
+                    "filename": r.filename,
+                    "material": r.material,
+                    "color": r.color,
+                    "quantity": r.quantity,
+                    "volume_cm3": round(float(r.volume_cm3 or 0), 2),
+                    "weight_g": round(float(r.weight_g or 0), 2),
+                    "estimated_time_h": round(float(r.estimated_time_h or 0), 2),
+                    "cost_cny": round(float(r.cost_cny or 0), 2),
+                    "dimensions": r.dimensions,
+                    "status": r.status,
+                    "error_msg": r.error_msg,
+                    "created_at": r.created_at,
+                    "printer_model": r.printer_model,
+                    "slicer_preset_id": r.slicer_preset_id,
+                    "nozzle_diameter": round(float(r.nozzle_diameter), 2) if r.nozzle_diameter is not None else None,
+                    "layer_height": round(float(r.layer_height), 2) if r.layer_height is not None else None,
+                    "wall_count": r.wall_count,
+                    "infill": r.infill,
+                    "brand": r.brand,
+                    "cost_breakdown": json.loads(r.cost_breakdown) if r.cost_breakdown else None,
+                }
+            )
     return {"items": items, "total": total, "limit": safe_limit, "offset": safe_offset}
 
 
@@ -528,6 +589,7 @@ async def export_quote_history(
     from datetime import datetime
     from fastapi.responses import StreamingResponse
     from .deps import is_member_user
+
     if not is_member_user(current_user):
         raise HTTPException(status_code=403, detail="导出功能仅限会员使用")
 
@@ -574,7 +636,7 @@ async def export_quote_history(
             ws.title = "报价历史"
 
             # Header styling
-            header_font = Font(bold=True, size=11)
+            Font(bold=True, size=11)
             header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
             header_font_white = Font(bold=True, size=11, color="FFFFFF")
             thin_border = Border(
@@ -694,22 +756,24 @@ async def export_quote_pdf(
         # Build items list
         items = []
         for r in rows:
-            items.append({
-                "filename": r.filename or "",
-                "material": r.material or "",
-                "color": r.color or "",
-                "quantity": int(r.quantity or 1),
-                "volume_cm3": round(float(r.volume_cm3 or 0), 2),
-                "weight_g": round(float(r.weight_g or 0), 2),
-                "estimated_time_h": round(float(r.estimated_time_h or 0), 2),
-                "cost_cny": round(float(r.cost_cny or 0), 2),
-                "printer_model": r.printer_model or "",
-                "nozzle_diameter": round(float(r.nozzle_diameter), 2) if r.nozzle_diameter is not None else "",
-                "layer_height": round(float(r.layer_height), 2) if r.layer_height is not None else 0,
-                "wall_count": int(r.wall_count) if r.wall_count is not None else 0,
-                "infill_percent": int(r.infill) if r.infill is not None else 0,
-                "brand": r.brand or "",
-            })
+            items.append(
+                {
+                    "filename": r.filename or "",
+                    "material": r.material or "",
+                    "color": r.color or "",
+                    "quantity": int(r.quantity or 1),
+                    "volume_cm3": round(float(r.volume_cm3 or 0), 2),
+                    "weight_g": round(float(r.weight_g or 0), 2),
+                    "estimated_time_h": round(float(r.estimated_time_h or 0), 2),
+                    "cost_cny": round(float(r.cost_cny or 0), 2),
+                    "printer_model": r.printer_model or "",
+                    "nozzle_diameter": round(float(r.nozzle_diameter), 2) if r.nozzle_diameter is not None else "",
+                    "layer_height": round(float(r.layer_height), 2) if r.layer_height is not None else 0,
+                    "wall_count": int(r.wall_count) if r.wall_count is not None else 0,
+                    "infill_percent": int(r.infill) if r.infill is not None else 0,
+                    "brand": r.brand or "",
+                }
+            )
 
         # Determine member discount
         membership_level, _ = get_membership_effective(current_user)
@@ -778,6 +842,7 @@ class PdfInlineItem(BaseModel):
     infill_percent: int = 0
     brand: str = ""
     thumbnail_b64: str = ""
+
 
 class PdfInlineRequest(BaseModel):
     items: List[PdfInlineItem]

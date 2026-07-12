@@ -23,25 +23,27 @@ logger = logging.getLogger(__name__)
 def _env_file_prusa_executable() -> str:
     """Best-effort read of PRUSA_EXECUTABLE from the project .env file."""
     root = os.path.dirname(os.path.dirname(__file__))
-    env_path = os.path.join(root, '.env')
+    env_path = os.path.join(root, ".env")
     if not os.path.isfile(env_path):
-        return ''
+        return ""
     try:
-        with open(env_path, 'r', encoding='utf-8') as f:
+        with open(env_path, "r", encoding="utf-8") as f:
             for raw_line in f:
                 line = raw_line.strip()
-                if not line or line.startswith('#') or '=' not in line:
+                if not line or line.startswith("#") or "=" not in line:
                     continue
-                key, value = line.split('=', 1)
-                if key.strip() != 'PRUSA_EXECUTABLE':
+                key, value = line.split("=", 1)
+                if key.strip() != "PRUSA_EXECUTABLE":
                     continue
                 value = value.strip().strip('"').strip("'")
                 return value
     except Exception:
-        return ''
-    return ''
+        return ""
+    return ""
+
 
 # ── Executable discovery ──
+
 
 def prusa_executable() -> Optional[str]:
     """Return path to prusa-slicer binary, or None if not installed.
@@ -53,6 +55,7 @@ def prusa_executable() -> Optional[str]:
     4. Check well-known Windows install paths.
     """
     import sys as _sys
+
     _env = os.getenv("PRUSA_EXECUTABLE", "").strip()
     if _env and os.path.isfile(_env):
         return _env
@@ -99,6 +102,7 @@ def prusa_executable_diagnostics() -> dict:
 
 
 # ── G-code parsing ──
+
 
 def parse_prusa_gcode_stats(gcode_path: str) -> dict:
     """Parse PrusaSlicer G-code for filament usage and print time."""
@@ -149,6 +153,7 @@ def _load_system_ini() -> str:
         raise RuntimeError(f"System PrusaSlicer config not found: {_SYSTEM_INI_PATH}")
     with open(_SYSTEM_INI_PATH, "r", encoding="utf-8") as f:
         return f.read()
+
 
 def _parse_ini_sections(content: str) -> dict[str, dict[str, str]]:
     """Parse INI content into {section_name: {key: value}} dict.
@@ -228,10 +233,7 @@ def _merge_preset_into_sections(
     text = raw.decode("utf-8", errors="replace")
 
     # Detect flat vs sectioned
-    has_sections = any(
-        line.strip().startswith("[") and line.strip().endswith("]")
-        for line in text.split("\n")
-    )
+    has_sections = any(line.strip().startswith("[") and line.strip().endswith("]") for line in text.split("\n"))
 
     if has_sections:
         preset_sections = _parse_ini_sections(text)
@@ -285,8 +287,12 @@ def generate_slice_config(
     # ── Apply user preset overrides ──
     # System preset (is_default=True) is NOT merged — quote params override it.
     # Only user-created presets are merged; they take precedence over quote form params.
-    if slicer_preset and isinstance(slicer_preset, dict) and slicer_preset.get("content") \
-            and not slicer_preset.get("is_default"):
+    if (
+        slicer_preset
+        and isinstance(slicer_preset, dict)
+        and slicer_preset.get("content")
+        and not slicer_preset.get("is_default")
+    ):
         raw = slicer_preset["content"]
         first_byte = raw[:1] if raw else b""
         if first_byte not in (b"{", b"[") and b"=" in raw:
@@ -321,28 +327,43 @@ def generate_slice_config(
         ps["sparse_infill_density"] = f"{infill_percent}%"
         ps["perimeters"] = str(perimeters)
         ps["wall_loops"] = str(perimeters)
-        ps["top_shell_layers"] = str(top_shell_layers) if top_shell_layers is not None else str(max(3, min(perimeters + 2, 10)))
-        ps["bottom_shell_layers"] = str(bottom_shell_layers) if bottom_shell_layers is not None else str(max(3, min(perimeters + 2, 10)))
+        ps["top_shell_layers"] = (
+            str(top_shell_layers) if top_shell_layers is not None else str(max(3, min(perimeters + 2, 10)))
+        )
+        ps["bottom_shell_layers"] = (
+            str(bottom_shell_layers) if bottom_shell_layers is not None else str(max(3, min(perimeters + 2, 10)))
+        )
 
     # ── Ensure fill_pattern is compatible with fill_density ──
     # PrusaSlicer rejects many patterns at 100% density.
     # Define known-compatible patterns and force "alignedrectilinear" for
     # ALL fill pattern fields when infill >= 99%.
-    _FILL_100_SAFE = frozenset({
-        "rectilinear", "alignedrectilinear",
-    })
+    _FILL_100_SAFE = frozenset(
+        {
+            "rectilinear",
+            "alignedrectilinear",
+        }
+    )
     if infill_percent >= 99:
         _safe_pattern = "alignedrectilinear"
         # PrusaSlicer 2.7.x checks ALL fill pattern keys at 100% density —
         # if any single key is set to an incompatible pattern, slicing fails.
-        for _field in ("fill_pattern", "sparse_infill_pattern", "solid_fill_pattern",
-                       "top_fill_pattern", "bottom_fill_pattern"):
+        for _field in (
+            "fill_pattern",
+            "sparse_infill_pattern",
+            "solid_fill_pattern",
+            "top_fill_pattern",
+            "bottom_fill_pattern",
+        ):
             _cur = ps.get(_field, "grid")
             if _cur not in _FILL_100_SAFE:
                 ps[_field] = _safe_pattern
                 logger.info(
                     "PrusaSlicer config: override %s '%s' -> '%s' for %d%% infill",
-                    _field, _cur, _safe_pattern, infill_percent,
+                    _field,
+                    _cur,
+                    _safe_pattern,
+                    infill_percent,
                 )
             elif _field not in ps:
                 ps[_field] = _cur
@@ -383,7 +404,9 @@ def generate_slice_config(
     fd, path = tempfile.mkstemp(suffix=".ini", prefix="prc3d_")
     with os.fdopen(fd, "w") as f:
         f.write("; Generated by pricer3d — combined slice config (flat, deduplicated)\n")
-        f.write(f"; layer_height={layer_height} infill={infill_percent}% perimeters={perimeters} density={material_density}\n\n")
+        f.write(
+            f"; layer_height={layer_height} infill={infill_percent}% perimeters={perimeters} density={material_density}\n\n"
+        )
         for key in sorted(flat_config):
             f.write(f"{key} = {flat_config[key]}\n")
 
@@ -422,6 +445,7 @@ def run_prusa_slice(
     exe = prusa_executable()
     if not exe:
         import sys as _sys
+
         if _sys.platform == "win32":
             raise RuntimeError("PrusaSlicer not found on Windows - install PrusaSlicer or set PRUSA_EXECUTABLE")
         raise RuntimeError("PrusaSlicer not found - install: apt-get install prusa-slicer")
@@ -454,16 +478,20 @@ def run_prusa_slice(
     cmd = [
         exe,
         "--ignore-nonexistent-config",
-        "--load", config_path,
+        "--load",
+        config_path,
         "--export-gcode",
-        "--output", output_gcode_path,
+        "--output",
+        output_gcode_path,
     ]
     if enable_supports:
         cmd.append("--support-material")
         cmd.append("--support-material-style=organic")
     cmd.append(model_path)
 
-    logger.info(f"PrusaSlicer: preset={preset_label} model={os.path.basename(model_path)} profile={printer_profile_path or 'none'}")
+    logger.info(
+        f"PrusaSlicer: preset={preset_label} model={os.path.basename(model_path)} profile={printer_profile_path or 'none'}"
+    )
 
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=_SLICE_TIMEOUT)
@@ -523,10 +551,15 @@ def prusa_support_diff_stats(
     def _slice_and_get_stats(supports: bool) -> tuple[float, int]:
         """Slice once and return (filament_g, time_s)."""
         gcode = os.path.join(out_dir, f"{prefix}_{'with' if supports else 'no'}_support.gcode")
-        stats = run_prusa_slice(model_path, gcode,
-                                layer_height=layer_height, infill_percent=infill_percent,
-                                perimeters=perimeters, enable_supports=supports,
-                                printer_profile_path=printer_profile_path)
+        stats = run_prusa_slice(
+            model_path,
+            gcode,
+            layer_height=layer_height,
+            infill_percent=infill_percent,
+            perimeters=perimeters,
+            enable_supports=supports,
+            printer_profile_path=printer_profile_path,
+        )
         g = float(stats.get("filament_g") or 0)
         if g <= 0 and float(stats.get("filament_cm3") or 0) > 0:
             g = float(stats["filament_cm3"]) * 1.24
@@ -548,6 +581,7 @@ def prusa_support_diff_stats(
 
 
 # ── Config generation for user presets ──
+
 
 def generate_prusa_config(
     layer_height: float = 0.2,
@@ -606,13 +640,21 @@ def generate_prusa_config(
     ps["brim_width"] = str(brim_width)
 
     # Ensure fill_pattern compatibility with 100% infill
-    _FILL_100_SAFE = frozenset({
-        "rectilinear", "alignedrectilinear",
-    })
+    _FILL_100_SAFE = frozenset(
+        {
+            "rectilinear",
+            "alignedrectilinear",
+        }
+    )
     if infill_percent >= 99:
         _safe_pattern = "alignedrectilinear"
-        for _field in ("fill_pattern", "sparse_infill_pattern", "solid_fill_pattern",
-                       "top_fill_pattern", "bottom_fill_pattern"):
+        for _field in (
+            "fill_pattern",
+            "sparse_infill_pattern",
+            "solid_fill_pattern",
+            "top_fill_pattern",
+            "bottom_fill_pattern",
+        ):
             _cur = ps.get(_field, "grid")
             if _cur not in _FILL_100_SAFE:
                 ps[_field] = _safe_pattern

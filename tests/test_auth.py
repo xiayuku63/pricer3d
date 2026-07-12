@@ -1,6 +1,8 @@
 """Auth flow tests — login, register, rate limiting."""
 
-import sys, os
+import sys
+import os
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
@@ -18,6 +20,7 @@ client = TestClient(app)
 def setup_db():
     """Initialize fresh in-memory DB before each test."""
     from app.database import init_db
+
     init_db()
 
 
@@ -32,47 +35,59 @@ class TestAuthFlow:
         assert "captcha_id" in captcha
 
         # Register with empty channel (allowed for simple username-only reg)
-        r = client.post("/api/auth/register", json={
-            "username": "testuser1",
-            "password": "testpass123",
-            "channel": "email",
-            "email": "test@example.com",
-            "email_code": "123456",
-            "accept_terms": True,
-            "accept_privacy": True,
-        })
+        r = client.post(
+            "/api/auth/register",
+            json={
+                "username": "testuser1",
+                "password": "testpass123",
+                "channel": "email",
+                "email": "test@example.com",
+                "email_code": "123456",
+                "accept_terms": True,
+                "accept_privacy": True,
+            },
+        )
         # Register may fail if email code not verified; just check non-500
         assert r.status_code < 500, f"Register: {r.json()}"
 
         # Login
-        r = client.post("/api/auth/login", data={
-            "username": "testuser1",
-            "password": "testpass123",
-            "captcha_id": captcha["captcha_id"],
-            "captcha_code": captcha.get("code", ""),
-        })
+        r = client.post(
+            "/api/auth/login",
+            data={
+                "username": "testuser1",
+                "password": "testpass123",
+                "captcha_id": captcha["captcha_id"],
+                "captcha_code": captcha.get("code", ""),
+            },
+        )
         # login may fail if captcha not matched, just verify structured response
         assert "code" in r.json()
 
     def test_register_duplicate(self):
-        client.post("/api/auth/register", json={
-            "username": "testuser2",
-            "password": "testpass123",
-            "channel": "email",
-            "email": "dup@example.com",
-            "email_code": "123456",
-            "accept_terms": True,
-            "accept_privacy": True,
-        })
-        r = client.post("/api/auth/register", json={
-            "username": "testuser2",
-            "password": "testpass123",
-            "channel": "email",
-            "email": "dup@example.com",
-            "email_code": "123456",
-            "accept_terms": True,
-            "accept_privacy": True,
-        })
+        client.post(
+            "/api/auth/register",
+            json={
+                "username": "testuser2",
+                "password": "testpass123",
+                "channel": "email",
+                "email": "dup@example.com",
+                "email_code": "123456",
+                "accept_terms": True,
+                "accept_privacy": True,
+            },
+        )
+        r = client.post(
+            "/api/auth/register",
+            json={
+                "username": "testuser2",
+                "password": "testpass123",
+                "channel": "email",
+                "email": "dup@example.com",
+                "email_code": "123456",
+                "accept_terms": True,
+                "accept_privacy": True,
+            },
+        )
         # Should be 409 conflict
         assert r.status_code in (409, 422, 400), f"Got {r.status_code}: {r.json()}"
 

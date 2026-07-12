@@ -22,7 +22,8 @@ def _backfill_user(conn: sqlite3.Connection, uid: int, username: str) -> dict[st
     row = conn.execute(
         "SELECT materials, colors, pricing_config, email_verified, phone_verified, "
         "membership_level, terms_accepted_at, privacy_accepted_at, terms_version, privacy_version "
-        "FROM users WHERE id = ?", (uid,)
+        "FROM users WHERE id = ?",
+        (uid,),
     ).fetchone()
     if not row:
         return {}
@@ -32,18 +33,23 @@ def _backfill_user(conn: sqlite3.Connection, uid: int, username: str) -> dict[st
 
     # materials / colors / pricing_config
     if row["materials"] is None:
-        conn.execute("UPDATE users SET materials = ? WHERE id = ?",
-                     (json.dumps(defaults.get("materials") or DEFAULT_MATERIALS), uid))
+        conn.execute(
+            "UPDATE users SET materials = ? WHERE id = ?",
+            (json.dumps(defaults.get("materials") or DEFAULT_MATERIALS), uid),
+        )
         fixed["materials"] = True
 
     if row["colors"] is None:
-        conn.execute("UPDATE users SET colors = ? WHERE id = ?",
-                     (json.dumps(defaults.get("colors") or DEFAULT_COLORS), uid))
+        conn.execute(
+            "UPDATE users SET colors = ? WHERE id = ?", (json.dumps(defaults.get("colors") or DEFAULT_COLORS), uid)
+        )
         fixed["colors"] = True
 
     if row["pricing_config"] is None:
-        conn.execute("UPDATE users SET pricing_config = ? WHERE id = ?",
-                     (json.dumps(defaults.get("pricing_config") or DEFAULT_PRICING_CONFIG), uid))
+        conn.execute(
+            "UPDATE users SET pricing_config = ? WHERE id = ?",
+            (json.dumps(defaults.get("pricing_config") or DEFAULT_PRICING_CONFIG), uid),
+        )
         fixed["pricing_config"] = True
 
     # verification flags
@@ -63,13 +69,11 @@ def _backfill_user(conn: sqlite3.Connection, uid: int, username: str) -> dict[st
     # legal acceptance
     now_iso = datetime.now(timezone.utc).isoformat()
     if row["terms_accepted_at"] is None:
-        conn.execute("UPDATE users SET terms_accepted_at = ?, terms_version = ? WHERE id = ?",
-                     (now_iso, "v1", uid))
+        conn.execute("UPDATE users SET terms_accepted_at = ?, terms_version = ? WHERE id = ?", (now_iso, "v1", uid))
         fixed["terms_accepted_at"] = True
 
     if row["privacy_accepted_at"] is None:
-        conn.execute("UPDATE users SET privacy_accepted_at = ?, privacy_version = ? WHERE id = ?",
-                     (now_iso, "v1", uid))
+        conn.execute("UPDATE users SET privacy_accepted_at = ?, privacy_version = ? WHERE id = ?", (now_iso, "v1", uid))
         fixed["privacy_accepted_at"] = True
 
     return fixed
@@ -81,29 +85,20 @@ def check_db(conn: Optional[sqlite3.Connection] = None) -> dict:
     if own:
         conn = get_db_conn()
 
-    tables = [r[0] for r in conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
-    ).fetchall()]
+    tables = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").fetchall()]
 
     user_count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
 
-    null_ev = conn.execute(
-        "SELECT COUNT(*) FROM users WHERE email_verified IS NULL"
-    ).fetchone()[0]
+    null_ev = conn.execute("SELECT COUNT(*) FROM users WHERE email_verified IS NULL").fetchone()[0]
 
-    null_membership = conn.execute(
-        "SELECT COUNT(*) FROM users WHERE membership_level IS NULL"
-    ).fetchone()[0]
+    null_membership = conn.execute("SELECT COUNT(*) FROM users WHERE membership_level IS NULL").fetchone()[0]
 
-    null_materials = conn.execute(
-        "SELECT COUNT(*) FROM users WHERE materials IS NULL"
-    ).fetchone()[0]
+    null_materials = conn.execute("SELECT COUNT(*) FROM users WHERE materials IS NULL").fetchone()[0]
 
     # Count stale verification codes
     now = datetime.now(timezone.utc).timestamp()
     stale_codes = conn.execute(
-        "SELECT COUNT(*) FROM verification_codes WHERE used_at IS NULL AND CAST(expires_at AS REAL) < ?",
-        (now,)
+        "SELECT COUNT(*) FROM verification_codes WHERE used_at IS NULL AND CAST(expires_at AS REAL) < ?", (now,)
     ).fetchone()[0]
 
     if own:
@@ -138,8 +133,7 @@ def sync_db() -> int:
     # Cleanup stale verification codes
     now = datetime.now(timezone.utc).timestamp()
     deleted = conn.execute(
-        "DELETE FROM verification_codes WHERE used_at IS NULL AND CAST(expires_at AS REAL) < ?",
-        (now,)
+        "DELETE FROM verification_codes WHERE used_at IS NULL AND CAST(expires_at AS REAL) < ?", (now,)
     ).rowcount
     if deleted:
         print(f"  [CLEAN] deleted {deleted} stale verification codes")
@@ -165,4 +159,4 @@ if __name__ == "__main__":
         print(f"  NULL membership: {result['null_membership']}")
         print(f"  NULL materials: {result['null_materials']}")
         print(f"  Stale verification codes: {result['stale_verification_codes']}")
-        print(f"\n  Run with --sync to fix NULL values.")
+        print("\n  Run with --sync to fix NULL values.")

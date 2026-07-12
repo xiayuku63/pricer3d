@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime, timezone
-from typing import Optional, List
+from typing import Optional
 
 from fastapi import Request, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 # ── Pydantic schemas ──
+
 
 class CategoryCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
@@ -45,16 +46,12 @@ class TodoUpdate(BaseModel):
 
 # ── Category routes ──
 
+
 async def list_categories(current_user=Depends(get_current_user)):
     """List all categories for the current user."""
     uid = int(current_user["id"])
     with get_db_session() as db:
-        rows = (
-            db.query(Category)
-            .filter(Category.user_id == uid)
-            .order_by(Category.created_at.desc())
-            .all()
-        )
+        rows = db.query(Category).filter(Category.user_id == uid).order_by(Category.created_at.desc()).all()
     items = [{"id": r.id, "name": r.name, "created_at": r.created_at} for r in rows]
     return {"items": items}
 
@@ -68,17 +65,19 @@ async def create_category(payload: CategoryCreate, request: Request, current_use
     now_iso = datetime.now(timezone.utc).isoformat()
     try:
         with get_db_session() as db:
-            existing = db.query(Category).filter(
-                Category.user_id == uid, Category.name == name
-            ).first()
+            existing = db.query(Category).filter(Category.user_id == uid, Category.name == name).first()
             if existing:
                 raise HTTPException(status_code=409, detail="分类名称已存在")
             cat = Category(name=name, user_id=uid, created_at=now_iso)
             db.add(cat)
             db.flush()
             result = {"id": cat.id, "name": cat.name, "created_at": cat.created_at}
-        write_audit_event(action="todo.category.create", request=request, user=current_user,
-                          detail={"category_id": result["id"], "name": name})
+        write_audit_event(
+            action="todo.category.create",
+            request=request,
+            user=current_user,
+            detail={"category_id": result["id"], "name": name},
+        )
         return result
     except HTTPException:
         raise
@@ -91,19 +90,22 @@ async def delete_category(category_id: int, request: Request, current_user=Depen
     """Delete a category. Todos in this category will have category_id set to NULL."""
     uid = int(current_user["id"])
     with get_db_session() as db:
-        cat = db.query(Category).filter(
-            Category.id == int(category_id), Category.user_id == uid
-        ).first()
+        cat = db.query(Category).filter(Category.id == int(category_id), Category.user_id == uid).first()
         if not cat:
             raise HTTPException(status_code=404, detail="分类不存在或无权限")
         cat_name = cat.name
         db.delete(cat)
-    write_audit_event(action="todo.category.delete", request=request, user=current_user,
-                      detail={"category_id": int(category_id), "name": cat_name})
+    write_audit_event(
+        action="todo.category.delete",
+        request=request,
+        user=current_user,
+        detail={"category_id": int(category_id), "name": cat_name},
+    )
     return {"status": "ok"}
 
 
 # ── Todo routes ──
+
 
 async def list_todos(
     status: Optional[str] = None,
@@ -126,26 +128,22 @@ async def list_todos(
         if priority is not None:
             query = query.filter(Todo.priority == int(priority))
         total = query.count()
-        rows = (
-            query
-            .order_by(Todo.priority.desc(), Todo.id.desc())
-            .offset(safe_offset)
-            .limit(safe_limit)
-            .all()
-        )
+        rows = query.order_by(Todo.priority.desc(), Todo.id.desc()).offset(safe_offset).limit(safe_limit).all()
     items = []
     for r in rows:
-        items.append({
-            "id": r.id,
-            "title": r.title,
-            "description": r.description,
-            "status": r.status,
-            "priority": r.priority,
-            "category_id": r.category_id,
-            "due_date": r.due_date,
-            "created_at": r.created_at,
-            "updated_at": r.updated_at,
-        })
+        items.append(
+            {
+                "id": r.id,
+                "title": r.title,
+                "description": r.description,
+                "status": r.status,
+                "priority": r.priority,
+                "category_id": r.category_id,
+                "due_date": r.due_date,
+                "created_at": r.created_at,
+                "updated_at": r.updated_at,
+            }
+        )
     return {"items": items, "total": total, "limit": safe_limit, "offset": safe_offset}
 
 
@@ -178,9 +176,7 @@ async def create_todo(payload: TodoCreate, request: Request, current_user=Depend
     # Validate category ownership if provided
     if payload.category_id is not None:
         with get_db_session() as db:
-            cat = db.query(Category).filter(
-                Category.id == int(payload.category_id), Category.user_id == uid
-            ).first()
+            cat = db.query(Category).filter(Category.id == int(payload.category_id), Category.user_id == uid).first()
             if not cat:
                 raise HTTPException(status_code=400, detail="指定的分类不存在或无权限")
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -210,8 +206,9 @@ async def create_todo(payload: TodoCreate, request: Request, current_user=Depend
                 "created_at": todo.created_at,
                 "updated_at": todo.updated_at,
             }
-        write_audit_event(action="todo.create", request=request, user=current_user,
-                          detail={"todo_id": result["id"], "title": title})
+        write_audit_event(
+            action="todo.create", request=request, user=current_user, detail={"todo_id": result["id"], "title": title}
+        )
         return result
     except HTTPException:
         raise
@@ -241,9 +238,9 @@ async def update_todo(todo_id: int, payload: TodoUpdate, request: Request, curre
             todo.priority = payload.priority
         if payload.category_id is not None:
             if payload.category_id != 0:
-                cat = db.query(Category).filter(
-                    Category.id == int(payload.category_id), Category.user_id == uid
-                ).first()
+                cat = (
+                    db.query(Category).filter(Category.id == int(payload.category_id), Category.user_id == uid).first()
+                )
                 if not cat:
                     raise HTTPException(status_code=400, detail="指定的分类不存在或无权限")
             todo.category_id = payload.category_id if payload.category_id != 0 else None
@@ -261,8 +258,7 @@ async def update_todo(todo_id: int, payload: TodoUpdate, request: Request, curre
             "created_at": todo.created_at,
             "updated_at": todo.updated_at,
         }
-    write_audit_event(action="todo.update", request=request, user=current_user,
-                      detail={"todo_id": int(todo_id)})
+    write_audit_event(action="todo.update", request=request, user=current_user, detail={"todo_id": int(todo_id)})
     return result
 
 
@@ -274,6 +270,5 @@ async def delete_todo(todo_id: int, request: Request, current_user=Depends(get_c
         if not todo:
             raise HTTPException(status_code=404, detail="待办事项不存在或无权限")
         db.delete(todo)
-    write_audit_event(action="todo.delete", request=request, user=current_user,
-                      detail={"todo_id": int(todo_id)})
+    write_audit_event(action="todo.delete", request=request, user=current_user, detail={"todo_id": int(todo_id)})
     return {"status": "ok"}

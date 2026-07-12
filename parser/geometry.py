@@ -108,7 +108,9 @@ def _convert_step_to_stl(step_path: str) -> "str | None":
     try:
         result = subprocess.run(
             ["prusa-slicer", "--export-stl", "--output", tmp, step_path],
-            capture_output=True, text=True, timeout=120,
+            capture_output=True,
+            text=True,
+            timeout=120,
         )
         if result.returncode != 0 or not os.path.exists(tmp) or os.path.getsize(tmp) == 0:
             logger.warning("STEP→STL conversion failed: %s", result.stderr[:200])
@@ -117,8 +119,12 @@ def _convert_step_to_stl(step_path: str) -> "str | None":
             except OSError:
                 pass
             return None
-        logger.info("STEP→STL converted: %s → %s (%d bytes)",
-                     os.path.basename(step_path), os.path.basename(tmp), os.path.getsize(tmp))
+        logger.info(
+            "STEP→STL converted: %s → %s (%d bytes)",
+            os.path.basename(step_path),
+            os.path.basename(tmp),
+            os.path.getsize(tmp),
+        )
         return tmp
     except Exception as e:
         logger.warning("STEP→STL conversion error: %s", e)
