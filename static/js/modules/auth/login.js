@@ -6,8 +6,8 @@ import {
 } from '../state.js';
 import { t } from '../i18n.js';
 import {
-    dom, _clearFieldError, _showFieldError, _showBannerError, _hideBannerError,
-    _hideBannerSuccess, showLoginView, handleAuthSuccess,
+    _clearFieldError, _showFieldError, _showBannerError, _hideBannerError,
+    _hideBannerSuccess, showLoginView, handleAuthSuccess, dom,
 } from './ui.js';
 import { _wireResetEnterKeys, showResetRequestView, _wireResetRequestCaptcha } from './reset.js';
 
