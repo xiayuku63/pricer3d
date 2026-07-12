@@ -14,7 +14,6 @@ import { buildThumbnails } from '../preview.js';
 import { quoteSelectedFiles } from '../quote.js';
 import { clearClusters } from '../layface.js';
 import { t } from '../i18n.js';
-import { _wireLoginForm, openLoginModal, closeLoginModal } from './login.js';
 
 // ── DOM refs (queried on init) ──
 export let dom = {};

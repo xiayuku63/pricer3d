@@ -464,7 +464,9 @@ def run_prusa_slice(
         import sys as _sys
 
         if _sys.platform == "win32":
-            raise RuntimeError("PrusaSlicer not found on Windows - install PrusaSlicer, set PRUSA_EXECUTABLE=wsl prusa-slicer, or run: wsl -d Ubuntu apt-get install prusa-slicer")
+            raise RuntimeError(
+                "PrusaSlicer not found on Windows - install PrusaSlicer, set PRUSA_EXECUTABLE=wsl prusa-slicer, or run: wsl -d Ubuntu apt-get install prusa-slicer"
+            )
         raise RuntimeError("PrusaSlicer not found - install: apt-get install prusa-slicer")
 
     out_dir = os.path.dirname(output_gcode_path)
