@@ -169,7 +169,8 @@ export async function saveCurrentPreset() {
     if (!printerId) { setMsg(t('slicer.selectPrinterFirst'), false); return; }
 
     // Find printer model - try compound ID first, then base ID
-    let printer = _printerModels.find(p => p.id === printerId || p.id === printerId.replace(/_\\d{2}$/, ''));
+    const baseId = printerId.replace(/_\d{2}$/, '');
+    let printer = _printerModels.find(p => p.id === printerId || p.id === baseId);
     if (!printer) { setMsg(t('slicer.printerDataMissing'), false); return; }
 
     const layer_height = Number(genLayerHeight?.value) || 0.2;

@@ -2,10 +2,9 @@
 
 import json
 import logging
+import re
 
-from fastapi import HTTPException, Request
-
-from fastapi import Depends
+from fastapi import Depends, HTTPException, Request
 
 from app.audit import write_audit_event
 from app.db import get_db_session
@@ -110,3 +109,105 @@ def clear_quote_history(request: Request, current_user=Depends(get_current_user)
     except Exception as e:
         logger.error(f"清理报价记录失败: user_id={uid} error={str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"清理失败: {str(e)}")
+
+
+def save_quote_history(user_id: int, results: list) -> None:
+    """Save quote results to history table."""
+    from datetime import datetime, timezone
+
+    now = datetime.now(timezone.utc).isoformat()
+    with get_db_session() as db:
+        for item in results:
+            raw_pm = item.get("_printer_model") or item.get("printer_model") or ""
+            slicer_preset_id = item.get("_slicer_preset_id") or item.get("slicer_preset_id")
+
+            breakdown = item.get("cost_breakdown")
+            gcode_summary = (breakdown or {}).get("gcode_summary") or {}
+            core_params = gcode_summary.get("core_params") or {}
+
+            nozzle_diameter = None
+            if core_params.get("nozzle_diameter") is not None:
+                try:
+                    nozzle_diameter = float(core_params["nozzle_diameter"])
+                except (ValueError, TypeError):
+                    pass
+
+            m = re.match(r"^(.+?)_(\d{2})$", raw_pm) if raw_pm else None
+            if m:
+                printer_model = m.group(1)
+                try:
+                    from app.printers import PRINTER_MODELS
+
+                    for pm_def in PRINTER_MODELS:
+                        if pm_def["id"] == printer_model:
+                            printer_model = pm_def["name"]
+                            break
+                except Exception:
+                    pass
+                if nozzle_diameter is None:
+                    nozzle_diameter = float(m.group(2)) / 10.0
+            else:
+                printer_model = raw_pm or None
+                if printer_model:
+                    try:
+                        from app.printers import PRINTER_MODELS, resolve_printer
+
+                        rp = resolve_printer(printer_model)
+                        if rp:
+                            printer_model = rp.get("name", printer_model)
+                    except Exception:
+                        pass
+
+            layer_height_val = item.get("layer_height")
+            try:
+                layer_height_val = float(layer_height_val) if layer_height_val is not None else None
+            except (ValueError, TypeError):
+                layer_height_val = None
+
+            wall_count = None
+            if core_params.get("perimeters") is not None:
+                try:
+                    wall_count = int(core_params["perimeters"])
+                except (ValueError, TypeError):
+                    pass
+
+            infill_val = None
+            raw_fill = core_params.get("fill_density")
+            if raw_fill is not None:
+                try:
+                    infill_val = int(float(str(raw_fill).replace("%", "")))
+                except (ValueError, TypeError):
+                    pass
+
+            brand = item.get("brand") or ""
+            cost_breakdown_str = json.dumps(breakdown) if isinstance(breakdown, dict) else None
+
+            entry = QuoteHistory(
+                user_id=user_id,
+                filename=str(item.get("filename") or "")[:200],
+                material=str(item.get("material") or "")[:40],
+                color=str(item.get("color") or "")[:40],
+                quantity=int(item.get("quantity") or 1),
+                volume_cm3=round(float(item.get("volume_cm3") or 0), 2),
+                weight_g=round(float(item.get("weight_g") or 0), 2),
+                estimated_time_h=round(float(item.get("estimated_time_h") or 0), 2),
+                cost_cny=round(float(item.get("cost_cny") or 0), 2),
+                dimensions=str(item.get("dimensions") or "")[:80],
+                status=str(item.get("status") or "success")[:20],
+                error_msg=str(item.get("error") or "")[:300] if item.get("status") != "success" else None,
+                created_at=now,
+                printer_model=str(printer_model)[:50] if printer_model else None,
+                slicer_preset_id=int(slicer_preset_id) if slicer_preset_id is not None else None,
+                nozzle_diameter=round(float(nozzle_diameter), 2) if nozzle_diameter is not None else None,
+                layer_height=round(float(layer_height_val), 2) if layer_height_val is not None else None,
+                wall_count=wall_count,
+                infill=infill_val,
+                brand=str(brand)[:40] if brand else None,
+                cost_breakdown=cost_breakdown_str,
+                slicer_fallback=int(bool((breakdown or {}).get("slicer_fallback"))) if breakdown else 0,
+                slicer_error=(breakdown or {}).get("slicer_error") if breakdown else None,
+                slicer_estimated_time_s=float((breakdown or {}).get("slicer_estimated_time_s", 0) or 0)
+                if (breakdown or {}).get("slicer_estimated_time_s")
+                else None,
+            )
+            db.add(entry)

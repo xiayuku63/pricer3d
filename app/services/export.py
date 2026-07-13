@@ -4,11 +4,11 @@ import csv
 import io
 import logging
 from datetime import datetime
-from typing import Optional
+from typing import Any, List, Optional
 
 from fastapi import Depends, HTTPException, Request
 from fastapi.responses import Response, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from app.db import get_db_session
 from app.deps import get_current_user, get_membership_effective, is_member_user
@@ -298,9 +298,23 @@ class PdfInlineItem(BaseModel):
     brand: str = ""
     thumbnail_b64: str = ""
 
+    @field_validator("layer_height", "volume_cm3", "weight_g", "estimated_time_h", "cost_cny", mode="before")
+    @classmethod
+    def coerce_float(cls, v):
+        if v == "" or v is None:
+            return 0.0
+        return float(v)
+
+    @field_validator("wall_count", "infill_percent", "quantity", mode="before")
+    @classmethod
+    def coerce_int(cls, v):
+        if v == "" or v is None:
+            return 0
+        return int(float(v))
+
 
 class PdfInlineRequest(BaseModel):
-    items: list
+    items: List[PdfInlineItem]
 
 
 async def export_pdf_inline(

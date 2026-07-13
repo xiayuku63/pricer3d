@@ -7,6 +7,14 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="/static/css/design-tokens.css?v=1">
     <style>
+        body { background: var(--color-bg); color: var(--color-text); }
+        .settings-shell { max-width: 1120px; margin: 0 auto; }
+        .settings-hero { border: 1px solid var(--color-border); border-radius: 18px; padding: 22px; margin-bottom: 20px; background: linear-gradient(135deg, var(--color-primary-bg), var(--color-surface)); }
+        .settings-section { border-radius: 16px !important; background: var(--color-surface); box-shadow: var(--shadow-sm); }
+        .settings-section h3 { letter-spacing: 0; }
+        .settings-section p { line-height: 1.6; }
+        .tab-btn { min-height: 44px; }
+        @media (max-width: 640px) { .settings-hero { padding: 16px; } nav { padding-left: 16px !important; padding-right: 16px !important; } }
         :root { --bg-primary: #0f1419; --bg-secondary: #1a1f2e; --bg-card: #1e2332; --text-primary: #e4e8f1; --text-secondary: #8b95a5; --accent: #3b82f6; }
         body { background-color: var(--color-bg); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
         .tab-btn { padding: 10px 20px; font-size: 14px; font-weight: 500; border-bottom: 2px solid transparent; color: var(--color-text-muted); transition: all 0.2s; cursor: pointer; background: none; border-top: none; border-left: none; border-right: none; }
@@ -29,7 +37,12 @@
         <a href="/" class="text-sm tw-text-primary hover:opacity-80">← 返回报价</a>
     </nav>
 
-    <div class="max-w-5xl mx-auto px-4 py-6">
+    <div class="settings-shell px-4 py-6">
+        <section class="settings-hero">
+            <div class="text-[11px] font-semibold uppercase tracking-wide tw-text-primary">Workspace settings</div>
+            <h1 class="text-2xl font-semibold tw-text-heading mt-1">报价配置中心</h1>
+            <p class="text-sm tw-text-secondary mt-2 max-w-2xl">集中管理打印机、材料和切片预设，保存后会同步到报价工作台。</p>
+        </section>
         <!-- Tab 按钮 -->
         <div class="flex mb-6" style="border-bottom: 1px solid var(--color-border);">
             <button class="tab-btn active" data-tab="printer">🖨️ 打印机配置</button>
@@ -39,7 +52,7 @@
 
         <!-- Tab 1: 打印机配置 -->
         <div id="tab-printer" class="tab-pane active space-y-6">
-            <div class="tw-card rounded-lg p-5" style="border: 1px solid var(--color-border);">
+            <div class="tw-card settings-section rounded-lg p-5" style="border: 1px solid var(--color-border);">
                 <h3 class="text-sm font-semibold tw-text-strong mb-1">打印机型号与喷嘴</h3>
                 <p class="text-xs tw-text-muted mb-4">选择默认打印机和喷嘴直径，切片时自动加载对应的硬件配置（含速度、加速度等参数）。</p>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md">
@@ -84,7 +97,7 @@
 
         <!-- Tab 2: 材料配置 -->
         <div id="tab-material" class="tab-pane space-y-6">
-            <div class="tw-card rounded-lg p-5" style="border: 1px solid var(--color-border);">
+            <div class="tw-card settings-section rounded-lg p-5" style="border: 1px solid var(--color-border);">
                 <div class="flex justify-between items-center mb-3">
                     <div>
                         <h3 class="text-sm font-semibold tw-text-strong">自定义材料</h3>
@@ -100,7 +113,7 @@
                                 <th class="px-3 py-2 cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="brand">品牌 <span class="sort-arrow tw-text-muted text-[9px]"></span></th>
                                 <th class="px-3 py-2 cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="density">密度 (g/cm³) <span class="sort-arrow tw-text-muted text-[9px]"></span></th>
                                 <th class="px-3 py-2 cursor-pointer select-none hover:bg-gray-200 transition-colors" data-sort-key="price">单价 (元/KG) <span class="sort-arrow tw-text-muted text-[9px]"></span></th>
-                                <th class="px-3 py-2">可选颜色</th>
+                                <th class="px-3 py-2">颜色</th>
                                 <th class="px-3 py-2 text-center">操作</th>
                             </tr>
                         </thead>
@@ -112,7 +125,7 @@
 
         <!-- Tab 3: 打印参数 -->
         <div id="tab-print-params" class="tab-pane space-y-6">
-            <div class="tw-card rounded-lg p-5" style="border: 1px solid var(--color-border);">
+            <div class="tw-card settings-section rounded-lg p-5" style="border: 1px solid var(--color-border);">
                 <h3 class="text-sm font-semibold tw-text-strong mb-1">切片预设管理</h3>
                 <p class="text-xs tw-text-muted mb-4">管理打印参数预设（层高、壁数、填充率等），保存后可在报价时快速选择。</p>
                 <!-- 预设选择 -->
