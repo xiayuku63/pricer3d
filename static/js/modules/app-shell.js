@@ -20,25 +20,38 @@ export function initColorDropdownUI({ quoteOptions, currentResults, selectedFile
         if (!wrapper.closest('#batch-results-body, #batch-results-cards, #batch-color-cell')) return;
         const rect = trigger.getBoundingClientRect();
         if (!rect.width) return;
-        const spaceBelow = window.innerHeight - rect.bottom;
-        const spaceAbove = rect.top;
-        const contentH = list.scrollHeight || 360;
-        const maxH = Math.min(360, contentH);
-        const placeBelow = spaceBelow >= maxH || spaceBelow >= spaceAbove;
-        let fitH = placeBelow ? Math.min(maxH, spaceBelow - 6) : Math.min(maxH, spaceAbove - 6);
-        if (fitH < 120) fitH = Math.min(maxH, 120);
+
+        // The list is portaled visually with fixed positioning. Read its real
+        // dimensions after it becomes visible so it stays anchored to the
+        // trigger instead of relying on a hard-coded width estimate.
         list.style.position = 'fixed';
         list.style.marginTop = '0';
-        list.style.maxHeight = `${fitH}px`;
+        list.style.maxHeight = '360px';
         list.style.minWidth = `${Math.max(rect.width, 160)}px`;
-        list.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - 180))}px`;
+        list.style.left = '0px';
+        list.style.top = '0px';
+        list.style.bottom = '';
+        const listRect = list.getBoundingClientRect();
+        const listWidth = Math.max(listRect.width, rect.width, 160);
+        const listHeight = Math.min(list.scrollHeight || listRect.height || 360, 360);
+        const gap = 6;
+        const left = Math.max(8, Math.min(rect.left, window.innerWidth - listWidth - 8));
+        const spaceBelow = window.innerHeight - rect.bottom - gap;
+        const spaceAbove = rect.top - gap;
+        const placeBelow = spaceBelow >= listHeight || spaceBelow >= spaceAbove;
+        const availableHeight = Math.max(120, Math.min(listHeight, placeBelow ? spaceBelow : spaceAbove));
+
+        list.style.zIndex = '100';
+        list.style.width = `${listWidth}px`;
+        list.style.maxHeight = `${availableHeight}px`;
+        list.style.left = `${left}px`;
         list.style.right = '';
         if (placeBelow) {
-            list.style.top = `${rect.bottom + 2}px`;
+            list.style.top = `${rect.bottom + gap}px`;
             list.style.bottom = '';
         } else {
             list.style.top = '';
-            list.style.bottom = `${window.innerHeight - rect.top + 2}px`;
+            list.style.bottom = `${window.innerHeight - rect.top + gap}px`;
         }
     }
     async function applyInlineRecolor(rowCtx, hex) {
