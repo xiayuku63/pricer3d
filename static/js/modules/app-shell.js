@@ -139,21 +139,14 @@ export function initColorDropdownUI({ quoteOptions, currentResults, selectedFile
         if (list) closeColorList(list);
 
         // Reset "more colors" for next open
-        const extra = wrapper.querySelector('.color-dd-extra');
-        if (extra) extra.classList.add('hidden');
-        const toggleMore = wrapper.querySelector('.color-dd-toggle-more');
-        if (toggleMore) {
-            const chevron = toggleMore.querySelector('svg');
+        const extra2 = wrapper.querySelector('.color-dd-extra');
+        if (extra2) extra2.classList.add('hidden');
+        const toggleMore2 = wrapper.querySelector('.color-dd-toggle-more');
+        if (toggleMore2) {
+            const chevron = toggleMore2.querySelector('svg');
             if (chevron) chevron.style.transform = '';
-        }
-
-        // If "more colors" was open, reset it for next open
-        const extraSection = wrapper.querySelector('.color-dd-extra');
-        if (extraSection) extraSection.classList.add('hidden');
-        const toggleMore = wrapper.querySelector('.color-dd-toggle-more');
-        if (toggleMore) {
-            toggleMore.querySelector('.color-dd-extra-hidden')?.classList.remove('hidden');
-            toggleMore.querySelector('.color-dd-extra-visible')?.classList.add('hidden');
+            toggleMore2.querySelector('.color-dd-extra-hidden')?.classList.remove('hidden');
+            toggleMore2.querySelector('.color-dd-extra-visible')?.classList.add('hidden');
         }
 
         if (wrapper.closest('#options-modal')) {
@@ -228,7 +221,7 @@ export function initMobileNavigation({ mobileNav, dom, getCurrentUser, getAuthTo
         const histBtn = document.getElementById('open-quote-history-btn');
         if (histBtn) histBtn.click();
     });
-    bind(mobileNav.openAdminUsersBtn, 'click', () => { closeMobileNav(); window.location.href = '/admin/users'; });
+    bind(mobileNav.openAdminUsersBtn, 'click', () => { closeMobileNav(); window.__navigateIfLeaving('/admin/users'); });
     bind(mobileNav.openUserCenterBtn, 'click', () => {
         closeMobileNav();
         const currentUser = getCurrentUser();
@@ -310,15 +303,32 @@ export function initAppLifecycle({ mobileNav, loadAppVersion, preloadPrinterSele
         }
     });
 
+    document.addEventListener('keydown', (e) => {
+        if (getSelectedFilesCount() === 0) return;
+        const isRefresh = e.key === 'F5' || ((e.ctrlKey || e.metaKey) && e.key === 'r');
+        if (!isRefresh) return;
+        e.preventDefault();
+        showLeaveConfirmModal(() => { window.location.reload(); });
+    });
+
     document.addEventListener('click', (e) => {
         if (getSelectedFilesCount() === 0) return;
         const link = e.target.closest('a[href]');
         if (!link || link.target === '_blank') return;
         const href = link.getAttribute('href');
-        if (!href || href === '#' || href.startsWith('javascript:')) return;
+        if (!href || href === '#' || href.startsWith('javascript:') || href.startsWith('blob:')) return;
         e.preventDefault();
         showLeaveConfirmModal(() => { window.location.href = href; });
     });
+
+    // Also expose for buttons that navigate
+    window.__navigateIfLeaving = (url) => {
+        if (getSelectedFilesCount() > 0) {
+            showLeaveConfirmModal(() => { window.location.href = url; });
+        } else {
+            window.location.href = url;
+        }
+    };
 
     function showLeaveConfirmModal(onConfirm) {
         const modal = document.getElementById('leave-confirm-modal');

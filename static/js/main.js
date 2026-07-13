@@ -40,8 +40,7 @@ import {
 import {
     initSettings, fetchUserSettings, updateDropdowns, refreshQuoteColorDropdowns,
     buildPrinterOptionsHtml, renderUserCenterUI,
-    syncPricingFromInputs, openColorEditor, closeColorEditor,
-    addColorToMaterial, removeColorFromMaterial, validateCurrentFormulas,
+    syncPricingFromInputs, validateCurrentFormulas,
     saveUserSettings, setAsDefaults, changePassword,
     restoreDefaultMaterials,
     initMobileFormOptimizations,
@@ -185,7 +184,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     _bind(dom.userMenuBtn, 'click', () => dom.userDropdown.classList.toggle('hidden'));
-    _bind(dom.openAdminUsersBtn, 'click', () => { dom.userDropdown.classList.add('hidden'); window.location.href = '/admin/users'; });
+    _bind(dom.openAdminUsersBtn, 'click', () => { dom.userDropdown.classList.add('hidden'); window.__navigateIfLeaving('/admin/users'); });
     _bind(dom.openMembershipBtn, 'click', () => { dom.userDropdown.classList.add('hidden'); openMembershipModal(); });
     if (dom.openUserCenterBtn) dom.openUserCenterBtn.addEventListener('click', () => {
         dom.userDropdown.classList.add('hidden');
@@ -402,10 +401,6 @@ document.addEventListener('DOMContentLoaded', () => {
         },
         settings: {
             renderUserCenterUI,
-            openColorEditor,
-            closeColorEditor,
-            addColorToMaterial,
-            removeColorFromMaterial,
             syncPricingFromInputs,
             validateCurrentFormulas,
             saveUserSettings,
@@ -525,7 +520,7 @@ document.addEventListener('DOMContentLoaded', () => {
         loadAppVersion,
         preloadPrinterSelectors,
         updateViewerSize,
-        getSelectedFilesCount: () => selectedFilesMap.size,
+        getSelectedFilesCount: () => selectedFilesMap.size + currentResults.length,
     });
 
     refreshOptionsSummary();

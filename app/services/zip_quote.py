@@ -443,14 +443,14 @@ async def build_zip_quote_response(
 
     total_stl = len(stl_files)
     if match_result["match_mode"] == "all":
-        match_msg = f"✅ 全部模型预设生效（{len(match_result['matched'])}/{total_stl} 个文件匹配）"
+        match_msg = f"全部模型预设生效（{len(match_result['matched'])}/{total_stl} 个文件匹配）"
     elif match_result["match_mode"] == "partial":
-        match_msg = f"⚠️ 部分模型预设生效，请检查清单（{len(match_result['matched'])} 匹配 / {len(match_result['checklist_only'])} 清单多余 / {len(match_result['stl_only'])} 无预设）"
+        match_msg = f"部分模型预设生效，请检查清单（{len(match_result['matched'])} 匹配 / {len(match_result['checklist_only'])} 清单多余 / {len(match_result['stl_only'])} 无预设）"
     else:
         if checklist:
-            match_msg = f"❌ 全部模型预设未生效，请检查清单（{len(stl_files)} 个模型均未匹配）"
+            match_msg = f"全部模型预设未生效，请检查清单（{len(stl_files)} 个模型均未匹配）"
         else:
-            match_msg = "ℹ️ 未包含 Excel 清单，使用默认参数"
+            match_msg = "未包含 Excel 清单，使用默认参数"
 
     # Resolve printer for stl_only files: request param > DB default
     _default_compound_id = None
@@ -815,7 +815,7 @@ def download_zip_template(request: Request):
             cell.border = thin_border
 
     note_row = 6
-    note_text = "💡 提示：空白单元格 = 使用系统默认值，填写 = 覆盖默认值。第一行（英文列名）必须保留。"
+    note_text = "提示：空白单元格 = 使用系统默认值，填写 = 覆盖默认值。第一行（英文列名）必须保留。"
     ws1.merge_cells(start_row=note_row, start_column=1, end_row=note_row, end_column=10)
     note_cell = ws1.cell(row=note_row, column=1, value=note_text)
     note_cell.font = note_font

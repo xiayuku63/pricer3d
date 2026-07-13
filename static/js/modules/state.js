@@ -64,14 +64,14 @@ const DEFAULT_COLORS = [
 ];
 
 export let MATERIAL_OPTIONS = [
-    { name: "PLA", brand: "Generic", density: 1.24, price_per_kg: 59.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
-    { name: "PLA+", brand: "Generic", density: 1.24, price_per_kg: 64.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
-    { name: "PETG", brand: "Generic", density: 1.27, price_per_kg: 85.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
-    { name: "ABS", brand: "Generic", density: 1.04, price_per_kg: 72.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
-    { name: "ASA", brand: "Generic", density: 1.07, price_per_kg: 102.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
-    { name: "TPU", brand: "Generic", density: 1.21, price_per_kg: 111.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
-    { name: "PA", brand: "Generic", density: 1.14, price_per_kg: 170.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
-    { name: "PC", brand: "Generic", density: 1.20, price_per_kg: 153.0, colors: DEFAULT_COLORS.map(c=>({...c})) },
+    { name: "PLA", brand: "Generic", density: 1.24, price_per_kg: 59.0, colors: [{ name: '#000000', hex: '#000000' }] },
+    { name: "PLA+", brand: "Generic", density: 1.24, price_per_kg: 64.0, colors: [{ name: '#000000', hex: '#000000' }] },
+    { name: "PETG", brand: "Generic", density: 1.27, price_per_kg: 85.0, colors: [{ name: '#000000', hex: '#000000' }] },
+    { name: "ABS", brand: "Generic", density: 1.04, price_per_kg: 72.0, colors: [{ name: '#000000', hex: '#000000' }] },
+    { name: "ASA", brand: "Generic", density: 1.07, price_per_kg: 102.0, colors: [{ name: '#000000', hex: '#000000' }] },
+    { name: "TPU", brand: "Generic", density: 1.21, price_per_kg: 111.0, colors: [{ name: '#000000', hex: '#000000' }] },
+    { name: "PA", brand: "Generic", density: 1.14, price_per_kg: 170.0, colors: [{ name: '#000000', hex: '#000000' }] },
+    { name: "PC", brand: "Generic", density: 1.20, price_per_kg: 153.0, colors: [{ name: '#000000', hex: '#000000' }] },
 ];
 
 /** 材料类型预设（密度 + 参考单价） */
@@ -203,7 +203,7 @@ function _rgbToHsl(r, g, b) {
     return [h * 360, s * 100, l * 100];
 }
 
-function _getMonochromeShades(hue, saturation, count) {
+export function getMonochromeShades(hue, saturation, count) {
     const shades = [];
     for (let i = 0; i < count; i++) {
         const t = i / (count - 1);
@@ -299,20 +299,20 @@ export function getColorWheelHueSat(canvas, clientX, clientY) {
 function _buildColorWheelPanel(hex) {
     const [r, g, b] = hexToRgb(hex);
     const [hue, sat] = _rgbToHsl(r, g, b);
-    const shades = _getMonochromeShades(hue, sat, 10);
+    const shades = getMonochromeShades(hue, sat, 10);
     const swatches = shades.map(sh =>
-        `<button type="button" class="cw-swatch w-7 h-7 rounded-md border border-gray-300 hover:border-indigo-400 hover:shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 flex-shrink-0" style="background:${sh}" data-color-hex="${sh}" title="${sh}"></button>`
+        `<button type="button" class="cw-swatch w-7 h-7 rounded-md border hover:border-indigo-400 hover:shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 flex-shrink-0" style="background:${sh};border-color:var(--color-border-input);" data-color-hex="${sh}" title="${sh}"></button>`
     ).join('');
 
-    return '<div class="cw-panel-inner bg-white" style="width:240px;">'
+    return '<div class="cw-panel-inner tw-bg-surface" style="width:240px;">'
         + '<div class="flex items-center gap-3 mb-3">'
-        + '<span class="cw-preview-swatch w-10 h-10 rounded-lg border border-gray-300 flex-shrink-0 shadow-sm" style="background:' + hex + '"></span>'
-        + '<span class="cw-preview-hex font-mono text-sm font-semibold text-gray-700 select-all">' + hex + '</span>'
+        + '<span class="cw-preview-swatch w-10 h-10 rounded-lg border flex-shrink-0 shadow-sm" style="background:' + hex + ';border-color:var(--color-border);"></span>'
+        + '<span class="cw-preview-hex font-mono text-sm font-semibold tw-text-secondary select-all">' + hex + '</span>'
         + '</div>'
         + '<div class="flex justify-center mb-3">'
         + '<canvas class="cw-canvas" width="200" height="200" style="cursor:crosshair;border-radius:50%;display:block;"></canvas>'
         + '</div>'
-        + '<div class="flex gap-1.5 justify-center flex-wrap px-1">'
+        + '<div class="color-picker-mono flex gap-1.5 justify-center flex-wrap px-1">'
         + swatches
         + '</div>'
         + '</div>';
@@ -504,10 +504,10 @@ export function renderColorDropdown(name, selectedColor, compact) {
     // unused but keep for reference
     const listItems = normColors.map(c => {
         const hex = c.hex || '#d1d5db';
-        return '<button type="button" class="color-dd-item flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-gray-50 border-b border-gray-100 last:border-0 text-left'
-            + (c.hex === safeHex ? ' bg-indigo-50' : '')
-            + '" data-color-hex="' + hex + '">'
-            + '<span class="w-5 h-5 rounded-sm border border-gray-400 flex-shrink-0" style="background:' + hex + '"></span>'
+        return '<button type="button" class="color-dd-item flex items-center gap-2 w-full px-3 py-2 text-sm hover:tw-bg-hover border-b last:border-0 text-left'
+            + (c.hex === safeHex ? ' tw-bg-primary' : '')
+            + '" style="border-color:var(--color-border);" data-color-hex="' + hex + '">'
+            + '<span class="w-5 h-5 rounded-sm border flex-shrink-0" style="background:' + hex + ';border-color:var(--color-border-input);"></span>'
             + '<span class="flex-1 font-mono text-xs tw-text-secondary">' + hex + '</span>'
             + '</button>';
     }).join('');
@@ -519,10 +519,10 @@ export function renderColorDropdown(name, selectedColor, compact) {
 
     const visibleHtml = visibleItems.map(c => {
         const hex = c.hex || '#d1d5db';
-        return '<button type="button" class="color-dd-item flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-gray-50 border-b border-gray-100 last:border-0 text-left'
-            + (c.hex === safeHex ? ' bg-indigo-50' : '')
-            + '" data-color-hex="' + hex + '">'
-            + '<span class="w-5 h-5 rounded-sm border border-gray-400 flex-shrink-0" style="background:' + hex + '"></span>'
+        return '<button type="button" class="color-dd-item flex items-center gap-2 w-full px-3 py-2 text-sm hover:tw-bg-hover border-b last:border-0 text-left'
+            + (c.hex === safeHex ? ' tw-bg-primary' : '')
+            + '" style="border-color:var(--color-border);" data-color-hex="' + hex + '">'
+            + '<span class="w-5 h-5 rounded-sm border flex-shrink-0" style="background:' + hex + ';border-color:var(--color-border-input);"></span>'
             + '<span class="flex-1 font-mono text-xs tw-text-secondary">' + hex + '</span>'
             + '</button>';
     }).join('');
@@ -531,14 +531,14 @@ export function renderColorDropdown(name, selectedColor, compact) {
         ? '<div class="color-dd-extra hidden">'
             + extraItems.map(c => {
                 const hex = c.hex || '#d1d5db';
-                return '<button type="button" class="color-dd-item flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-gray-50 border-b border-gray-100 last:border-0 text-left'
-                    + (c.hex === safeHex ? ' bg-indigo-50' : '')
-                    + '" data-color-hex="' + hex + '">'
-                    + '<span class="w-5 h-5 rounded-sm border border-gray-400 flex-shrink-0" style="background:' + hex + '"></span>'
+                return '<button type="button" class="color-dd-item flex items-center gap-2 w-full px-3 py-2 text-sm hover:tw-bg-hover border-b last:border-0 text-left'
+                    + (c.hex === safeHex ? ' tw-bg-primary' : '')
+                    + '" style="border-color:var(--color-border);" data-color-hex="' + hex + '">'
+                    + '<span class="w-5 h-5 rounded-sm border flex-shrink-0" style="background:' + hex + ';border-color:var(--color-border-input);"></span>'
                     + '<span class="flex-1 font-mono text-xs tw-text-secondary">' + hex + '</span>'
                     + '</button>';
             }).join('')
-            + '<button type="button" class="color-dd-toggle-more flex items-center gap-2 w-full px-3 py-2 text-xs text-indigo-600 hover:bg-gray-50 font-medium text-left hover:text-indigo-700">'
+            + '<button type="button" class="color-dd-toggle-more flex items-center gap-2 w-full px-3 py-2 text-xs tw-text-primary hover:tw-bg-hover font-medium text-left">'
             + '<svg class="w-3 h-3 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>'
             + '<span>更多颜色 (' + extraItems.length + ')</span></button>'
             + '</div>'
@@ -548,11 +548,11 @@ export function renderColorDropdown(name, selectedColor, compact) {
 
     if (compact) {
         const html = '<div class="color-dd-wrapper relative inline-block">'
-                + '<button type="button" class="color-dd-trigger flex items-center gap-1 px-2 py-1 border rounded text-[11px] tw-card tw-text hover:border-gray-400 min-w-[36px]" style="border-color: var(--color-border-strong);">'
-                + '<span class="color-dd-swatch w-3.5 h-3.5 rounded-sm border border-gray-400 flex-shrink-0" style="background:' + safeHex + '"></span>'
-                + '<svg class="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>'
+                + '<button type="button" class="color-dd-trigger flex items-center gap-1 px-2 py-1 border rounded text-[11px] tw-card tw-text min-w-[36px]" style="border-color:var(--color-border-strong);">'
+                + '<span class="color-dd-swatch w-3.5 h-3.5 rounded-sm border flex-shrink-0" style="background:' + safeHex + ';border-color:var(--color-border-input);"></span>'
+                + '<svg class="w-3 h-3 tw-text-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>'
                 + '</button>'
-                + '<div class="color-dd-list hidden absolute z-50 left-0 mt-1 tw-bg-surface border border-gray-200 rounded-md shadow-lg overflow-y-auto min-w-[140px]" style="max-height:360px;">'
+                + '<div class="color-dd-list hidden absolute z-50 left-0 mt-1 tw-bg-surface border rounded-md shadow-lg overflow-y-auto min-w-[140px]" style="border-color:var(--color-border);max-height:360px;">'
             + combinedListHtml
             + '</div>'
             + '<input type="hidden" class="row-color-value" value="' + safeHex + '">'
@@ -561,12 +561,12 @@ export function renderColorDropdown(name, selectedColor, compact) {
     }
 
     const html = '<div class="color-dd-wrapper relative">'
-        + '<button type="button" class="color-dd-trigger flex items-center gap-2 w-full px-3 py-2 border border-gray-400 rounded-md text-sm tw-bg-surface tw-text hover:border-gray-400">'
-        + '<span class="color-dd-swatch w-5 h-5 rounded-sm border border-gray-400 flex-shrink-0" style="background:' + safeHex + '"></span>'
+        + '<button type="button" class="color-dd-trigger flex items-center gap-2 w-full px-3 py-2 border rounded-md text-sm tw-bg-surface tw-text" style="border-color:var(--color-border-input);">'
+        + '<span class="color-dd-swatch w-5 h-5 rounded-sm border flex-shrink-0" style="background:' + safeHex + ';border-color:var(--color-border-input);"></span>'
         + '<span class="color-dd-label flex-1 text-left font-mono text-xs tw-text-secondary">' + safeHex + '</span>'
-        + '<svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>'
+        + '<svg class="w-4 h-4 tw-text-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>'
         + '</button>'
-        + '<div class="color-dd-list hidden absolute z-50 left-0 right-0 mt-1 tw-bg-surface border border-gray-200 rounded-md shadow-lg overflow-y-auto" style="max-height:360px;">'
+        + '<div class="color-dd-list hidden absolute z-50 left-0 right-0 mt-1 tw-bg-surface border rounded-md shadow-lg overflow-y-auto" style="border-color:var(--color-border);max-height:360px;">'
         + combinedListHtml
         + '</div>'
         + '<input type="hidden" class="row-color-value" value="' + safeHex + '">'

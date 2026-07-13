@@ -14,13 +14,6 @@ export {
 } from './materials.js';
 
 export {
-    openColorEditor,
-    closeColorEditor,
-    addColorToMaterial,
-    removeColorFromMaterial,
-} from './colors.js';
-
-export {
     syncPricingFromInputs,
     validateCurrentFormulas,
 } from './pricing.js';

@@ -332,7 +332,7 @@ function _buildMaterialInfoHtml(materialName) {
         html += '<div class="flex flex-wrap gap-1 mb-2">';
         info.tags.forEach(tag => {
             const cls = _tagColorClasses(tag.color);
-            html += '<span class="inline-flex items-center gap-0.5 border rounded-full px-2 py-0.5 text-[9px] font-medium ' + cls + '">' + tag.icon + ' ' + tag.label + '</span>';
+            html += '<span class="inline-flex items-center gap-0.5 border rounded-full px-2 py-0.5 text-[9px] font-medium ' + cls + '">' + tag.label + '</span>';
         });
         html += '</div>';
     }
@@ -455,7 +455,7 @@ function _buildMaterialComparisonHtml(baseMaterial) {
         if (info && info.tags) {
             tagsHtml = '<div class="flex flex-wrap gap-0.5 justify-center">';
             info.tags.forEach(tag => {
-                tagsHtml += '<span class="text-[8px] border rounded-full px-1.5 py-0.5 ' + _tagColorClasses(tag.color) + '">' + tag.icon + tag.label + '</span>';
+                tagsHtml += '<span class="text-[8px] border rounded-full px-1.5 py-0.5 ' + _tagColorClasses(tag.color) + '">' + tag.label + '</span>';
             });
             tagsHtml += '</div>';
         }
@@ -870,7 +870,7 @@ export function renderResultsTable() {
     if (!tbody) return;
     tbody.innerHTML = '';
     if (!currentResults.length) {
-        tbody.innerHTML = '<tr class="border-t border-gray-100"><td class="px-2 py-2 text-gray-500" colspan="13">' + t('common.noData') + '</td></tr>';
+        tbody.innerHTML = '<tr class="border-t border-gray-100"><td class="px-2 py-2 text-gray-500" colspan="9">' + t('common.noData') + '</td></tr>';
         _updatePaginationControls(0, 0);
         _updateSortArrows();
         return;
@@ -924,13 +924,8 @@ export function renderResultsTable() {
             tr.innerHTML = `
                 <td class="px-2 py-1.5"><div>${escapeHtml(item.filename)}${_buildParamBadge(item)}</div><button type="button" data-toggle-detail="${escapeHtml(item.filename)}" class="mt-0.5 text-[10px] text-indigo-500 hover:text-indigo-700 underline flex items-center gap-0.5"><svg class="w-3 h-3 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>详情</button></td>
                 <td class="px-2 py-1.5">${previewButtonHtml}</td>
-                <td class="px-2 py-1.5"><select data-field="_printer_model" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5 max-w-[110px]">${pmOptions}</select></td>
-                <td class="px-2 py-1.5"><select data-field="_slicer_preset_id" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5 max-w-[100px]">${presetOptions}</select></td>
-                <td class="px-2 py-1.5"><select data-field="_brand" class="row-edit row-brand-select text-[11px] border border-gray-300 rounded px-1 py-0.5 w-full max-w-[110px]">${brandOptionsHtml}</select></td>
-                <td class="px-2 py-1.5"><select data-field="material" class="row-edit text-[11px] border border-gray-300 rounded px-1 py-0.5">${materialOptionsHtml}</select></td>
-                <td class="px-2 py-1.5" data-field="color">${renderedRowColors.html}</td>
+                <td class="px-2 py-1.5"><div class="grid grid-cols-2 gap-1 min-w-[220px]"><select data-field="_printer_model" aria-label="打印机" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5">${pmOptions}</select><select data-field="_slicer_preset_id" aria-label="预设" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5">${presetOptions}</select><select data-field="_brand" aria-label="品牌" class="row-edit row-brand-select text-[11px] border border-gray-300 rounded px-1 py-0.5">${brandOptionsHtml}</select><select data-field="material" aria-label="材料" class="row-edit text-[11px] border border-gray-300 rounded px-1 py-0.5">${materialOptionsHtml}</select><div class="col-span-2" data-field="color">${renderedRowColors.html}</div></div></td>
                 <td class="px-2 py-1.5"><input data-field="quantity" type="number" min="1" value="${item.quantity}" class="row-edit w-14 text-[11px] border border-gray-300 rounded px-1 py-0.5" /></td>
-                <td class="px-2 py-1.5 text-[10px] leading-tight">${geometryText}</td>
                 <td class="px-2 py-1.5">
                     <div class="text-[10px] leading-tight">${recalculating ? '-' : (item.weight_g / Math.max(1, item.quantity)).toFixed(1)}g</div>
                     <div class="text-xs leading-tight font-medium">${recalculating ? '-' : item.weight_g + 'g'}</div>
@@ -976,13 +971,9 @@ export function renderResultsTable() {
             tr.innerHTML = `
                 <td class="px-2 py-1.5">${escapeHtml(item.filename)}${_buildParamBadge(item)}</td>
                 <td class="px-2 py-1.5">${previewButtonHtml}</td>
-                <td class="px-2 py-1.5"><select data-field="_printer_model" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5 max-w-[110px]">${pmOptions}</select></td>
-                <td class="px-2 py-1.5"><select data-field="_slicer_preset_id" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5 max-w-[100px]">${presetOptions}</select></td>
-                <td class="px-2 py-1.5"><select data-field="_brand" class="row-edit row-brand-select text-[11px] border border-gray-300 rounded px-1 py-0.5 w-full max-w-[110px]">${brandOptionsHtml}</select></td>
-                <td class="px-2 py-1.5"><select data-field="material" class="row-edit text-[11px] border border-gray-300 rounded px-1 py-0.5">${materialOptionsHtml}</select></td>
-                <td class="px-2 py-1.5" data-field="color">${renderedRowColors.html}</td>
+                <td class="px-2 py-1.5"><div class="grid grid-cols-2 gap-1 min-w-[220px]"><select data-field="_printer_model" aria-label="打印机" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5">${pmOptions}</select><select data-field="_slicer_preset_id" aria-label="预设" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5">${presetOptions}</select><select data-field="_brand" aria-label="品牌" class="row-edit row-brand-select text-[11px] border border-gray-300 rounded px-1 py-0.5">${brandOptionsHtml}</select><select data-field="material" aria-label="材料" class="row-edit text-[11px] border border-gray-300 rounded px-1 py-0.5">${materialOptionsHtml}</select><div class="col-span-2" data-field="color">${renderedRowColors.html}</div></div></td>
                 <td class="px-2 py-1.5"><input data-field="quantity" type="number" min="1" value="${quantityValue}" class="row-edit w-14 text-[11px] border border-gray-300 rounded px-1 py-0.5" /></td>
-                <td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td>
+                <td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td>
                 <td data-role="status-cell" class="px-2 py-1.5 whitespace-nowrap">
                     ${recalculating ? `
                     <span class="relative cursor-default text-amber-600 font-medium text-[11px]"><span class="inline-block w-2 h-2 rounded-full bg-amber-500 mr-1 align-middle"></span>${t('quote.recalculating')}</span>
@@ -1002,7 +993,7 @@ export function renderResultsTable() {
             detailTr.className = 'border-t border-gray-50';
             detailTr.setAttribute('data-detail-row', item.filename);
             const td = document.createElement('td');
-            td.setAttribute('colspan', '13');
+            td.setAttribute('colspan', '9');
             td.className = 'px-3 py-2 bg-white overflow-hidden';
 
             const detailDiv = document.createElement('div');
@@ -1065,7 +1056,7 @@ export function renderResultsTable() {
             spacerTr.className = 'border-t border-gray-50';
             spacerTr.setAttribute('data-detail-row', item.filename);
             const spacerTd = document.createElement('td');
-            spacerTd.setAttribute('colspan', '13');
+            spacerTd.setAttribute('colspan', '9');
             spacerTd.className = 'py-2 bg-white';
             spacerTr.appendChild(spacerTd);
             tbody.appendChild(spacerTr);
@@ -1276,7 +1267,7 @@ function _buildGcodeDetailHtml(gcode, wrapInTd = true, item) {
     const bd = item && item.cost_breakdown;
     const fmtTime = (s) => { if (!s||s<=0) return null; const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=Math.round(s%60); return h>0?h+"时"+m+"分"+sec+"秒":m>0?m+"分"+sec+"秒":sec+"秒"; };
     const gridCls = 'grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-x-3 gap-y-0.5 text-[10px]';
-    let html = wrapInTd ? '<td colspan="13" class="px-3 py-1.5"><div class="' + gridCls + '">' : '<div class="' + gridCls + '">';
+    let html = wrapInTd ? '<td colspan="9" class="px-3 py-1.5"><div class="' + gridCls + '">' : '<div class="' + gridCls + '">';
     const add = (label, value, unit) => {
         if (value != null && value !== '') {
             html += '<div class="flex items-baseline gap-1"><span class="text-gray-400 shrink-0">' + label + '</span><span class="font-medium text-gray-700">' + value + (unit||'') + '</span></div>';

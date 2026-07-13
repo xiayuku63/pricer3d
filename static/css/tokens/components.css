@@ -208,6 +208,67 @@ body {
   background-color: var(--color-bg-active) !important;
 }
 
+/* ── Settings workspace ── */
+#user-center-modal .uc-tab-btn {
+  position: relative;
+  min-height: 42px;
+  border: 1px solid transparent;
+  transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+#user-center-modal .uc-tab-btn:hover {
+  background-color: var(--color-bg-hover) !important;
+  color: var(--color-text-strong) !important;
+}
+#user-center-modal .uc-tab-btn.uc-tab-active,
+#user-center-modal .uc-tab-btn.active {
+  background-color: var(--color-primary-bg) !important;
+  color: var(--color-primary-text) !important;
+  border-color: var(--color-primary-border);
+}
+#user-center-modal .uc-tab-btn.uc-tab-active::before,
+#user-center-modal .uc-tab-btn.active::before {
+  content: '';
+  position: absolute;
+  left: -0.5rem;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--color-primary);
+}
+#user-center-modal .uc-tab-pane > p:first-child,
+#user-center-modal .pp-sub-pane > p:first-child {
+  max-width: 720px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-hover);
+  line-height: 1.6;
+}
+#user-center-modal .pp-sub-tab-btn {
+  min-height: 40px;
+  white-space: nowrap;
+}
+#user-center-modal .pp-sub-tab-btn.active {
+  color: var(--color-primary) !important;
+  border-bottom-color: var(--color-primary) !important;
+}
+#user-center-modal .tw-input {
+  min-height: 40px;
+}
+#user-center-modal [id="user-center-msg"] {
+  padding: 7px 10px;
+  border-radius: var(--radius-md);
+  background: var(--color-success-bg);
+  border: 1px solid var(--color-success-border);
+}
+@media (max-width: 640px) {
+  #user-center-modal .uc-tab-btn { min-width: 132px; }
+  #user-center-modal > div:last-child > div > div { flex-direction: column; }
+  #user-center-modal .uc-tab-btn.uc-tab-active::before,
+  #user-center-modal .uc-tab-btn.active::before { display: none; }
+}
+
 .apple-shell {
   position: relative;
 }

@@ -13,7 +13,7 @@ class Settings(BaseSettings):
 
     # ── Environment ──
     app_env: str = "development"
-    allowed_origins: str = "https://www.pricer3d.top,https://pricer3d.top,http://localhost:5000,http://127.0.0.1:5000,http://localhost:3000,http://127.0.0.1:3000"
+    allowed_origins: str = "https://www.pricer3d.top,https://pricer3d.top,http://localhost:5000,http://127.0.0.1:5000,http://localhost:5001,http://127.0.0.1:5001,http://localhost:3000,http://127.0.0.1:3000"
 
     # ── Secrets (required in production) ──
     jwt_secret_key: str = ""
