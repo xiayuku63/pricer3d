@@ -27,12 +27,30 @@
 }
 #batch-results-body tr[data-row-file] .color-dd-wrapper {
     display: block;
-    min-width: 58px;
+    min-width: 64px;
 }
 #batch-results-body tr[data-row-file] .color-dd-trigger {
     width: 100%;
-    justify-content: center;
-    padding: 4px 7px;
+    justify-content: space-between;
+    padding: 4px 9px;
+}
+#batch-results-body tr[data-row-file] .quote-config-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+#batch-results-body tr[data-row-file] .quote-config-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 4px;
+    align-items: center;
+}
+#batch-results-body tr[data-row-file] .quote-config-row-color {
+    grid-template-columns: minmax(0, 88px);
+    justify-content: start;
+}
+#batch-results-body tr[data-row-file] .quote-config-row .row-edit {
+    width: 100%;
 }
 #batch-results-body tr[data-row-file] .color-dd-trigger .color-dd-swatch {
     border-color: rgba(15, 23, 42, 0.12) !important;
