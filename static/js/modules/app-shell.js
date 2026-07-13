@@ -7,6 +7,13 @@ export function initColorDropdownUI({ quoteOptions, currentResults, selectedFile
         panel.style.bottom = '';
         panel.style.marginTop = '';
         panel.style.minWidth = '';
+        panel.style.width = '';
+        panel.style.maxHeight = '';
+        if (panel.__portalHost === document.body) {
+            panel.__portalOrigin?.appendChild(panel);
+        }
+        panel.__portalHost = null;
+        panel.__portalOrigin = null;
     }
     function closeColorList(list) {
         resetPanel(list);
@@ -24,6 +31,11 @@ export function initColorDropdownUI({ quoteOptions, currentResults, selectedFile
         // The list is portaled visually with fixed positioning. Read its real
         // dimensions after it becomes visible so it stays anchored to the
         // trigger instead of relying on a hard-coded width estimate.
+        if (list.parentElement !== document.body) {
+            list.__portalOrigin = list.parentElement;
+            document.body.appendChild(list);
+            list.__portalHost = document.body;
+        }
         list.style.position = 'fixed';
         list.style.marginTop = '0';
         list.style.maxHeight = '360px';
@@ -305,12 +317,14 @@ export function initMobileNavigation({ mobileNav, dom, getCurrentUser, getAuthTo
 }
 
 export function initAppLifecycle({ mobileNav, loadAppVersion, preloadPrinterSelectors, updateViewerSize, getSelectedFilesCount }) {
+    let isLeavingAfterConfirmation = false;
+
     loadAppVersion();
     preloadPrinterSelectors();
     window.addEventListener('resize', updateViewerSize);
 
     window.addEventListener('beforeunload', (event) => {
-        if (getSelectedFilesCount() > 0) {
+        if (!isLeavingAfterConfirmation && getSelectedFilesCount() > 0) {
             event.preventDefault();
             event.returnValue = '';
         }
@@ -347,7 +361,11 @@ export function initAppLifecycle({ mobileNav, loadAppVersion, preloadPrinterSele
         const modal = document.getElementById('leave-confirm-modal');
         const cancelBtn = document.getElementById('leave-confirm-cancel');
         const okBtn = document.getElementById('leave-confirm-ok');
-        if (!modal) { onConfirm(); return; }
+        const leave = () => {
+            isLeavingAfterConfirmation = true;
+            onConfirm();
+        };
+        if (!modal) { leave(); return; }
         modal.classList.remove('hidden');
         function close() {
             modal.classList.add('hidden');
@@ -355,7 +373,7 @@ export function initAppLifecycle({ mobileNav, loadAppVersion, preloadPrinterSele
             okBtn.onclick = null;
         }
         cancelBtn.onclick = close;
-        okBtn.onclick = () => { close(); onConfirm(); };
+        okBtn.onclick = () => { close(); leave(); };
         modal.querySelector('.bg-black\/50')?.addEventListener('click', close, { once: true });
     }
 }
