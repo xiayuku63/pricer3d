@@ -1,5 +1,75 @@
 /* ── Quote Results Table Enhancements ── */
 
+/* Apple-style row controls: filled surfaces instead of mixed hard borders. */
+#batch-results-body tr[data-row-file] td {
+    vertical-align: middle;
+}
+#batch-results-body tr[data-row-file] .row-edit,
+#batch-results-body tr[data-row-file] .color-dd-trigger {
+    min-height: 28px;
+    border: 1px solid transparent !important;
+    border-radius: 8px;
+    background-color: rgba(242, 242, 247, 0.72) !important;
+    color: var(--color-text);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+    transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+#batch-results-body tr[data-row-file] .row-edit:hover,
+#batch-results-body tr[data-row-file] .color-dd-trigger:hover {
+    background-color: rgba(232, 232, 237, 0.9) !important;
+}
+#batch-results-body tr[data-row-file] .row-edit:focus,
+#batch-results-body tr[data-row-file] .color-dd-trigger:focus-visible {
+    outline: none;
+    border-color: rgba(0, 122, 255, 0.42) !important;
+    background-color: rgba(255, 255, 255, 0.94) !important;
+    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+#batch-results-body tr[data-row-file] .color-dd-wrapper {
+    display: block;
+    min-width: 58px;
+}
+#batch-results-body tr[data-row-file] .color-dd-trigger {
+    width: 100%;
+    justify-content: center;
+    padding: 4px 7px;
+}
+#batch-results-body tr[data-row-file] .color-dd-trigger .color-dd-swatch {
+    border-color: rgba(15, 23, 42, 0.12) !important;
+}
+#batch-results-body tr[data-row-file] td:nth-child(5),
+#batch-results-body tr[data-row-file] td:nth-child(6),
+#batch-results-body tr[data-row-file] td:nth-child(7) {
+    font-variant-numeric: tabular-nums;
+}
+#batch-results-body tr[data-row-file] td:nth-child(5) > div,
+#batch-results-body tr[data-row-file] td:nth-child(6) > div,
+#batch-results-body tr[data-row-file] td:nth-child(7) > div {
+    line-height: 1.45;
+}
+#batch-results-body tr[data-row-file] td:nth-child(5) > div:first-child,
+#batch-results-body tr[data-row-file] td:nth-child(6) > div:first-child,
+#batch-results-body tr[data-row-file] td:nth-child(7) > div:first-child {
+    color: var(--color-text-muted);
+    font-size: 10px;
+}
+#batch-results-body tr[data-row-file] td:nth-child(5) > div:last-child,
+#batch-results-body tr[data-row-file] td:nth-child(6) > div:last-child,
+#batch-results-body tr[data-row-file] td:nth-child(7) > div:last-child {
+    color: var(--color-text-strong);
+    font-size: 11px;
+}
+
+.dark #batch-results-body tr[data-row-file] .row-edit,
+.dark #batch-results-body tr[data-row-file] .color-dd-trigger {
+    background-color: rgba(28, 39, 56, 0.86) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.dark #batch-results-body tr[data-row-file] .row-edit:hover,
+.dark #batch-results-body tr[data-row-file] .color-dd-trigger:hover {
+    background-color: rgba(42, 58, 82, 0.92) !important;
+}
+
 /* Row status highlighting */
 .table-row-failed {
     border-left: 3px solid var(--color-danger) !important;
