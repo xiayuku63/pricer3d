@@ -1008,6 +1008,7 @@ export function renderResultsTable() {
                     '<div class="text-[11px] font-semibold text-purple-700 mb-2 flex items-center gap-1.5">' +
                     '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>' +
                     '切片参数</div>' +
+                    buildModelGeometryDetailHtml(item) +
                     _buildGcodeDetailHtml(gcodeData, false, item) + '</div>';
             }
 
@@ -1159,7 +1160,7 @@ function renderResultsCards() {
                 </div>
                 <div class="hidden mt-2" data-detail-content="${escapeHtml(item.filename)}">
 
-                    ${item.cost_breakdown?.gcode_summary ? '<div class="mb-3 p-3 bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-200 rounded-xl shadow-sm"><div class="text-[11px] font-semibold text-purple-700 mb-2 flex items-center gap-1.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>切片参数</div>' + _buildGcodeDetailHtml(item.cost_breakdown.gcode_summary, false, item) + '</div>' : ''}
+                    ${item.cost_breakdown?.gcode_summary ? '<div class="mb-3 p-3 bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-200 rounded-xl shadow-sm"><div class="text-[11px] font-semibold text-purple-700 mb-2 flex items-center gap-1.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>切片参数</div>' + buildModelGeometryDetailHtml(item) + _buildGcodeDetailHtml(item.cost_breakdown.gcode_summary, false, item) + '</div>' : ''}
                     ${item._printer_speed_params ? '<div class="mb-3 p-3 bg-gradient-to-br from-amber-50 to-yellow-50 border border-amber-200 rounded-xl shadow-sm"><div class="text-[11px] font-semibold text-amber-700 mb-2 flex items-center gap-1.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>打印机速度参数（硬件绑定）</div><div class="grid grid-cols-3 gap-x-4 gap-y-0.5 text-[11px] text-gray-600"><div>最大速度: <span class="font-medium text-gray-800">' + item._printer_speed_params.max_speed + ' mm/s</span></div><div>最大加速度: <span class="font-medium text-gray-800">' + item._printer_speed_params.max_acceleration + ' mm/s²</span></div><div>Jerk限制: <span class="font-medium text-gray-800">' + item._printer_speed_params.jerk_limit + ' mm/s</span></div></div></div>' : ''}
                     <div class="grid grid-cols-1 gap-2">
                         ${_buildCostBreakdownHtml(item)}
@@ -1262,6 +1263,19 @@ function renderResultsCards() {
 })();
 
 // ── G-code 详情构建 ──
+export function buildModelGeometryDetailHtml(item) {
+    const values = [];
+    if (item?.dimensions) values.push('<span>包裹 ' + escapeHtml(String(item.dimensions)) + '</span>');
+    if (item?.surface_area_cm2 != null) values.push('<span>表面积 ' + escapeHtml(String(item.surface_area_cm2)) + ' cm²</span>');
+    if (item?.volume_cm3 != null) values.push('<span class="font-semibold text-gray-800">体积 ' + escapeHtml(String(item.volume_cm3)) + ' cm³</span>');
+    if (!values.length) return '';
+
+    return '<div class="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-gray-600">'
+        + '<span class="font-medium text-gray-500">模型尺寸</span>'
+        + values.join('<span class="text-gray-300">|</span>')
+        + '</div>';
+}
+
 function _buildGcodeDetailHtml(gcode, wrapInTd = true, item) {
     const cp = gcode.core_params || {};
     const bd = item && item.cost_breakdown;
