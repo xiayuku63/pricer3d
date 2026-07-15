@@ -206,7 +206,7 @@ function _buildMaterialInfoHtml(materialName) {
         html += '<div class="flex flex-wrap gap-1 mb-2">';
         info.tags.forEach(tag => {
             const cls = _tagColorClasses(tag.color);
-            html += '<span class="inline-flex items-center gap-0.5 border rounded-full px-2 py-0.5 text-[9px] font-medium ' + cls + '">' + tag.icon + ' ' + tag.label + '</span>';
+            html += '<span class="inline-flex items-center gap-0.5 border rounded-full px-2 py-0.5 text-[9px] font-medium ' + cls + '">' + tag.label + '</span>';
         });
         html += '</div>';
     }
@@ -316,7 +316,7 @@ function _buildMaterialComparisonHtml(baseMaterial) {
         if (info && info.tags) {
             tagsHtml = '<div class="flex flex-wrap gap-0.5 justify-center">';
             info.tags.forEach(tag => {
-                tagsHtml += '<span class="text-[8px] border rounded-full px-1.5 py-0.5 ' + _tagColorClasses(tag.color) + '">' + tag.icon + tag.label + '</span>';
+                tagsHtml += '<span class="text-[8px] border rounded-full px-1.5 py-0.5 ' + _tagColorClasses(tag.color) + '">' + tag.label + '</span>';
             });
             tagsHtml += '</div>';
         }

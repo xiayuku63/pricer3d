@@ -1,4 +1,8 @@
-import { currentUser, authToken, currentResults } from './state.js';
+import {
+    currentUser, authToken, currentResults,
+    MATERIAL_OPTIONS,
+    hexToRgb, drawColorWheel, getMonochromeShades,
+} from './state.js';
 
 export function initSettingsAreaEvents({
     dom,
@@ -10,7 +14,6 @@ export function initSettingsAreaEvents({
     i18n,
 }) {
     const {
-        MATERIAL_OPTIONS,
         quoteOptions,
         MATERIAL_TYPE_PRESETS,
         getUsedBrandOptions,
@@ -20,10 +23,6 @@ export function initSettingsAreaEvents({
 
     const {
         renderUserCenterUI,
-        openColorEditor,
-        closeColorEditor,
-        addColorToMaterial,
-        removeColorFromMaterial,
         syncPricingFromInputs,
         validateCurrentFormulas,
         saveUserSettings,
@@ -196,6 +195,12 @@ export function initSettingsAreaEvents({
                     if (!matSel.value && matSel.options.length) matSel.value = matSel.options[0].value;
                     quoteOptions.material = matSel.value;
                 }
+            } else if (field === 'color') {
+                if (!MATERIAL_OPTIONS[idx].colors || !Array.isArray(MATERIAL_OPTIONS[idx].colors)) {
+                    MATERIAL_OPTIONS[idx].colors = [{ name: target.value, hex: target.value }];
+                } else {
+                    MATERIAL_OPTIONS[idx].colors[0] = { name: target.value, hex: target.value };
+                }
             } else if (field === 'density') {
                 MATERIAL_OPTIONS[idx].density = parseFloat(target.value) || 1.0;
             } else if (field === 'price_per_kg') {
@@ -233,29 +238,193 @@ export function initSettingsAreaEvents({
                     quoteOptions.material = remainingMaterials[0]?.name || '';
                 }
                 renderUserCenterUI();
-            } else if (e.target.classList.contains('edit-colors-btn')) {
-                openColorEditor(parseInt(e.target.getAttribute('data-idx'), 10));
+                return;
+            }
+
+            // Toggle color wheel panel
+            const trigger = e.target.closest('.color-picker-trigger > .cw-swatch');
+            if (trigger) {
+                const outer = trigger.closest('.color-picker-trigger');
+                const idx = parseInt(outer.getAttribute('data-idx'), 10);
+                // Close all other panels
+                document.querySelectorAll('.color-picker-trigger .color-picker-panel').forEach(p => {
+                    if (p._portalCleanup) p._portalCleanup();
+                    p.classList.add('hidden');
+                });
+                const panel = outer.querySelector('.color-picker-panel');
+                const wasHidden = panel.classList.contains('hidden');
+                panel.classList.remove('hidden');
+                // If the panel was hidden, portal it to body to avoid table overflow clipping
+                if (wasHidden) {
+                    const trigRect = trigger.getBoundingClientRect();
+                    panel.style.position = 'fixed';
+                    panel.style.top = (trigRect.bottom + 4) + 'px';
+                    panel.style.left = Math.max(4, trigRect.left) + 'px';
+                    panel.style.zIndex = '1000';
+                    panel._portalFrom = outer;
+                    panel._portalCleanup = () => {
+                        outer.appendChild(panel);
+                        panel.style.position = '';
+                        panel.style.top = '';
+                        panel.style.left = '';
+                        panel.style.zIndex = '';
+                        delete panel._portalFrom;
+                        delete panel._portalCleanup;
+                    };
+                    document.body.appendChild(panel);
+                    // Reposition if clipped on the right
+                    const pr = panel.getBoundingClientRect();
+                    if (pr.right > window.innerWidth - 8) {
+                        panel.style.left = (window.innerWidth - pr.width - 8) + 'px';
+                    }
+                }
+                // Initialize canvas
+                const canvas = panel.querySelector('.cw-canvas');
+                if (canvas) {
+                    const hex = trigger.getAttribute('data-color-hex') || '#000000';
+                    const [r, g, b] = hexToRgb(hex);
+                    // Compute hue/sat for dot
+                    const rn = r / 255, gn = g / 255, bn = b / 255;
+                    const mx = Math.max(rn, gn, bn), mn = Math.min(rn, gn, bn);
+                    let hue = 0, sat = 100;
+                    if (mx !== mn) {
+                        const d = mx - mn;
+                        sat = (d / (1 - Math.abs(mx + mn - 1))) * 100;
+                        let h = 0;
+                        if (mx === rn) h = ((gn - bn) / d + (gn < bn ? 6 : 0)) / 6;
+                        else if (mx === gn) h = ((bn - rn) / d + 2) / 6;
+                        else h = ((rn - gn) / d + 4) / 6;
+                        hue = h * 360;
+                    }
+                    drawColorWheel(canvas, hue, sat);
+                }
+                return;
+            }
+
+            // Monochrome swatch pick
+            const mono = e.target.closest('.color-picker-panel .ce-swatch');
+            if (mono) {
+                const hex = mono.getAttribute('data-color-hex');
+                const panel = mono.closest('.color-picker-panel');
+                const idx = parseInt(panel.getAttribute('data-idx'), 10);
+                // Update preview
+                const previewSwatch = panel.querySelector('.cw-preview-swatch');
+                const previewHex = panel.querySelector('.cw-preview-hex');
+                if (previewSwatch) previewSwatch.style.background = hex;
+                if (previewHex) previewHex.textContent = hex;
+                panel.querySelector('.row-color-value').value = hex;
+                // Update trigger swatch (may be portaled — use _portalFrom)
+                const outer = panel._portalFrom || panel.closest('.color-picker-trigger');
+                const trigSwatch = outer?.querySelector('.cw-swatch');
+                if (trigSwatch) {
+                    trigSwatch.style.background = hex;
+                    trigSwatch.setAttribute('data-color-hex', hex);
+                }
+                // Save
+                if (!MATERIAL_OPTIONS[idx].colors || !Array.isArray(MATERIAL_OPTIONS[idx].colors)) {
+                    MATERIAL_OPTIONS[idx].colors = [];
+                }
+                MATERIAL_OPTIONS[idx].colors[0] = { name: hex, hex };
+                mono.closest('.color-picker-mono').querySelectorAll('.ce-swatch').forEach(s => s.classList.remove('ring-2', 'ring-indigo-500'));
+                mono.classList.add('ring-2', 'ring-indigo-500');
+                return;
             }
         });
+
+        // Color canvas mouse interaction (delegated)
+        let _colorCanvasDrag = false;
+        dom.materialsTbody.addEventListener('mousedown', (e) => {
+            const canvas = e.target.closest('.color-picker-panel .cw-canvas');
+            if (!canvas) return;
+            _colorCanvasDrag = true;
+            _colorCanvasPick(e.clientX, e.clientY, canvas);
+        });
+        document.addEventListener('mousemove', (e) => {
+            if (!_colorCanvasDrag) return;
+            const canvas = document.querySelector('.color-picker-panel:not(.hidden) .cw-canvas');
+            if (canvas) _colorCanvasPick(e.clientX, e.clientY, canvas);
+        });
+        document.addEventListener('mouseup', () => { _colorCanvasDrag = false; });
+
+        function _colorCanvasPick(clientX, clientY, canvas) {
+            const panel = canvas.closest('.color-picker-panel');
+            const idx = parseInt(panel.getAttribute('data-idx'), 10);
+            const rect = canvas.getBoundingClientRect();
+            const x = (clientX - rect.left) * (canvas.width / rect.width);
+            const y = (clientY - rect.top) * (canvas.height / rect.height);
+            const cx = canvas.width / 2, cy = canvas.height / 2;
+            const radius = Math.min(cx, cy) - 2;
+            const dx = x - cx, dy = y - cy;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist > radius) return;
+            let angle = Math.atan2(dy, dx);
+            if (angle < 0) angle += Math.PI * 2;
+            const hue = (angle / (Math.PI * 2)) * 360;
+            const sat = (dist / radius) * 100;
+            drawColorWheel(canvas, hue, sat);
+            // Compute hex from HSL(50% lightness)
+            const h = hue / 360; const s = sat / 100;
+            const l2 = 0.5;
+            const q2 = l2 < 0.5 ? l2 * (1 + s) : l2 + s - l2 * s;
+            const p2 = 2 * l2 - q2;
+            const hue2rgb = (p3, q3, t) => {
+                if (t < 0) t += 1;
+                if (t > 1) t -= 1;
+                if (t < 1/6) return p3 + (q3 - p3) * 6 * t;
+                if (t < 1/2) return q3;
+                if (t < 2/3) return p3 + (q3 - p3) * (2/3 - t) * 6;
+                return p3;
+            };
+            const r = Math.round(hue2rgb(p2, q2, h + 1/3) * 255);
+            const g = Math.round(hue2rgb(p2, q2, h) * 255);
+            const b = Math.round(hue2rgb(p2, q2, h - 1/3) * 255);
+            const hex = '#' + [r, g, b].map(v => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0')).join('');
+
+            const previewSwatch = panel.querySelector('.cw-preview-swatch');
+            const previewHex = panel.querySelector('.cw-preview-hex');
+            if (previewSwatch) previewSwatch.style.background = hex;
+            if (previewHex) previewHex.textContent = hex;
+            panel.querySelector('.row-color-value').value = hex;
+            // Save to MATERIAL_OPTIONS
+            if (!MATERIAL_OPTIONS[idx].colors || !Array.isArray(MATERIAL_OPTIONS[idx].colors)) {
+                MATERIAL_OPTIONS[idx].colors = [];
+            }
+            MATERIAL_OPTIONS[idx].colors[0] = { name: hex, hex };
+            // Update trigger swatch
+            const outer = panel.closest('.color-picker-trigger') || (panel._portalFrom);
+            const trigSwatch = outer.querySelector('.cw-swatch');
+            if (trigSwatch) {
+                trigSwatch.style.background = hex;
+                trigSwatch.setAttribute('data-color-hex', hex);
+            }
+            // Regenerate monochrome shade swatches based on new hue/sat at fixed lightness range
+            const shades = getMonochromeShades(hue, sat, 10);
+            const monoContainer = panel.querySelector('.color-picker-mono');
+            if (monoContainer) {
+                monoContainer.innerHTML = shades.map(sh =>
+                    '<button type="button" class="ce-swatch w-7 h-7 rounded-md border border-gray-300 hover:border-indigo-400 hover:shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 flex-shrink-0" style="background:' + sh + '" data-color-hex="' + sh + '" title="' + sh + '"></button>'
+                ).join('');
+            }
+        }
+
+        // Close color panels on outside click
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.color-picker-trigger') && !e.target.closest('.color-picker-panel')) {
+                document.querySelectorAll('.color-picker-panel').forEach(p => {
+                    if (p._portalCleanup) p._portalCleanup();
+                    p.classList.add('hidden');
+                });
+            }
+        }, true);
     }
 
     bind(dom.addMaterialBtn, 'click', () => {
         const defaultType = Object.keys(MATERIAL_TYPE_PRESETS)[0] || 'PLA';
         const defaultPreset = MATERIAL_TYPE_PRESETS[defaultType] || { density: 1.24, price_per_kg: 80 };
-        MATERIAL_OPTIONS.push({ name: defaultType, brand: (quoteOptions.brand || 'Generic'), density: defaultPreset.density, price_per_kg: defaultPreset.price_per_kg, colors: [{ name: '黑色', hex: '#000000' }, { name: '白色', hex: '#ffffff' }] });
+        MATERIAL_OPTIONS.push({ name: defaultType, brand: (quoteOptions.brand || 'Generic'), density: defaultPreset.density, price_per_kg: defaultPreset.price_per_kg, colors: [{ name: '#000000', hex: '#000000' }] });
         renderUserCenterUI();
     });
     bind(document.getElementById('material-restore-defaults-btn'), 'click', restoreDefaultMaterials);
-
-    const colorEditorList = document.getElementById('color-editor-list');
-    if (colorEditorList) {
-        colorEditorList.addEventListener('click', (e) => {
-            const btn = e.target.closest('.remove-color-btn');
-            if (btn) removeColorFromMaterial(btn.getAttribute('data-color-hex'));
-        });
-    }
-    bind(document.getElementById('color-editor-close'), 'click', closeColorEditor);
-    bind(document.getElementById('color-editor-add'), 'click', addColorToMaterial);
 
     if (dom.formulaVarsToggleBtn) {
         dom.formulaVarsToggleBtn.addEventListener('click', () => {

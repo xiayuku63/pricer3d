@@ -11,7 +11,7 @@ const ALLOWED_EXTENSIONS = ['.stl', '.stp', '.step', '.obj', '.3mf', '.zip'];
 const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 const MAX_ZIP_SIZE = 1024 * 1024 * 1024; // 1GB
 const EXT_ICONS = {
-    stl: '🧊', stp: '📐', step: '📐', obj: '📦', '3mf': '🖨️', zip: '📁',
+    stl: 'STL', stp: 'STP', step: 'STEP', obj: 'OBJ', '3mf': '3MF', zip: 'ZIP',
 };
 
 // ── DOM refs (lazy-init) ──
@@ -176,7 +176,7 @@ export function renderFilePreviewChips(files) {
     allFiles.forEach(file => {
         const isNew = newFileNames.has(file.name);
         const ext = file.name.includes('.') ? file.name.split('.').pop().toLowerCase() : '-';
-        const icon = EXT_ICONS[ext] || '📄';
+        const icon = EXT_ICONS[ext] || ext.toUpperCase() || 'FILE';
         const thumbnail = thumbnailMap.get(file.name);
 
         const chip = document.createElement('div');
@@ -184,7 +184,7 @@ export function renderFilePreviewChips(files) {
 
         const previewHtml = thumbnail && thumbnail.startsWith('data:image/png')
             ? `<img src="${thumbnail}" class="w-10 h-10 rounded object-cover bg-white border border-gray-200" alt="" />`
-            : `<span class="w-10 h-10 flex items-center justify-center rounded bg-gray-100 text-lg">${icon}</span>`;
+            : `<span class="w-10 h-10 flex items-center justify-center rounded bg-gray-100 text-[10px] font-semibold text-gray-500">${icon}</span>`;
 
         chip.innerHTML = `
             ${previewHtml}

@@ -332,7 +332,7 @@ function _buildMaterialInfoHtml(materialName) {
         html += '<div class="flex flex-wrap gap-1 mb-2">';
         info.tags.forEach(tag => {
             const cls = _tagColorClasses(tag.color);
-            html += '<span class="inline-flex items-center gap-0.5 border rounded-full px-2 py-0.5 text-[9px] font-medium ' + cls + '">' + tag.icon + ' ' + tag.label + '</span>';
+            html += '<span class="inline-flex items-center gap-0.5 border rounded-full px-2 py-0.5 text-[9px] font-medium ' + cls + '">' + tag.label + '</span>';
         });
         html += '</div>';
     }
@@ -384,7 +384,7 @@ function _buildMaterialInfoHtml(materialName) {
         html += '<div class="mt-2 bg-amber-50 rounded-lg p-2 border border-amber-200">';
         html += '<span class="text-[10px] font-semibold text-amber-700 flex items-center gap-1 mb-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>注意事项</span>';
         html += '<ul class="space-y-0.5">';
-        info.warnings.forEach(w => { html += '<li class="text-[9px] text-amber-700 leading-snug">⚠ ' + w + '</li>'; });
+        info.warnings.forEach(w => { html += '<li class="text-[9px] text-amber-700 leading-snug">' + w + '</li>'; });
         html += '</ul></div>';
     }
 
@@ -455,7 +455,7 @@ function _buildMaterialComparisonHtml(baseMaterial) {
         if (info && info.tags) {
             tagsHtml = '<div class="flex flex-wrap gap-0.5 justify-center">';
             info.tags.forEach(tag => {
-                tagsHtml += '<span class="text-[8px] border rounded-full px-1.5 py-0.5 ' + _tagColorClasses(tag.color) + '">' + tag.icon + tag.label + '</span>';
+                tagsHtml += '<span class="text-[8px] border rounded-full px-1.5 py-0.5 ' + _tagColorClasses(tag.color) + '">' + tag.label + '</span>';
             });
             tagsHtml += '</div>';
         }
@@ -870,7 +870,7 @@ export function renderResultsTable() {
     if (!tbody) return;
     tbody.innerHTML = '';
     if (!currentResults.length) {
-        tbody.innerHTML = '<tr class="border-t border-gray-100"><td class="px-2 py-2 text-gray-500" colspan="13">' + t('common.noData') + '</td></tr>';
+        tbody.innerHTML = '<tr class="border-t border-gray-100"><td class="px-2 py-2 text-gray-500" colspan="9">' + t('common.noData') + '</td></tr>';
         _updatePaginationControls(0, 0);
         _updateSortArrows();
         return;
@@ -924,13 +924,8 @@ export function renderResultsTable() {
             tr.innerHTML = `
                 <td class="px-2 py-1.5"><div>${escapeHtml(item.filename)}${_buildParamBadge(item)}</div><button type="button" data-toggle-detail="${escapeHtml(item.filename)}" class="mt-0.5 text-[10px] text-indigo-500 hover:text-indigo-700 underline flex items-center gap-0.5"><svg class="w-3 h-3 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>详情</button></td>
                 <td class="px-2 py-1.5">${previewButtonHtml}</td>
-                <td class="px-2 py-1.5"><select data-field="_printer_model" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5 max-w-[110px]">${pmOptions}</select></td>
-                <td class="px-2 py-1.5"><select data-field="_slicer_preset_id" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5 max-w-[100px]">${presetOptions}</select></td>
-                <td class="px-2 py-1.5"><select data-field="_brand" class="row-edit row-brand-select text-[11px] border border-gray-300 rounded px-1 py-0.5 w-full max-w-[110px]">${brandOptionsHtml}</select></td>
-                <td class="px-2 py-1.5"><select data-field="material" class="row-edit text-[11px] border border-gray-300 rounded px-1 py-0.5">${materialOptionsHtml}</select></td>
-                <td class="px-2 py-1.5" data-field="color">${renderedRowColors.html}</td>
+                <td class="px-2 py-1.5"><div class="quote-config-grid min-w-[232px]"><div class="quote-config-row"><select data-field="_printer_model" aria-label="打印机" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5">${pmOptions}</select><select data-field="_slicer_preset_id" aria-label="预设" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5">${presetOptions}</select></div><div class="quote-config-row"><select data-field="_brand" aria-label="品牌" class="row-edit row-brand-select text-[11px] border border-gray-300 rounded px-1 py-0.5">${brandOptionsHtml}</select><select data-field="material" aria-label="材料" class="row-edit text-[11px] border border-gray-300 rounded px-1 py-0.5">${materialOptionsHtml}</select></div><div class="quote-config-row quote-config-row-color" data-field="color">${renderedRowColors.html}</div></div></td>
                 <td class="px-2 py-1.5"><input data-field="quantity" type="number" min="1" value="${item.quantity}" class="row-edit w-14 text-[11px] border border-gray-300 rounded px-1 py-0.5" /></td>
-                <td class="px-2 py-1.5 text-[10px] leading-tight">${geometryText}</td>
                 <td class="px-2 py-1.5">
                     <div class="text-[10px] leading-tight">${recalculating ? '-' : (item.weight_g / Math.max(1, item.quantity)).toFixed(1)}g</div>
                     <div class="text-xs leading-tight font-medium">${recalculating ? '-' : item.weight_g + 'g'}</div>
@@ -976,13 +971,9 @@ export function renderResultsTable() {
             tr.innerHTML = `
                 <td class="px-2 py-1.5">${escapeHtml(item.filename)}${_buildParamBadge(item)}</td>
                 <td class="px-2 py-1.5">${previewButtonHtml}</td>
-                <td class="px-2 py-1.5"><select data-field="_printer_model" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5 max-w-[110px]">${pmOptions}</select></td>
-                <td class="px-2 py-1.5"><select data-field="_slicer_preset_id" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5 max-w-[100px]">${presetOptions}</select></td>
-                <td class="px-2 py-1.5"><select data-field="_brand" class="row-edit row-brand-select text-[11px] border border-gray-300 rounded px-1 py-0.5 w-full max-w-[110px]">${brandOptionsHtml}</select></td>
-                <td class="px-2 py-1.5"><select data-field="material" class="row-edit text-[11px] border border-gray-300 rounded px-1 py-0.5">${materialOptionsHtml}</select></td>
-                <td class="px-2 py-1.5" data-field="color">${renderedRowColors.html}</td>
+                <td class="px-2 py-1.5"><div class="quote-config-grid min-w-[232px]"><div class="quote-config-row"><select data-field="_printer_model" aria-label="打印机" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5">${pmOptions}</select><select data-field="_slicer_preset_id" aria-label="预设" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5">${presetOptions}</select></div><div class="quote-config-row"><select data-field="_brand" aria-label="品牌" class="row-edit row-brand-select text-[11px] border border-gray-300 rounded px-1 py-0.5">${brandOptionsHtml}</select><select data-field="material" aria-label="材料" class="row-edit text-[11px] border border-gray-300 rounded px-1 py-0.5">${materialOptionsHtml}</select></div><div class="quote-config-row quote-config-row-color" data-field="color">${renderedRowColors.html}</div></div></td>
                 <td class="px-2 py-1.5"><input data-field="quantity" type="number" min="1" value="${quantityValue}" class="row-edit w-14 text-[11px] border border-gray-300 rounded px-1 py-0.5" /></td>
-                <td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td>
+                <td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td>
                 <td data-role="status-cell" class="px-2 py-1.5 whitespace-nowrap">
                     ${recalculating ? `
                     <span class="relative cursor-default text-amber-600 font-medium text-[11px]"><span class="inline-block w-2 h-2 rounded-full bg-amber-500 mr-1 align-middle"></span>${t('quote.recalculating')}</span>
@@ -1002,7 +993,7 @@ export function renderResultsTable() {
             detailTr.className = 'border-t border-gray-50';
             detailTr.setAttribute('data-detail-row', item.filename);
             const td = document.createElement('td');
-            td.setAttribute('colspan', '13');
+            td.setAttribute('colspan', '9');
             td.className = 'px-3 py-2 bg-white overflow-hidden';
 
             const detailDiv = document.createElement('div');
@@ -1017,6 +1008,7 @@ export function renderResultsTable() {
                     '<div class="text-[11px] font-semibold text-purple-700 mb-2 flex items-center gap-1.5">' +
                     '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>' +
                     '切片参数</div>' +
+                    buildModelGeometryDetailHtml(item) +
                     _buildGcodeDetailHtml(gcodeData, false, item) + '</div>';
             }
 
@@ -1065,7 +1057,7 @@ export function renderResultsTable() {
             spacerTr.className = 'border-t border-gray-50';
             spacerTr.setAttribute('data-detail-row', item.filename);
             const spacerTd = document.createElement('td');
-            spacerTd.setAttribute('colspan', '13');
+            spacerTd.setAttribute('colspan', '9');
             spacerTd.className = 'py-2 bg-white';
             spacerTr.appendChild(spacerTd);
             tbody.appendChild(spacerTr);
@@ -1168,7 +1160,7 @@ function renderResultsCards() {
                 </div>
                 <div class="hidden mt-2" data-detail-content="${escapeHtml(item.filename)}">
 
-                    ${item.cost_breakdown?.gcode_summary ? '<div class="mb-3 p-3 bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-200 rounded-xl shadow-sm"><div class="text-[11px] font-semibold text-purple-700 mb-2 flex items-center gap-1.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>切片参数</div>' + _buildGcodeDetailHtml(item.cost_breakdown.gcode_summary, false, item) + '</div>' : ''}
+                    ${item.cost_breakdown?.gcode_summary ? '<div class="mb-3 p-3 bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-200 rounded-xl shadow-sm"><div class="text-[11px] font-semibold text-purple-700 mb-2 flex items-center gap-1.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>切片参数</div>' + buildModelGeometryDetailHtml(item) + _buildGcodeDetailHtml(item.cost_breakdown.gcode_summary, false, item) + '</div>' : ''}
                     ${item._printer_speed_params ? '<div class="mb-3 p-3 bg-gradient-to-br from-amber-50 to-yellow-50 border border-amber-200 rounded-xl shadow-sm"><div class="text-[11px] font-semibold text-amber-700 mb-2 flex items-center gap-1.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>打印机速度参数（硬件绑定）</div><div class="grid grid-cols-3 gap-x-4 gap-y-0.5 text-[11px] text-gray-600"><div>最大速度: <span class="font-medium text-gray-800">' + item._printer_speed_params.max_speed + ' mm/s</span></div><div>最大加速度: <span class="font-medium text-gray-800">' + item._printer_speed_params.max_acceleration + ' mm/s²</span></div><div>Jerk限制: <span class="font-medium text-gray-800">' + item._printer_speed_params.jerk_limit + ' mm/s</span></div></div></div>' : ''}
                     <div class="grid grid-cols-1 gap-2">
                         ${_buildCostBreakdownHtml(item)}
@@ -1271,12 +1263,25 @@ function renderResultsCards() {
 })();
 
 // ── G-code 详情构建 ──
+export function buildModelGeometryDetailHtml(item) {
+    const values = [];
+    if (item?.dimensions) values.push('<span>包裹 ' + escapeHtml(String(item.dimensions)) + '</span>');
+    if (item?.surface_area_cm2 != null) values.push('<span>表面积 ' + escapeHtml(String(item.surface_area_cm2)) + ' cm²</span>');
+    if (item?.volume_cm3 != null) values.push('<span class="font-semibold text-gray-800">体积 ' + escapeHtml(String(item.volume_cm3)) + ' cm³</span>');
+    if (!values.length) return '';
+
+    return '<div class="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-gray-600">'
+        + '<span class="font-medium text-gray-500">模型尺寸</span>'
+        + values.join('<span class="text-gray-300">|</span>')
+        + '</div>';
+}
+
 function _buildGcodeDetailHtml(gcode, wrapInTd = true, item) {
     const cp = gcode.core_params || {};
     const bd = item && item.cost_breakdown;
     const fmtTime = (s) => { if (!s||s<=0) return null; const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=Math.round(s%60); return h>0?h+"时"+m+"分"+sec+"秒":m>0?m+"分"+sec+"秒":sec+"秒"; };
     const gridCls = 'grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-x-3 gap-y-0.5 text-[10px]';
-    let html = wrapInTd ? '<td colspan="13" class="px-3 py-1.5"><div class="' + gridCls + '">' : '<div class="' + gridCls + '">';
+    let html = wrapInTd ? '<td colspan="9" class="px-3 py-1.5"><div class="' + gridCls + '">' : '<div class="' + gridCls + '">';
     const add = (label, value, unit) => {
         if (value != null && value !== '') {
             html += '<div class="flex items-baseline gap-1"><span class="text-gray-400 shrink-0">' + label + '</span><span class="font-medium text-gray-700">' + value + (unit||'') + '</span></div>';

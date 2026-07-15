@@ -3,124 +3,79 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>用户管理 - 3D打印自动报价系统</title>
+    <title>用户管理 - Pricer3D</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/css/design-tokens.css?v=1">
+    <style>
+        body { min-height: 100vh; padding: 24px; }
+        .admin-shell { max-width: 1440px; margin: 0 auto; }
+        .admin-topbar { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:24px; }
+        .brand-mark { display:flex; align-items:center; gap:10px; color:var(--color-text-strong); font-weight:700; }
+        .brand-icon { width:34px; height:34px; display:grid; place-items:center; border-radius:11px; color:#fff; background:var(--color-primary); box-shadow:0 8px 18px rgba(0,122,255,.22); }
+        .admin-panel { padding:24px; }
+        .eyebrow { color:var(--color-primary); font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
+        .tabs { display:flex; gap:6px; border-bottom:1px solid var(--color-border); margin:24px -24px 20px; padding:0 24px; overflow:auto; }
+        .tab-btn { border:0; border-bottom:2px solid transparent; background:transparent; color:var(--color-text-muted); padding:12px 14px; white-space:nowrap; cursor:pointer; font-size:13px; font-weight:600; }
+        .tab-btn.active { color:var(--color-primary); border-bottom-color:var(--color-primary); }
+        .toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+        .searchbar { display:flex; gap:8px; flex:1; min-width:240px; }
+        .searchbar input { flex:1; }
+        .stat-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-bottom:20px; }
+        .stat { padding:16px; border:1px solid var(--color-border); border-radius:14px; background:var(--color-bg-hover); }
+        .stat-label { font-size:11px; color:var(--color-text-muted); }
+        .stat-value { margin-top:8px; color:var(--color-text-strong); font-size:22px; font-weight:700; }
+        .table-wrap { overflow:auto; border:1px solid var(--color-border); border-radius:14px; }
+        table { width:100%; border-collapse:collapse; min-width:980px; }
+        th { background:var(--color-bg); color:var(--color-text-muted); font-size:11px; font-weight:600; text-align:left; white-space:nowrap; }
+        th, td { padding:12px 14px; border-bottom:1px solid var(--color-border); }
+        td { color:var(--color-text); font-size:12px; white-space:nowrap; }
+        tbody tr:hover { background:var(--color-bg-hover); }
+        tbody tr:last-child td { border-bottom:0; }
+        .badge { display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:999px; font-size:10px; font-weight:600; }
+        .badge-blue { color:var(--color-primary-text); background:var(--color-primary-bg); border:1px solid var(--color-primary-border); }
+        .badge-green { color:var(--color-success-text); background:var(--color-success-bg); border:1px solid var(--color-success-border); }
+        .badge-gray { color:var(--color-text-secondary); background:var(--color-disabled-bg); border:1px solid var(--color-border); }
+        .badge-red { color:var(--color-danger-text); background:var(--color-danger-bg); border:1px solid var(--color-danger-border); }
+        .pagination { display:flex; align-items:center; justify-content:space-between; gap:12px; padding-top:14px; color:var(--color-text-muted); font-size:12px; }
+        .pagination-actions { display:flex; gap:6px; }
+        .empty { padding:44px 16px; text-align:center; color:var(--color-text-muted); }
+        .hidden { display:none !important; }
+        @media (max-width: 720px) { body { padding:12px; } .admin-panel { padding:16px; } .tabs { margin-left:-16px; margin-right:-16px; padding:0 16px; } .stat-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .admin-topbar { align-items:flex-start; } }
+    </style>
 </head>
-<body class="bg-gray-50 min-h-screen p-4 lg:p-6">
-    <div class="max-w-6xl mx-auto bg-white rounded-xl shadow-md overflow-hidden">
-        <div class="p-8 space-y-5">
-            <div class="flex items-start justify-between gap-4">
-                <div>
-                    <div class="uppercase tracking-wide text-sm text-indigo-500 font-semibold mb-1">3D Printing Parts Automated Quoting System</div>
-                    <h2 class="text-2xl font-bold text-gray-900">用户管理</h2>
-                </div>
-                <a href="/" class="text-sm px-3 py-1.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50">返回首页</a>
+<body>
+    <main class="admin-shell">
+        <header class="admin-topbar">
+            <div class="brand-mark"><span class="brand-icon">P3</span><span>Pricer3D <small class="tw-text-muted">/ 管理后台</small></span></div>
+            <a href="/" class="tw-btn-secondary px-3 py-2 text-xs">返回报价</a>
+        </header>
+        <section class="tw-card admin-panel">
+            <div class="eyebrow">Operations console</div>
+            <div class="flex items-end justify-between gap-4 flex-wrap mt-1">
+                <div><h1 class="text-2xl font-semibold tw-text-heading">用户管理</h1><p class="text-xs tw-text-muted mt-2">管理账号权益，查看关键操作与服务运行状态。</p></div>
+                <p id="msg" class="hidden text-xs"></p>
             </div>
-
-            <div class="flex flex-wrap gap-2">
-                <button data-tab="users" type="button" class="tab-btn px-3 py-1.5 rounded-md bg-indigo-600 text-white text-sm">用户</button>
-                <button data-tab="audit" type="button" class="tab-btn px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 text-sm hover:bg-gray-50">审计日志</button>
-                <button data-tab="metrics" type="button" class="tab-btn px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 text-sm hover:bg-gray-50">监控</button>
+            <nav class="tabs" aria-label="管理模块">
+                <button data-tab="users" type="button" class="tab-btn active">用户 <span id="user-count" class="tw-text-muted"></span></button>
+                <button data-tab="audit" type="button" class="tab-btn">审计日志</button>
+                <button data-tab="metrics" type="button" class="tab-btn">运行监控</button>
+            </nav>
+            <div id="tab-users">
+                <div class="toolbar"><div class="searchbar"><input id="search-input" type="search" class="tw-input px-3 py-2 text-sm" placeholder="搜索用户名、邮箱或手机号" /><button id="search-btn" type="button" class="tw-btn-primary px-4 py-2 text-xs">查询</button></div><button id="users-refresh-btn" type="button" class="tw-btn-ghost px-3 py-2 text-xs">刷新</button></div>
+                <div class="table-wrap"><table><thead><tr><th>ID</th><th>账号</th><th>邮箱</th><th>手机号</th><th>权益</th><th>验证状态</th><th>注册时间</th><th>操作</th></tr></thead><tbody id="users-tbody"></tbody></table></div>
+                <div id="users-pagination" class="pagination"></div>
             </div>
-
-            <p id="msg" class="hidden text-xs"></p>
-
-            <div id="tab-users" class="space-y-3">
-                <div class="grid grid-cols-[1fr,auto] gap-2">
-                    <input id="search-input" type="text" class="block w-full py-2 px-3 border border-gray-300 rounded-md text-sm" placeholder="按用户名/邮箱/手机号搜索" />
-                    <button id="search-btn" type="button" class="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm hover:bg-indigo-700">搜索</button>
-                </div>
-                <div class="overflow-x-auto border border-gray-200 rounded-md">
-                    <table class="min-w-full text-xs text-left">
-                        <thead class="bg-gray-50 text-gray-600">
-                            <tr>
-                                <th class="px-3 py-2">ID</th>
-                                <th class="px-3 py-2">用户名</th>
-                                <th class="px-3 py-2">邮箱(脱敏)</th>
-                                <th class="px-3 py-2">手机(脱敏)</th>
-                                <th class="px-3 py-2">类型</th>
-                                <th class="px-3 py-2">邮箱验证</th>
-                                <th class="px-3 py-2">手机验证</th>
-                                <th class="px-3 py-2">注册时间</th>
-                                <th class="px-3 py-2">操作</th>
-                            </tr>
-                        </thead>
-                        <tbody id="users-tbody" class="bg-white divide-y divide-gray-100">
-                            <tr><td colspan="9" class="px-3 py-4 text-gray-500">加载中...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
+            <div id="tab-audit" class="hidden">
+                <div class="toolbar"><div class="searchbar"><input id="audit-q" type="search" class="tw-input px-3 py-2 text-sm" placeholder="搜索 action、用户名、IP、路径或 request_id" /><button id="audit-search-btn" type="button" class="tw-btn-primary px-4 py-2 text-xs">查询</button></div></div>
+                <div class="table-wrap"><table><thead><tr><th>时间</th><th>操作</th><th>用户</th><th>IP</th><th>请求</th><th>Request ID</th><th>详情</th></tr></thead><tbody id="audit-tbody"></tbody></table></div>
             </div>
-
-            <div id="tab-audit" class="space-y-3 hidden">
-                <div class="grid grid-cols-1 lg:grid-cols-[1fr,1fr,1fr,auto] gap-2">
-                    <input id="audit-q" type="text" class="block w-full py-2 px-3 border border-gray-300 rounded-md text-sm" placeholder="全文搜索：action/用户名/IP/path/request_id" />
-                    <input id="audit-action" type="text" class="block w-full py-2 px-3 border border-gray-300 rounded-md text-sm" placeholder="action 过滤（可选）" />
-                    <input id="audit-username" type="text" class="block w-full py-2 px-3 border border-gray-300 rounded-md text-sm" placeholder="用户名过滤（可选）" />
-                    <button id="audit-search-btn" type="button" class="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm hover:bg-indigo-700">查询</button>
-                </div>
-                <div class="overflow-x-auto border border-gray-200 rounded-md">
-                    <table class="min-w-full text-xs text-left">
-                        <thead class="bg-gray-50 text-gray-600">
-                            <tr>
-                                <th class="px-3 py-2">时间</th>
-                                <th class="px-3 py-2">action</th>
-                                <th class="px-3 py-2">用户</th>
-                                <th class="px-3 py-2">IP</th>
-                                <th class="px-3 py-2">请求</th>
-                                <th class="px-3 py-2">request_id</th>
-                                <th class="px-3 py-2">detail</th>
-                            </tr>
-                        </thead>
-                        <tbody id="audit-tbody" class="bg-white divide-y divide-gray-100">
-                            <tr><td colspan="7" class="px-3 py-4 text-gray-500">加载中...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
+            <div id="tab-metrics" class="hidden">
+                <div class="toolbar"><span class="text-xs tw-text-muted">最近运行数据</span><div class="flex gap-2"><button id="metrics-refresh-btn" type="button" class="tw-btn-primary px-3 py-2 text-xs">刷新</button><button id="cleanup-btn" type="button" class="tw-btn-ghost px-3 py-2 text-xs">清理过期数据</button></div></div>
+                <div class="stat-grid"><div class="stat"><div class="stat-label">运行时长</div><div id="m-uptime" class="stat-value">-</div></div><div class="stat"><div class="stat-label">已追踪请求</div><div id="m-req" class="stat-value">-</div></div><div class="stat"><div class="stat-label">平均耗时</div><div id="m-avg" class="stat-value">-</div></div><div class="stat"><div class="stat-label">P95 耗时</div><div id="m-p95" class="stat-value">-</div></div></div>
+                <div class="table-wrap"><table style="min-width:520px"><thead><tr><th>Path</th><th>请求数</th><th>5xx</th><th>平均耗时</th></tr></thead><tbody id="metrics-tbody"></tbody></table></div>
             </div>
-
-            <div id="tab-metrics" class="space-y-3 hidden">
-                <div class="flex flex-wrap gap-2 items-center">
-                    <button id="metrics-refresh-btn" type="button" class="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm hover:bg-indigo-700">刷新</button>
-                    <button id="cleanup-btn" type="button" class="px-4 py-2 rounded-md border border-gray-300 text-gray-700 text-sm hover:bg-gray-50">清理过期数据</button>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                    <div class="border border-gray-200 rounded-md p-3 bg-gray-50">
-                        <div class="text-xs text-gray-500">运行时长</div>
-                        <div id="m-uptime" class="text-lg font-semibold text-gray-900">-</div>
-                    </div>
-                    <div class="border border-gray-200 rounded-md p-3 bg-gray-50">
-                        <div class="text-xs text-gray-500">请求数(Tracked)</div>
-                        <div id="m-req" class="text-lg font-semibold text-gray-900">-</div>
-                    </div>
-                    <div class="border border-gray-200 rounded-md p-3 bg-gray-50">
-                        <div class="text-xs text-gray-500">平均耗时(ms)</div>
-                        <div id="m-avg" class="text-lg font-semibold text-gray-900">-</div>
-                    </div>
-                    <div class="border border-gray-200 rounded-md p-3 bg-gray-50">
-                        <div class="text-xs text-gray-500">P95 耗时(ms)</div>
-                        <div id="m-p95" class="text-lg font-semibold text-gray-900">-</div>
-                    </div>
-                </div>
-                <div class="overflow-x-auto border border-gray-200 rounded-md">
-                    <table class="min-w-full text-xs text-left">
-                        <thead class="bg-gray-50 text-gray-600">
-                            <tr>
-                                <th class="px-3 py-2">Path</th>
-                                <th class="px-3 py-2">Count</th>
-                                <th class="px-3 py-2">5xx</th>
-                                <th class="px-3 py-2">Avg(ms)</th>
-                            </tr>
-                        </thead>
-                        <tbody id="metrics-tbody" class="bg-white divide-y divide-gray-100">
-                            <tr><td colspan="4" class="px-3 py-4 text-gray-500">加载中...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-
+        </section>
+    </main>
     <script type="module" src="/static/js/admin_users.js"></script>
 </body>
 </html>

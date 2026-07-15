@@ -157,9 +157,9 @@ function showGestureHint() {
             background:rgba(0,0,0,0.75);color:#fff;padding:12px 20px;border-radius:12px;
             font-size:13px;z-index:9999;pointer-events:none;display:flex;gap:20px;
             align-items:center;backdrop-filter:blur(4px);transition:opacity 0.5s">
-            <span>👆 拖动旋转</span>
-            <span>🤏 双指缩放</span>
-            <span>✌️ 双指平移</span>
+            <span>拖动旋转</span>
+            <span>双指缩放</span>
+            <span>双指平移</span>
         </div>`;
     document.body.appendChild(hint);
     setTimeout(() => {
