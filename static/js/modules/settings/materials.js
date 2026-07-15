@@ -42,33 +42,22 @@ export function restoreDefaultMaterials() {
         { name: '灰色', hex: '#808080' }, { name: '红色', hex: '#dc2626' },
         { name: '蓝色', hex: '#2563eb' }, { name: '绿色', hex: '#16a34a' },
         { name: '黄色', hex: '#ca8a04' }, { name: '橙色', hex: '#ea580c' },
-        { name: '紫色', hex: '#933333' }, { name: '粉色', hex: '#db2777' },
+        { name: '紫色', hex: '#9333ea' }, { name: '粉色', hex: '#db2777' },
     ];
-    setMaterialOptions(_DEFAULT_MATERIALS.map(m => ({ ...m, colors: defaultColors.map(c => ({ ...c })) })));
+    setMaterialOptions(_DEFAULT_MATERIALS.map(m => ({ ...m, colors: [defaultColors[1]] })));
     updateDropdowns();
     renderUserCenterUI(dom);
 }
 
 /**
- * Get available material types for a row, excluding types already used by same brand.
+ * Get available material types for a row.
  */
 function _getTypeOptionsForRow(m, rowIdx) {
-    const brand = (m.brand || 'Generic').trim();
     const allTypes = new Set(Object.keys(MATERIAL_TYPE_PRESETS));
     // Include custom types from MATERIAL_OPTIONS
     for (const mat of MATERIAL_OPTIONS) {
         if (mat.name && !MATERIAL_TYPE_PRESETS[mat.name]) allTypes.add(mat.name);
     }
-    // Exclude types already used by same brand in other rows
-    for (let i = 0; i < MATERIAL_OPTIONS.length; i++) {
-        if (i === rowIdx) continue;
-        const other = MATERIAL_OPTIONS[i];
-        if ((other.brand || 'Generic').trim() === brand && other.name) {
-            allTypes.delete(other.name);
-        }
-    }
-    // Always keep current row's type
-    if (m.name) allTypes.add(m.name);
     return [...allTypes].sort();
 }
 
@@ -93,6 +82,96 @@ function renderComboInput(opts, value, dataIdx, dataField) {
                 <span class="combo-badge text-[11px] text-amber-500 leading-none flex-shrink-0 cursor-help ml-1 hidden" title="${dataField === 'brand' ? (t('material.brandCustom') || '自定义品牌') : (t('material.typeCustom') || '自定义类型')}">✦</span> \
                 <div class="combo-d hidden absolute z-50 left-0 right-0 top-full mt-0.5 border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto" style="background:var(--color-surface);color:var(--color-text);min-width:100px">${optHtml}</div> \
             </span>`;
+}
+
+/**
+ * Render single color picker for a material.
+ */
+function renderColorPicker(m, idx) {
+    const colors = materialColorsArray(m);
+    const first = colors[0];
+    const hex = first ? first.hex : '#d1d5db';
+    const panel = _buildColorWheelPanel(hex);
+    return `<span class="color-picker-trigger relative inline-block" data-idx="${idx}">
+        <span class="cw-swatch w-6 h-6 rounded-sm border inline-block cursor-pointer" style="background:${hex};border-color:var(--color-border-input);" data-color-hex="${hex}"></span>
+        <span class="color-picker-panel hidden absolute z-50 left-0 top-8 tw-card shadow-xl p-3 rounded-lg" style="background:var(--color-surface);" data-idx="${idx}">
+            ${panel}
+            <input type="hidden" class="row-color-value" value="${hex}">
+        </span>
+    </span>`;
+}
+
+// Wrapper: build a color wheel panel (reuses state.js helpers via imported _buildColorWheelPanel)
+function _buildColorWheelPanel(hex) {
+    const [r, g, b] = hexToRgb(hex);
+    const [hue, sat] = _rgbToHsl(r, g, b);
+    const shades = _getMonochromeShades(hue, sat, 10);
+    const swatches = shades.map(sh =>
+        `<button type="button" class="ce-swatch w-7 h-7 rounded-md border hover:border-indigo-400 hover:shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 flex-shrink-0" style="background:${sh};border-color:var(--color-border-input);" data-color-hex="${sh}" title="${sh}"></button>`
+    ).join('');
+    return '<div class="cw-panel-inner">'
+        + '<div class="flex items-center gap-3 mb-3">'
+        + '<span class="cw-preview-swatch w-10 h-10 rounded-lg border flex-shrink-0 shadow-sm" style="background:' + hex + ';border-color:var(--color-border);"></span>'
+        + '<span class="cw-preview-hex font-mono text-sm font-semibold tw-text-secondary select-all">' + hex + '</span>'
+        + '</div>'
+        + '<div class="flex justify-center mb-3">'
+        + '<canvas class="cw-canvas" width="200" height="200" style="cursor:crosshair;border-radius:50%;display:block;"></canvas>'
+        + '</div>'
+        + '<div class="color-picker-mono flex gap-1.5 justify-center flex-wrap px-1">'
+        + swatches
+        + '</div>'
+        + '</div>';
+}
+
+// RGB → HSL helper (lightweight, no import needed for local)
+function _rgbToHsl(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    let h = 0, s = 0;
+    const l = (mx + mn) / 2;
+    if (mx !== mn) {
+        const d = mx - mn;
+        s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+        if (mx === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+        else if (mx === g) h = ((b - r) / d + 2) / 6;
+        else h = ((r - g) / d + 4) / 6;
+    }
+    return [h * 360, s * 100, l * 100];
+}
+
+// HSL → RGB helper
+function _hslToRgb(h, s, l) {
+    h /= 360; s /= 100; l /= 100;
+    if (s === 0) { const v = Math.round(l * 255); return [v, v, v]; }
+    const hue2rgb = (p, q, t) => {
+        if (t < 0) t += 1;
+        if (t > 1) t -= 1;
+        if (t < 1/6) return p + (q - p) * 6 * t;
+        if (t < 1/2) return q;
+        if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+        return p;
+    };
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    return [
+        Math.round(hue2rgb(p, q, h + 1/3) * 255),
+        Math.round(hue2rgb(p, q, h) * 255),
+        Math.round(hue2rgb(p, q, h - 1/3) * 255)
+    ];
+}
+
+// Monochrome shades helper
+function _getMonochromeShades(hue, saturation, count) {
+    const shades = [];
+    for (let i = 0; i < count; i++) {
+        const t = i / (count - 1);
+        const l = 10 + t * 82;
+        const s = saturation * (1 - t * 0.5);
+        const [r2, g2, b2] = _hslToRgb(hue, s, l);
+        const sh = '#' + [r2, g2, b2].map(x => Math.max(0, Math.min(255, Math.round(x))).toString(16).padStart(2, '0')).join('');
+        shades.push(sh);
+    }
+    return shades;
 }
 
 // ── Render user center ──
@@ -161,9 +240,8 @@ export function renderUserCenterUI() {
                 <td class="px-3 py-2.5"><input type="number" step="0.01" class="w-full border-gray-300 rounded-md text-xs px-2 py-1.5 tw-bg-surface" value="${m.density}" data-idx="${idx}" data-field="density"></td>
                 <td class="px-3 py-2.5"><input type="number" step="0.01" class="w-full border-gray-300 rounded-md text-xs px-2 py-1.5 tw-bg-surface" value="${m.price_per_kg}" data-idx="${idx}" data-field="price_per_kg"></td>
                 <td class="px-3 py-2.5">
-                    <div class="flex flex-wrap items-center gap-1.5">
-                        ${materialColorsArray(m).map(c => `<span class="w-5 h-5 rounded-sm border border-gray-400 inline-block cursor-pointer" style="background:${c.hex}" title="${escapeHtml(c.name)}" data-color-idx="${idx}" data-color-hex="${c.hex}"></span>`).join('')}
-                        <button type="button" class="text-xs text-indigo-600 hover:text-indigo-800 edit-colors-btn ml-1" data-idx="${idx}">${t('common.edit')}</button>
+                    <div class="flex items-center gap-1.5">
+                        ${renderColorPicker(m, idx)}
                     </div>
                 </td>
                 <td class="px-3 py-2.5 text-center"><button type="button" class="text-xs tw-text-danger hover:tw-text-danger delete-material-btn" data-idx="${idx}">${t('common.delete')}</button></td>

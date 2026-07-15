@@ -26,7 +26,6 @@ async def index():
         "quote-history-modal",
         "preview-modal",
         "orient-modal",
-        "color-editor-modal",
         "zip-preview-modal",
         "scripts",
         "closing",

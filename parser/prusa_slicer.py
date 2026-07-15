@@ -680,8 +680,8 @@ def generate_prusa_config(
     """Generate a downloadable PrusaSlicer config for a given preset snapshot.
 
     Unlike generate_slice_config() which writes a temp file for CLI use,
-    this function returns a human-readable .ini string the user can load
-    in PrusaSlicer GUI.
+    this function returns a path to a temp file containing the .ini content
+    the caller can read / serve / persist.
     """
     # Load base config from printer profile or system default
     ini_content = ""
@@ -772,4 +772,8 @@ def generate_prusa_config(
     ms["bed_size"] = f"{bed_size_x},{bed_size_y}"
     ms["max_print_height"] = str(max_print_height)
 
-    return _write_ini_sections(sections)
+    body = _write_ini_sections(sections)
+    fd, path = tempfile.mkstemp(suffix=".ini", prefix="prc3d_preset_")
+    with os.fdopen(fd, "w") as f:
+        f.write(body)
+    return path

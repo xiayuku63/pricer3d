@@ -7,6 +7,13 @@ export function initColorDropdownUI({ quoteOptions, currentResults, selectedFile
         panel.style.bottom = '';
         panel.style.marginTop = '';
         panel.style.minWidth = '';
+        panel.style.width = '';
+        panel.style.maxHeight = '';
+        if (panel.__portalHost === document.body) {
+            panel.__portalOrigin?.appendChild(panel);
+        }
+        panel.__portalHost = null;
+        panel.__portalOrigin = null;
     }
     function closeColorList(list) {
         resetPanel(list);
@@ -20,25 +27,43 @@ export function initColorDropdownUI({ quoteOptions, currentResults, selectedFile
         if (!wrapper.closest('#batch-results-body, #batch-results-cards, #batch-color-cell')) return;
         const rect = trigger.getBoundingClientRect();
         if (!rect.width) return;
-        const spaceBelow = window.innerHeight - rect.bottom;
-        const spaceAbove = rect.top;
-        const contentH = list.scrollHeight || 360;
-        const maxH = Math.min(360, contentH);
-        const placeBelow = spaceBelow >= maxH || spaceBelow >= spaceAbove;
-        let fitH = placeBelow ? Math.min(maxH, spaceBelow - 6) : Math.min(maxH, spaceAbove - 6);
-        if (fitH < 120) fitH = Math.min(maxH, 120);
+
+        // The list is portaled visually with fixed positioning. Read its real
+        // dimensions after it becomes visible so it stays anchored to the
+        // trigger instead of relying on a hard-coded width estimate.
+        if (list.parentElement !== document.body) {
+            list.__portalOrigin = list.parentElement;
+            document.body.appendChild(list);
+            list.__portalHost = document.body;
+        }
         list.style.position = 'fixed';
         list.style.marginTop = '0';
-        list.style.maxHeight = `${fitH}px`;
+        list.style.maxHeight = '360px';
         list.style.minWidth = `${Math.max(rect.width, 160)}px`;
-        list.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - 180))}px`;
+        list.style.left = '0px';
+        list.style.top = '0px';
+        list.style.bottom = '';
+        const listRect = list.getBoundingClientRect();
+        const listWidth = Math.max(listRect.width, rect.width, 160);
+        const listHeight = Math.min(list.scrollHeight || listRect.height || 360, 360);
+        const gap = 6;
+        const left = Math.max(8, Math.min(rect.left, window.innerWidth - listWidth - 8));
+        const spaceBelow = window.innerHeight - rect.bottom - gap;
+        const spaceAbove = rect.top - gap;
+        const placeBelow = spaceBelow >= listHeight || spaceBelow >= spaceAbove;
+        const availableHeight = Math.max(120, Math.min(listHeight, placeBelow ? spaceBelow : spaceAbove));
+
+        list.style.zIndex = '100';
+        list.style.width = `${listWidth}px`;
+        list.style.maxHeight = `${availableHeight}px`;
+        list.style.left = `${left}px`;
         list.style.right = '';
         if (placeBelow) {
-            list.style.top = `${rect.bottom + 2}px`;
+            list.style.top = `${rect.bottom + gap}px`;
             list.style.bottom = '';
         } else {
             list.style.top = '';
-            list.style.bottom = `${window.innerHeight - rect.top + 2}px`;
+            list.style.bottom = `${window.innerHeight - rect.top + gap}px`;
         }
     }
     async function applyInlineRecolor(rowCtx, hex) {
@@ -139,21 +164,14 @@ export function initColorDropdownUI({ quoteOptions, currentResults, selectedFile
         if (list) closeColorList(list);
 
         // Reset "more colors" for next open
-        const extra = wrapper.querySelector('.color-dd-extra');
-        if (extra) extra.classList.add('hidden');
-        const toggleMore = wrapper.querySelector('.color-dd-toggle-more');
-        if (toggleMore) {
-            const chevron = toggleMore.querySelector('svg');
+        const extra2 = wrapper.querySelector('.color-dd-extra');
+        if (extra2) extra2.classList.add('hidden');
+        const toggleMore2 = wrapper.querySelector('.color-dd-toggle-more');
+        if (toggleMore2) {
+            const chevron = toggleMore2.querySelector('svg');
             if (chevron) chevron.style.transform = '';
-        }
-
-        // If "more colors" was open, reset it for next open
-        const extraSection = wrapper.querySelector('.color-dd-extra');
-        if (extraSection) extraSection.classList.add('hidden');
-        const toggleMore = wrapper.querySelector('.color-dd-toggle-more');
-        if (toggleMore) {
-            toggleMore.querySelector('.color-dd-extra-hidden')?.classList.remove('hidden');
-            toggleMore.querySelector('.color-dd-extra-visible')?.classList.add('hidden');
+            toggleMore2.querySelector('.color-dd-extra-hidden')?.classList.remove('hidden');
+            toggleMore2.querySelector('.color-dd-extra-visible')?.classList.add('hidden');
         }
 
         if (wrapper.closest('#options-modal')) {
@@ -228,7 +246,7 @@ export function initMobileNavigation({ mobileNav, dom, getCurrentUser, getAuthTo
         const histBtn = document.getElementById('open-quote-history-btn');
         if (histBtn) histBtn.click();
     });
-    bind(mobileNav.openAdminUsersBtn, 'click', () => { closeMobileNav(); window.location.href = '/admin/users'; });
+    bind(mobileNav.openAdminUsersBtn, 'click', () => { closeMobileNav(); window.__navigateIfLeaving('/admin/users'); });
     bind(mobileNav.openUserCenterBtn, 'click', () => {
         closeMobileNav();
         const currentUser = getCurrentUser();
@@ -299,15 +317,25 @@ export function initMobileNavigation({ mobileNav, dom, getCurrentUser, getAuthTo
 }
 
 export function initAppLifecycle({ mobileNav, loadAppVersion, preloadPrinterSelectors, updateViewerSize, getSelectedFilesCount }) {
+    let isLeavingAfterConfirmation = false;
+
     loadAppVersion();
     preloadPrinterSelectors();
     window.addEventListener('resize', updateViewerSize);
 
     window.addEventListener('beforeunload', (event) => {
-        if (getSelectedFilesCount() > 0) {
+        if (!isLeavingAfterConfirmation && getSelectedFilesCount() > 0) {
             event.preventDefault();
             event.returnValue = '';
         }
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (getSelectedFilesCount() === 0) return;
+        const isRefresh = e.key === 'F5' || ((e.ctrlKey || e.metaKey) && e.key === 'r');
+        if (!isRefresh) return;
+        e.preventDefault();
+        showLeaveConfirmModal(() => { window.location.reload(); });
     });
 
     document.addEventListener('click', (e) => {
@@ -315,16 +343,29 @@ export function initAppLifecycle({ mobileNav, loadAppVersion, preloadPrinterSele
         const link = e.target.closest('a[href]');
         if (!link || link.target === '_blank') return;
         const href = link.getAttribute('href');
-        if (!href || href === '#' || href.startsWith('javascript:')) return;
+        if (!href || href === '#' || href.startsWith('javascript:') || href.startsWith('blob:')) return;
         e.preventDefault();
         showLeaveConfirmModal(() => { window.location.href = href; });
     });
+
+    // Also expose for buttons that navigate
+    window.__navigateIfLeaving = (url) => {
+        if (getSelectedFilesCount() > 0) {
+            showLeaveConfirmModal(() => { window.location.href = url; });
+        } else {
+            window.location.href = url;
+        }
+    };
 
     function showLeaveConfirmModal(onConfirm) {
         const modal = document.getElementById('leave-confirm-modal');
         const cancelBtn = document.getElementById('leave-confirm-cancel');
         const okBtn = document.getElementById('leave-confirm-ok');
-        if (!modal) { onConfirm(); return; }
+        const leave = () => {
+            isLeavingAfterConfirmation = true;
+            onConfirm();
+        };
+        if (!modal) { leave(); return; }
         modal.classList.remove('hidden');
         function close() {
             modal.classList.add('hidden');
@@ -332,7 +373,7 @@ export function initAppLifecycle({ mobileNav, loadAppVersion, preloadPrinterSele
             okBtn.onclick = null;
         }
         cancelBtn.onclick = close;
-        okBtn.onclick = () => { close(); onConfirm(); };
+        okBtn.onclick = () => { close(); leave(); };
         modal.querySelector('.bg-black\/50')?.addEventListener('click', close, { once: true });
     }
 }

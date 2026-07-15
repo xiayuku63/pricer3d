@@ -197,7 +197,7 @@ export function renderSTL(file, colorKey = 'Blue', orientation = null) {
         clearCurrentMesh();
         renderViaGLB(file, orientation, colorKey).then(ok => {
             if (!ok) {
-                previewPlaceholder.innerHTML = '<div style="text-align:center;padding-top:20%"><div style="font-size:4rem;margin-bottom:1rem">📦</div><p style="color:var(--color-text-muted)">' + ext.toUpperCase() + ' 预览失败</p><p style="color:var(--color-disabled-text);font-size:0.8rem">上传后将自动切片报价</p></div>';
+                previewPlaceholder.innerHTML = '<div style="text-align:center;padding-top:20%"><div style="font-size:1.5rem;font-weight:600;color:var(--color-text-muted);margin-bottom:1rem">' + ext.toUpperCase() + '</div><p style="color:var(--color-text-muted)">' + ext.toUpperCase() + ' 预览失败</p><p style="color:var(--color-disabled-text);font-size:0.8rem">上传后将自动切片报价</p></div>';
                 previewPlaceholder.classList.remove('hidden');
             }
         });

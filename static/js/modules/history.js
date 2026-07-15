@@ -4,6 +4,8 @@ import { t } from './i18n.js';
 
 let historyTbody, quoteHistoryModal, quoteHistoryBackdrop;
 let paginationContainer;
+let historySearchInput, historyStatusFilter, historySummary;
+let currentItems = [];
 
 // ── Pagination state ──
 const PAGE_SIZE = 20;
@@ -23,9 +25,16 @@ export function initQuoteHistory() {
     quoteHistoryModal = document.getElementById('quote-history-modal');
     quoteHistoryBackdrop = document.getElementById('quote-history-backdrop');
     paginationContainer = document.getElementById('history-pagination');
+    historySearchInput = document.getElementById('history-search-input');
+    historyStatusFilter = document.getElementById('history-status-filter');
+    historySummary = document.getElementById('history-summary');
     const historyRefreshBtn = document.getElementById('history-refresh-btn');
     const historyCloseBtn = document.getElementById('history-close-btn');
     const openQuoteHistoryBtn = document.getElementById('open-quote-history-btn');
+
+    const applyFilters = () => renderHistoryRows(currentItems);
+    if (historySearchInput) historySearchInput.addEventListener('input', applyFilters);
+    if (historyStatusFilter) historyStatusFilter.addEventListener('change', applyFilters);
 
     if (historyRefreshBtn) {
         historyRefreshBtn.addEventListener('click', () => {
@@ -177,6 +186,48 @@ function renderPagination() {
     `;
 }
 
+function renderHistoryRows(items) {
+    if (!historyTbody) return;
+    const keyword = (historySearchInput?.value || '').trim().toLowerCase();
+    const status = historyStatusFilter?.value || 'all';
+    const filteredItems = (items || []).filter((item) => {
+        const searchable = `${item.filename || ''} ${item.material || ''} ${item.printer_model || ''}`.toLowerCase();
+        return (!keyword || searchable.includes(keyword)) && (status === 'all' || item.status === status);
+    });
+    const successCount = (items || []).filter((item) => item.status === 'success').length;
+    const failedCount = (items || []).length - successCount;
+    const totalCost = (items || []).reduce((sum, item) => sum + (Number(item.cost_cny) || 0), 0);
+    if (historySummary) historySummary.textContent = `本页 ${items?.length || 0} 条 · 成功 ${successCount} · 失败 ${failedCount} · ¥${totalCost.toFixed(2)}`;
+    if (!filteredItems.length) {
+        historyTbody.innerHTML = `<tr><td class="px-3 py-10 text-gray-400 text-center" colspan="15"><p class="text-sm">${items?.length ? '没有符合筛选条件的记录' : t('history.noRecords')}</p><p class="text-xs mt-1 text-gray-300">${items?.length ? '请调整搜索词或状态筛选' : t('history.noRecordsSubtext')}</p></td></tr>`;
+        return;
+    }
+    historyTbody.innerHTML = filteredItems.map(item => {
+        const ts = item.created_at ? new Date(item.created_at).toLocaleString('zh-CN') : '-';
+        const statusBadge = item.status === 'success'
+            ? '<span class="tw-badge-success">● ' + t('history.success') + '</span>'
+            : `<span class="tw-badge-failed" title="${escapeHtml(item.error_msg || '')}">● ${t('history.failed')}</span>`;
+        const deleteBtn = `<button data-action="delete" data-id="${item.id}" class="text-xs tw-text-danger hover:underline" title="${t('common.delete')}">${t('common.delete')}</button>`;
+        return `<tr class="border-t border-gray-100 hover:bg-gray-50">
+            <td class="px-3 py-2 text-gray-500 whitespace-nowrap">${ts}</td>
+            <td class="px-3 py-2 max-w-[150px] truncate" title="${escapeHtml(item.filename)}">${escapeHtml(item.filename)}</td>
+            <td class="px-3 py-2">${escapeHtml(item.printer_model || '-')}</td>
+            <td class="px-3 py-2">${item.nozzle_diameter || '-'}</td>
+            <td class="px-3 py-2">${item.layer_height || '-'}</td>
+            <td class="px-3 py-2">${item.wall_count || '-'}</td>
+            <td class="px-3 py-2">${item.infill ? item.infill + '%' : '-'}</td>
+            <td class="px-3 py-2">${escapeHtml(item.material)}</td>
+            <td class="px-3 py-2">${item.quantity}</td>
+            <td class="px-3 py-2">${item.volume_cm3}</td>
+            <td class="px-3 py-2">${item.weight_g}</td>
+            <td class="px-3 py-2">${formatTimeHMS(item.estimated_time_h)}</td>
+            <td class="px-3 py-2 font-medium tw-text-primary">¥${item.cost_cny}</td>
+            <td class="px-3 py-2">${statusBadge}</td>
+            <td class="px-3 py-2 whitespace-nowrap">${deleteBtn}</td>
+        </tr>`;
+    }).join('');
+}
+
 // ── Toast notification (lightweight) ──
 function showToast(message, type = 'info') {
     let container = document.getElementById('history-toast-container');
@@ -216,40 +267,8 @@ export async function loadQuoteHistory(token) {
 
         totalRecords = data.total || 0;
 
-        if (!data.items || data.items.length === 0) {
-            historyTbody.innerHTML = '<tr><td class="px-3 py-12 text-gray-400 text-center" colspan="15"><div class="text-6xl mb-3">📭</div><p class="text-sm">' + t('history.noRecords') + '</p><p class="text-xs mt-1 text-gray-300">' + t('history.noRecordsSubtext') + '</p></td></tr>';
-            if (paginationContainer) paginationContainer.innerHTML = '';
-            return;
-        }
-
-        historyTbody.innerHTML = data.items.map(item => {
-            const ts = item.created_at ? new Date(item.created_at).toLocaleString('zh-CN') : '-';
-            const statusBadge = item.status === 'success'
-                ? '<span class="text-green-600 font-medium">' + t('history.success') + '</span>'
-                : `<span class="text-red-500 font-medium" title="${escapeHtml(item.error_msg || '')}">` + t('history.failed') + '</span>';
-
-            // Delete button
-            const deleteBtn = `<button data-action="delete" data-id="${item.id}" class="text-xs text-red-500 hover:text-red-700" title="${t('common.delete')}">${t('common.delete')}</button>`;
-
-            return `<tr class="border-t border-gray-100 hover:bg-gray-50">
-                <td class="px-3 py-2 text-gray-500">${ts}</td>
-                <td class="px-3 py-2 max-w-[120px] truncate" title="${escapeHtml(item.filename)}">${escapeHtml(item.filename)}</td>
-                <td class="px-3 py-2">${escapeHtml(item.printer_model || '-')}</td>
-                <td class="px-3 py-2">${item.nozzle_diameter || '-'}</td>
-                <td class="px-3 py-2">${item.layer_height || '-'}</td>
-                <td class="px-3 py-2">${item.wall_count || '-'}</td>
-                <td class="px-3 py-2">${item.infill ? item.infill + '%' : '-'}</td>
-                <td class="px-3 py-2">${escapeHtml(item.material)}</td>
-                <td class="px-3 py-2">${item.quantity}</td>
-                <td class="px-3 py-2">${item.volume_cm3}</td>
-                <td class="px-3 py-2">${item.weight_g}</td>
-                <td class="px-3 py-2">${formatTimeHMS(item.estimated_time_h)}</td>
-                <td class="px-3 py-2 font-medium text-indigo-600">¥${item.cost_cny}</td>
-                <td class="px-3 py-2">${statusBadge}</td>
-                <td class="px-3 py-2 whitespace-nowrap">${deleteBtn}</td>
-            </tr>`;
-        }).join('');
-
+        currentItems = data.items || [];
+        renderHistoryRows(currentItems);
         renderPagination();
     } catch (e) {
         historyTbody.innerHTML = '<tr><td class="px-3 py-4 text-gray-400 text-center" colspan="15">' + t('common.loadError') + '</td></tr>';

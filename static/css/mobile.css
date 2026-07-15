@@ -360,19 +360,6 @@
         min-height: 44px;
         font-size: 0.875rem;
     }
-
-    /* Color editor modal */
-    #color-editor-modal .max-w-sm {
-        max-width: 100%;
-        border-radius: 16px 16px 0 0;
-    }
-    #color-editor-modal input {
-        min-height: 40px;
-        font-size: 0.875rem;
-    }
-    #color-editor-modal button {
-        min-height: 40px;
-    }
 }
 
 /* ── Toast notifications: center on mobile ── */
