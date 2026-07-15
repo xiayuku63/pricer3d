@@ -4,7 +4,7 @@ import csv
 import io
 import logging
 from datetime import datetime
-from typing import Any, List, Optional
+from typing import List, Optional
 
 from fastapi import Depends, HTTPException, Request
 from fastapi.responses import Response, StreamingResponse
