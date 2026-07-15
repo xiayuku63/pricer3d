@@ -14,4 +14,5 @@ if __name__ == "__main__":
     reload_ = os.getenv("UVICORN_RELOAD", "true").lower() in {"1", "true", "yes", "on"}
 
     import uvicorn.config
+
     uvicorn.run("main:app", host=host, port=port, reload=reload_)
