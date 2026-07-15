@@ -895,7 +895,7 @@ async def download_zip_template(request: Request):
 
     # Note row explaining empty = default
     note_row = 6
-        note_text = "提示：空白单元格 = 使用系统默认值，填写 = 覆盖默认值。第一行（英文列名）必须保留。"
+    note_text = "提示：空白单元格 = 使用系统默认值，填写 = 覆盖默认值。第一行（英文列名）必须保留。"
     ws1.merge_cells(start_row=note_row, start_column=1, end_row=note_row, end_column=10)
     note_cell = ws1.cell(row=note_row, column=1, value=note_text)
     note_cell.font = note_font
