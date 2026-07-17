@@ -23,6 +23,32 @@ import { reQuoteAllSelectedFiles } from '../quote.js';
 import { updateBedSize, setBedLabel } from '../viewer.js';
 import { deleteSlicerPreset } from './slicer.js';
 
+async function _syncBatchPresetControls() {
+    const batchPreset = document.getElementById('batch-slicer-preset');
+    if (!batchPreset || !batchPreset.value) return;
+    const presetId = batchPreset.value;
+    try {
+        const response = await authFetch(`/api/slicer/presets/${presetId}`);
+        if (!response.ok) return;
+        const data = await response.json();
+        const params = data.preset?.params;
+        if (!params) return;
+        const layer = document.getElementById('gen-layer-height');
+        const walls = document.getElementById('gen-wall-count');
+        const infill = document.getElementById('gen-infill');
+        if (layer && params.layer_height != null) layer.value = Number(params.layer_height).toFixed(2);
+        if (walls && params.perimeters != null) walls.value = String(params.perimeters);
+        if (infill && params.fill_density != null) infill.value = String(params.fill_density);
+        const summary = document.getElementById('batch-preset-params');
+        if (summary) {
+            summary.textContent = `层高:${params.layer_height ?? '-'} 墙:${params.perimeters ?? '-'} 填充:${params.fill_density ?? '-'}%`;
+            summary.classList.remove('hidden');
+        }
+    } catch (error) {
+        console.warn('Failed to sync initial batch slicer preset:', error);
+    }
+}
+
 export function initPresets(d) {
     dom = d;
     // Listen for language changes to update printer options
@@ -120,6 +146,9 @@ export function renderSlicerPresetsUI() {
             '<option value="">' + t('quote.presetNone') + '</option>',
             ...items.map(function(p) { return '<option value="' + p.id + '"' + (String(p.id) === String(batchCurrentVal) ? ' selected' : '') + '>' + (p.name || '#' + p.id) + '</option>'; })
         ].join('');
+        // The selector is populated after the saved default is loaded. Sync
+        // the effective controls immediately; no change event fires here.
+        void _syncBatchPresetControls();
     }
     if (!slicerPresetsTbody) return;
     const items = slicerPresets || [];

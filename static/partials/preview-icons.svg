@@ -7,15 +7,6 @@
     <path d="M10 12l-7 7"/>
   </symbol>
 
-  <!-- 手动摆放 — 鼠标点选 -->
-  <symbol id="icon-hand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h2"/>
-    <path d="M10 12V2a1 1 0 012 0v10"/>
-    <path d="M12 11V7a1 1 0 012 0v6"/>
-    <path d="M14 12V8a1 1 0 012 0v6"/>
-    <path d="M8 12V5a1 1 0 012 0v7"/>
-  </symbol>
-
   <!-- 模型居中 — 十字瞄准 -->
   <symbol id="icon-center" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <circle cx="12" cy="12" r="3"/>

@@ -2,10 +2,9 @@
 import {
     authToken, currentUser,
     MATERIAL_OPTIONS, setMaterialOptions,
-    COLOR_OPTIONS, setColorOptions,
     PRICING_CONFIG, setPricingConfig,
     quoteOptions,
-    authFetch, colorToObj, materialColorsArray, escapeHtml,
+    authFetch, colorToObj, escapeHtml,
     renderColorDropdown, getColorsForMaterial,
     hexToRgb, drawColorWheel,
     saveSlicerPresetSelection, loadSlicerPresetSelection,

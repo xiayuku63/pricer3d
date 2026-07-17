@@ -9,7 +9,7 @@ import {
     authToken, currentUser,
     quoteOptions, selectedFilesMap, thumbnailMap,
     currentResults, setCurrentResults,
-    MATERIAL_OPTIONS, PRICING_CONFIG, COLOR_OPTIONS,
+    MATERIAL_OPTIONS, PRICING_CONFIG,
     authFetch, formatColorLabel, formatTimeHMS, escapeHtml,
     renderColorDropdown, getColorsForMaterial,
     colorToObj, isColorInAllowedColors, pickAllowedColor,
@@ -31,7 +31,8 @@ import {
 import {
     quoteSingleFileWithOptions, quoteSelectedFiles, quoteSelectedFilesWithProgress,
     mergeResultsByFilename, normalizeResultsWithCurrentOptions, reQuoteAllSelectedFiles,
-    abortActiveRecalc,
+    abortActiveRecalc, getSlicerConfigSnapshot, getAffectedFilenamesForSlicerConfigChange,
+    getAffectedFilenamesForSlicerPresetChange,
 } from './quote-api.js';
 import {
     refreshBatchBrandDropdown, refreshBatchMaterialDropdown,
@@ -39,6 +40,7 @@ import {
 } from './quote-batch.js';
 import { MATERIAL_INFO } from './quote-data.js';
 import { updateBedSize, setBedLabel } from './viewer.js';
+import { getResultOrientation, withResultOrientation } from './orientation-state.js';
 
 // ── Re-export all public symbols for backward compatibility ──
 export {
@@ -53,6 +55,9 @@ export {
     normalizeResultsWithCurrentOptions,
     reQuoteAllSelectedFiles,
     abortActiveRecalc,
+    getSlicerConfigSnapshot,
+    getAffectedFilenamesForSlicerConfigChange,
+    getAffectedFilenamesForSlicerPresetChange,
     refreshBatchBrandDropdown,
     refreshBatchMaterialDropdown,
     refreshBatchColorDropdown,
@@ -253,7 +258,7 @@ function _buildMaterialInfoHtml(materialName) {
         html += '<div class="mt-2 bg-amber-50 rounded-lg p-2 border border-amber-200">';
         html += '<span class="text-[10px] font-semibold text-amber-700 flex items-center gap-1 mb-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>注意事项</span>';
         html += '<ul class="space-y-0.5">';
-        info.warnings.forEach(w => { html += '<li class="text-[9px] text-amber-700 leading-snug">⚠ ' + w + '</li>'; });
+        info.warnings.forEach(w => { html += '<li class="text-[9px] text-amber-700 leading-snug">' + w + '</li>'; });
         html += '</ul></div>';
     }
 
@@ -498,7 +503,8 @@ function _buildCommonRowHtml(item, ext, selectedMaterial, selectedColor, quantit
     const previewButtonHtml = _buildPreviewHtml(item, ext);
     const { pmOptions, presetOptions } = _buildRowDropdownsHtml(item);
     const materialOptionsHtml = MATERIAL_OPTIONS.map((m) => `<option value="${m.name}" ${m.name === selectedMaterial ? 'selected' : ''}>${m.name}</option>`).join('');
-    const renderedRowColors = renderColorDropdown(selectedMaterial, selectedColor, true);
+    const rowBrand = item.brand || (MATERIAL_OPTIONS.find(m => m.name === selectedMaterial) || {}).brand || '';
+    const renderedRowColors = renderColorDropdown(selectedMaterial, selectedColor, true, rowBrand);
     return {
         previewButtonHtml, pmOptions, presetOptions, materialOptionsHtml,
         renderedRowColors,
@@ -541,6 +547,7 @@ async function _handleCardEdit(card, filename, abortSignal) {
     const file = selectedFilesMap.get(filename);
     if (!file) return;
     const material = card.querySelector('[data-field="material"]').value;
+    const brand = card.querySelector('[data-field="_brand"]')?.value || '';
     const quantity = Number.parseInt(card.querySelector('[data-field="quantity"]').value, 10);
     if (!Number.isFinite(quantity) || quantity < 1) {
         if (errorMsg) { errorMsg.textContent = t('quote.countMustBePositive'); errorContainer.classList.remove('hidden'); }
@@ -554,6 +561,7 @@ async function _handleCardEdit(card, filename, abortSignal) {
 
     const idx = currentResults.findIndex((i) => i.filename === filename);
     const prevItem = idx >= 0 ? { ...currentResults[idx] } : null;
+    const currentColor = idx >= 0 ? (currentResults[idx].color || quoteOptions.color) : quoteOptions.color;
     if (idx >= 0) {
         // Immediately update color in currentResults so preview sees the correct color
         currentResults[idx] = { ...currentResults[idx], color: currentColor, _recalculating: true };
@@ -561,14 +569,13 @@ async function _handleCardEdit(card, filename, abortSignal) {
     renderResultsTable();
 
     try {
-        const currentColor = idx >= 0 ? (currentResults[idx].color || quoteOptions.color) : quoteOptions.color;
         await ensureThumbnailForFile(file, currentColor);
         if (abortSignal.aborted) {
             if (prevItem && idx >= 0) currentResults[idx] = prevItem;
             return;
         }
-        const opts = { material, color: currentColor, quantity, _printer_model: pm };
-        if (sp !== null) opts._slicer_preset_id = sp;
+        const orientation = getResultOrientation(prevItem);
+        const opts = { brand, material, color: currentColor, quantity, _printer_model: pm, _slicer_preset_id: sp, orientation };
         const updated = await quoteSingleFileWithOptions(file, opts, abortSignal);
         if (abortSignal.aborted) {
             if (prevItem && idx >= 0) currentResults[idx] = prevItem;
@@ -576,12 +583,16 @@ async function _handleCardEdit(card, filename, abortSignal) {
         }
         if (idx >= 0) {
             // Preserve the card-selected color; do NOT let the API response overwrite it
+            const printerChanged = pm !== (prevItem?._printer_model || '');
+            const presetChanged = sp !== (prevItem?._slicer_preset_id ?? null);
             currentResults[idx] = {
-                ...updated,
+                ...(orientation ? withResultOrientation(updated, orientation) : updated),
                 color: currentColor,
                 _printer_model: pm || prevItem?._printer_model,
+                _printer_model_explicit: prevItem?._printer_model_explicit || printerChanged,
+                _slicer_preset_explicit: prevItem?._slicer_preset_explicit || presetChanged,
             };
-            if (sp !== null) currentResults[idx]._slicer_preset_id = sp;
+            currentResults[idx]._slicer_preset_id = sp;
         }
         renderResultsTable();
         recalcSummaryFromCurrentResults();
@@ -769,7 +780,7 @@ async function _handleRowEdit(event, abortSignal) {
             const newMaterial = materialSelect.value;
             const currentColorInput = colorCell ? colorCell.querySelector('.row-color-value') : null;
             const currentColor = currentColorInput ? currentColorInput.value : '';
-            const rendered = renderColorDropdown(newMaterial, currentColor, true);
+            const rendered = renderColorDropdown(newMaterial, currentColor, true, brand);
             if (colorCell) colorCell.innerHTML = rendered.html;
         }
         if (!materialSelect || !materialSelect.classList.contains('row-edit')) return;
@@ -779,8 +790,9 @@ async function _handleRowEdit(event, abortSignal) {
     const colorCell = row.querySelector('[data-field="color"]');
     const colorValueInput = colorCell ? colorCell.querySelector('.row-color-value') : null;
     const material = materialSelect.value;
+    const brand = brandSelect ? brandSelect.value : '';
     const currentColor = colorValueInput ? colorValueInput.value : '';
-    const rendered = renderColorDropdown(material, currentColor, true);
+    const rendered = renderColorDropdown(material, currentColor, true, brand);
     if (target === materialSelect && colorCell) {
         colorCell.innerHTML = rendered.html;
     }
@@ -822,8 +834,8 @@ async function _handleRowEdit(event, abortSignal) {
             if (prevItem && idx >= 0) currentResults[idx] = prevItem;
             return;
         }
-        const opts = { material, color, quantity, _printer_model: pm };
-        if (sp !== null) opts._slicer_preset_id = sp;
+        const orientation = getResultOrientation(prevItem);
+        const opts = { brand, material, color, quantity, _printer_model: pm, _slicer_preset_id: sp, orientation };
         const updated = await quoteSingleFileWithOptions(file, opts, abortSignal);
         if (abortSignal.aborted) {
             if (prevItem && idx >= 0) currentResults[idx] = prevItem;
@@ -832,14 +844,16 @@ async function _handleRowEdit(event, abortSignal) {
         if (idx >= 0) {
             // Preserve the dropdown-selected color; do NOT let the API response overwrite it
             const dropdownColor = color;  // captured from the .row-color-value at line ~786
+            const printerChanged = pm !== (prevItem?._printer_model || '');
+            const presetChanged = sp !== (prevItem?._slicer_preset_id ?? null);
             currentResults[idx] = {
-                ...updated,
+                ...(orientation ? withResultOrientation(updated, orientation) : updated),
                 color: dropdownColor,
                 _printer_model: pm || prevItem._printer_model,
+                _printer_model_explicit: prevItem?._printer_model_explicit || printerChanged,
+                _slicer_preset_explicit: prevItem?._slicer_preset_explicit || presetChanged,
             };
-            if (sp !== null) {
-                currentResults[idx]._slicer_preset_id = sp;
-            }
+            currentResults[idx]._slicer_preset_id = sp;
         }
         renderResultsTable();
         recalcSummaryFromCurrentResults();

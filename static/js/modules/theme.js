@@ -72,14 +72,14 @@ function _injectControls() {
 
 function _renderLangDropdown(container) {
     container.innerHTML = `
-        <button id="lang-toggle-btn" type="button" class="text-sm px-2 py-1.5 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors flex items-center gap-1 tw-text">
+        <button id="lang-toggle-btn" type="button" class="text-sm px-2 py-1.5 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors flex items-center gap-1 tw-text tw-popup-trigger">
             <span>${langFlag(lang)}</span>
             <span id="lang-current-label">${langLabel(lang)}</span>
             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
         </button>
-        <div id="lang-dropdown-list" class="hidden absolute right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-50 min-w-[120px]">
+        <div id="lang-dropdown-list" class="hidden absolute right-0 mt-1 tw-dropdown-panel z-50 min-w-[120px]">
             ${SUPPORTED_LANGS.map(l => `
-                <button type="button" class="lang-option w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2 ${l.code === lang ? 'tw-text-primary font-medium tw-bg-primary' : 'tw-text'}" data-lang="${l.code}">
+                <button type="button" class="lang-option tw-dropdown-option text-sm ${l.code === lang ? 'tw-dropdown-option-active font-medium' : 'tw-text'}" data-lang="${l.code}">
                     <span>${l.flag}</span>
                     <span>${l.label}</span>
                 </button>

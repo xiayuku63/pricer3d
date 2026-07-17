@@ -13,8 +13,9 @@ import {
     lookAtView, applyOrientationRotation, resetOrientation,
     setupFaceClickHandler, highlightFaces, resetHighlight, fitCameraToMesh,
 } from './viewer.js';
-import { clearClusters, hidePlacementPlane } from './layface.js';
+import { clearClusters } from './layface.js';
 import { t } from './i18n.js';
+import { getResultOrientation, hasNonZeroOrientation } from './orientation-state.js';
 
 let dom = {};
 
@@ -232,7 +233,6 @@ export function closePreviewModal() {
     setupFaceClickHandler(null);
     import('./orientation-ui.js').then(m => m.cleanupLayFaceMode()).catch(() => {
         clearClusters();
-        hidePlacementPlane();
         window.__onLayFaceClick = null;
     });
     if (dom.layFaceHint) dom.layFaceHint.classList.add('hidden');
@@ -260,10 +260,9 @@ export function previewByFilename(filename, ext) {
     }
     if (previewPlaceholder) { previewPlaceholder.textContent = t('preview.loadingFile', { filename: filename, size: (file.size/1024).toFixed(0) }); previewPlaceholder.classList.remove('hidden'); }
     const rowData = currentResults.find((i) => i && i.filename === filename);
-    var perFileOrient = (rowData && rowData.euler_angles_deg) ? rowData.euler_angles_deg : null;
+    var perFileOrient = getResultOrientation(rowData);
     // 如果没有 per-file 方向（API 不返回），使用最后一次用户设置的 quoteOptions.orientation
-    if (!perFileOrient && quoteOptions.orientation &&
-        (quoteOptions.orientation.x || quoteOptions.orientation.y || quoteOptions.orientation.z)) {
+    if (!perFileOrient && hasNonZeroOrientation(quoteOptions.orientation)) {
         perFileOrient = quoteOptions.orientation;
     }
     var colorForPreview = (rowData && rowData.color) ? rowData.color : quoteOptions.color;
@@ -275,6 +274,15 @@ export function previewByFilename(filename, ext) {
     var _previewColorObj = colorToObj(colorForPreview);
     if (_previewColorObj && _previewColorObj.hex) colorForPreview = _previewColorObj.hex;
     renderSTL(file, colorForPreview, perFileOrient);
+}
+
+export function updatePreviewColor(filename, color) {
+    if (!filename || currentPreviewFilename !== filename) return false;
+    const file = selectedFilesMap.get(filename);
+    if (!file) return false;
+    const obj = colorToObj(color);
+    renderSTL(file, obj?.hex || color || '#ffffff', getResultOrientation(currentResults.find((item) => item && item.filename === filename)));
+    return true;
 }
 
 // ── View cube ──

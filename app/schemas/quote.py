@@ -24,6 +24,7 @@ class QuoteFileResult(BaseModel):
     quantity: int = 1
     color: str = "White"
     material: str = "PLA"
+    brand: Optional[str] = None
     layer_height: float = 0.2
     infill: int = 20
     effective_weight_g: float = 0.0

@@ -202,7 +202,7 @@
         <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-header">
-                <h2>🖨️ 打印机管理</h2>
+                <h2>打印机管理</h2>
                 <p>选择打印机和喷嘴配置</p>
             </div>
             <div class="printer-tree" id="printerTree">
@@ -224,7 +224,7 @@
             
             <div class="content-area" id="contentArea">
                 <div class="empty-state">
-                    <div class="empty-icon">🖨️</div>
+                    <div class="empty-icon">3D</div>
                     <div class="empty-text">请选择打印机和喷嘴</div>
                     <div class="empty-hint">从左侧列表选择要配置的打印机</div>
                 </div>
@@ -300,7 +300,7 @@
                     <div class="printer-group-header ${isExpanded ? 'expanded active' : ''}" 
                          onclick="togglePrinter('${printerId}')">
                         <span class="arrow">▶</span>
-                        <span class="printer-icon">🖨</span>
+                        <span class="printer-icon">3D</span>
                         <span class="printer-name">${displayName}</span>
                         <span class="nozzle-count">${nozzles.length}个喷嘴</span>
                     </div>
@@ -383,7 +383,7 @@
             } catch (e) {
                 content.innerHTML = `
                     <div class="empty-state">
-                        <div class="empty-icon">⚠️</div>
+                    <div class="empty-icon">!</div>
                         <div class="empty-text">加载参数失败</div>
                         <div class="empty-hint">${e.message}</div>
                     </div>
@@ -603,7 +603,7 @@
             const content = document.getElementById('contentArea');
             content.innerHTML = `
                 <div class="empty-state">
-                    <div class="empty-icon">🖨️</div>
+                    <div class="empty-icon">3D</div>
                     <div class="empty-text">请选择打印机和喷嘴</div>
                     <div class="empty-hint">从左侧列表选择要配置的打印机</div>
                 </div>

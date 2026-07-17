@@ -30,10 +30,76 @@ from calculator.cost import process_single_file
 logger = logging.getLogger(__name__)
 
 
+def _extract_preset_core_params(preset: Optional[dict]) -> dict:
+    """Read explicitly configured core print values from a user preset.
+
+    The model-page form historically sent its fallback values (0.2 / 3 / 20)
+    even when a different preset was selected. Core values explicitly present
+    in that preset must therefore be authoritative before slicing starts.
+    Missing keys are left untouched so an arbitrary uploaded preset that only
+    changes secondary settings does not unexpectedly reset the form values.
+    """
+    if not isinstance(preset, dict):
+        return {}
+    raw = preset.get("content")
+    if isinstance(raw, bytes):
+        text = raw.decode("utf-8", errors="replace")
+    elif isinstance(raw, str):
+        text = raw
+    else:
+        return {}
+
+    values: dict = {}
+    aliases = {
+        "layer_height": "layer_height",
+        "perimeters": "perimeters",
+        "wall_loops": "perimeters",
+        "fill_density": "infill",
+        "sparse_infill_density": "infill",
+    }
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith((";", "#", "[")) or "=" not in line:
+            continue
+        key, value = (part.strip() for part in line.split("=", 1))
+        target = aliases.get(key)
+        if not target:
+            continue
+        value = value.rstrip("%").strip()
+        try:
+            if target == "layer_height":
+                parsed = float(value)
+                if 0.05 <= parsed <= 1.0:
+                    values[target] = parsed
+            elif target == "perimeters":
+                parsed = int(float(value))
+                if 1 <= parsed <= 20:
+                    values[target] = parsed
+            elif target == "infill":
+                parsed = int(float(value))
+                if 0 <= parsed <= 100:
+                    values[target] = parsed
+        except (TypeError, ValueError):
+            continue
+    return values
+
+
+def _material_color_matches(material: dict, requested_color: str) -> bool:
+    raw_color = material.get("color") if isinstance(material, dict) else None
+    values = []
+    if isinstance(raw_color, dict):
+        values.extend([raw_color.get("hex"), raw_color.get("name")])
+    elif raw_color:
+        values.append(raw_color)
+    requested = str(requested_color or "").strip().lower()
+    return bool(requested) and any(str(value or "").strip().lower() == requested for value in values)
+
+
 async def build_quote_payload(
     request,
     files: List[UploadFile],
     material: str,
+    brand: Optional[str],
     layer_height: float,
     infill: int,
     wall_count: int,
@@ -111,20 +177,33 @@ async def build_quote_payload(
     if material not in material_names:
         raise HTTPException(status_code=400, detail="材料参数不合法")
 
-    selected_material = next(
-        (m for m in user_materials if isinstance(m, dict) and str(m.get("name")) == material), None
+    requested_brand = str(brand or "").strip()
+    material_candidates = [
+        m
+        for m in user_materials
+        if isinstance(m, dict)
+        and str(m.get("name")) == material
+        and (not requested_brand or str(m.get("brand") or "Generic").strip() == requested_brand)
+    ]
+    selected_material = next((m for m in material_candidates if _material_color_matches(m, color)), None)
+    selected_material = selected_material or (material_candidates[0] if material_candidates else None)
+    if requested_brand and selected_material is None:
+        raise HTTPException(status_code=400, detail="材料品牌参数不合法")
+    effective_brand = str(selected_material.get("brand") or "Generic").strip() if selected_material else requested_brand
+    materials_for_quote = (
+        [selected_material] + [m for m in user_materials if m is not selected_material]
+        if selected_material
+        else user_materials
     )
     allowed_colors = []
-    if selected_material:
-        raw_colors = selected_material.get("colors", [])
-        if isinstance(raw_colors, list):
-            for c in raw_colors:
-                if isinstance(c, dict):
-                    allowed_colors.append(str(c.get("hex", "")).strip())
-                    allowed_colors.append(str(c.get("name", "")).strip())
-                else:
-                    allowed_colors.append(str(c).strip())
-            allowed_colors = [a for a in allowed_colors if a]
+    if material_candidates:
+        for candidate in material_candidates:
+            raw_color = candidate.get("color")
+            if isinstance(raw_color, dict):
+                allowed_colors.extend([str(raw_color.get("hex", "")).strip(), str(raw_color.get("name", "")).strip()])
+            elif raw_color:
+                allowed_colors.append(str(raw_color).strip())
+        allowed_colors = [a for a in allowed_colors if a]
     if allowed_colors and color not in allowed_colors:
         raise HTTPException(status_code=400, detail="颜色参数不合法")
 
@@ -136,12 +215,29 @@ async def build_quote_payload(
             if slicer_preset is None:
                 raise HTTPException(status_code=400, detail="切片预设不存在或无权限")
 
+    # A selected preset is the source of truth for its explicitly stored core
+    # values. This protects the real slice from stale frontend fallback values
+    # such as 0.20 / 3 / 20 when the page shows a 0.40 / 2 / 15% preset.
+    preset_params = _extract_preset_core_params(slicer_preset)
+    if preset_params:
+        layer_height = preset_params.get("layer_height", layer_height)
+        wall_count = preset_params.get("perimeters", wall_count)
+        infill = preset_params.get("infill", infill)
+        logger.info(
+            "Effective slicer preset params: preset_id=%s name=%s layer_height=%s perimeters=%s infill=%s",
+            slicer_preset_id,
+            slicer_preset.get("name") if slicer_preset else None,
+            layer_height,
+            wall_count,
+            infill,
+        )
+
     _semaphore = asyncio.Semaphore(max(1, QUOTE_CONCURRENCY))
 
     async def process_one(file):
         async with _semaphore:
             try:
-                return await asyncio.to_thread(
+                result = await asyncio.to_thread(
                     _process_single_file_sync,
                     file,
                     material,
@@ -149,7 +245,7 @@ async def build_quote_payload(
                     infill,
                     quantity,
                     color,
-                    user_materials,
+                    materials_for_quote,
                     pricing_config,
                     slicer_preset,
                     wall_count,
@@ -159,6 +255,9 @@ async def build_quote_payload(
                     orient_y,
                     orient_z,
                 )
+                if isinstance(result, dict) and effective_brand:
+                    result["brand"] = effective_brand
+                return result
             except Exception as e:
                 fname = file.filename or "unknown"
                 logger.error(f"处理文件 {fname} 时发生未捕获的错误: {str(e)}", exc_info=True)

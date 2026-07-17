@@ -20,6 +20,7 @@ let _initialMeshPos = null;
 let _lastRenderedFileKey = null;
 let _lastRenderedColorKey = null;
 let _lastRenderedOrientation = null;
+let _renderRequestId = 0;
 
 const FACES_COLORS = [0x22c55e, 0x3b82f6, 0xa855f7, 0xeab308, 0xf97316, 0xec4899];
 
@@ -76,10 +77,6 @@ export function recolorCurrentMesh(colorKey) {
 // ── Mesh lifecycle ──
 
 export function clearCurrentMesh() {
-    // 清理可放置平面视觉（如果有）
-    if (typeof window.__cleanupPlaceablePlane === 'function') {
-        window.__cleanupPlaceablePlane();
-    }
     if (!currentMesh) return;
     scene.remove(currentMesh);
     if (currentMesh.type === 'Group') {
@@ -192,6 +189,7 @@ export function renderSTL(file, colorKey = 'Blue', orientation = null) {
         return;
     }
     const ext = file.name && file.name.includes('.') ? file.name.split('.').pop().toLowerCase() : '';
+    const requestId = ++_renderRequestId;
     if (ext !== 'stl') {
         // 为 3MF/OBJ/STP 通过后端转为 GLB 预览
         clearCurrentMesh();
@@ -212,6 +210,7 @@ export function renderSTL(file, colorKey = 'Blue', orientation = null) {
         previewPlaceholder.classList.remove('hidden');
     };
     reader.onload = (event) => {
+        if (requestId !== _renderRequestId) return;
         try {
             const geometry = stlLoader.parse(event.target.result);
             geometry.computeVertexNormals();

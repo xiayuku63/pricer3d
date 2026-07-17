@@ -75,6 +75,7 @@
   /* ── 页面背景 & 表面 ── */
   --color-bg:                #0f172a;                    /* 深色背景（保持原色） */
   --color-surface:           #1c2738;                    /* 卡片/面板背景（暖化，辅助层次） */
+  --color-surface-solid:     #1c2738;                    /* 下拉/浮层不透明背景 */
   --color-surface-hover:     #24334a;                    /* 卡片悬停背景 */
 
   --color-bg-hover:          #1c2738;                    /* 通用悬停背景 */
@@ -390,7 +391,7 @@
 .dark .combo-w .combo-d,
 .dark #materials-tbody input[type="text"],
 .dark #materials-tbody input[type="number"] {
-  background-color: var(--color-surface) !important;
+  background-color: var(--color-surface-solid) !important;
   color: var(--color-text) !important;
 }
 

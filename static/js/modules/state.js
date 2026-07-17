@@ -50,28 +50,15 @@ export let pendingQuoteFiles = null;
 export let slicerPresets = [];
 
 // ── Default materials (only used when not logged in / no user settings) ──
-const DEFAULT_COLORS = [
-    { name: '白色', hex: '#ffffff' },
-    { name: '黑色', hex: '#000000' },
-    { name: '灰色', hex: '#808080' },
-    { name: '红色', hex: '#dc2626' },
-    { name: '蓝色', hex: '#2563eb' },
-    { name: '绿色', hex: '#16a34a' },
-    { name: '黄色', hex: '#ca8a04' },
-    { name: '橙色', hex: '#ea580c' },
-    { name: '紫色', hex: '#9333ea' },
-    { name: '粉色', hex: '#db2777' },
-];
-
 export let MATERIAL_OPTIONS = [
-    { name: "PLA", brand: "Generic", density: 1.24, price_per_kg: 59.0, colors: [{ name: '#000000', hex: '#000000' }] },
-    { name: "PLA+", brand: "Generic", density: 1.24, price_per_kg: 64.0, colors: [{ name: '#000000', hex: '#000000' }] },
-    { name: "PETG", brand: "Generic", density: 1.27, price_per_kg: 85.0, colors: [{ name: '#000000', hex: '#000000' }] },
-    { name: "ABS", brand: "Generic", density: 1.04, price_per_kg: 72.0, colors: [{ name: '#000000', hex: '#000000' }] },
-    { name: "ASA", brand: "Generic", density: 1.07, price_per_kg: 102.0, colors: [{ name: '#000000', hex: '#000000' }] },
-    { name: "TPU", brand: "Generic", density: 1.21, price_per_kg: 111.0, colors: [{ name: '#000000', hex: '#000000' }] },
-    { name: "PA", brand: "Generic", density: 1.14, price_per_kg: 170.0, colors: [{ name: '#000000', hex: '#000000' }] },
-    { name: "PC", brand: "Generic", density: 1.20, price_per_kg: 153.0, colors: [{ name: '#000000', hex: '#000000' }] },
+    { name: "PLA", brand: "Generic", density: 1.24, price_per_kg: 59.0, color: { name: '黑色', hex: '#000000' } },
+    { name: "PLA+", brand: "Generic", density: 1.24, price_per_kg: 64.0, color: { name: '黑色', hex: '#000000' } },
+    { name: "PETG", brand: "Generic", density: 1.27, price_per_kg: 85.0, color: { name: '黑色', hex: '#000000' } },
+    { name: "ABS", brand: "Generic", density: 1.04, price_per_kg: 72.0, color: { name: '黑色', hex: '#000000' } },
+    { name: "ASA", brand: "Generic", density: 1.07, price_per_kg: 102.0, color: { name: '黑色', hex: '#000000' } },
+    { name: "TPU", brand: "Generic", density: 1.21, price_per_kg: 111.0, color: { name: '黑色', hex: '#000000' } },
+    { name: "PA", brand: "Generic", density: 1.14, price_per_kg: 170.0, color: { name: '黑色', hex: '#000000' } },
+    { name: "PC", brand: "Generic", density: 1.20, price_per_kg: 153.0, color: { name: '黑色', hex: '#000000' } },
 ];
 
 /** 材料类型预设（密度 + 参考单价） */
@@ -95,10 +82,10 @@ export const MATERIAL_TYPE_PRESETS = {
 
 /** 获取所有支持的品牌列表 */
 const MAJOR_BRANDS = [
-    '??', 'Bambu Lab', 'eSUN', 'Polymaker', 'Sunlu', 'Creality', 'Prusament',
+    'Bambu Lab', 'eSUN', 'Polymaker', 'Sunlu', 'Creality', 'Prusament',
     'OVERTURE', 'Hatchbox', 'ELEGOO', 'Anycubic', 'QIDI TECH', 'Flashforge',
     'ColorFabb', 'Fiberlogy', 'FormFutura', 'Raise3D', 'MatterHackers',
-    'BASF Forward AM', 'Colorful Cloud', 'Generic', '??', 'Prusa', 'Voron',
+    'BASF Forward AM', 'Colorful Cloud', 'Generic', 'Prusa', 'Voron',
 ];
 
 /** 获取品牌列表（MATERIAL_OPTIONS 中已有的品牌 + MAJOR_BRANDS） */
@@ -131,10 +118,14 @@ export function getUsedBrandOptions() {
 /** 按品牌筛选材料；brand 为空时返回全部 */
 export function getMaterialsByBrand(brand) {
     const items = !brand ? MATERIAL_OPTIONS : MATERIAL_OPTIONS.filter(m => (m.brand || 'Generic').trim() === brand);
-    return items.slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'zh-Hans-CN', { sensitivity: 'base', numeric: true }));
+    const unique = [];
+    const seen = new Set();
+    for (const item of items) {
+        const key = String(item.name || '').trim().toLowerCase();
+        if (!seen.has(key)) { seen.add(key); unique.push(item); }
+    }
+    return unique.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'zh-Hans-CN', { sensitivity: 'base', numeric: true }));
 }
-export let COLOR_OPTIONS = DEFAULT_COLORS.map(c => ({...c}));
-
 export let PRICING_CONFIG = {
     machine_hourly_rate_cny: 15.0,
     setup_fee_cny: 0.0,
@@ -186,6 +177,10 @@ function _rgbToHex(r, g, b) {
 export function hexToRgb(hex) {
     const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : [0, 0, 0];
+}
+
+function _getSwatchBorderColor(hex) {
+    return 'rgba(0,0,0,0.72)';
 }
 
 function _rgbToHsl(r, g, b) {
@@ -346,16 +341,6 @@ export function normalizeColorToken(token) {
     return trimmed;
 }
 
-export function materialColorsArray(m) {
-    if (!m) return [];
-    const raw = Array.isArray(m.colors) ? m.colors : [];
-    return raw.map(c => colorToObj(c)).filter(Boolean);
-}
-
-export function materialColorNames(m) {
-    return materialColorsArray(m).map(c => c ? c.name : '').join(', ');
-}
-
 export function escapeHtml(value) {
     const s = String(value ?? "");
     return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
@@ -455,24 +440,39 @@ export function saveSlicerPresetSelection() {
 }
 
 // ── Material helpers ──
-export function getMaterialByName(name) {
+export function getMaterialByName(name, brand) {
+    if (brand) {
+        const branded = MATERIAL_OPTIONS.find((m) => m && m.name === name && (m.brand || 'Generic') === brand);
+        if (branded) return branded;
+    }
     return MATERIAL_OPTIONS.find((m) => m && m.name === name) || null;
 }
 
-export function getColorsForMaterial(name) {
-    const material = getMaterialByName(name);
-    const colors = material && Array.isArray(material.colors) ? material.colors : [];
+export function getColorsForMaterial(name, brand) {
+    const matches = MATERIAL_OPTIONS.filter((m) => m && m.name === name && (!brand || (m.brand || 'Generic') === brand));
+    const colors = [];
+    const seen = new Set();
+    for (const material of matches) {
+        const color = colorToObj(material.color);
+        if (!color) continue;
+        const key = (color.hex || color.name || '').toLowerCase();
+        if (!seen.has(key)) { seen.add(key); colors.push(color); }
+    }
     return colors.length ? colors : [{ name: '黑色', hex: '#000000' }];
 }
 
 export function isColorInAllowedColors(color, allowedColors) {
     if (!color || !allowedColors || !allowedColors.length) return false;
     const obj = colorToObj(color);
-    if (!obj || !obj.hex) return false;
-    const targetHex = obj.hex.toLowerCase();
+    if (!obj) return false;
+    const targetHex = String(obj.hex || '').trim().toLowerCase();
+    const targetName = String(obj.name || '').trim().toLowerCase();
     return allowedColors.some(c => {
         const a = colorToObj(c);
-        return a && a.hex && a.hex.toLowerCase() === targetHex;
+        if (!a) return false;
+        const allowedHex = String(a.hex || '').trim().toLowerCase();
+        const allowedName = String(a.name || '').trim().toLowerCase();
+        return (targetHex && allowedHex === targetHex) || (targetName && allowedName === targetName);
     });
 }
 
@@ -487,96 +487,59 @@ export function pickAllowedColor(allowedColors, preferredColor, defaultColor) {
     return typeof defaultColor === 'string' ? defaultColor : '';
 }
 
-export function renderColorDropdown(name, selectedColor, compact) {
-    const allowedColors = getColorsForMaterial(name);
+export function renderColorDropdown(name, selectedColor, compact, brand) {
+    const allowedColors = getColorsForMaterial(name, brand);
     const normColors = allowedColors.map(c => colorToObj(c)).filter(Boolean);
     if (!normColors.length) return { html: '', selected: '' };
 
-    // Match by hex (color display is hex-only now)
+    // Match by normalized hex or color name so refreshes do not silently select the first item.
     const selObj = colorToObj(selectedColor);
     let match = null;
-    if (selObj && selObj.hex) {
-        match = normColors.find(c => c.hex === selObj.hex);
+    if (selObj) {
+        const selectedHex = String(selObj.hex || '').trim().toLowerCase();
+        const selectedName = String(selObj.name || '').trim().toLowerCase();
+        match = normColors.find(c => {
+            const colorHex = String(c.hex || '').trim().toLowerCase();
+            const colorName = String(c.name || '').trim().toLowerCase();
+            return (selectedHex && colorHex === selectedHex) || (selectedName && colorName === selectedName);
+        });
     }
     const safe = match || normColors[0];
     const safeHex = safe.hex || '#d1d5db';
-
-    // unused but keep for reference
-    const listItems = normColors.map(c => {
-        const hex = c.hex || '#d1d5db';
-        return '<button type="button" class="color-dd-item flex items-center gap-2 w-full px-3 py-2 text-sm hover:tw-bg-hover border-b last:border-0 text-left'
-            + (c.hex === safeHex ? ' tw-bg-primary' : '')
-            + '" style="border-color:var(--color-border);" data-color-hex="' + hex + '">'
-            + '<span class="w-5 h-5 rounded-sm border flex-shrink-0" style="background:' + hex + ';border-color:var(--color-border-input);"></span>'
-            + '<span class="flex-1 font-mono text-xs tw-text-secondary">' + hex + '</span>'
+    const safeBorder = _getSwatchBorderColor(safeHex);
+    const swatchSize = compact ? 'w-3.5 h-3.5' : 'w-5 h-5';
+    const wrapperClass = compact ? 'color-dd-wrapper color-dd-wrapper-compact' : 'color-dd-wrapper color-dd-wrapper-default';
+    const triggerClass = compact
+        ? 'color-dd-trigger color-dd-trigger-compact tw-popup-trigger text-[11px]'
+        : 'color-dd-trigger color-dd-trigger-default tw-popup-trigger text-sm';
+    const items = normColors.map((color) => {
+        const hex = color.hex || '#d1d5db';
+        const swatchBorder = _getSwatchBorderColor(hex);
+        const isSelected = hex.toLowerCase() === safeHex.toLowerCase();
+        const activeClass = isSelected ? ' color-dd-item-active' : '';
+        return '<button type="button" class="color-dd-item color-dd-item-swatch-only tw-dropdown-option flex items-center justify-center w-full px-2 py-2' + activeClass + '" data-color-hex="' + hex + '" role="option" aria-selected="' + (isSelected ? 'true' : 'false') + '" aria-label="' + hex + '" title="' + hex + '">'
+            + '<span class="color-dd-item-swatch ' + swatchSize + ' rounded-sm border flex-shrink-0" style="background:' + hex + ';border-color:' + swatchBorder + ';"></span>'
             + '</button>';
     }).join('');
-
-    const MAX_VISIBLE = 5;
-    const visibleItems = normColors.slice(0, MAX_VISIBLE);
-    const extraItems = normColors.slice(MAX_VISIBLE);
-    const hasExtra = extraItems.length > 0;
-
-    const visibleHtml = visibleItems.map(c => {
-        const hex = c.hex || '#d1d5db';
-        return '<button type="button" class="color-dd-item flex items-center gap-2 w-full px-3 py-2 text-sm hover:tw-bg-hover border-b last:border-0 text-left'
-            + (c.hex === safeHex ? ' tw-bg-primary' : '')
-            + '" style="border-color:var(--color-border);" data-color-hex="' + hex + '">'
-            + '<span class="w-5 h-5 rounded-sm border flex-shrink-0" style="background:' + hex + ';border-color:var(--color-border-input);"></span>'
-            + '<span class="flex-1 font-mono text-xs tw-text-secondary">' + hex + '</span>'
-            + '</button>';
-    }).join('');
-
-    const extraHtml = hasExtra
-        ? '<div class="color-dd-extra hidden">'
-            + extraItems.map(c => {
-                const hex = c.hex || '#d1d5db';
-                return '<button type="button" class="color-dd-item flex items-center gap-2 w-full px-3 py-2 text-sm hover:tw-bg-hover border-b last:border-0 text-left'
-                    + (c.hex === safeHex ? ' tw-bg-primary' : '')
-                    + '" style="border-color:var(--color-border);" data-color-hex="' + hex + '">'
-                    + '<span class="w-5 h-5 rounded-sm border flex-shrink-0" style="background:' + hex + ';border-color:var(--color-border-input);"></span>'
-                    + '<span class="flex-1 font-mono text-xs tw-text-secondary">' + hex + '</span>'
-                    + '</button>';
-            }).join('')
-            + '<button type="button" class="color-dd-toggle-more flex items-center gap-2 w-full px-3 py-2 text-xs tw-text-primary hover:tw-bg-hover font-medium text-left">'
-            + '<svg class="w-3 h-3 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>'
-            + '<span>更多颜色 (' + extraItems.length + ')</span></button>'
-            + '</div>'
-        : '';
-
-    const combinedListHtml = visibleHtml + extraHtml;
-
-    if (compact) {
-        const html = '<div class="color-dd-wrapper relative inline-block">'
-                + '<button type="button" class="color-dd-trigger flex items-center gap-1 px-2 py-1 border rounded text-[11px] tw-card tw-text min-w-[36px]" style="border-color:var(--color-border-strong);">'
-                + '<span class="color-dd-swatch w-3.5 h-3.5 rounded-sm border flex-shrink-0" style="background:' + safeHex + ';border-color:var(--color-border-input);"></span>'
-                + '<svg class="w-3 h-3 tw-text-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>'
-                + '</button>'
-                + '<div class="color-dd-list hidden absolute z-50 left-0 mt-1 tw-bg-surface border rounded-md shadow-lg overflow-y-auto min-w-[140px]" style="border-color:var(--color-border);max-height:360px;">'
-            + combinedListHtml
-            + '</div>'
-            + '<input type="hidden" class="row-color-value" value="' + safeHex + '">'
-            + '</div>';
-        return { html, selected: safeHex };
-    }
-
-    const html = '<div class="color-dd-wrapper relative">'
-        + '<button type="button" class="color-dd-trigger flex items-center gap-2 w-full px-3 py-2 border rounded-md text-sm tw-bg-surface tw-text" style="border-color:var(--color-border-input);">'
-        + '<span class="color-dd-swatch w-5 h-5 rounded-sm border flex-shrink-0" style="background:' + safeHex + ';border-color:var(--color-border-input);"></span>'
-        + '<span class="color-dd-label flex-1 text-left font-mono text-xs tw-text-secondary">' + safeHex + '</span>'
-        + '<svg class="w-4 h-4 tw-text-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>'
+    const html = '<div class="' + wrapperClass + '" data-selected-color="' + safeHex + '">'
+        + '<button type="button" class="' + triggerClass + '" data-color-trigger="1" aria-haspopup="listbox" aria-expanded="false" aria-label="' + safeHex + '" title="' + safeHex + '">'
+        + '<span class="color-dd-swatch ' + swatchSize + ' rounded-sm border flex-shrink-0" style="background:' + safeHex + ';border-color:' + safeBorder + ';"></span>'
+        + (compact ? '' : '<span class="color-dd-trigger-label flex-1 text-left font-mono text-xs tw-text-secondary">' + safeHex + '</span>')
+        + '<svg class="color-dd-chevron w-4 h-4 tw-text-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>'
         + '</button>'
-        + '<div class="color-dd-list hidden absolute z-50 left-0 right-0 mt-1 tw-bg-surface border rounded-md shadow-lg overflow-y-auto" style="border-color:var(--color-border);max-height:360px;">'
-        + combinedListHtml
+        + '<div class="color-dd-list color-dd-list-swatch-only tw-dropdown-panel hidden" role="listbox">'
+        + items
         + '</div>'
-        + '<input type="hidden" class="row-color-value" value="' + safeHex + '">'
-        + '</div>';
+        + '<input type="hidden" class="row-color-value" value="' + safeHex + '"></div>';
     return { html, selected: safeHex };
 }
 
 // ── Mutators (used by settings) ──
-export function setMaterialOptions(v) { MATERIAL_OPTIONS = v; }
-export function setColorOptions(v) { COLOR_OPTIONS = v; }
+export function setMaterialOptions(v) {
+    // Keep the array identity stable because init-time event modules retain a
+    // reference to MATERIAL_OPTIONS while user settings are loaded later.
+    MATERIAL_OPTIONS.splice(0, MATERIAL_OPTIONS.length, ...(Array.isArray(v) ? v : []));
+}
 export function setPricingConfig(v) { PRICING_CONFIG = v; }
 export function setCurrentUser(v) { currentUser = v; }
 export function setAuthToken(v) { authToken = v; }

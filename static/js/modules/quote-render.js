@@ -672,13 +672,13 @@ function _buildCommonRowHtml(item, ext, selectedMaterial, selectedColor, quantit
     const previewButtonHtml = _buildPreviewHtml(item, ext);
     const { pmOptions, presetOptions } = _buildRowDropdownsHtml(item);
     const brands = getBrandOptions();
-    const currentBrand = (MATERIAL_OPTIONS.find(m => m.name === selectedMaterial) || {}).brand || '';
+    const currentBrand = item.brand || (MATERIAL_OPTIONS.find(m => m.name === selectedMaterial) || {}).brand || '';
     const effectiveBrand = currentBrand || brands[0] || '';
     const brandOptionsHtml = brands.map(b => `<option value="${b}" ${b === effectiveBrand ? 'selected' : ''}>${b}</option>`).join('');
     // 按品牌过滤材料
     const filteredMaterials = effectiveBrand ? MATERIAL_OPTIONS.filter(m => (m.brand || 'Generic') === effectiveBrand) : MATERIAL_OPTIONS;
     const materialOptionsHtml = filteredMaterials.map((m) => `<option value="${m.name}" ${m.name === selectedMaterial ? 'selected' : ''}>${m.name}</option>`).join('');
-    const renderedRowColors = renderColorDropdown(selectedMaterial, selectedColor, true);
+    const renderedRowColors = renderColorDropdown(selectedMaterial, selectedColor, true, effectiveBrand);
     return {
         previewButtonHtml, pmOptions, presetOptions, materialOptionsHtml, brandOptionsHtml,
         renderedRowColors,
@@ -903,12 +903,12 @@ export function renderResultsTable() {
                 : `<button type="button" data-preview-file="${item.filename}" data-preview-ext="${ext}" class="text-[12px] text-indigo-600 hover:text-indigo-700 border border-indigo-200 hover:border-indigo-300 rounded px-2 py-0.5">预览</button>`;
 
             const brands = getBrandOptions();
-            const currentBrand = (MATERIAL_OPTIONS.find(m => m.name === item.material) || {}).brand || '';
+            const currentBrand = item.brand || (MATERIAL_OPTIONS.find(m => m.name === item.material) || {}).brand || '';
             const effectiveBrand = currentBrand || brands[0] || '';
             const brandOptionsHtml = brands.map(b => `<option value="${b}" ${b === effectiveBrand ? 'selected' : ''}>${b}</option>`).join('');
             const filteredMaterials = effectiveBrand ? MATERIAL_OPTIONS.filter(m => (m.brand || 'Generic') === effectiveBrand) : MATERIAL_OPTIONS;
             const materialOptionsHtml = filteredMaterials.map((m) => `<option value="${m.name}" ${m.name === item.material ? 'selected' : ''}>${m.name}</option>`).join('');
-            const renderedRowColors = renderColorDropdown(item.material, item.color, true);
+            const renderedRowColors = renderColorDropdown(item.material, item.color, true, effectiveBrand);
 
             // Per-file printer + preset dropdowns
             const printerModels = getCachedPrinterModels();
@@ -951,12 +951,12 @@ export function renderResultsTable() {
             const selectedMaterial = item.material || quoteOptions.material;
             const selectedColor = item.color || quoteOptions.color;
             const brands3 = getBrandOptions();
-            const currentBrand3 = (MATERIAL_OPTIONS.find(m => m.name === selectedMaterial) || {}).brand || '';
+            const currentBrand3 = item.brand || (MATERIAL_OPTIONS.find(m => m.name === selectedMaterial) || {}).brand || '';
             const effectiveBrand3 = currentBrand3 || brands3[0] || '';
             const brandOptionsHtml = brands3.map(b => `<option value="${b}" ${b === effectiveBrand3 ? 'selected' : ''}>${b}</option>`).join('');
             const filteredMaterials3 = effectiveBrand3 ? MATERIAL_OPTIONS.filter(m => (m.brand || 'Generic') === effectiveBrand3) : MATERIAL_OPTIONS;
             const materialOptionsHtml = filteredMaterials3.map((m) => `<option value="${m.name}" ${m.name === selectedMaterial ? 'selected' : ''}>${m.name}</option>`).join('');
-            const renderedRowColors = renderColorDropdown(selectedMaterial, selectedColor, true);
+            const renderedRowColors = renderColorDropdown(selectedMaterial, selectedColor, true, effectiveBrand3);
             const quantityValue = item.quantity || quoteOptions.quantity || 1;
             // Per-file printer + preset
             const printerModels = getCachedPrinterModels();
@@ -1097,7 +1097,7 @@ function renderResultsCards() {
             ...presets.map(p => `<option value="${p.id}" ${String(p.id) === String(item._slicer_preset_id || '') ? 'selected' : ''}>${p.name || '#' + p.id}</option>`)
         ].join('');
         const mobileBrands = getBrandOptions();
-        const mobileCurrentBrand = (MATERIAL_OPTIONS.find(m => m.name === (item.material || quoteOptions.material)) || {}).brand || '';
+        const mobileCurrentBrand = item.brand || (MATERIAL_OPTIONS.find(m => m.name === (item.material || quoteOptions.material)) || {}).brand || '';
         const mobileEffectiveBrand = mobileCurrentBrand || mobileBrands[0] || '';
         const mobileBrandOptionsHtml = mobileBrands.map(b => `<option value="${b}" ${b === mobileEffectiveBrand ? 'selected' : ''}>${b}</option>`).join('');
         const filteredMobileMaterials = mobileEffectiveBrand ? MATERIAL_OPTIONS.filter(m => (m.brand || 'Generic') === mobileEffectiveBrand) : MATERIAL_OPTIONS;

@@ -34,7 +34,7 @@ from app.zip_parser import (
     _match_checklist_to_models,
     _parse_excel_checklist,
 )
-from app.services.quote import save_quote_history
+from app.services.quote import _extract_preset_core_params, save_quote_history
 from calculator.cost import process_single_file
 
 logger = logging.getLogger(__name__)
@@ -203,6 +203,26 @@ def _lookup_printer(printer_name, nozzle_str):
                 return resolved.get("_compound_id") or pid
             return pid
     return None
+
+
+def _resolve_zip_slicer_params(
+    layer_height: float,
+    wall_count: int,
+    infill: int,
+    slicer_preset: Optional[dict],
+) -> tuple[float, int, int]:
+    """Resolve ZIP defaults with the same preset precedence as normal quotes."""
+    preset_params = _extract_preset_core_params(slicer_preset)
+    return (
+        preset_params.get("layer_height", float(layer_height or 0.2)),
+        preset_params.get("perimeters", int(wall_count or 3)),
+        preset_params.get("infill", int(infill or 20)),
+    )
+
+
+def _zip_preview_model_path(result: dict, model: dict) -> Optional[str]:
+    """Return the ZIP-owned model path exposed by the authenticated download route."""
+    return model.get("_pre_saved_path") or result.get("_saved_path")
 
 
 async def build_zip_preview_response(file: UploadFile):
@@ -393,6 +413,9 @@ async def build_zip_quote_response(
     quantity: int,
     printer_model: Optional[str],
     slicer_preset_id: Optional[int],
+    layer_height: float,
+    wall_count: int,
+    infill: int,
     session_id: Optional[str],
     current_user: dict,
 ):
@@ -468,6 +491,15 @@ async def build_zip_quote_response(
     if _effective_preset_id:
         _default_preset = get_slicer_preset_by_id(int(current_user["id"]), _effective_preset_id)
 
+    # Keep ZIP uploads on the same parameter contract as normal uploads. A
+    # preset's core values win over stale form fallbacks, while checklist
+    # fields below can still override them per model.
+    (
+        effective_layer_height,
+        effective_wall_count,
+        effective_infill,
+    ) = _resolve_zip_slicer_params(layer_height, wall_count, infill, _default_preset)
+
     _files_to_process = []
     for m in match_result["matched"]:
         _files_to_process.append(("matched", m))
@@ -533,14 +565,14 @@ async def build_zip_quote_response(
 
                     if has_print_params:
                         file_preset = None
-                        _lh = lh if lh is not None else 0.2
-                        _wc = wc if wc is not None else 3
-                        _inf = inf if inf is not None else 20
+                        _lh = lh if lh is not None else effective_layer_height
+                        _wc = wc if wc is not None else effective_wall_count
+                        _inf = inf if inf is not None else effective_infill
                     else:
                         file_preset = _default_preset
-                        _lh = 0.2
-                        _wc = 3
-                        _inf = 20
+                        _lh = effective_layer_height
+                        _wc = effective_wall_count
+                        _inf = effective_infill
 
                     fake_file = UploadFile(
                         filename=stl["filename"],
@@ -573,8 +605,7 @@ async def build_zip_quote_response(
                         "color": cl_color_raw or cl_color,
                         "quantity": cl_qty,
                     }
-                    if result.get("_saved_path"):
-                        result["checklist_file_path"] = result["_saved_path"]
+                    result["checklist_file_path"] = _zip_preview_model_path(result, stl)
 
                     filename = stl["filename"]
                     pre_saved = stl.get("_pre_saved_path")
@@ -592,20 +623,19 @@ async def build_zip_quote_response(
                     result = await process_single_file(
                         fake_file,
                         material=material,
-                        layer_height=0.2,
-                        infill=20,
+                        layer_height=effective_layer_height,
+                        infill=effective_infill,
                         quantity=quantity,
                         color=_resolve_color_hex(color),
                         user_materials=user_materials,
                         pricing_config=file_pricing,
                         slicer_preset=_default_preset,
-                        perimeters=3,
+                        perimeters=effective_wall_count,
                         current_user=current_user,
                         auto_orient=False,
                     )
                     result["_checklist_params"] = False
-                    if result.get("_saved_path"):
-                        result["checklist_file_path"] = result["_saved_path"]
+                    result["checklist_file_path"] = _zip_preview_model_path(result, stl)
 
                     filename = stl["filename"]
                     pre_saved = stl.get("_pre_saved_path")
@@ -690,10 +720,13 @@ def download_zip_model(file_path: str, current_user: dict):
     from app.utils import _user_base_dir
 
     user_folder = f"user_{current_user['id']}_{current_user['username']}"
-    allowed_prefix = os.path.join(_user_base_dir(), user_folder, "uploads")
-
-    abs_path = os.path.abspath(file_path)
-    if not abs_path.startswith(allowed_prefix):
+    allowed_dir = os.path.realpath(os.path.join(_user_base_dir(), user_folder, "uploads"))
+    abs_path = os.path.realpath(file_path)
+    try:
+        is_allowed = os.path.commonpath([abs_path, allowed_dir]) == allowed_dir
+    except ValueError:
+        is_allowed = False
+    if not is_allowed:
         raise HTTPException(status_code=403, detail="Access denied")
     if not os.path.isfile(abs_path):
         raise HTTPException(status_code=404, detail="File not found")

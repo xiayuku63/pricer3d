@@ -22,7 +22,7 @@ import { initQuoteHistory, loadQuoteHistory } from './modules/history.js';
 import {
     authToken, currentUser, setCurrentUser, setAuthToken,
     currentResults, setCurrentResults, selectedFilesMap, thumbnailMap,
-    quoteOptions, pendingQuoteFiles, COLOR_OPTIONS,
+    quoteOptions, pendingQuoteFiles,
     PRICING_CONFIG, MATERIAL_OPTIONS, setMaterialOptions,
     loadUserSession, clearUserSession, saveUserSession, loadSlicerPresetSelection,
     saveSlicerPresetSelection, formatColorLabel, formatTimeHMS, escapeHtml,
@@ -78,7 +78,7 @@ import {
 } from './modules/upload.js';
 import {
     initPreview, buildStlThumbnail, buildNonStlThumbnail,
-    openPreviewModal, closePreviewModal, previewByFilename, setupViewCube,
+    openPreviewModal, closePreviewModal, previewByFilename, updatePreviewColor, setupViewCube,
     ensureThumbnailForFile,
 } from './modules/preview.js';
 import {
@@ -262,6 +262,7 @@ document.addEventListener('DOMContentLoaded', () => {
         dom,
         ensureThumbnailForFile,
         recolorCurrentMesh,
+        updatePreviewColor,
         getCurrentPreviewFilename: () => currentPreviewFilename,
         refreshOptionsSummary,
     });
@@ -281,7 +282,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Options modal — color dropdown
     if (dom.optMaterial) dom.optMaterial.addEventListener('change', () => {
-        const rendered = renderColorDropdown(dom.optMaterial.value, quoteOptions.color);
+        const rendered = renderColorDropdown(dom.optMaterial.value, quoteOptions.color, false, quoteOptions.brand);
         dom.optColor.innerHTML = rendered.html;
     });
     if (dom.optionsSaveBtn) dom.optionsSaveBtn.addEventListener('click', () => {
@@ -291,7 +292,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         quoteOptions.material = dom.optMaterial.value;
-        const wrapper = dom.optColor.querySelector('.color-dd-wrapper');
+        const wrapper = dom.optColor.querySelector('.color-select-wrap');
         const hiddenInput = wrapper ? wrapper.querySelector('.row-color-value') : null;
         if (hiddenInput) quoteOptions.color = hiddenInput.value;
         quoteOptions.quantity = quantity;
@@ -323,6 +324,9 @@ document.addEventListener('DOMContentLoaded', () => {
         batchSlicerPreset.addEventListener('change', async () => {
             const val = batchSlicerPreset.value;
             const paramsEl = document.getElementById('batch-preset-params');
+            const layerEl = document.getElementById('gen-layer-height');
+            const wallEl = document.getElementById('gen-wall-count');
+            const infillEl = document.getElementById('gen-infill');
             if (!val) {
                 quoteOptions.slicer_preset_id = null;
                 saveSlicerPresetSelection();
@@ -331,6 +335,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const genSel = document.getElementById('gen-preset-select');
                 if (genSel) genSel.value = '';
                 setDefaultSlicerPresetId(null);
+                await reQuoteAllSelectedFiles(t('quote.recalculate'));
                 return;
             }
             quoteOptions.slicer_preset_id = Number(val);
@@ -345,12 +350,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (resp.ok) {
                     const data = await resp.json();
                     const p = data.preset?.params;
-                    if (p && paramsEl) {
-                        paramsEl.textContent = `层高:${p.layer_height || '-'} 墙:${p.perimeters || '-'} 填充:${p.fill_density || '-'}%`;
-                        paramsEl.classList.remove('hidden');
+                    if (p) {
+                        // The quote API reads these controls when it builds the
+                        // request. Keep them in sync with the selected batch preset.
+                        if (layerEl && p.layer_height != null) layerEl.value = Number(p.layer_height).toFixed(2);
+                        if (wallEl && p.perimeters != null) wallEl.value = String(p.perimeters);
+                        if (infillEl && p.fill_density != null) infillEl.value = String(p.fill_density);
+                        if (paramsEl) {
+                            paramsEl.textContent = `层高:${p.layer_height || '-'} 墙:${p.perimeters || '-'} 填充:${p.fill_density || '-'}%`;
+                            paramsEl.classList.remove('hidden');
+                        }
                     }
                 }
             } catch (e) { /* ignore */ }
+            await reQuoteAllSelectedFiles(t('quote.recalculate'));
         });
     }
 
@@ -360,7 +373,7 @@ document.addEventListener('DOMContentLoaded', () => {
         openOptionsTrigger.addEventListener('click', () => {
             updateDropdowns();
             dom.optMaterial.value = quoteOptions.material;
-            const rendered = renderColorDropdown(dom.optMaterial.value, quoteOptions.color);
+            const rendered = renderColorDropdown(dom.optMaterial.value, quoteOptions.color, false, quoteOptions.brand);
             dom.optColor.innerHTML = rendered.html;
             dom.optQuantity.value = String(quoteOptions.quantity);
             dom.optionsModal.classList.remove('hidden');
@@ -381,14 +394,7 @@ document.addEventListener('DOMContentLoaded', () => {
     _bind(dom.orientLearnedBtn, 'click', learnedAutoOrient);
     _bind(dom.orientSaveBtn, 'click', saveOrientationAndRequote);
 
-    // User center
-    const hideUserCenter = () => { dom.userCenterModal.classList.add('hidden'); dom.userCenterMsg.classList.add('hidden'); };
-    _bind(dom.userCenterCloseBtn, 'click', hideUserCenter);
-    _bind(dom.userCenterBackdrop, 'click', hideUserCenter);
-    _bind(dom.userCenterSaveBtn, 'click', saveUserSettings);
-    _bind(dom.userCenterSetDefaultsBtn, 'click', setAsDefaults);
-    _bind(dom.ucChangePasswordBtn, 'click', changePassword);
-
+    // User-center events are wired by initSettingsAreaEvents below.
     initSettingsAreaEvents({
         dom,
         state: {

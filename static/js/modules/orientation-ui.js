@@ -6,7 +6,6 @@ import {
 import {
     renderClusters, clearClusters, setClusterHover, intersectClusters,
     placeFaceOnBed, isClusterMode,
-    showPlacementPlane, hidePlacementPlane,
 } from './layface.js';
 import {
     authToken, authFetch, quoteOptions,
@@ -14,6 +13,7 @@ import {
 } from './state.js';
 import { t } from './i18n.js';
 import { openLoginModal } from './auth.js';
+import { normalizeOrientation, withResultOrientation } from './orientation-state.js';
 
 let dom = {};
 let hoverRaycaster = new THREE.Raycaster();
@@ -122,7 +122,6 @@ export function cleanupLayFaceMode() {
     layFaceAbortController = null;
     layFaceState = 'idle';
     clearClusters();
-    hidePlacementPlane();
     unbindLayFaceHover();
     unbindLayFaceEscape();
     setLayFaceHint(false);
@@ -133,10 +132,15 @@ export function cleanupLayFaceMode() {
 export function syncOrientationFromMesh() {
     if (!currentMesh) return quoteOptions.orientation || { x: 0, y: 0, z: 0 };
     currentMesh.updateMatrixWorld();
-    const rx = THREE.MathUtils.radToDeg(currentMesh.rotation.x) || 0;
-    const ry = THREE.MathUtils.radToDeg(currentMesh.rotation.y) || 0;
-    const rz = THREE.MathUtils.radToDeg(currentMesh.rotation.z) || 0;
+    // Lay-on-face applies a quaternion. Reading rotation.x/y/z directly can
+    // therefore return the old Euler values even though the model moved.
+    const euler = new THREE.Euler().setFromQuaternion(currentMesh.quaternion, 'XYZ');
+    const rx = THREE.MathUtils.radToDeg(euler.x) || 0;
+    const ry = THREE.MathUtils.radToDeg(euler.y) || 0;
+    const rz = THREE.MathUtils.radToDeg(euler.z) || 0;
     quoteOptions.orientation = { x: Math.round(rx), y: Math.round(ry), z: Math.round(rz) };
+    const idx = currentResults.findIndex((item) => item && item.filename === currentPreviewFilename);
+    if (idx >= 0) currentResults[idx] = withResultOrientation(currentResults[idx], quoteOptions.orientation);
     return quoteOptions.orientation;
 }
 
@@ -161,6 +165,8 @@ export function centerModel() {
 export function resetOrientationHandler() {
     cleanupLayFaceMode();
     quoteOptions.orientation = { x: 0, y: 0, z: 0 };
+    const idx = currentResults.findIndex((item) => item && item.filename === currentPreviewFilename);
+    if (idx >= 0) currentResults[idx] = withResultOrientation(currentResults[idx], quoteOptions.orientation);
     // resetOrientation is from viewer.js
     const viewerModule = import('./viewer.js');
     viewerModule.then(m => m.resetOrientation());
@@ -179,7 +185,6 @@ export async function toggleLayFace() {
     }
 
     clearClusters();
-    hidePlacementPlane();
     layFaceState = 'loading';
     bindLayFaceEscape();
     setLayFaceButtonLabel(t('orientation.analyzing'), { disabled: true });
@@ -213,7 +218,6 @@ export async function toggleLayFace() {
             cleanupLayFaceMode();
             placeFaceOnBed(currentMesh, cluster.normal, 'Z', cluster.face_vertices);
             syncOrientationFromMesh();
-            showPlacementPlane(currentMesh, cluster.face_vertices);
             return true;
         };
 
@@ -224,7 +228,6 @@ export async function toggleLayFace() {
                     cleanupLayFaceMode();
                     placeFaceOnBed(currentMesh, c.normal, 'Z', c.face_vertices);
                     syncOrientationFromMesh();
-                    showPlacementPlane(currentMesh, c.face_vertices);
                 }
             },
             setClusterHover
@@ -365,7 +368,9 @@ export async function learnedAutoOrient() {
 
         // 更新 state
         const { quoteOptions } = await import('./state.js');
-        quoteOptions.orientation = data.euler_angles_deg;
+        quoteOptions.orientation = normalizeOrientation(data.euler_angles_deg);
+        const idx = currentResults.findIndex((item) => item && item.filename === currentPreviewFilename);
+        if (idx >= 0) currentResults[idx] = withResultOrientation(currentResults[idx], quoteOptions.orientation);
 
         if (orientLearnedBtn) {
             const p = data.prusa;
@@ -442,15 +447,17 @@ export async function saveOrientationAndRequote() {
             orient_z: orient.z,
         });
 
-        mergeResultsByFilename([{
+        // The quote response is authoritative for time/cost. Attach the
+        // selected orientation after spreading it so the refreshed row keeps
+        // the newly sliced values while retaining the viewer state.
+        mergeResultsByFilename([withResultOrientation({
             ...updated,
             material: ctx.material,
             color: ctx.color,
             quantity: ctx.quantity,
             _printer_model: ctx.printerModel || updated._printer_model,
             _slicer_preset_id: ctx.slicerPresetId !== null ? ctx.slicerPresetId : updated._slicer_preset_id,
-            euler_angles_deg: updated.euler_angles_deg || { ...orient },
-        }]);
+        }, orient)]);
         renderResultsTable();
         recalcSummaryFromCurrentResults();
 

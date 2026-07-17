@@ -548,7 +548,7 @@ async function sendVerifyCode(channel, target) {
         if (data.dev_code) {
             let msg = `验证码已发送（开发模式）：${data.dev_code}`;
             if (data.email_warning) {
-                msg += ` ⚠️ ${data.email_warning}`;
+                msg += ` ${data.email_warning}`;
             }
             showMsg(msg, 'ok', step2Msg);
         } else {

@@ -90,6 +90,11 @@ class TestPrinterModelsData:
         ids = [pm["id"] for pm in PRINTER_MODELS]
         assert "bambu_a1" in ids
 
+    def test_bambu_a1_mini_supports_08_nozzle(self):
+        """A1 Mini 的批量喷嘴选择应包含 0.8mm。"""
+        model = next(pm for pm in PRINTER_MODELS if pm["id"] == "bambu_a1_mini")
+        assert 0.8 in model["nozzles"]
+
     def test_known_prusa_mk4_exists(self):
         """Prusa MK4 应在列表中。"""
         ids = [pm["id"] for pm in PRINTER_MODELS]

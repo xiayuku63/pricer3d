@@ -272,6 +272,36 @@ def _build_hull_coplanar_planes(conv_hull, exact_eps: float = 1e-3):
     return np.array(plane_normals), np.array(plane_offsets)
 
 
+def _is_on_matching_hull_plane(
+    candidate_normal: np.ndarray,
+    candidate_centroid: np.ndarray,
+    hull_normals: np.ndarray,
+    hull_offsets: np.ndarray,
+    normal_cos_threshold: float,
+    offset_tol: float,
+) -> bool:
+    """Return whether a candidate lies on a parallel hull plane.
+
+    STL triangle winding is not reliable, so a candidate face normal may be
+    opposite to the equivalent convex-hull face normal.  A plane is unchanged
+    by negating both its normal and offset; compare both orientations before
+    evaluating the candidate centroid's distance from that geometric plane.
+    """
+    cos_sims = np.nan_to_num(
+        hull_normals @ candidate_normal,
+        nan=-2.0,
+        posinf=1.0,
+        neginf=-2.0,
+    )
+    parallel = np.where(np.abs(cos_sims) >= normal_cos_threshold)[0]
+    if len(parallel) == 0:
+        return False
+
+    candidate_offset = float(np.dot(candidate_normal, candidate_centroid))
+    aligned_offsets = hull_offsets[parallel] * np.sign(cos_sims[parallel])
+    return bool(np.min(np.abs(aligned_offsets - candidate_offset)) <= offset_tol)
+
+
 def cluster_coplanar_faces(
     mesh: trimesh.Trimesh,
     include_upward_faces: bool = False,
@@ -467,25 +497,15 @@ def cluster_coplanar_faces(
             # ── 过滤A: 凸包表面筛选 (主过滤手段) ──
             # 候选面簇若不在凸包表面上 → 内部/凹腔面 → 直接过滤, 无需后续射线检测
             if hull_available:
-                # 1) 法向量匹配: 候选簇法向量须与某凸包平面法向量高度对齐
-                cos_sims = np.nan_to_num(hp_n @ cn, nan=-2.0, posinf=1.0, neginf=-2.0)
-                max_cos = float(cos_sims.max())
-                if max_cos < HULL_NORMAL_COS_THRESHOLD:
-                    logger.debug(
-                        f"过滤内部面[A-法向不匹配]: area={mc['area']:.1f}mm², "
-                        f"max_cos={max_cos:.4f}, threshold={HULL_NORMAL_COS_THRESHOLD}"
-                    )
-                    continue
-                # 2) 平面偏移匹配: 候选簇平面到匹配凸包平面须真正共面 (紧容差)
-                matching = np.where(cos_sims >= HULL_NORMAL_COS_THRESHOLD)[0]
-                plane_off_cluster = float(np.dot(cn, centroid))
-                min_offset_diff = float(np.min(np.abs(hp_o[matching] - plane_off_cluster)))
-                if min_offset_diff > offset_tol:
-                    logger.debug(
-                        f"过滤内部面[A-平面偏移不匹配]: area={mc['area']:.1f}mm², "
-                        f"min_offset_diff={min_offset_diff:.3f}mm, "
-                        f"tol={offset_tol:.3f}mm"
-                    )
+                if not _is_on_matching_hull_plane(
+                    cn,
+                    centroid,
+                    hp_n,
+                    hp_o,
+                    HULL_NORMAL_COS_THRESHOLD,
+                    offset_tol,
+                ):
+                    logger.debug(f"过滤内部面[A-凸包平面不匹配]: area={mc['area']:.1f}mm², tol={offset_tol:.3f}mm")
                     continue
 
             # ── 过滤B: 法向量方向过滤 ──

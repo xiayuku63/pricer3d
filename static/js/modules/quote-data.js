@@ -3,9 +3,9 @@ export const MATERIAL_INFO = {
     'PLA': {
         desc: '聚乳酸（PLA）是最常用的FDM 3D打印材料，由玉米淀粉等可再生资源制成，环保可降解。',
         tags: [
-            { label: '环保', color: 'green', icon: '♻️' },
-            { label: '易打印', color: 'blue', icon: '🖨️' },
-            { label: '低成本', color: 'gray', icon: '💰' },
+            { label: '环保', color: 'green' },
+            { label: '易打印', color: 'blue' },
+            { label: '低成本', color: 'gray' },
         ],
         properties: { heatResist: 60, strength: 3, flexibility: 2, detail: 4, cost: 5 },
         pros: ['打印温度低（190-220°C），不易翘曲', '表面质量好，细节还原度高', '颜色丰富，价格实惠', '环保可降解'],
@@ -17,9 +17,9 @@ export const MATERIAL_INFO = {
     'ABS': {
         desc: '丙烯腈-丁二烯-苯乙烯共聚物（ABS）是工程级热塑性材料，具有良好的韧性和耐热性。',
         tags: [
-            { label: '耐热', color: 'red', icon: '🔥' },
-            { label: '高强度', color: 'orange', icon: '💪' },
-            { label: '工程级', color: 'purple', icon: '⚙️' },
+            { label: '耐热', color: 'red' },
+            { label: '高强度', color: 'orange' },
+            { label: '工程级', color: 'purple' },
         ],
         properties: { heatResist: 100, strength: 4, flexibility: 3, detail: 3, cost: 3 },
         pros: ['韧性好，耐冲击', '耐热性较高（约100°C)', '可丙酮蒸汽抛光获得光滑表面', '适合功能性零件'],
@@ -31,9 +31,9 @@ export const MATERIAL_INFO = {
     'PETG': {
         desc: 'PETG（聚对苯二甲酸乙二醇酯-1,4-环己烷二甲醇酯）兼具PLA的易打印性和ABS的耐用性，是实用型零件的理想选择。',
         tags: [
-            { label: '耐候', color: 'teal', icon: '🌤️' },
-            { label: '食品级可选', color: 'green', icon: '🍎' },
-            { label: '耐化学', color: 'blue', icon: '🧪' },
+            { label: '耐候', color: 'teal' },
+            { label: '食品级可选', color: 'green' },
+            { label: '耐化学', color: 'blue' },
         ],
         properties: { heatResist: 80, strength: 4, flexibility: 3, detail: 3, cost: 3 },
         pros: ['韧性好，不易翘曲', '耐化学腐蚀', '耐候性好，可户外使用', '食品安全级可选'],
@@ -45,9 +45,9 @@ export const MATERIAL_INFO = {
     'TPU': {
         desc: 'TPU（热塑性聚氨酯）是一种柔性3D打印材料，具有优异的弹性和耐磨性。',
         tags: [
-            { label: '柔性', color: 'pink', icon: '🤸' },
-            { label: '耐磨', color: 'amber', icon: '🛡️' },
-            { label: '弹性体', color: 'rose', icon: '🔄' },
+            { label: '柔性', color: 'pink' },
+            { label: '耐磨', color: 'amber' },
+            { label: '弹性体', color: 'rose' },
         ],
         properties: { heatResist: 75, strength: 3, flexibility: 5, detail: 2, cost: 3 },
         pros: ['高弹性，可弯曲变形', '耐磨耐撕裂', '减震性能好', '耐油耐低温'],
@@ -59,9 +59,9 @@ export const MATERIAL_INFO = {
     'ASA': {
         desc: 'ASA（丙烯腈-苯乙烯-丙烯酸酯）是ABS的户外升级版，具有优异的抗紫外线和耐候性能。',
         tags: [
-            { label: '抗UV', color: 'yellow', icon: '☀️' },
-            { label: '户外级', color: 'orange', icon: '🏔️' },
-            { label: '耐候', color: 'teal', icon: '🌧️' },
+            { label: '抗UV', color: 'yellow' },
+            { label: '户外级', color: 'orange' },
+            { label: '耐候', color: 'teal' },
         ],
         properties: { heatResist: 100, strength: 4, flexibility: 3, detail: 3, cost: 2 },
         pros: ['优异的抗紫外线性能', '耐候性极佳', '机械性能与ABS相当', '可丙酮抛光'],
@@ -73,9 +73,9 @@ export const MATERIAL_INFO = {
     'Nylon': {
         desc: '尼龙（Nylon/PA）是高性能工程塑料，具有极高的强度、韧性和耐磨性。',
         tags: [
-            { label: '高强度', color: 'red', icon: '💪' },
-            { label: '耐磨', color: 'amber', icon: '🛡️' },
-            { label: '工程级', color: 'purple', icon: '⚙️' },
+            { label: '高强度', color: 'red' },
+            { label: '耐磨', color: 'amber' },
+            { label: '工程级', color: 'purple' },
         ],
         properties: { heatResist: 120, strength: 5, flexibility: 4, detail: 3, cost: 1 },
         pros: ['极高的强度和韧性', '优异的耐磨性', '耐高温', '可染色'],
@@ -87,9 +87,9 @@ export const MATERIAL_INFO = {
     'PC': {
         desc: '聚碳酸酯（PC）是透明度最高的工程塑料之一，兼具高强度和高耐热性。',
         tags: [
-            { label: '透明', color: 'sky', icon: '💎' },
-            { label: '高耐热', color: 'red', icon: '🔥' },
-            { label: '高强度', color: 'orange', icon: '💪' },
+            { label: '透明', color: 'sky' },
+            { label: '高耐热', color: 'red' },
+            { label: '高强度', color: 'orange' },
         ],
         properties: { heatResist: 140, strength: 5, flexibility: 3, detail: 3, cost: 1 },
         pros: ['耐热性极高（140°C）', '透明度好', '强度极高', '阻燃性好'],

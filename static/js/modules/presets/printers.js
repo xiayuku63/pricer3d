@@ -10,7 +10,7 @@ import { t } from '../i18n.js';
 import { updateBedSize, setBedLabel } from '../viewer.js';
 import { dom, _printerModels, _syncBatchPrinter, setPrinterModels } from './ui.js';
 import { updatePrinterDetailPanel } from './printer.js';
-import { updateLayerHeightRangeHint } from './slicer.js';
+import { updateLayerHeightRangeHint, syncStandardPresetForNozzle } from './slicer.js';
 
 export async function fetchPrinterModels() {
     const resp = await authFetch("/api/slicer/printers");
@@ -25,6 +25,21 @@ export async function fetchPrinterModels() {
         ? _printerModels.filter(p => enabled.includes(p.id))
         : _printerModels;
 
+    const currentCfgNozzle = document.getElementById('cfg-nozzle-diameter')?.value || '';
+    const currentBatchNozzle = document.getElementById('batch-nozzle-diameter')?.value || '';
+
+    function _sameNozzle(left, right) {
+        const a = Number.parseFloat(left);
+        const b = Number.parseFloat(right);
+        return Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) < 0.0001;
+    }
+
+    function _preferredNozzle(model, currentValue) {
+        const nozzles = (model && model.nozzles) ? model.nozzles : [0.4];
+        const candidates = [currentValue, defaultNozzle, model?.nozzle, nozzles[0]];
+        return candidates.find((candidate) => nozzles.some((n) => _sameNozzle(n, candidate))) ?? nozzles[0];
+    }
+
     // ── Helper: get compound id for model + nozzle ──
     function _compoundId(modelId, nozzle) {
         const n = String(Math.round(nozzle * 10)).padStart(2, '0').slice(-2);
@@ -37,11 +52,11 @@ export async function fetchPrinterModels() {
         if (!sel) return;
         const model = visibleModels.find(p => p.id === modelId);
         const nozzles = (model && model.nozzles) ? model.nozzles : [0.4];
-        const currentVal = sel.value;
+        const preferred = _preferredNozzle(model, sel.value);
         sel.innerHTML = nozzles.map(n =>
-            '<option value="' + n + '"' + (n === defaultNozzle ? ' selected' : '') + '>' + n + ' mm</option>'
+            '<option value="' + n + '"' + (_sameNozzle(n, preferred) ? ' selected' : '') + '>' + n + ' mm</option>'
         ).join('');
-        if (!sel.value && nozzles.length) sel.value = String(nozzles[0]);
+        if (nozzles.length) sel.value = String(preferred);
     }
 
     // ── Populate printer model tab ──
@@ -64,8 +79,7 @@ export async function fetchPrinterModels() {
             var printer = visibleModels.find(function(p) { return p.id === prefId; });
             if (printer) {
                 if (dom.cfgNozzleDiameter) {
-                    dom.cfgNozzleDiameter.value = defaultNozzle && printer.nozzles && printer.nozzles.includes(parseFloat(defaultNozzle))
-                        ? String(defaultNozzle) : String(printer.nozzle);
+                    dom.cfgNozzleDiameter.value = String(_preferredNozzle(printer, currentCfgNozzle));
                 }
                 if (dom.printerBedInfo) {
                     dom.printerBedInfo.textContent = t('printer.bedInfo', { x: printer.bed_width, y: printer.bed_depth, z: printer.bed_height });
@@ -91,13 +105,11 @@ export async function fetchPrinterModels() {
             batchSel.value = preferredId;
             _populateNozzleDropdown("batch-nozzle-diameter", preferredId);
             // If user has a saved nozzle default, set it after populating
-            if (defaultNozzle) {
+            if (defaultNozzle || currentBatchNozzle) {
                 var batchNozzleEl = document.getElementById("batch-nozzle-diameter");
                 if (batchNozzleEl) {
-                    var nozzleOpts = Array.from(batchNozzleEl.options).map(function(o) { return o.value; });
-                    if (nozzleOpts.indexOf(String(defaultNozzle)) >= 0) {
-                        batchNozzleEl.value = String(defaultNozzle);
-                    }
+                    const batchModel = visibleModels.find(function(p) { return p.id === preferredId; });
+                    batchNozzleEl.value = String(_preferredNozzle(batchModel, currentBatchNozzle));
                 }
             }
             _syncBatchPrinter();
@@ -138,8 +150,7 @@ export async function fetchPrinterModels() {
     const cfgPrinter = document.getElementById("cfg-printer-model-main");
     if (cfgPrinter && dom.cfgNozzleDiameter) {
         var resolveNozzle = function(printer) {
-            return (defaultNozzle && printer.nozzles && printer.nozzles.includes(parseFloat(defaultNozzle)))
-                ? String(defaultNozzle) : String(printer.nozzle);
+            return String(_preferredNozzle(printer, currentCfgNozzle));
         };
         var updateNozzleAndBed = function() {
             var printer = visibleModels.find(function(p) { return p.id === cfgPrinter.value; });
@@ -180,9 +191,11 @@ export async function fetchPrinterModels() {
             }
             // Update layer height range hint when nozzle changes
             if (typeof updateLayerHeightRangeHint === 'function') updateLayerHeightRangeHint();
+            if (typeof syncStandardPresetForNozzle === 'function') syncStandardPresetForNozzle();
         });
         // Initial hint update
         if (typeof updateLayerHeightRangeHint === 'function') updateLayerHeightRangeHint();
+        if (typeof syncStandardPresetForNozzle === 'function') syncStandardPresetForNozzle();
     }
 
     // ── Update 3D viewer bed size to match the currently selected batch printer ──

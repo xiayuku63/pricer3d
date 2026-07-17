@@ -24,6 +24,7 @@ let _previewChips = null;
 let _dropZone = null;
 let _dropIcon = null;
 let _toastContainer = null;
+let _progressAnchor = null;
 
 function _initRefs() {
     if (_progressContainer) return;
@@ -36,6 +37,14 @@ function _initRefs() {
     _dropZone = document.getElementById('drop-zone');
     _dropIcon = document.getElementById('drop-icon');
     _toastContainer = document.getElementById('toast-container');
+    _progressAnchor = document.getElementById('upload-progress-inline-anchor');
+
+    // Place the live progress bar directly below the selected-file status.
+    if (_progressContainer && _progressAnchor && _progressAnchor.parentElement) {
+        _progressAnchor.parentElement.insertBefore(_progressContainer, _progressAnchor.nextSibling);
+    } else if (_progressContainer && _dropZone && _dropZone.contains(_progressContainer)) {
+        _dropZone.parentElement.insertBefore(_progressContainer, _dropZone.nextSibling);
+    }
 }
 
 // ═══════════════════════════════════════════════

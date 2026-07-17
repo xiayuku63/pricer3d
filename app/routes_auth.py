@@ -22,7 +22,6 @@ from .config import (  # noqa: E402
     IS_PRODUCTION,
     SHOW_DEV_CODES,
     DEFAULT_MATERIALS,
-    DEFAULT_COLORS,
     DEFAULT_PRICING_CONFIG,
     FREE_TOTAL_MODEL_LIMIT,
 )
@@ -372,7 +371,7 @@ async def admin_login(request: Request):
         created_at = datetime.now(timezone.utc).isoformat()
         defaults = get_app_defaults()
         materials_json = json.dumps(defaults.get("materials") or DEFAULT_MATERIALS)
-        colors_json = json.dumps(defaults.get("colors") or DEFAULT_COLORS)
+        colors_json = "[]"
         pricing_json = json.dumps(defaults.get("pricing_config") or DEFAULT_PRICING_CONFIG)
         accepted_at = datetime.now(timezone.utc).isoformat()
         from .db import get_db_session

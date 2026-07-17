@@ -93,11 +93,11 @@
                     <button id="open-membership-btn" type="button" class="hidden w-full sm:w-auto text-sm px-3 py-2.5 sm:py-1.5 min-h-[44px] sm:min-h-0" style="border: 1px solid var(--color-warning-border); color: var(--color-warning-text); border-radius: var(--radius-md); background-color: var(--color-warning-bg);" data-i18n="common.membershipService">会员服务</button>
                     <div id="user-menu" class="hidden relative w-full sm:w-auto">
                         <button id="user-menu-btn" type="button" class="w-full sm:w-auto text-sm px-3 py-2.5 sm:py-1.5 min-h-[44px] sm:min-h-0 tw-input"></button>
-                        <div id="user-dropdown" class="hidden absolute right-0 top-full mt-2 w-40 rounded-md tw-card shadow-lg z-[60]" style="border: 1px solid var(--color-border);">
-                            <button id="open-admin-users-btn" type="button" class="hidden w-full text-left text-xs px-3 py-2.5 tw-btn-ghost min-h-[44px]">用户管理</button>
-                            <button id="open-user-center-btn" type="button" class="w-full text-left text-xs px-3 py-2.5 tw-btn-ghost min-h-[44px]" data-i18n="common.userCenter">用户中心</button>
-                            <button id="open-quote-history-btn" type="button" class="w-full text-left text-xs px-3 py-2.5 tw-btn-ghost min-h-[44px]" data-i18n="common.quoteHistory">报价历史</button>
-                            <button id="logout-btn" type="button" class="w-full text-left text-xs px-3 py-2.5 tw-text-danger tw-btn-ghost min-h-[44px]" data-i18n="auth.logout">退出登录</button>
+                        <div id="user-dropdown" class="hidden absolute right-0 top-full mt-2 w-40 rounded-md tw-dropdown-panel z-[60]">
+                            <button id="open-admin-users-btn" type="button" class="hidden text-xs tw-dropdown-option min-h-[44px]">用户管理</button>
+                            <button id="open-user-center-btn" type="button" class="text-xs tw-dropdown-option min-h-[44px]" data-i18n="common.userCenter">用户中心</button>
+                            <button id="open-quote-history-btn" type="button" class="text-xs tw-dropdown-option min-h-[44px]" data-i18n="common.quoteHistory">报价历史</button>
+                            <button id="logout-btn" type="button" class="text-xs tw-text-danger tw-dropdown-option min-h-[44px]" data-i18n="auth.logout">退出登录</button>
                         </div>
                     </div>
                 </div>
@@ -271,6 +271,7 @@
                                             </label>
                                         </div>
                                         <p id="file-name" class="text-xs tw-text-muted mt-2" data-i18n="quote.noFileSelected">未选择文件（单文件<10MB，ZIP<1GB）</p>
+                                        <div id="upload-progress-inline-anchor" class="hidden"></div>
                                         <p id="upload-limit-hint" class="hidden text-[10px] tw-text-muted mt-1"></p>
                                         <div class="text-sm font-medium tw-text mt-2" data-i18n="quote.uploadModels">上传 3D 模型（stl/stp/step/obj/3mf 单文件<10MB，ZIP<1GB）</div>
 

@@ -13,8 +13,8 @@ PRINTER_MODELS = [
         "bed_depth": 180,
         "bed_height": 180,
         "nozzle": 0.4,
-        "nozzles": [0.2, 0.4, 0.6],
-        "icon": "🖨️",
+        "nozzles": [0.2, 0.4, 0.6, 0.8],
+        "icon": "3D",
         "profile": "profiles/prusa/printers/bambu_a1_mini.ini",
     },
     # ── Bambu Lab A1 (256×256×256mm cantilever) ──
@@ -26,7 +26,7 @@ PRINTER_MODELS = [
         "bed_height": 256,
         "nozzle": 0.4,
         "nozzles": [0.2, 0.4, 0.6, 0.8],
-        "icon": "🖨️",
+        "icon": "3D",
         "profile": "profiles/prusa/printers/bambu_a1.ini",
     },
     # ── Bambu Lab P1P (256×256×256mm CoreXY open frame) ──
@@ -38,7 +38,7 @@ PRINTER_MODELS = [
         "bed_height": 256,
         "nozzle": 0.4,
         "nozzles": [0.2, 0.4, 0.6, 0.8],
-        "icon": "🖨️",
+        "icon": "3D",
         "profile": "profiles/prusa/printers/bambu_p1p.ini",
     },
     # ── Bambu Lab P1S (256×256×256mm CoreXY enclosed) ──
@@ -50,7 +50,7 @@ PRINTER_MODELS = [
         "bed_height": 256,
         "nozzle": 0.4,
         "nozzles": [0.2, 0.4, 0.6, 0.8],
-        "icon": "🖨️",
+        "icon": "3D",
         "profile": "profiles/prusa/printers/bambu_p1s.ini",
     },
     # ── Bambu Lab X1 Carbon (256×256×256mm CoreXY enclosed high-temp) ──
@@ -62,7 +62,7 @@ PRINTER_MODELS = [
         "bed_height": 256,
         "nozzle": 0.4,
         "nozzles": [0.2, 0.4, 0.6, 0.8],
-        "icon": "🖨️",
+        "icon": "3D",
         "profile": "profiles/prusa/printers/bambu_x1c.ini",
     },
     # ── Bambu Lab X1E (256×256×256mm CoreXY enclosed enterprise) ──
@@ -74,7 +74,7 @@ PRINTER_MODELS = [
         "bed_height": 256,
         "nozzle": 0.4,
         "nozzles": [0.2, 0.4, 0.6, 0.8],
-        "icon": "🖨️",
+        "icon": "3D",
         "profile": "profiles/prusa/printers/bambu_x1e.ini",
     },
     # ── Bambu Lab P2S (256×256×256mm CoreXY enclosed 2nd-Gen) ──
@@ -86,7 +86,7 @@ PRINTER_MODELS = [
         "bed_height": 256,
         "nozzle": 0.4,
         "nozzles": [0.2, 0.4, 0.6, 0.8],
-        "icon": "🖨️",
+        "icon": "3D",
         "profile": "profiles/prusa/printers/bambu_p1s.ini",
     },
     # ── Bambu Lab H2D (350×320×325mm CoreXY dual-nozzle enclosed) ──
@@ -98,7 +98,7 @@ PRINTER_MODELS = [
         "bed_height": 325,
         "nozzle": 0.4,
         "nozzles": [0.2, 0.4, 0.6, 0.8],
-        "icon": "🖨️",
+        "icon": "3D",
         "profile": "profiles/prusa/printers/bambu_x1c.ini",
     },
     # ── Bambu Lab H2D Pro (350×320×325mm CoreXY dual-nozzle enclosed) ──
@@ -110,7 +110,7 @@ PRINTER_MODELS = [
         "bed_height": 325,
         "nozzle": 0.4,
         "nozzles": [0.2, 0.4, 0.6, 0.8],
-        "icon": "🖨️",
+        "icon": "3D",
         "profile": "profiles/prusa/printers/bambu_x1c.ini",
     },
     # ── Bambu Lab X2D (256×256×260mm CoreXY dual-nozzle enclosed) ──
@@ -122,7 +122,7 @@ PRINTER_MODELS = [
         "bed_height": 260,
         "nozzle": 0.4,
         "nozzles": [0.2, 0.4, 0.6, 0.8],
-        "icon": "🖨️",
+        "icon": "3D",
         "profile": "profiles/prusa/printers/bambu_x1c.ini",
     },
     # ── Creality K1 (220×220×250mm CoreXY enclosed) ──
@@ -134,7 +134,7 @@ PRINTER_MODELS = [
         "bed_height": 250,
         "nozzle": 0.4,
         "nozzles": [0.4, 0.6, 0.8],
-        "icon": "🖨️",
+        "icon": "3D",
         "profile": "profiles/prusa/printers/bambu_a1.ini",
     },
     # ── Creality K1C (220×220×250mm CoreXY enclosed, all-metal hotend) ──
@@ -146,7 +146,7 @@ PRINTER_MODELS = [
         "bed_height": 250,
         "nozzle": 0.4,
         "nozzles": [0.4, 0.6, 0.8],
-        "icon": "🖨️",
+        "icon": "3D",
         "profile": "profiles/prusa/printers/bambu_a1.ini",
     },
     # ── Creality K1 Max (300×300×300mm CoreXY enclosed) ──
@@ -158,7 +158,7 @@ PRINTER_MODELS = [
         "bed_height": 300,
         "nozzle": 0.4,
         "nozzles": [0.4, 0.6, 0.8],
-        "icon": "🖨️",
+        "icon": "3D",
         "profile": "profiles/prusa/printers/bambu_a1.ini",
     },
     # ── Creality K1 SE (220×220×250mm CoreXY enclosed, budget) ──
@@ -170,7 +170,7 @@ PRINTER_MODELS = [
         "bed_height": 250,
         "nozzle": 0.4,
         "nozzles": [0.4, 0.6, 0.8],
-        "icon": "🖨️",
+        "icon": "3D",
         "profile": "profiles/prusa/printers/bambu_a1.ini",
     },
     # ── Creality K2 Plus (350×350×350mm CoreXY enclosed, CFS multi-color) ──
@@ -182,7 +182,7 @@ PRINTER_MODELS = [
         "bed_height": 350,
         "nozzle": 0.4,
         "nozzles": [0.4, 0.6, 0.8],
-        "icon": "🖨️",
+        "icon": "3D",
         "profile": "profiles/prusa/printers/bambu_a1.ini",
     },
     # ── Voron V2 (250×250×250mm CoreXY) ──
@@ -194,7 +194,7 @@ PRINTER_MODELS = [
         "bed_height": 250,
         "nozzle": 0.4,
         "nozzles": [0.4],
-        "icon": "🖨️",
+        "icon": "3D",
         "profile": "profiles/prusa/printers/voron_v2_250.ini",
     },
     # ── Prusa MK4 (250×210×220mm) ──
@@ -206,7 +206,7 @@ PRINTER_MODELS = [
         "bed_height": 220,
         "nozzle": 0.4,
         "nozzles": [0.4],
-        "icon": "🖨️",
+        "icon": "3D",
         "profile": "profiles/prusa/printers/prusa_mk4.ini",
     },
 ]
@@ -270,7 +270,7 @@ def _resolve_user_printer(printer_id: str, nozzle: float | None = None) -> dict 
         "bed_height": preset["bed_height"],
         "nozzle": nz,
         "nozzles": preset["nozzles"],
-        "icon": "🖨️",
+        "icon": "3D",
         "profile": path,  # temp file path
         "_nozzle": nz,
         "_compound_id": printer_id,

@@ -8,7 +8,7 @@ from typing import Optional
 from fastapi import Request, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from .config import DEFAULT_MATERIALS, DEFAULT_COLORS, DEFAULT_PRICING_CONFIG, APP_DEFAULTS_KEY, AUDIT_RETENTION_DAYS
+from .config import DEFAULT_MATERIALS, DEFAULT_PRICING_CONFIG, APP_DEFAULTS_KEY, AUDIT_RETENTION_DAYS
 from .db import get_db_session
 from .models_orm import User, AppDefault, AuditEvent, VerificationCode, IdempotencyResponse, LoginFailure
 from sqlalchemy import or_, func, cast, Float, and_
@@ -39,15 +39,9 @@ async def admin_get_defaults(current_user=Depends(get_current_user)):
 async def admin_set_defaults_from_me(request: Request, current_user=Depends(get_current_user)):
     require_admin(current_user)
     with get_db_session() as db:
-        row = db.query(User.materials, User.colors, User.pricing_config).filter(User.id == current_user["id"]).first()
+        row = db.query(User.materials, User.pricing_config).filter(User.id == current_user["id"]).first()
     raw_materials = json.loads(row.materials) if row and row.materials else DEFAULT_MATERIALS
-    colors = json.loads(row.colors) if row and row.colors else DEFAULT_COLORS
-    materials = normalize_materials(raw_materials, fallback_colors=colors)
-    derived_colors = []
-    for m in materials:
-        for c in m.get("colors", []):
-            if c not in derived_colors:
-                derived_colors.append(c)
+    materials = normalize_materials(raw_materials)
     raw_pricing = json.loads(row.pricing_config) if row and row.pricing_config else DEFAULT_PRICING_CONFIG
     pricing_config = merge_pricing_config(raw_pricing)
     unit_ok, unit_err, _ = validate_formula_expression(str(pricing_config.get("unit_cost_formula") or "").strip())
@@ -59,7 +53,7 @@ async def admin_set_defaults_from_me(request: Request, current_user=Depends(get_
         if not total_ok:
             messages.append(f"总价公式：{total_err or '无效'}")
         raise HTTPException(status_code=400, detail="；".join(messages) or "公式无效")
-    payload = {"materials": materials, "colors": derived_colors, "pricing_config": pricing_config}
+    payload = {"materials": materials, "colors": [], "pricing_config": pricing_config}
     now_iso = datetime.now(timezone.utc).isoformat()
     value_json = json.dumps(payload, ensure_ascii=False)
     with get_db_session() as db:
@@ -82,7 +76,7 @@ async def admin_set_defaults_from_me(request: Request, current_user=Depends(get_
         action="admin.defaults.update",
         request=request,
         user=current_user,
-        detail={"key": APP_DEFAULTS_KEY, "materials_count": len(materials), "colors_count": len(derived_colors)},
+        detail={"key": APP_DEFAULTS_KEY, "materials_count": len(materials), "colors_count": 0},
     )
     return {"status": "ok", "key": APP_DEFAULTS_KEY, "updated_at": now_iso}
 
