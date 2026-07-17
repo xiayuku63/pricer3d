@@ -39,7 +39,7 @@ from .utils import (
     hash_verify_code,
     generate_numeric_code,
 )
-from .config import DEFAULT_MATERIALS, DEFAULT_COLORS, DEFAULT_PRICING_CONFIG
+from .config import DEFAULT_MATERIALS, DEFAULT_PRICING_CONFIG
 
 _logger = logging.getLogger(__name__)
 
@@ -330,7 +330,7 @@ def create_user(
     created_at = datetime.now(timezone.utc).isoformat()
     defaults = get_app_defaults()
     materials_json = json.dumps(defaults.get("materials") or DEFAULT_MATERIALS)
-    colors_json = json.dumps(defaults.get("colors") or DEFAULT_COLORS)
+    colors_json = "[]"
     pricing_json = json.dumps(defaults.get("pricing_config") or DEFAULT_PRICING_CONFIG)
     membership_level = "free"
     membership_expires_at = None

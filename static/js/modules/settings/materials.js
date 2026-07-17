@@ -2,10 +2,9 @@
 import {
     authToken, currentUser,
     MATERIAL_OPTIONS, setMaterialOptions,
-    COLOR_OPTIONS, setColorOptions,
     PRICING_CONFIG, setPricingConfig,
     quoteOptions,
-    authFetch, colorToObj, materialColorsArray, escapeHtml,
+    authFetch, colorToObj, escapeHtml,
     renderColorDropdown, getColorsForMaterial,
     hexToRgb, drawColorWheel,
     saveSlicerPresetSelection, loadSlicerPresetSelection,
@@ -44,7 +43,7 @@ export function restoreDefaultMaterials() {
         { name: '黄色', hex: '#ca8a04' }, { name: '橙色', hex: '#ea580c' },
         { name: '紫色', hex: '#9333ea' }, { name: '粉色', hex: '#db2777' },
     ];
-    setMaterialOptions(_DEFAULT_MATERIALS.map(m => ({ ...m, colors: [defaultColors[1]] })));
+    setMaterialOptions(_DEFAULT_MATERIALS.map(m => ({ ...m, color: defaultColors[1] })));
     updateDropdowns();
     renderUserCenterUI(dom);
 }
@@ -80,7 +79,7 @@ function renderComboInput(opts, value, dataIdx, dataField) {
             <span class="combo-w relative" style="display:inline-flex;align-items:center;flex:1;min-width:0"> \
                 <input type="text" class="combo-i flex-1 min-w-0 border-gray-300 rounded-md text-xs px-2 py-1.5 tw-bg-surface" value="${escVal}" autocomplete="off" data-idx="${dataIdx}" data-field="${dataField}" onfocus="this.parentElement.querySelector('.combo-d').classList.remove('hidden')" oninput="var q=this.value.toLowerCase();var d=this.parentElement.querySelector('.combo-d');d.querySelectorAll('.combo-opt').forEach(function(o){o.classList.toggle('hidden',o.textContent.toLowerCase().indexOf(q)===-1)});d.classList.remove('hidden')" onblur="setTimeout(function(el){var dd=el.parentElement?.querySelector('.combo-d');if(dd)dd.classList.add('hidden')},150,this)"> \
                 <span class="combo-badge text-[11px] text-amber-500 leading-none flex-shrink-0 cursor-help ml-1 hidden" title="${dataField === 'brand' ? (t('material.brandCustom') || '自定义品牌') : (t('material.typeCustom') || '自定义类型')}">✦</span> \
-                <div class="combo-d hidden absolute z-50 left-0 right-0 top-full mt-0.5 border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto" style="background:var(--color-surface);color:var(--color-text);min-width:100px">${optHtml}</div> \
+                <div class="combo-d tw-dropdown-panel hidden absolute z-50 left-0 right-0 top-full mt-0.5 max-h-48 overflow-y-auto" style="color:var(--color-text);min-width:100px">${optHtml}</div> \
             </span>`;
 }
 
@@ -88,13 +87,12 @@ function renderComboInput(opts, value, dataIdx, dataField) {
  * Render single color picker for a material.
  */
 function renderColorPicker(m, idx) {
-    const colors = materialColorsArray(m);
-    const first = colors[0];
-    const hex = first ? first.hex : '#d1d5db';
+    const color = colorToObj(m?.color);
+    const hex = color?.hex || '#d1d5db';
     const panel = _buildColorWheelPanel(hex);
     return `<span class="color-picker-trigger relative inline-block" data-idx="${idx}">
         <span class="cw-swatch w-6 h-6 rounded-sm border inline-block cursor-pointer" style="background:${hex};border-color:var(--color-border-input);" data-color-hex="${hex}"></span>
-        <span class="color-picker-panel hidden absolute z-50 left-0 top-8 tw-card shadow-xl p-3 rounded-lg" style="background:var(--color-surface);" data-idx="${idx}">
+        <span class="color-picker-panel hidden absolute z-50 left-0 top-8 tw-dropdown-panel p-3" data-idx="${idx}">
             ${panel}
             <input type="hidden" class="row-color-value" value="${hex}">
         </span>
@@ -119,6 +117,11 @@ function _buildColorWheelPanel(hex) {
         + '</div>'
         + '<div class="color-picker-mono flex gap-1.5 justify-center flex-wrap px-1">'
         + swatches
+        + '</div>'
+        + '<div class="flex justify-end mt-3 pt-2 border-t" style="border-color:var(--color-border);">'
+        + '<button type="button" class="color-picker-save-btn tw-btn-primary px-3 py-1.5 text-xs rounded-md">'
+        + t('common.save')
+        + '</button>'
         + '</div>'
         + '</div>';
 }
@@ -183,6 +186,13 @@ export function renderUserCenterUI() {
         cfgDifficultyCoefficient, cfgDifficultyRatioLow, cfgDifficultyRatioHigh,
         cfgSupportPricePerG, cfgUnitCostFormula, cfgTotalCostFormula,
     } = dom;
+
+    // Preserve the user's current selections while the material table is
+    // re-rendered. This matters when a second color record is added for the
+    // currently selected material.
+    const existingDefaultBrand = document.getElementById('uc-default-brand')?.value || '';
+    const existingDefaultMaterial = document.getElementById('uc-default-material')?.value || '';
+    const existingDefaultColor = document.getElementById('uc-default-color-dropdown')?.getAttribute('data-selected-color') || '';
 
     if (materialsTbody) {
         const majorBrands = [
@@ -303,85 +313,63 @@ export function renderUserCenterUI() {
         }
     }
 
-    // Populate default material dropdown (filtered by selected brand)
+    // Refresh the default material and color controls from the current material records.
+    // This is called after adding/editing a row so duplicate material colors appear immediately.
     const defaultMaterialSel = document.getElementById('uc-default-material');
-    const _refreshDefaultMaterialList = (brand) => {
+    const colorDropdownContainer = document.getElementById('uc-default-color-dropdown');
+    const refreshDefaultMaterialControls = (brand, preferredMaterial, preferredColor) => {
         if (!defaultMaterialSel) return;
         const materials = getMaterialsByBrand(brand);
         defaultMaterialSel.innerHTML = materials.map(m =>
-            `<option value="${escapeHtml(m.name)}" ${defaultMaterial === m.name ? 'selected' : ''}>${escapeHtml(m.name)}</option>`
+            `<option value="${escapeHtml(m.name)}">${escapeHtml(m.name)}</option>`
         ).join('');
-        // 如果已选材料不在列表中，重置为第一个
-        if (!defaultMaterialSel.value && defaultMaterialSel.options.length) {
-            defaultMaterialSel.value = defaultMaterialSel.options[0].value;
-        }
-        if (defaultMaterialSel.value !== defaultMaterial) {
-            quoteOptions.material = defaultMaterialSel.value;
+        const nextMaterial = materials.some(m => m.name === preferredMaterial)
+            ? preferredMaterial
+            : (materials[0]?.name || '');
+        defaultMaterialSel.value = nextMaterial;
+        quoteOptions.brand = brand || '';
+        quoteOptions.material = nextMaterial;
+        if (colorDropdownContainer && nextMaterial) {
+            const rendered = renderColorDropdown(nextMaterial, preferredColor || '', false, brand);
+            colorDropdownContainer.innerHTML = rendered.html;
+            _initColorWheelCanvas(colorDropdownContainer);
+            colorDropdownContainer.setAttribute('data-selected-color', rendered.selected || '');
+            quoteOptions.color = rendered.selected || quoteOptions.color;
         }
     };
-    _refreshDefaultMaterialList(defaultBrandSel ? defaultBrandSel.value : '');
+    refreshDefaultMaterialControls(
+        existingDefaultBrand || defaultBrandSel?.value || defaultBrand || '',
+        existingDefaultMaterial || defaultMaterial || '',
+        existingDefaultColor || defaultColor || '',
+    );
 
     // Brand → Material filtering
     const _brandSel = document.getElementById('uc-default-brand');
     if (_brandSel) {
-        _brandSel.addEventListener('change', () => {
-            _refreshDefaultMaterialList(_brandSel.value);
-            // Reset color dropdown
-            if (colorDropdownContainer) {
-                const matName = defaultMaterialSel.value;
-                const rendered = renderColorDropdown(matName, '');
-                colorDropdownContainer.innerHTML = rendered.html;
-                _initColorWheelCanvas(colorDropdownContainer);
-                colorDropdownContainer.setAttribute('data-selected-color', rendered.selected || '');
-            }
-        });
+        _brandSel.onchange = () => {
+            refreshDefaultMaterialControls(_brandSel.value, '', '');
+        };
     }
 
-    // Populate default color dropdown using renderColorDropdown (色块+hex)
-    const colorDropdownContainer = document.getElementById('uc-default-color-dropdown');
-    if (colorDropdownContainer) {
-        const matName = defaultMaterial || (MATERIAL_OPTIONS[0] ? MATERIAL_OPTIONS[0].name : '');
-        const rendered = renderColorDropdown(matName, defaultColor || '');
-        colorDropdownContainer.innerHTML = rendered.html;
-        _initColorWheelCanvas(colorDropdownContainer);
-        // Store the selected color in a hidden data attribute for save
-        colorDropdownContainer.setAttribute('data-selected-color', rendered.selected || '');
-    }
-
-    // Update color dropdown when material changes
+    /* Keep these handlers stable across repeated table renders. */
     if (defaultMaterialSel) {
-        defaultMaterialSel.addEventListener('change', () => {
-            const matName = defaultMaterialSel.value;
-            if (colorDropdownContainer) {
-                const rendered = renderColorDropdown(matName, '');
-                colorDropdownContainer.innerHTML = rendered.html;
-                _initColorWheelCanvas(colorDropdownContainer);
-                colorDropdownContainer.setAttribute('data-selected-color', rendered.selected || '');
-            }
-        });
+        defaultMaterialSel.onchange = () => {
+            refreshDefaultMaterialControls(defaultBrandSel ? defaultBrandSel.value : '', defaultMaterialSel.value, '');
+        };
     }
 
-    // Handle color selection in user center (delegated event)
+    /* The color selector is rendered by refreshDefaultMaterialControls. */
     if (colorDropdownContainer) {
-        colorDropdownContainer.addEventListener('click', (e) => {
-            const swatch = e.target.closest('.cw-swatch');
-            if (swatch) {
-                const hex = swatch.getAttribute('data-color-hex');
+        colorDropdownContainer.onclick = (e) => {
+            const item = e.target.closest('.color-dd-item');
+            if (item) {
+                const hex = item.getAttribute('data-color-hex');
                 if (hex) {
                     colorDropdownContainer.setAttribute('data-selected-color', hex);
-                    // Sync model page color
                     quoteOptions.color = hex;
-                    // Update batch color dropdown trigger swatch
-                    const batchColorContainer = document.getElementById('batch-color-dropdown');
-                    if (batchColorContainer) {
-                        const batchSwatch = batchColorContainer.querySelector('.cw-trigger .cw-swatch');
-                        if (batchSwatch) batchSwatch.style.background = hex;
-                        const batchValueInput = batchColorContainer.querySelector('.row-color-value');
-                        if (batchValueInput) batchValueInput.value = hex;
-                    }
                 }
             }
-        });
+        };
     }
 
     if (cfgMachineHourlyRate) cfgMachineHourlyRate.value = String(PRICING_CONFIG.machine_hourly_rate_cny ?? 15);

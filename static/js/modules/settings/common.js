@@ -2,10 +2,9 @@
 import {
     authToken, currentUser, setCurrentUser, setAuthToken,
     MATERIAL_OPTIONS, setMaterialOptions,
-    COLOR_OPTIONS, setColorOptions,
     PRICING_CONFIG, setPricingConfig,
     quoteOptions,
-    authFetch, colorToObj, materialColorsArray, escapeHtml,
+    authFetch, colorToObj, escapeHtml,
     renderColorDropdown, getColorsForMaterial,
     hexToRgb, drawColorWheel,
     saveSlicerPresetSelection, loadSlicerPresetSelection,
@@ -58,7 +57,6 @@ export async function fetchUserSettings() {
         if (response.ok) {
             const data = await response.json();
             setMaterialOptions(data.materials || MATERIAL_OPTIONS);
-            setColorOptions(data.colors || COLOR_OPTIONS);
             setPricingConfig(data.pricing_config || PRICING_CONFIG);
             setDefaultPrinterId(data.default_printer_id || null);
             setDefaultNozzle(data.default_nozzle || null);
@@ -123,7 +121,7 @@ export function updateDropdowns() {
         if (!MATERIAL_OPTIONS.find(m => m.name === quoteOptions.material) && MATERIAL_OPTIONS.length > 0) {
             quoteOptions.material = MATERIAL_OPTIONS[0].name;
         }
-        const rendered = renderColorDropdown(quoteOptions.material, quoteOptions.color);
+        const rendered = renderColorDropdown(quoteOptions.material, quoteOptions.color, false, quoteOptions.brand);
         if (optColor) optColor.innerHTML = rendered.html;
         _initColorWheelCanvas(optColor);
         quoteOptions.color = rendered.selected;
@@ -154,7 +152,7 @@ export function updateDropdowns() {
 
 export function refreshQuoteColorDropdowns() {
     const { optColor } = dom;
-    const rendered = renderColorDropdown(quoteOptions.material, quoteOptions.color);
+    const rendered = renderColorDropdown(quoteOptions.material, quoteOptions.color, false, quoteOptions.brand);
     if (optColor) optColor.innerHTML = rendered.html;
     _initColorWheelCanvas(optColor);
     quoteOptions.color = rendered.selected;

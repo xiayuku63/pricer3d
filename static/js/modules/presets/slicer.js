@@ -3,13 +3,32 @@ import {
     authToken,
     quoteOptions, slicerPresets, setSlicerPresets,
     authFetch, saveSlicerPresetSelection,
+    setDefaultSlicerPresetId,
     selectedFilesMap, getActivePrinterCompoundId,
 } from '../state.js';
 import { openLoginModal } from '../auth.js';
 import { t } from '../i18n.js';
-import { reQuoteAllSelectedFiles } from '../quote.js';
+import { reQuoteAllSelectedFiles, getSlicerConfigSnapshot, getAffectedFilenamesForSlicerConfigChange, getAffectedFilenamesForSlicerPresetChange } from '../quote.js';
 import { dom, _printerModels, _selectedPresetId, setMsg, renderSlicerPresetsUI } from './ui.js';
 import { fetchPrinterModels } from './printers.js';
+
+async function _fetchPresetParams(presetId) {
+    if (!presetId) return null;
+    try {
+        const resp = await authFetch(`/api/slicer/presets/${presetId}`);
+        if (!resp.ok) return null;
+        const data = await resp.json();
+        const params = data?.preset?.params;
+        if (!params) return null;
+        return {
+            layer_height: Number(params.layer_height),
+            perimeters: Number(params.perimeters),
+            fill_density: Number(params.fill_density),
+        };
+    } catch (e) {
+        return null;
+    }
+}
 
 export async function fetchSlicerPresets() {
     if (!authToken) return;
@@ -40,6 +59,7 @@ export async function uploadSlicerPreset() {
     const formData = new FormData();
     formData.append("file", file);
     if (name) formData.append("name", name);
+    const previousSlicerConfig = getSlicerConfigSnapshot();
     try {
         const resp = await authFetch('/api/slicer/presets', { method: 'POST', body: formData });
         if (resp.status === 401) { if (dom.userCenterModal) dom.userCenterModal.classList.add('hidden'); openLoginModal(); return; }
@@ -55,7 +75,14 @@ export async function uploadSlicerPreset() {
             quoteOptions.slicer_preset_id = Number(preset.id);
             saveSlicerPresetSelection();
             renderSlicerPresetsUI();
-            if (selectedFilesMap.size > 0) await reQuoteAllSelectedFiles(t('slicer.recalcAfterUpdate'));
+            const presetParams = await _fetchPresetParams(preset.id);
+            const affected = previousSlicerConfig.presetId === Number(preset.id)
+                ? new Set(getAffectedFilenamesForSlicerPresetChange(preset.id, presetParams))
+                : new Set(getAffectedFilenamesForSlicerConfigChange(
+                    previousSlicerConfig,
+                    { ...previousSlicerConfig, presetId: Number(preset.id), params: presetParams },
+                ));
+            if (affected.size > 0) await reQuoteAllSelectedFiles(t('slicer.recalcAfterUpdate'), (result) => affected.has(result?.filename));
         }
     } catch (e) { setMsg(e.message || t('slicer.uploadError'), false); }
 }
@@ -79,6 +106,7 @@ export async function generateSlicerPreset() {
     const bed_height = printer.bed_height;
     const nozzle_size = Number(cfgNozzleDiameter?.value) || printer.nozzle || 0.4;
     const payload = { name, bed_width, bed_depth, bed_height, nozzle_size, infill, wall_count, layer_height };
+    const previousSlicerConfig = getSlicerConfigSnapshot();
     try {
         const resp = await authFetch('/api/slicer/presets/generate', {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
@@ -95,13 +123,16 @@ export async function generateSlicerPreset() {
             quoteOptions.slicer_preset_id = Number(preset.id);
             saveSlicerPresetSelection();
             renderSlicerPresetsUI();
-            if (selectedFilesMap.size > 0) await reQuoteAllSelectedFiles(t('slicer.recalcAfterGen'));
+            const nextSlicerConfig = { ...previousSlicerConfig, presetId: Number(preset.id), params: { layer_height, perimeters: wall_count, fill_density: infill } };
+            const affected = new Set(getAffectedFilenamesForSlicerConfigChange(previousSlicerConfig, nextSlicerConfig));
+            if (affected.size > 0) await reQuoteAllSelectedFiles(t('slicer.recalcAfterGen'), (result) => affected.has(result?.filename));
         }
     } catch (e) { setMsg(e.message || t('slicer.genError'), false); }
 }
 
 export async function deleteSlicerPreset(presetId) {
     if (!authToken) return;
+    const previousSlicerConfig = getSlicerConfigSnapshot();
     try {
         const resp = await authFetch(`/api/slicer/presets/${presetId}`, { method: 'DELETE' });
         if (resp.status === 401) { if (dom.userCenterModal) dom.userCenterModal.classList.add('hidden'); openLoginModal(); return; }
@@ -114,7 +145,13 @@ export async function deleteSlicerPreset(presetId) {
         setMsg(t('slicer.deleted'), true);
         await fetchSlicerPresets();
         fetchPrinterModels();
-        if (selectedFilesMap.size > 0) await reQuoteAllSelectedFiles(t('slicer.recalcAfterDelete'));
+        const nextSlicerConfig = {
+            ...previousSlicerConfig,
+            // Deleting an unrelated preset must not invalidate current quotes.
+            presetId: quoteOptions.slicer_preset_id ?? null,
+        };
+        const affected = new Set(getAffectedFilenamesForSlicerConfigChange(previousSlicerConfig, nextSlicerConfig));
+        if (affected.size > 0) await reQuoteAllSelectedFiles(t('slicer.recalcAfterDelete'), (result) => affected.has(result?.filename));
     } catch (e) { setMsg(e.message || t('slicer.presetDeleteError'), false); }
 }
 
@@ -190,6 +227,9 @@ export async function saveCurrentPreset() {
         wall_count,
     };
 
+    const nextParams = { layer_height, perimeters: wall_count, fill_density: infill };
+    const savedPresetId = _selectedPresetId;
+
     try {
         const resp = await authFetch('/api/slicer/presets/generate', {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
@@ -200,7 +240,8 @@ export async function saveCurrentPreset() {
         setMsg(t('slicer.saved'), true);
         await fetchSlicerPresets();
         fetchPrinterModels();
-        if (selectedFilesMap.size > 0) await reQuoteAllSelectedFiles(t('slicer.recalcAfterUpdate'));
+        const affected = new Set(getAffectedFilenamesForSlicerPresetChange(savedPresetId, nextParams));
+        if (affected.size > 0) await reQuoteAllSelectedFiles(t('slicer.recalcAfterUpdate'), (result) => affected.has(result?.filename));
     } catch (e) { setMsg(e.message || t('slicer.presetSaveError'), false); }
 }
 
@@ -264,6 +305,7 @@ export async function saveAsNewPreset() {
         wall_count,
     };
 
+    const previousSlicerConfig = getSlicerConfigSnapshot();
     try {
         const resp = await authFetch('/api/slicer/presets/generate', {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
@@ -282,7 +324,9 @@ export async function saveAsNewPreset() {
             quoteOptions.slicer_preset_id = Number(preset.id);
             saveSlicerPresetSelection();
             renderSlicerPresetsUI();
-            if (selectedFilesMap.size > 0) await reQuoteAllSelectedFiles(t('slicer.recalcAfterGen'));
+            const nextSlicerConfig = { ...previousSlicerConfig, presetId: Number(preset.id), params: { layer_height, perimeters: wall_count, fill_density: infill } };
+            const affected = new Set(getAffectedFilenamesForSlicerConfigChange(previousSlicerConfig, nextSlicerConfig));
+            if (affected.size > 0) await reQuoteAllSelectedFiles(t('slicer.recalcAfterGen'), (result) => affected.has(result?.filename));
         }
     } catch (e) { setMsg(e.message || t('slicer.presetSaveError'), false); }
 }
@@ -294,6 +338,88 @@ const LAYER_HEIGHT_BY_NOZZLE = {
     '0.6': { min: 0.18, max: 0.42, valid: [0.18, 0.24, 0.30, 0.36, 0.42], defaultVal: 0.30 },
     '0.8': { min: 0.24, max: 0.56, valid: [0.24, 0.32, 0.40, 0.48, 0.56], defaultVal: 0.40 },
 };
+
+const STANDARD_WALL_COUNT = 2;
+const STANDARD_INFILL = 15;
+let _standardPresetSync = null;
+
+function _nozzleSettings(nozzleValue) {
+    const key = Number(nozzleValue || 0.4).toFixed(1);
+    return { key, settings: LAYER_HEIGHT_BY_NOZZLE[key] || LAYER_HEIGHT_BY_NOZZLE['0.4'] };
+}
+
+function _setStandardSlicerForm(settings) {
+    const layerSelect = document.getElementById('gen-layer-height');
+    const wallSelect = document.getElementById('gen-wall-count');
+    const infillSelect = document.getElementById('gen-infill');
+    if (layerSelect) layerSelect.value = settings.defaultVal.toFixed(2);
+    if (wallSelect) wallSelect.value = String(STANDARD_WALL_COUNT);
+    if (infillSelect) infillSelect.value = String(STANDARD_INFILL);
+}
+
+function _selectPresetAndSyncForm(preset) {
+    if (!preset) return;
+    const presetSelect = document.getElementById('gen-preset-select');
+    if (presetSelect) presetSelect.value = String(preset.id);
+    quoteOptions.slicer_preset_id = Number(preset.id);
+    saveSlicerPresetSelection();
+    setDefaultSlicerPresetId(Number(preset.id));
+    const params = preset.params || {};
+    _setSelectClosest(document.getElementById('gen-layer-height'), params.layer_height);
+    _setSelectClosest(document.getElementById('gen-wall-count'), params.perimeters || STANDARD_WALL_COUNT);
+    _setSelectClosest(document.getElementById('gen-infill'), params.fill_density || STANDARD_INFILL);
+}
+
+/** Select or create the standard 2-wall/15% preset for the active nozzle. */
+export async function syncStandardPresetForNozzle() {
+    const nozzleEl = document.getElementById('cfg-nozzle-diameter');
+    const { key, settings } = _nozzleSettings(nozzleEl?.value);
+    updateLayerHeightDropdown();
+    _setStandardSlicerForm(settings);
+
+    const standardName = `${settings.defaultVal.toFixed(2)}-${STANDARD_WALL_COUNT}-${STANDARD_INFILL}%`;
+    const existing = (slicerPresets || []).find((preset) => String(preset.name || '').trim() === standardName);
+    if (existing) {
+        _selectPresetAndSyncForm(existing);
+        return existing;
+    }
+    if (!authToken || _standardPresetSync) return null;
+
+    const printerId = getActivePrinterCompoundId ? getActivePrinterCompoundId() : '';
+    const baseId = String(printerId || '').replace(/_\d{2}$/, '');
+    const printer = _printerModels.find((item) => item.id === printerId || item.id === baseId);
+    if (!printer) return null;
+
+    _standardPresetSync = (async () => {
+        try {
+            const response = await authFetch('/api/slicer/presets/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: standardName,
+                    bed_width: printer.bed_width,
+                    bed_depth: printer.bed_depth,
+                    bed_height: printer.bed_height,
+                    nozzle_size: Number(nozzleEl?.value) || Number(key),
+                    layer_height: settings.defaultVal,
+                    wall_count: STANDARD_WALL_COUNT,
+                    infill: STANDARD_INFILL,
+                }),
+            });
+            if (!response.ok) return null;
+            await fetchSlicerPresets();
+            const created = (slicerPresets || []).find((preset) => String(preset.name || '').trim() === standardName);
+            if (created) _selectPresetAndSyncForm(created);
+            return created || null;
+        } catch (error) {
+            console.warn('Failed to sync standard nozzle preset:', error);
+            return null;
+        } finally {
+            _standardPresetSync = null;
+        }
+    })();
+    return _standardPresetSync;
+}
 
 // ── Update layer height dropdown options based on current nozzle ──
 export function updateLayerHeightDropdown() {
@@ -318,19 +444,19 @@ export function updateLayerHeightDropdown() {
 // ── Update layer height range hint based on current nozzle ──
 export function updateLayerHeightRangeHint() {
     const hintEl = document.getElementById('layer-height-range-hint');
-    if (!hintEl) return;
     // Get current nozzle diameter
     const nozzleEl = document.getElementById('cfg-nozzle-diameter');
     const nozzle = nozzleEl ? parseFloat(nozzleEl.value) : 0.4;
     if (isNaN(nozzle) || nozzle <= 0) {
-        hintEl.textContent = '';
+        if (hintEl) hintEl.textContent = '';
+        updateLayerHeightDropdown();
         return;
     }
     const key = nozzle.toFixed(1);
     const settings = LAYER_HEIGHT_BY_NOZZLE[key];
-    if (settings) {
+    if (hintEl && settings) {
         hintEl.textContent = `有效值: ${settings.valid.map(v => v.toFixed(2)).join(', ')}mm`;
-    } else {
+    } else if (hintEl) {
         hintEl.textContent = '';
     }
     // Also update the layer height dropdown options

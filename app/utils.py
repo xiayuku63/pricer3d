@@ -129,6 +129,42 @@ def validate_password_or_raise(password: str) -> str:
     return password
 
 
+def _normalize_color_value(value, fallback=None):
+    """Return one material color as {name, hex}; accept legacy values once."""
+    known_hex = {
+        "white": "#ffffff",
+        "black": "#000000",
+        "gray": "#808080",
+        "grey": "#808080",
+        "red": "#dc2626",
+        "blue": "#2563eb",
+        "green": "#16a34a",
+        "yellow": "#ca8a04",
+        "orange": "#ea580c",
+        "purple": "#9333ea",
+        "pink": "#db2777",
+        "白色": "#ffffff",
+        "黑色": "#000000",
+        "灰色": "#808080",
+        "红色": "#dc2626",
+        "蓝色": "#2563eb",
+        "绿色": "#16a34a",
+        "黄色": "#ca8a04",
+        "橙色": "#ea580c",
+    }
+    if isinstance(value, dict):
+        name = str(value.get("name") or value.get("hex") or "").strip()
+        hex_value = str(value.get("hex") or "").strip()
+    else:
+        name = str(value or "").strip()
+        hex_value = name if name.startswith("#") else ""
+    if not name and fallback is not None:
+        return _normalize_color_value(fallback)
+    if not hex_value:
+        hex_value = known_hex.get(name.lower(), "")
+    return {"name": name or "黑色", "hex": hex_value}
+
+
 def normalize_materials(raw_materials, fallback_colors: Optional[List[str]] = None):
     if not raw_materials:
         return DEFAULT_MATERIALS
@@ -143,32 +179,31 @@ def normalize_materials(raw_materials, fallback_colors: Optional[List[str]] = No
         else:
             price = float(m.get("price") or 0) or 0.0
             price_per_kg = price * 1000.0
-        raw_colors = m.get("colors")
-        if isinstance(raw_colors, list):
-            colors = []
-            for c in raw_colors:
-                if isinstance(c, dict):
-                    colors.append(
-                        {"name": str(c.get("name", c.get("hex", ""))).strip(), "hex": str(c.get("hex", "")).strip()}
-                    )
-                else:
-                    val = str(c).strip()
-                    if val:
-                        colors.append({"name": val, "hex": ""})
-            colors = [c for c in colors if c["name"]]
-        else:
-            fallback = fallback_colors or DEFAULT_COLORS
-            colors = [{"name": str(f).strip(), "hex": ""} for f in fallback if str(f).strip()]
+        # The old format stored a palette in `colors`. Keep only its first
+        # entry while reading old records, then emit the canonical `color`.
+        raw_color = m.get("color")
+        if raw_color is None:
+            legacy_colors = m.get("colors")
+            if isinstance(legacy_colors, list) and legacy_colors:
+                raw_color = legacy_colors[0]
+        fallback = (fallback_colors or DEFAULT_COLORS or ["黑色"])[0]
+        color = _normalize_color_value(raw_color, fallback)
         normalized.append(
             {
                 "name": name,
-                "brand": str(m.get("brand", "Generic") or "Generic").strip(),
+                "brand": _normalize_brand_name(m.get("brand", "Generic")),
                 "density": density,
                 "price_per_kg": price_per_kg,
-                "colors": colors,
+                "color": color,
             }
         )
     return normalized or DEFAULT_MATERIALS
+
+
+def _normalize_brand_name(value) -> str:
+    """Normalize legacy placeholder names without altering real custom brands."""
+    brand = str(value or "Generic").strip()
+    return "Generic" if brand in {"通用", "??", "?"} else (brand or "Generic")
 
 
 def mask_email(value: Optional[str]) -> Optional[str]:

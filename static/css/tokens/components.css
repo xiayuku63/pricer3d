@@ -194,6 +194,368 @@ body {
   background-color: var(--color-primary-bg) !important;
 }
 
+/* ── 自定义下拉/浮层面板 ── */
+.tw-dropdown-panel {
+  background-color: var(--color-surface-solid) !important;
+  color: var(--color-text) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-md) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  opacity: 1 !important;
+  overflow: hidden !important;
+}
+
+.tw-dropdown-option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  background-color: transparent;
+  color: var(--color-text) !important;
+  text-align: left;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.tw-dropdown-option:last-child {
+  border-bottom: 0;
+}
+
+.tw-dropdown-option:hover {
+  background-color: var(--color-bg-hover) !important;
+  color: var(--color-text-strong) !important;
+}
+
+.tw-dropdown-option:active {
+  background-color: var(--color-bg-active) !important;
+}
+
+.tw-dropdown-option-active {
+  background-color: var(--color-primary-bg) !important;
+  color: var(--color-primary-text) !important;
+}
+
+.tw-dropdown-option-active:hover,
+.tw-dropdown-option-active:active {
+  background-color: var(--color-primary-bg) !important;
+  color: var(--color-primary-text) !important;
+}
+
+.tw-dropdown-option.tw-text-danger:hover,
+.tw-dropdown-option.tw-text-danger:active {
+  color: var(--color-danger) !important;
+}
+
+.color-select-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.color-select-wrap-compact {
+  width: auto;
+  min-width: 72px;
+  gap: 6px;
+}
+
+.color-native-select {
+  width: 100%;
+  appearance: auto;
+  -webkit-appearance: menulist;
+  background-color: var(--color-surface-solid) !important;
+  background-image:
+    linear-gradient(var(--selected-color, #d1d5db), var(--selected-color, #d1d5db));
+  background-repeat: no-repeat;
+  background-size: 16px 16px;
+  background-position: 12px 50%;
+  color: var(--color-text) !important;
+  border: 1px solid var(--color-border-strong) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: none !important;
+  padding-left: 42px !important;
+}
+
+.color-native-select-default {
+  min-height: 40px;
+  padding-top: 8px !important;
+  padding-right: 12px !important;
+  padding-bottom: 8px !important;
+}
+
+.color-native-select-compact {
+  min-height: 30px;
+  width: 72px;
+  padding-top: 4px !important;
+  padding-right: 8px !important;
+  padding-bottom: 4px !important;
+  padding-left: 28px !important;
+  background-size: 12px 12px;
+  background-position: 8px 50%;
+}
+
+.color-native-select:focus {
+  outline: none;
+}
+
+.tw-popup-trigger {
+  background-color: var(--color-surface-solid) !important;
+  color: var(--color-text) !important;
+  border: 1px solid var(--color-border-strong) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.tw-popup-trigger:hover {
+  background-color: var(--color-surface-solid) !important;
+}
+
+.color-dd-trigger-default,
+.color-dd-trigger-compact {
+  color: var(--color-text) !important;
+}
+
+.color-dd-trigger-default:hover,
+.color-dd-trigger-compact:hover {
+  background-color: var(--color-surface-solid) !important;
+}
+
+.color-dd-trigger:focus,
+.color-dd-trigger:focus-visible {
+  outline: none;
+  border-color: rgba(0, 122, 255, 0.42) !important;
+  background-color: rgba(255, 255, 255, 0.94) !important;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+}
+
+/* Keep every select, including custom color triggers, on the same focus ring. */
+select:focus,
+select:focus-visible,
+.color-dd-trigger:focus,
+.color-dd-trigger:focus-visible {
+  outline: none !important;
+  border-color: rgba(0, 122, 255, 0.42) !important;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+}
+
+.color-dd-trigger-compact {
+  min-height: 30px;
+}
+
+.color-dd-list .color-dd-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 8px 10px;
+  background-color: transparent;
+  color: var(--color-text) !important;
+  border-color: var(--color-border) !important;
+}
+
+.color-dd-list {
+  background-color: var(--color-surface-solid) !important;
+  border-radius: 0 !important;
+}
+
+.color-dd-item-swatch-only {
+  position: relative;
+  gap: 0 !important;
+}
+
+.color-dd-list .color-dd-item .color-dd-item-swatch {
+  box-shadow: none;
+}
+
+.color-dd-list .color-dd-item.color-dd-item-active {
+  background-color: #808080 !important;
+  color: #ffffff !important;
+}
+
+.color-dd-list .color-dd-item.color-dd-item-active:hover,
+.color-dd-list .color-dd-item.color-dd-item-active:active {
+  background-color: #808080 !important;
+}
+
+.color-dd-list.color-dd-has-preview .color-dd-item.color-dd-item-active:not(.color-dd-item-preview) {
+  background-color: var(--color-surface-solid) !important;
+  color: var(--color-text) !important;
+}
+
+.color-dd-list .color-dd-item.color-dd-item-preview {
+  background-color: #808080 !important;
+  color: #ffffff !important;
+}
+
+.color-dd-list .color-dd-item.color-dd-item-active .color-dd-item-swatch {
+  box-shadow: none;
+}
+
+.color-dd-item-swatch-only.color-dd-item-active::after {
+  content: none;
+}
+
+.color-dd-list .color-dd-item:hover,
+.color-dd-list .color-dd-item:focus-visible {
+  background-color: #808080 !important;
+  color: #ffffff !important;
+  outline: none;
+}
+
+.color-dd-list .color-dd-item .tw-text-secondary,
+.color-dd-list .color-dd-item .color-dd-label {
+  color: var(--color-text-secondary) !important;
+}
+
+.color-dd-list .color-dd-item.color-dd-item-active .tw-text-secondary,
+.color-dd-list .color-dd-item.color-dd-item-active .color-dd-label {
+  color: var(--color-text) !important;
+}
+
+.combo-w .combo-d {
+  background-color: var(--color-surface-solid) !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.color-picker-panel {
+  min-width: 260px;
+}
+
+.color-dd-wrapper {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+}
+
+.color-dd-wrapper-compact {
+  width: auto;
+  min-width: 58px;
+}
+
+.color-dd-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 12px;
+}
+
+.color-dd-trigger-default {
+  justify-content: space-between;
+}
+
+#uc-default-color-dropdown .color-dd-trigger-label {
+  display: none;
+}
+
+/* The default color only needs to show a swatch and the menu affordance. */
+#uc-default-color-dropdown {
+  width: 120px;
+}
+
+#uc-default-color-dropdown .color-dd-wrapper,
+#uc-default-color-dropdown .color-dd-trigger {
+  width: 100%;
+}
+
+/* Keep the preset selector compact while leaving the parameter controls below unchanged. */
+#uc-default-preset-dropdown {
+  width: 360px;
+  max-width: 100%;
+}
+
+#uc-default-preset-dropdown .tw-input {
+  width: 100%;
+}
+
+@media (max-width: 639px) {
+  #uc-default-color-dropdown,
+  #uc-default-preset-dropdown {
+    width: 100%;
+  }
+}
+
+.color-dd-trigger-compact {
+  justify-content: center;
+  min-height: 30px;
+  width: 58px;
+  padding: 4px 8px;
+  gap: 6px;
+}
+
+.color-dd-list {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 80;
+  max-height: 320px;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.color-dd-wrapper-compact .color-dd-list {
+  left: 0;
+  right: auto;
+  min-width: 58px;
+}
+
+.color-dd-item {
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.color-dd-item:last-child {
+  border-bottom: 0;
+}
+
+.color-dd-item-active {
+  background-color: var(--color-bg-active) !important;
+}
+
+.color-dd-item-active .color-dd-label {
+  color: var(--color-text) !important;
+}
+
+.color-picker-trigger .cw-swatch,
+.ce-swatch {
+  border-color: var(--color-border-input) !important;
+}
+
+.color-dd-swatch,
+.color-dd-item-swatch {
+  border-color: var(--color-border-input);
+}
+
+.color-picker-panel .ce-swatch.is-active {
+  box-shadow: 0 0 0 2px var(--color-primary);
+}
+
+#user-dropdown,
+#lang-dropdown-list {
+  background-color: var(--color-surface-solid) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-md) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
 /* ── iOS 风格导航项 / 幽灵按钮 ── */
 .tw-btn-ghost {
   background-color: transparent !important;

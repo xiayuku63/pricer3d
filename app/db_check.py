@@ -14,7 +14,7 @@ import sqlite3
 from datetime import datetime, timezone
 
 from .database import init_db, get_db_conn, get_app_defaults
-from .config import DEFAULT_MATERIALS, DEFAULT_COLORS, DEFAULT_PRICING_CONFIG
+from .config import DEFAULT_MATERIALS, DEFAULT_PRICING_CONFIG
 
 
 def _backfill_user(conn: sqlite3.Connection, uid: int, username: str) -> dict[str, bool]:
@@ -35,14 +35,12 @@ def _backfill_user(conn: sqlite3.Connection, uid: int, username: str) -> dict[st
     if row["materials"] is None:
         conn.execute(
             "UPDATE users SET materials = ? WHERE id = ?",
-            (json.dumps(defaults.get("materials") or DEFAULT_MATERIALS), uid),
+            (json.dumps(defaults.get("materials") or DEFAULT_MATERIALS, ensure_ascii=False), uid),
         )
         fixed["materials"] = True
 
-    if row["colors"] is None:
-        conn.execute(
-            "UPDATE users SET colors = ? WHERE id = ?", (json.dumps(defaults.get("colors") or DEFAULT_COLORS), uid)
-        )
+    if row["colors"] is None or row["colors"] != "[]":
+        conn.execute("UPDATE users SET colors = '[]' WHERE id = ?", (uid,))
         fixed["colors"] = True
 
     if row["pricing_config"] is None:

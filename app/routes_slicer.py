@@ -289,7 +289,7 @@ async def api_list_printers(request: Request):
                             "bed_height": up["bed_height"],
                             "nozzle": up["nozzle"],
                             "nozzles": up["nozzles"],
-                            "icon": "🖨️",
+                            "icon": "3D",
                             "profile": None,
                             "_user_preset_id": up["id"],
                         }

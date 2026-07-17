@@ -121,13 +121,13 @@ async function _handleZipUpload(zipFiles, modelFiles, validFiles) {
             let errMsg = 'ZIP 上传失败';
             try {
                 const errData = await previewResp.json();
-                errMsg = errData.message || errData.detail || errMsg;
+                errMsg = errData.message || errData.detail || errData.error || errMsg;
             } catch (_) {}
             throw new Error(errMsg);
         }
 
         const previewData = await previewResp.json();
-        hideProgress();
+        updateProgress(100, '清单与模型解析完成');
 
         // ── Step 2: Show preview modal and wait for user confirmation ──
         const confirmed = await _showZipPreviewModal(previewData);
@@ -163,6 +163,12 @@ async function _handleZipUpload(zipFiles, modelFiles, validFiles) {
         const zipPresetEl = document.getElementById('batch-slicer-preset');
         const zipPresetId = (zipPresetEl && zipPresetEl.value) ? Number(zipPresetEl.value) : null;
         if (zipPresetId) sliceFormData.append('slicer_preset_id', String(zipPresetId));
+        const zipLayerEl = document.getElementById('gen-layer-height');
+        const zipWallEl = document.getElementById('gen-wall-count');
+        const zipInfillEl = document.getElementById('gen-infill');
+        if (zipLayerEl && zipLayerEl.value) sliceFormData.append('layer_height', zipLayerEl.value);
+        if (zipWallEl && zipWallEl.value) sliceFormData.append('wall_count', zipWallEl.value);
+        if (zipInfillEl && zipInfillEl.value) sliceFormData.append('infill', zipInfillEl.value);
 
         const resp = await fetch('/api/quote/zip', {
             method: 'POST',
@@ -175,7 +181,7 @@ async function _handleZipUpload(zipFiles, modelFiles, validFiles) {
             let errMsg = 'ZIP 切片失败';
             try {
                 const errData = await resp.json();
-                errMsg = errData.message || errData.detail || errMsg;
+                errMsg = errData.message || errData.detail || errData.error || errMsg;
             } catch (_) {}
             throw new Error(errMsg);
         }
@@ -225,9 +231,10 @@ async function _handleZipUpload(zipFiles, modelFiles, validFiles) {
         const zipModelFiles = [];
         for (let ri = 0; ri < (zipData.results || []).length; ri++) {
             const r = zipData.results[ri];
-            if (r.checklist_file_path) {
+            const modelPath = r.checklist_file_path || r.model_file_path;
+            if (modelPath) {
                 try {
-                    const fileResp = await authFetch('/api/quote/zip/file?file_path=' + encodeURIComponent(r.checklist_file_path));
+                    const fileResp = await authFetch('/api/quote/zip/file?file_path=' + encodeURIComponent(modelPath));
                     if (fileResp.ok) {
                         const blob = await fileResp.blob();
                         const modelFile = new File([blob], r.filename, { type: 'application/octet-stream' });
@@ -319,10 +326,10 @@ function _showZipPreviewModal(previewData) {
             summaryParts.push(`<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-100 text-green-800 text-xs font-medium">✓ ${ms.matched} ${t('zipPreview.matched') || '已匹配'}</span>`);
         }
         if (ms.bom_only > 0) {
-            summaryParts.push(`<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-100 text-red-800 text-xs font-medium">⚠ ${ms.bom_only} ${t('zipPreview.bomOnly') || '清单多余'}</span>`);
+            summaryParts.push(`<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-100 text-red-800 text-xs font-medium">${ms.bom_only} ${t('zipPreview.bomOnly') || '清单多余'}</span>`);
         }
         if (ms.model_only > 0) {
-            summaryParts.push(`<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-medium">ℹ ${ms.model_only} ${t('zipPreview.modelOnly') || '无清单'}</span>`);
+            summaryParts.push(`<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-medium">${ms.model_only} ${t('zipPreview.modelOnly') || '无清单'}</span>`);
         }
         summaryEl.innerHTML = summaryParts.join('');
 

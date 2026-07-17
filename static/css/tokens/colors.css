@@ -121,6 +121,7 @@
   /* 页面级语义别名 */
   --color-bg:                #F5F5F7;                    /* Apple-like app canvas */
   --color-surface:           rgba(255, 255, 255, 0.82); /* 卡片/面板背景 */
+  --color-surface-solid:     #FFFFFF;                  /* 下拉/浮层不透明背景 */
   --color-surface-hover:     rgba(255, 255, 255, 0.92); /* 卡片悬停背景 */
 
   --color-bg-hover:          rgba(255, 255, 255, 0.72);  /* 通用悬停背景 */

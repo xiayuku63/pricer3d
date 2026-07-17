@@ -9,7 +9,7 @@ from typing import List, Optional
 from fastapi import Request, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from .config import DEFAULT_MATERIALS, DEFAULT_COLORS, DEFAULT_PRICING_CONFIG
+from .config import DEFAULT_MATERIALS, DEFAULT_PRICING_CONFIG
 from .db import get_db_session
 from .models_orm import User
 from .deps import get_current_user, is_member_user
@@ -31,7 +31,8 @@ class MaterialItem(BaseModel):
     brand: Optional[str] = Field(default="Generic", max_length=40)
     density: float = Field(..., gt=0, le=10)
     price_per_kg: float = Field(..., ge=0, le=100000)
-    colors: List = Field(default_factory=list, max_length=30)  # List[ColorItem|str]
+    color: ColorItem = Field(default_factory=lambda: ColorItem(name="黑色", hex="#000000"))
+    max_volumetric_speed: Optional[float] = Field(default=None, ge=0, le=1000)
 
 
 class PricingConfig(BaseModel):
@@ -57,7 +58,6 @@ class PricingConfig(BaseModel):
 
 class UserSettingsUpdate(BaseModel):
     materials: List[MaterialItem] = Field(..., min_length=1, max_length=100)
-    colors: Optional[List[str]] = Field(default=None, max_length=100)
     pricing_config: Optional[PricingConfig] = None
     default_printer_id: Optional[str] = None
     default_nozzle: Optional[str] = None
@@ -76,7 +76,6 @@ async def get_user_settings(current_user=Depends(get_current_user)):
                 raise HTTPException(status_code=404, detail="USER_NOT_FOUND: 用户不存在")
 
             raw_materials = json.loads(row.materials) if row and row.materials else DEFAULT_MATERIALS
-            colors = json.loads(row.colors) if row and row.colors else DEFAULT_COLORS
             raw_pricing = json.loads(row.pricing_config) if row and row.pricing_config else DEFAULT_PRICING_CONFIG
             default_printer_id = row.default_printer_id or None
             default_nozzle = row.default_nozzle or None
@@ -87,16 +86,10 @@ async def get_user_settings(current_user=Depends(get_current_user)):
             default_color = row.default_color or None
             default_brand = row.default_brand or None
 
-        materials = normalize_materials(raw_materials, fallback_colors=colors)
+        materials = normalize_materials(raw_materials)
         pricing_config = merge_pricing_config(raw_pricing)
-        derived_colors = []
-        for m in materials:
-            for c in m.get("colors", []):
-                if c not in derived_colors:
-                    derived_colors.append(c)
         return {
             "materials": materials,
-            "colors": derived_colors,
             "pricing_config": pricing_config,
             "default_printer_id": default_printer_id,
             "default_nozzle": default_nozzle,
@@ -113,26 +106,20 @@ async def get_user_settings(current_user=Depends(get_current_user)):
 
 
 async def update_user_settings(payload: UserSettingsUpdate, request: Request, current_user=Depends(get_current_user)):
-    seen_material_names = set()
+    seen_material_keys = set()
     for item in payload.materials:
         normalized_name = item.name.strip()
         if not normalized_name:
             raise HTTPException(status_code=400, detail="材料名称不能为空")
-        name_key = normalized_name.lower()
-        if name_key in seen_material_names:
-            raise HTTPException(status_code=400, detail=f"材料名称重复：{normalized_name}")
-        seen_material_names.add(name_key)
+        color_key = (item.color.hex or item.color.name).strip().lower()
+        key = ((item.brand or "Generic").strip().lower(), normalized_name.lower(), color_key)
+        if key in seen_material_keys:
+            raise HTTPException(
+                status_code=400, detail=f"材料重复：{item.brand or 'Generic'} / {normalized_name} / {color_key}"
+            )
+        seen_material_keys.add(key)
 
     materials_json = json.dumps([m.model_dump() for m in payload.materials])
-    if payload.colors is not None:
-        derived_colors = payload.colors
-    else:
-        derived_colors = []
-        for m in payload.materials:
-            for c in m.colors:
-                if c not in derived_colors:
-                    derived_colors.append(c)
-    colors_json = json.dumps(derived_colors)
     pricing_json = None
     if payload.pricing_config is not None:
         unit_ok, unit_err, _ = validate_formula_expression(payload.pricing_config.unit_cost_formula)
@@ -150,7 +137,7 @@ async def update_user_settings(payload: UserSettingsUpdate, request: Request, cu
         if not user:
             raise HTTPException(status_code=404, detail="用户不存在")
         user.materials = materials_json
-        user.colors = colors_json
+        user.colors = "[]"  # Legacy global palette; material colors live in materials.color.
         if pricing_json is not None:
             user.pricing_config = pricing_json
         user.default_printer_id = payload.default_printer_id
@@ -165,7 +152,12 @@ async def update_user_settings(payload: UserSettingsUpdate, request: Request, cu
         user=current_user,
         detail={"materials_count": len(payload.materials), "has_pricing_config": payload.pricing_config is not None},
     )
-    return {"status": "success"}
+    return {
+        "status": "success",
+        "default_printer_id": payload.default_printer_id,
+        "default_nozzle": payload.default_nozzle,
+        "default_slicer_preset_id": payload.default_slicer_preset_id,
+    }
 
 
 class ChangePasswordRequest(BaseModel):
@@ -218,17 +210,15 @@ async def export_user_settings(current_user=Depends(get_current_user)):
                 raise HTTPException(status_code=404, detail="用户不存在")
 
             raw_materials = json.loads(row.materials) if row.materials else DEFAULT_MATERIALS
-            colors = json.loads(row.colors) if row.colors else DEFAULT_COLORS
             raw_pricing = json.loads(row.pricing_config) if row.pricing_config else DEFAULT_PRICING_CONFIG
 
-        materials = normalize_materials(raw_materials, fallback_colors=colors)
+        materials = normalize_materials(raw_materials)
         pricing_config = merge_pricing_config(raw_pricing)
 
         export_data = {
             "version": 1,
             "exported_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
             "materials": materials,
-            "colors": colors,
             "pricing_config": pricing_config,
             "default_printer_id": row.default_printer_id,
             "default_nozzle": row.default_nozzle,
@@ -244,7 +234,6 @@ async def export_user_settings(current_user=Depends(get_current_user)):
 
 class ImportSettingsRequest(BaseModel):
     materials: Optional[List[MaterialItem]] = None
-    colors: Optional[List[str]] = None
     pricing_config: Optional[PricingConfig] = None
     default_printer_id: Optional[str] = None
     default_nozzle: Optional[str] = None
@@ -267,15 +256,7 @@ async def import_user_settings(
                 materials_json = json.dumps([m.model_dump() for m in payload.materials])
                 user.materials = materials_json
 
-                if payload.colors is not None:
-                    user.colors = json.dumps(payload.colors)
-                else:
-                    derived = []
-                    for m in payload.materials:
-                        for c in m.colors:
-                            if c not in derived:
-                                derived.append(c)
-                    user.colors = json.dumps(derived)
+                user.colors = "[]"
 
             if payload.pricing_config is not None:
                 unit_ok, unit_err, _ = validate_formula_expression(payload.pricing_config.unit_cost_formula)
@@ -326,7 +307,7 @@ async def reset_user_section(payload: ResetSectionRequest, request: Request, cur
             section = payload.section
             if section in ("materials", "all"):
                 user.materials = json.dumps(DEFAULT_MATERIALS)
-                user.colors = json.dumps(DEFAULT_COLORS)
+                user.colors = "[]"
             if section in ("pricing", "all"):
                 user.pricing_config = json.dumps(DEFAULT_PRICING_CONFIG)
             if section in ("printer", "all"):

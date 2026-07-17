@@ -473,8 +473,8 @@ export default {
 
   // ── Orientation ──
   'orientation.autoOrient': 'Manual Place',
-  'orientation.autoPlace': '🎯 Auto Orient',
-  'orientation.exit': '🔙 Exit Lay Mode',
+  'orientation.autoPlace': 'Auto Orient',
+  'orientation.exit': 'Exit Lay Mode',
   'orientation.analyzing': 'Analyzing surfaces...',
   'orientation.pickFaceHint': 'Select a face to place onto the print bed',
   'orientation.noFace': 'No surface available',
@@ -486,7 +486,7 @@ export default {
   'orientation.markFailed': 'Mark failed: {msg}',
   'orientation.learnedSuccess': 'Auto Orient ✓',
   'orientation.learnedFailed': 'Orient Failed',
-  'orientation.autoLearn': '🎯 Auto Orient',
+  'orientation.autoLearn': 'Auto Orient',
 
   // ── Theme ──
   'theme.toggle': 'Toggle dark/light theme',

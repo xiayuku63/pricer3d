@@ -1,4 +1,15 @@
-export function initColorDropdownUI({ quoteOptions, currentResults, selectedFilesMap, thumbnailMap, dom, ensureThumbnailForFile, recolorCurrentMesh, getCurrentPreviewFilename, refreshOptionsSummary }) {
+export function initColorDropdownUI({ quoteOptions, currentResults, selectedFilesMap, thumbnailMap, dom, ensureThumbnailForFile, recolorCurrentMesh, updatePreviewColor, getCurrentPreviewFilename, refreshOptionsSummary }) {
+    function getSwatchBorderColor(hex) {
+        return 'rgba(0,0,0,0.72)';
+    }
+
+    function getWrapper(element) {
+        const direct = element?.closest?.('.color-dd-wrapper');
+        if (direct) return direct;
+        const list = element?.closest?.('.color-dd-list');
+        return list?.__portalOrigin || null;
+    }
+
     function resetPanel(panel) {
         panel.style.position = '';
         panel.style.left = '';
@@ -7,6 +18,7 @@ export function initColorDropdownUI({ quoteOptions, currentResults, selectedFile
         panel.style.bottom = '';
         panel.style.marginTop = '';
         panel.style.minWidth = '';
+        panel.style.maxWidth = '';
         panel.style.width = '';
         panel.style.maxHeight = '';
         if (panel.__portalHost === document.body) {
@@ -15,22 +27,30 @@ export function initColorDropdownUI({ quoteOptions, currentResults, selectedFile
         panel.__portalHost = null;
         panel.__portalOrigin = null;
     }
+
     function closeColorList(list) {
+        const wrapper = list.__portalOrigin || list.closest('.color-dd-wrapper');
+        list.classList.remove('color-dd-has-preview');
+        list.querySelectorAll('.color-dd-item-preview').forEach((item) => item.classList.remove('color-dd-item-preview'));
         resetPanel(list);
         list.classList.add('hidden');
+        const trigger = wrapper?.querySelector('.color-dd-trigger');
+        if (trigger) trigger.setAttribute('aria-expanded', 'false');
     }
-    function closeAllColorLists(e) {
-        if (e && e.target && e.target.closest && e.target.closest('.color-dd-list')) return;
+
+    function closeAllColorLists(event) {
+        if (event?.target?.closest?.('.color-dd-list, .color-dd-wrapper')) return;
         document.querySelectorAll('.color-dd-list:not(.hidden)').forEach((list) => closeColorList(list));
     }
+
     function positionColorList(trigger, list, wrapper) {
-        if (!wrapper.closest('#batch-results-body, #batch-results-cards, #batch-color-cell')) return;
+        if (!wrapper.closest('#batch-results-body, #batch-results-cards, #batch-color-cell, #user-center-modal, #options-modal')) return;
         const rect = trigger.getBoundingClientRect();
         if (!rect.width) return;
+        const compact = wrapper.classList.contains('color-dd-wrapper-compact');
+        const viewportMaxWidth = Math.max(160, window.innerWidth - 16);
+        const minWidth = compact ? Math.max(58, rect.width) : Math.max(120, rect.width);
 
-        // The list is portaled visually with fixed positioning. Read its real
-        // dimensions after it becomes visible so it stays anchored to the
-        // trigger instead of relying on a hard-coded width estimate.
         if (list.parentElement !== document.body) {
             list.__portalOrigin = list.parentElement;
             document.body.appendChild(list);
@@ -39,12 +59,15 @@ export function initColorDropdownUI({ quoteOptions, currentResults, selectedFile
         list.style.position = 'fixed';
         list.style.marginTop = '0';
         list.style.maxHeight = '360px';
-        list.style.minWidth = `${Math.max(rect.width, 160)}px`;
+        list.style.minWidth = `${minWidth}px`;
+        list.style.maxWidth = `${viewportMaxWidth}px`;
+        list.style.right = '';
+        list.style.width = 'max-content';
         list.style.left = '0px';
         list.style.top = '0px';
         list.style.bottom = '';
         const listRect = list.getBoundingClientRect();
-        const listWidth = Math.max(listRect.width, rect.width, 160);
+        const listWidth = Math.min(Math.max(listRect.width, minWidth), viewportMaxWidth);
         const listHeight = Math.min(list.scrollHeight || listRect.height || 360, 360);
         const gap = 6;
         const left = Math.max(8, Math.min(rect.left, window.innerWidth - listWidth - 8));
@@ -66,40 +89,116 @@ export function initColorDropdownUI({ quoteOptions, currentResults, selectedFile
             list.style.bottom = `${window.innerHeight - rect.top + gap}px`;
         }
     }
+
+    function syncColorSelection(wrapper, hex) {
+        if (!wrapper || !hex) return;
+        const valueInput = wrapper.querySelector('.row-color-value');
+        if (valueInput) valueInput.value = hex;
+        wrapper.setAttribute('data-selected-color', hex);
+        const triggerSwatch = wrapper.querySelector('.color-dd-swatch');
+        if (triggerSwatch) {
+            triggerSwatch.style.background = hex;
+            triggerSwatch.style.borderColor = getSwatchBorderColor(hex);
+        }
+        const triggerLabel = wrapper.querySelector('.color-dd-trigger-label');
+        if (triggerLabel) triggerLabel.textContent = hex;
+        const trigger = wrapper.querySelector('.color-dd-trigger');
+        if (trigger) trigger.title = hex;
+        wrapper.querySelectorAll('.color-dd-item').forEach((item) => {
+            const selected = String(item.getAttribute('data-color-hex') || '').toLowerCase() === String(hex).toLowerCase();
+            item.classList.toggle('color-dd-item-active', selected);
+            item.setAttribute('aria-selected', selected ? 'true' : 'false');
+        });
+    }
+
     async function applyInlineRecolor(rowCtx, hex) {
         const filename = rowCtx.getAttribute('data-row-file') || rowCtx.getAttribute('data-card-file');
         if (!filename) return;
         const idx = currentResults.findIndex((item) => item && item.filename === filename);
         if (idx >= 0) currentResults[idx].color = hex;
+
+        // Recolor the open viewer immediately. The thumbnail render is async,
+        // so waiting for it can lose a race with the viewer's FileReader.
+        if (getCurrentPreviewFilename() === filename) {
+            try {
+                if (!updatePreviewColor?.(filename, hex)) recolorCurrentMesh(hex);
+            } catch (e) { console.warn('3D preview recolor failed:', e.message); }
+        }
+
         const file = selectedFilesMap.get(filename);
         if (file) {
             try { await ensureThumbnailForFile(file, hex); } catch (e) { console.warn('Thumbnail generation failed:', e.message); }
             const newThumb = thumbnailMap.get(filename);
-            if (newThumb) {
-                rowCtx.querySelectorAll('button[data-preview-file] img').forEach((img) => { img.src = newThumb; });
+            if (newThumb) rowCtx.querySelectorAll('button[data-preview-file] img').forEach((img) => { img.src = newThumb; });
+            // The viewer may still be parsing the file from FileReader. Retry
+            // after the thumbnail work so that late-loaded meshes use the new
+            // color too.
+            if (getCurrentPreviewFilename() === filename) {
+                if (!updatePreviewColor?.(filename, hex)) recolorCurrentMesh(hex);
             }
-        }
-        try {
-            if (dom.previewModal && !dom.previewModal.classList.contains('hidden') && getCurrentPreviewFilename() === filename) {
-                recolorCurrentMesh(hex);
-            }
-        } catch (e) {
-            console.warn('3D preview recolor failed:', e.message);
         }
     }
 
     document.addEventListener('scroll', closeAllColorLists, true);
     window.addEventListener('resize', closeAllColorLists);
 
-    document.addEventListener('click', (e) => {
-        if (!e.target.closest('.color-dd-wrapper')) {
-            document.querySelectorAll('.color-dd-list:not(.hidden)').forEach((list) => closeColorList(list));
+    document.addEventListener('mouseover', (event) => {
+        const item = event.target.closest('.color-dd-item');
+        if (!item) return;
+        const list = item.closest('.color-dd-list');
+        if (!list) return;
+        list.classList.add('color-dd-has-preview');
+        list.querySelectorAll('.color-dd-item-preview').forEach((other) => other.classList.remove('color-dd-item-preview'));
+        item.classList.add('color-dd-item-preview');
+    });
+
+    document.addEventListener('mouseout', (event) => {
+        const list = event.target.closest('.color-dd-list');
+        if (!list || (event.relatedTarget && list.contains(event.relatedTarget))) return;
+        list.classList.remove('color-dd-has-preview');
+        list.querySelectorAll('.color-dd-item-preview').forEach((item) => item.classList.remove('color-dd-item-preview'));
+    });
+
+    document.addEventListener('click', (event) => {
+        const item = event.target.closest('.color-dd-item');
+        if (item) {
+            event.stopPropagation();
+            const hex = item.getAttribute('data-color-hex');
+            const wrapper = getWrapper(item);
+            if (!wrapper || !hex) return;
+            syncColorSelection(wrapper, hex);
+            const list = item.closest('.color-dd-list');
+            if (list) closeColorList(list);
+
+            if (wrapper.closest('#options-modal')) {
+                quoteOptions.color = hex;
+                refreshOptionsSummary();
+                return;
+            }
+
+            if (wrapper.closest('#uc-default-color-dropdown')) {
+                const defaultColorContainer = wrapper.closest('#uc-default-color-dropdown');
+                defaultColorContainer.setAttribute('data-selected-color', hex);
+                quoteOptions.color = hex;
+                return;
+            }
+
+            const rowCtx = wrapper.closest('tr[data-row-file], [data-card-file]');
+            if (rowCtx) {
+                applyInlineRecolor(rowCtx, hex).catch((err) => console.warn('Inline recolor failed:', err.message));
+                return;
+            }
+
+            if (wrapper.closest('#batch-color-dropdown')) {
+                quoteOptions.color = hex;
+            }
+            return;
         }
 
-        const trigger = e.target.closest('.color-dd-trigger');
+        const trigger = event.target.closest('.color-dd-trigger');
         if (trigger) {
-            e.stopPropagation();
-            const wrapper = trigger.closest('.color-dd-wrapper');
+            event.stopPropagation();
+            const wrapper = getWrapper(trigger);
             if (!wrapper) return;
             const list = wrapper.querySelector('.color-dd-list');
             if (!list) return;
@@ -109,14 +208,7 @@ export function initColorDropdownUI({ quoteOptions, currentResults, selectedFile
             });
             if (wasHidden) {
                 list.classList.remove('hidden');
-                // Reset "more colors" when opening
-                const extra = wrapper.querySelector('.color-dd-extra');
-                if (extra) extra.classList.add('hidden');
-                const toggleMore = wrapper.querySelector('.color-dd-toggle-more');
-                if (toggleMore) {
-                    const chevron = toggleMore.querySelector('svg');
-                    if (chevron) chevron.style.transform = '';
-                }
+                trigger.setAttribute('aria-expanded', 'true');
                 positionColorList(trigger, list, wrapper);
             } else {
                 closeColorList(list);
@@ -124,65 +216,8 @@ export function initColorDropdownUI({ quoteOptions, currentResults, selectedFile
             return;
         }
 
-        const toggleMore = e.target.closest('.color-dd-toggle-more');
-        if (toggleMore) {
-            e.stopPropagation();
-            const wrapper = toggleMore.closest('.color-dd-wrapper');
-            if (!wrapper) return;
-            const extra = wrapper.querySelector('.color-dd-extra');
-            if (!extra) return;
-            const isOpen = !extra.classList.contains('hidden');
-            if (isOpen) {
-                extra.classList.add('hidden');
-                const chevron = toggleMore.querySelector('svg');
-                if (chevron) chevron.style.transform = '';
-            } else {
-                extra.classList.remove('hidden');
-                const chevron = toggleMore.querySelector('svg');
-                if (chevron) chevron.style.transform = 'rotate(180deg)';
-                const list = wrapper.querySelector('.color-dd-list');
-                if (list) positionColorList(wrapper.querySelector('.color-dd-trigger'), list, wrapper);
-            }
-            return;
-        }
-
-        const item = e.target.closest('.color-dd-item');
-        if (!item) return;
-        e.stopPropagation();
-        const hex = item.getAttribute('data-color-hex');
-        if (!hex) return;
-        const wrapper = item.closest('.color-dd-wrapper');
-        if (!wrapper) return;
-        const valueInput = wrapper.querySelector('.row-color-value');
-        if (valueInput) valueInput.value = hex;
-        const swatch = wrapper.querySelector('.color-dd-swatch');
-        if (swatch) swatch.style.background = hex;
-        const label = wrapper.querySelector('.color-dd-label');
-        if (label) label.textContent = hex;
-        // Close list after selecting
-        const list = wrapper.querySelector('.color-dd-list');
-        if (list) closeColorList(list);
-
-        // Reset "more colors" for next open
-        const extra2 = wrapper.querySelector('.color-dd-extra');
-        if (extra2) extra2.classList.add('hidden');
-        const toggleMore2 = wrapper.querySelector('.color-dd-toggle-more');
-        if (toggleMore2) {
-            const chevron = toggleMore2.querySelector('svg');
-            if (chevron) chevron.style.transform = '';
-            toggleMore2.querySelector('.color-dd-extra-hidden')?.classList.remove('hidden');
-            toggleMore2.querySelector('.color-dd-extra-visible')?.classList.add('hidden');
-        }
-
-        if (wrapper.closest('#options-modal')) {
-            quoteOptions.color = hex;
-            refreshOptionsSummary();
-            return;
-        }
-
-        const rowCtx = wrapper.closest('tr[data-row-file], [data-card-file]');
-        if (rowCtx) {
-            applyInlineRecolor(rowCtx, hex).catch((err) => console.warn('Inline recolor failed:', err.message));
+        if (!event.target.closest('.color-dd-wrapper') && !event.target.closest('.color-dd-list')) {
+            document.querySelectorAll('.color-dd-list:not(.hidden)').forEach((list) => closeColorList(list));
         }
     });
 }
@@ -348,7 +383,6 @@ export function initAppLifecycle({ mobileNav, loadAppVersion, preloadPrinterSele
         showLeaveConfirmModal(() => { window.location.href = href; });
     });
 
-    // Also expose for buttons that navigate
     window.__navigateIfLeaving = (url) => {
         if (getSelectedFilesCount() > 0) {
             showLeaveConfirmModal(() => { window.location.href = url; });

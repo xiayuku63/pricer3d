@@ -3,6 +3,7 @@ import {
     MATERIAL_OPTIONS,
     hexToRgb, drawColorWheel, getMonochromeShades,
 } from './state.js';
+import { getResultOrientation, withResultOrientation } from './orientation-state.js';
 
 export function initSettingsAreaEvents({
     dom,
@@ -13,6 +14,18 @@ export function initSettingsAreaEvents({
     preview,
     i18n,
 }) {
+    const ADD_MATERIAL_COLOR_CHOICES = [
+        { name: '黑色', hex: '#000000' },
+        { name: '白色', hex: '#ffffff' },
+        { name: '灰色', hex: '#808080' },
+        { name: '红色', hex: '#dc2626' },
+        { name: '蓝色', hex: '#2563eb' },
+        { name: '绿色', hex: '#16a34a' },
+        { name: '黄色', hex: '#ca8a04' },
+        { name: '橙色', hex: '#ea580c' },
+        { name: '紫色', hex: '#9333ea' },
+        { name: '粉色', hex: '#db2777' },
+    ];
     const {
         quoteOptions,
         MATERIAL_TYPE_PRESETS,
@@ -176,6 +189,7 @@ export function initSettingsAreaEvents({
                     if (densityInput) { densityInput.value = preset.density; MATERIAL_OPTIONS[idx].density = preset.density; }
                     if (priceInput) { priceInput.value = preset.price_per_kg; MATERIAL_OPTIONS[idx].price_per_kg = preset.price_per_kg; }
                 }
+                renderUserCenterUI();
             } else if (field === 'brand') {
                 MATERIAL_OPTIONS[idx].brand = target.value;
                 const brandSel = document.getElementById('uc-default-brand');
@@ -195,12 +209,10 @@ export function initSettingsAreaEvents({
                     if (!matSel.value && matSel.options.length) matSel.value = matSel.options[0].value;
                     quoteOptions.material = matSel.value;
                 }
+                renderUserCenterUI();
             } else if (field === 'color') {
-                if (!MATERIAL_OPTIONS[idx].colors || !Array.isArray(MATERIAL_OPTIONS[idx].colors)) {
-                    MATERIAL_OPTIONS[idx].colors = [{ name: target.value, hex: target.value }];
-                } else {
-                    MATERIAL_OPTIONS[idx].colors[0] = { name: target.value, hex: target.value };
-                }
+                MATERIAL_OPTIONS[idx].color = { name: target.value, hex: target.value };
+                renderUserCenterUI();
             } else if (field === 'density') {
                 MATERIAL_OPTIONS[idx].density = parseFloat(target.value) || 1.0;
             } else if (field === 'price_per_kg') {
@@ -227,7 +239,73 @@ export function initSettingsAreaEvents({
             }
         });
 
-        dom.materialsTbody.addEventListener('click', (e) => {
+        // The color panel is portaled to document.body while open so it is not
+        // clipped by the table's overflow container. Delegate from document so
+        // clicks on the portaled panel still reach the picker logic.
+        const closeColorPanels = () => {
+            document.querySelectorAll('.color-picker-panel').forEach(p => {
+                if (p._portalCleanup) p._portalCleanup();
+                p.classList.add('hidden');
+            });
+        };
+        const getHueSatFromHex = (hex) => {
+            const [r, g, b] = hexToRgb(hex);
+            const rn = r / 255, gn = g / 255, bn = b / 255;
+            const mx = Math.max(rn, gn, bn), mn = Math.min(rn, gn, bn);
+            let hue = 0, sat = 100;
+            if (mx !== mn) {
+                const d = mx - mn;
+                sat = (d / (1 - Math.abs(mx + mn - 1))) * 100;
+                if (!Number.isFinite(sat)) sat = 0;
+                if (mx === rn) hue = ((gn - bn) / d + (gn < bn ? 6 : 0)) / 6 * 360;
+                else if (mx === gn) hue = ((bn - rn) / d + 2) / 6 * 360;
+                else hue = ((rn - gn) / d + 4) / 6 * 360;
+            }
+            return [hue, sat];
+        };
+        const renderPanelShades = (panel, hue, sat) => {
+            const monoContainer = panel.querySelector('.color-picker-mono');
+            if (!monoContainer) return;
+            monoContainer.innerHTML = getMonochromeShades(hue, sat, 10).map(sh =>
+                '<button type="button" class="ce-swatch w-7 h-7 rounded-md border border-gray-300 hover:border-indigo-400 hover:shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 flex-shrink-0" style="background:' + sh + ';border-color:var(--color-border-input);" data-color-hex="' + sh + '" title="' + sh + '"></button>'
+            ).join('');
+        };
+        const updatePanelPreview = (panel, hex) => {
+            const previewSwatch = panel.querySelector('.cw-preview-swatch');
+            const previewHex = panel.querySelector('.cw-preview-hex');
+            const valueInput = panel.querySelector('.row-color-value');
+            if (previewSwatch) previewSwatch.style.background = hex;
+            if (previewHex) previewHex.textContent = hex;
+            if (valueInput) valueInput.value = hex;
+            panel.dataset.pendingColor = hex;
+        };
+        const resetPanelPreview = (panel, hex) => {
+            updatePanelPreview(panel, hex);
+            const [hue, sat] = getHueSatFromHex(hex);
+            const canvas = panel.querySelector('.cw-canvas');
+            if (canvas) drawColorWheel(canvas, hue, sat);
+            renderPanelShades(panel, hue, sat);
+            requestAnimationFrame(() => {
+                panel.querySelectorAll('.ce-swatch').forEach((swatch) => {
+                    swatch.classList.toggle('is-active', swatch.getAttribute('data-color-hex') === hex);
+                });
+            });
+        };
+        const savePanelColor = (panel) => {
+            const idx = parseInt(panel.getAttribute('data-idx'), 10);
+            const hex = panel.dataset.pendingColor || panel.querySelector('.row-color-value')?.value;
+            if (!hex || !MATERIAL_OPTIONS[idx]) return;
+            MATERIAL_OPTIONS[idx].color = { name: hex, hex };
+            const outer = panel._portalFrom || panel.closest('.color-picker-trigger');
+            const triggerSwatch = outer?.querySelector('.cw-swatch');
+            if (triggerSwatch) {
+                triggerSwatch.style.background = hex;
+                triggerSwatch.setAttribute('data-color-hex', hex);
+            }
+            closeColorPanels();
+            renderUserCenterUI();
+        };
+        document.addEventListener('click', (e) => {
             if (e.target.classList.contains('delete-material-btn')) {
                 const idx = e.target.getAttribute('data-idx');
                 MATERIAL_OPTIONS.splice(idx, 1);
@@ -246,58 +324,45 @@ export function initSettingsAreaEvents({
             if (trigger) {
                 const outer = trigger.closest('.color-picker-trigger');
                 const idx = parseInt(outer.getAttribute('data-idx'), 10);
-                // Close all other panels
-                document.querySelectorAll('.color-picker-trigger .color-picker-panel').forEach(p => {
-                    if (p._portalCleanup) p._portalCleanup();
-                    p.classList.add('hidden');
-                });
-                const panel = outer.querySelector('.color-picker-panel');
-                const wasHidden = panel.classList.contains('hidden');
+                const panel = outer.querySelector('.color-picker-panel')
+                    || [...document.querySelectorAll('.color-picker-panel')]
+                        .find(p => p._portalFrom === outer);
+                if (!panel) return;
+                const wasOpen = !panel.classList.contains('hidden');
+                closeColorPanels();
+                if (wasOpen) return;
                 panel.classList.remove('hidden');
-                // If the panel was hidden, portal it to body to avoid table overflow clipping
-                if (wasHidden) {
-                    const trigRect = trigger.getBoundingClientRect();
-                    panel.style.position = 'fixed';
-                    panel.style.top = (trigRect.bottom + 4) + 'px';
-                    panel.style.left = Math.max(4, trigRect.left) + 'px';
-                    panel.style.zIndex = '1000';
-                    panel._portalFrom = outer;
-                    panel._portalCleanup = () => {
-                        outer.appendChild(panel);
-                        panel.style.position = '';
-                        panel.style.top = '';
-                        panel.style.left = '';
-                        panel.style.zIndex = '';
-                        delete panel._portalFrom;
-                        delete panel._portalCleanup;
-                    };
-                    document.body.appendChild(panel);
-                    // Reposition if clipped on the right
-                    const pr = panel.getBoundingClientRect();
-                    if (pr.right > window.innerWidth - 8) {
-                        panel.style.left = (window.innerWidth - pr.width - 8) + 'px';
-                    }
+                // Portal the panel to body to avoid table overflow clipping.
+                const trigRect = trigger.getBoundingClientRect();
+                panel.style.position = 'fixed';
+                panel.style.top = (trigRect.bottom + 4) + 'px';
+                panel.style.left = Math.max(4, trigRect.left) + 'px';
+                panel.style.zIndex = '1000';
+                panel._portalFrom = outer;
+                panel._portalCleanup = () => {
+                    outer.appendChild(panel);
+                    panel.style.position = '';
+                    panel.style.top = '';
+                    panel.style.left = '';
+                    panel.style.zIndex = '';
+                    delete panel._portalFrom;
+                    delete panel._portalCleanup;
+                };
+                document.body.appendChild(panel);
+                // Reposition if clipped on the right
+                const pr = panel.getBoundingClientRect();
+                if (pr.right > window.innerWidth - 8) {
+                    panel.style.left = (window.innerWidth - pr.width - 8) + 'px';
                 }
-                // Initialize canvas
-                const canvas = panel.querySelector('.cw-canvas');
-                if (canvas) {
-                    const hex = trigger.getAttribute('data-color-hex') || '#000000';
-                    const [r, g, b] = hexToRgb(hex);
-                    // Compute hue/sat for dot
-                    const rn = r / 255, gn = g / 255, bn = b / 255;
-                    const mx = Math.max(rn, gn, bn), mn = Math.min(rn, gn, bn);
-                    let hue = 0, sat = 100;
-                    if (mx !== mn) {
-                        const d = mx - mn;
-                        sat = (d / (1 - Math.abs(mx + mn - 1))) * 100;
-                        let h = 0;
-                        if (mx === rn) h = ((gn - bn) / d + (gn < bn ? 6 : 0)) / 6;
-                        else if (mx === gn) h = ((bn - rn) / d + 2) / 6;
-                        else h = ((rn - gn) / d + 4) / 6;
-                        hue = h * 360;
-                    }
-                    drawColorWheel(canvas, hue, sat);
-                }
+                // Rebuild the preview from the committed color whenever the panel opens.
+                resetPanelPreview(panel, trigger.getAttribute('data-color-hex') || '#000000');
+                return;
+            }
+
+            const saveButton = e.target.closest('.color-picker-save-btn');
+            if (saveButton) {
+                const panel = saveButton.closest('.color-picker-panel');
+                if (panel) savePanelColor(panel);
                 return;
             }
 
@@ -306,34 +371,17 @@ export function initSettingsAreaEvents({
             if (mono) {
                 const hex = mono.getAttribute('data-color-hex');
                 const panel = mono.closest('.color-picker-panel');
-                const idx = parseInt(panel.getAttribute('data-idx'), 10);
-                // Update preview
-                const previewSwatch = panel.querySelector('.cw-preview-swatch');
-                const previewHex = panel.querySelector('.cw-preview-hex');
-                if (previewSwatch) previewSwatch.style.background = hex;
-                if (previewHex) previewHex.textContent = hex;
-                panel.querySelector('.row-color-value').value = hex;
-                // Update trigger swatch (may be portaled — use _portalFrom)
-                const outer = panel._portalFrom || panel.closest('.color-picker-trigger');
-                const trigSwatch = outer?.querySelector('.cw-swatch');
-                if (trigSwatch) {
-                    trigSwatch.style.background = hex;
-                    trigSwatch.setAttribute('data-color-hex', hex);
-                }
-                // Save
-                if (!MATERIAL_OPTIONS[idx].colors || !Array.isArray(MATERIAL_OPTIONS[idx].colors)) {
-                    MATERIAL_OPTIONS[idx].colors = [];
-                }
-                MATERIAL_OPTIONS[idx].colors[0] = { name: hex, hex };
-                mono.closest('.color-picker-mono').querySelectorAll('.ce-swatch').forEach(s => s.classList.remove('ring-2', 'ring-indigo-500'));
-                mono.classList.add('ring-2', 'ring-indigo-500');
+                updatePanelPreview(panel, hex);
+                mono.closest('.color-picker-mono').querySelectorAll('.ce-swatch').forEach(s => s.classList.remove('is-active'));
+                mono.classList.add('is-active');
                 return;
             }
         });
 
         // Color canvas mouse interaction (delegated)
         let _colorCanvasDrag = false;
-        dom.materialsTbody.addEventListener('mousedown', (e) => {
+        // The open color panel lives under body after portaling.
+        document.addEventListener('mousedown', (e) => {
             const canvas = e.target.closest('.color-picker-panel .cw-canvas');
             if (!canvas) return;
             _colorCanvasDrag = true;
@@ -380,40 +428,15 @@ export function initSettingsAreaEvents({
             const b = Math.round(hue2rgb(p2, q2, h - 1/3) * 255);
             const hex = '#' + [r, g, b].map(v => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0')).join('');
 
-            const previewSwatch = panel.querySelector('.cw-preview-swatch');
-            const previewHex = panel.querySelector('.cw-preview-hex');
-            if (previewSwatch) previewSwatch.style.background = hex;
-            if (previewHex) previewHex.textContent = hex;
-            panel.querySelector('.row-color-value').value = hex;
-            // Save to MATERIAL_OPTIONS
-            if (!MATERIAL_OPTIONS[idx].colors || !Array.isArray(MATERIAL_OPTIONS[idx].colors)) {
-                MATERIAL_OPTIONS[idx].colors = [];
-            }
-            MATERIAL_OPTIONS[idx].colors[0] = { name: hex, hex };
-            // Update trigger swatch
-            const outer = panel.closest('.color-picker-trigger') || (panel._portalFrom);
-            const trigSwatch = outer.querySelector('.cw-swatch');
-            if (trigSwatch) {
-                trigSwatch.style.background = hex;
-                trigSwatch.setAttribute('data-color-hex', hex);
-            }
+            updatePanelPreview(panel, hex);
             // Regenerate monochrome shade swatches based on new hue/sat at fixed lightness range
-            const shades = getMonochromeShades(hue, sat, 10);
-            const monoContainer = panel.querySelector('.color-picker-mono');
-            if (monoContainer) {
-                monoContainer.innerHTML = shades.map(sh =>
-                    '<button type="button" class="ce-swatch w-7 h-7 rounded-md border border-gray-300 hover:border-indigo-400 hover:shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 flex-shrink-0" style="background:' + sh + '" data-color-hex="' + sh + '" title="' + sh + '"></button>'
-                ).join('');
-            }
+            renderPanelShades(panel, hue, sat);
         }
 
         // Close color panels on outside click
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.color-picker-trigger') && !e.target.closest('.color-picker-panel')) {
-                document.querySelectorAll('.color-picker-panel').forEach(p => {
-                    if (p._portalCleanup) p._portalCleanup();
-                    p.classList.add('hidden');
-                });
+                closeColorPanels();
             }
         }, true);
     }
@@ -421,7 +444,15 @@ export function initSettingsAreaEvents({
     bind(dom.addMaterialBtn, 'click', () => {
         const defaultType = Object.keys(MATERIAL_TYPE_PRESETS)[0] || 'PLA';
         const defaultPreset = MATERIAL_TYPE_PRESETS[defaultType] || { density: 1.24, price_per_kg: 80 };
-        MATERIAL_OPTIONS.push({ name: defaultType, brand: (quoteOptions.brand || 'Generic'), density: defaultPreset.density, price_per_kg: defaultPreset.price_per_kg, colors: [{ name: '#000000', hex: '#000000' }] });
+        const brand = quoteOptions.brand || 'Generic';
+        const usedColors = new Set(
+            MATERIAL_OPTIONS
+                .filter((material) => material.name === defaultType && (material.brand || 'Generic') === brand)
+                .map((material) => String(material.color?.hex || material.color?.name || '').toLowerCase()),
+        );
+        const color = ADD_MATERIAL_COLOR_CHOICES.find((candidate) => !usedColors.has(candidate.hex))
+            || ADD_MATERIAL_COLOR_CHOICES[0];
+        MATERIAL_OPTIONS.push({ name: defaultType, brand, density: defaultPreset.density, price_per_kg: defaultPreset.price_per_kg, color: { ...color } });
         renderUserCenterUI();
     });
     bind(document.getElementById('material-restore-defaults-btn'), 'click', restoreDefaultMaterials);
@@ -537,18 +568,19 @@ export function initResultsAreaEvents({
                 if (file) {
                     const existing = currentResults.find((r) => r && r.filename === filename);
                     const material = existing?.material || quoteOptions.material;
-                    const allowedColors = getColorsForMaterial(material);
+                    const allowedColors = getColorsForMaterial(material, existing?.brand);
                     const color = pickAllowedColor(allowedColors, existing?.color, quoteOptions.color);
                     const quantity = existing?.quantity || quoteOptions.quantity || 1;
                     const pm = existing?._printer_model || '';
-                    const sp = existing?._slicer_preset_id;
+                    const sp = existing?._slicer_preset_id ?? null;
+                    const orientation = getResultOrientation(existing);
                     const idx = currentResults.findIndex((item) => item && item.filename === filename);
                     if (idx >= 0) currentResults[idx] = { ...currentResults[idx], _recalculating: true };
                     renderResultsTable();
                     recalcSummaryFromCurrentResults();
-                    quoteSingleFileWithOptions(file, { material, color, quantity, _printer_model: pm, _slicer_preset_id: sp })
+                    quoteSingleFileWithOptions(file, { material, color, quantity, _printer_model: pm, _slicer_preset_id: sp, orientation })
                         .then((updated) => {
-                            mergeResultsByFilename([updated]);
+                            mergeResultsByFilename([withResultOrientation(updated, orientation)]);
                             renderResultsTable();
                             recalcSummaryFromCurrentResults();
                         })

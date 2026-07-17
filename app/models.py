@@ -48,7 +48,8 @@ class MaterialItem(BaseModel):
     name: str
     density: float
     price_per_kg: float
-    colors: List[str] = []
+    brand: Optional[str] = "Generic"
+    color: dict = {"name": "黑色", "hex": "#000000"}
 
 
 class PricingConfig(BaseModel):
@@ -75,7 +76,6 @@ class PricingConfig(BaseModel):
 
 class UserSettingsUpdate(BaseModel):
     materials: Optional[List[MaterialItem]] = None
-    colors: Optional[List[str]] = None
     pricing_config: Optional[PricingConfig] = None
     email: Optional[str] = None
     phone: Optional[str] = None

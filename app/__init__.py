@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from .config import ALLOWED_ORIGINS, APP_ENV
 from .middleware import security_middleware
@@ -15,6 +16,18 @@ from .logging_config import setup_logging
 from .errors import register_exception_handlers
 
 logger = logging.getLogger("uvicorn.error")
+
+
+class NoStoreStaticAssetsMiddleware(BaseHTTPMiddleware):
+    """Prevent browser/proxy cache from mixing ES module revisions."""
+
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        if request.url.path.startswith("/static/"):
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+        return response
 
 
 @asynccontextmanager
@@ -61,6 +74,7 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     app = FastAPI(title="pricer3d — 3D Printing Quoting System", lifespan=lifespan)
+    app.add_middleware(NoStoreStaticAssetsMiddleware)
 
     # exception handlers (unified {code, message, data} format)
     register_exception_handlers(app)

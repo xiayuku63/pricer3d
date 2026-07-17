@@ -56,7 +56,7 @@
                                             </div>
                                             <div>
                                                 <label class="block text-xs tw-text-secondary" data-i18n="settings.defaultColor">默认颜色</label>
-                                                <div id="uc-default-color-dropdown" class="mt-1">
+                                                <div id="uc-default-color-dropdown" class="mt-1 uc-default-color-dropdown">
                                                     <!-- renderColorDropdown 渲染 -->
                                                 </div>
                                             </div>
@@ -180,7 +180,7 @@
                                         <p class="text-xs tw-text-muted" data-i18n="settings.slicerHint">选择影响打印时间和重量的关键参数。 <span class="inline-flex items-center gap-1 ml-1 px-1.5 py-px rounded text-[10px]" style="background-color: var(--color-warning-bg); color: var(--color-warning-text); border: 1px solid var(--color-warning-border);">默认项<span class="tw-text-muted font-normal">· 点底部「保存设置」生效</span></span></p>
 
                                         <!-- Default preset selector -->
-                                        <div class="max-w-md">
+                                        <div id="uc-default-preset-dropdown" class="uc-default-preset-dropdown">
                                             <label class="block text-xs tw-text-secondary" data-i18n="settings.defaultPreset">默认切片预设</label>
                                             <select id="gen-preset-select" class="tw-input mt-1 block w-full py-2 px-3 rounded-md text-sm">
                                             </select>
@@ -193,7 +193,6 @@
                                                 <select id="gen-layer-height" data-preset-param="layer_height" class="tw-input flex-1 max-w-[200px] text-xs px-2 py-1.5">
                                                     <option value="0.08" data-i18n="slicer.layerFine">0.08 精细</option><option value="0.10">0.10</option><option value="0.12">0.12</option><option value="0.16">0.16</option><option value="0.20" selected data-i18n="slicer.layerStandard">0.20 标准</option><option value="0.28" data-i18n="slicer.layerFast">0.28 快速</option><option value="0.32">0.32</option>
                                                 </select>
-                                                <span id="layer-height-range-hint" class="text-[10px] tw-text-muted flex-shrink-0"></span>
                                             </div>
                                             <div class="flex items-center gap-3 py-1.5">
                                                 <label class="w-28 text-xs tw-text-secondary flex-shrink-0" data-i18n="slicer.wallCount">外墙层数</label>

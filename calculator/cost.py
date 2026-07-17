@@ -158,6 +158,7 @@ def calculate_cost(
     _resolved_printer: Optional[dict] = None,  # pre-resolved printer info
     _speed_params: Optional[dict] = None,  # pre-resolved speed params
     _printer_profile_path: Optional[str] = None,  # pre-resolved profile path
+    _nozzle_diameter: Optional[float] = None,
 ):
     """Calculate cost for a single model from geometry + material + config.
 
@@ -285,15 +286,6 @@ def calculate_cost(
             outputs_dir = os.path.dirname(model_path)  # same dir as model
             output_gcode = os.path.join(outputs_dir, f"{base_name}.gcode")
 
-            speed_kwargs = {}
-            if _speed_params:
-                if _speed_params.get("max_speed"):
-                    speed_kwargs["max_speed"] = float(_speed_params["max_speed"])
-                if _speed_params.get("max_acceleration"):
-                    speed_kwargs["max_acceleration"] = float(_speed_params["max_acceleration"])
-                if _speed_params.get("jerk_limit"):
-                    speed_kwargs["jerk_limit"] = float(_speed_params["jerk_limit"])
-
             stats = run_prusa_slice(
                 actual_slice_path,
                 output_gcode,
@@ -308,7 +300,11 @@ def calculate_cost(
                 bottom_shell_layers=bottom_shell_layers,
                 hotend_temp=spec.get("hotend_temp"),
                 bed_temp=spec.get("bed_temp"),
-                **speed_kwargs,
+                nozzle_diameter=_nozzle_diameter,
+                max_print_speed=(_speed_params or {}).get("max_speed"),
+                max_acceleration=(_speed_params or {}).get("max_acceleration"),
+                jerk_limit=(_speed_params or {}).get("jerk_limit"),
+                max_volumetric_speed=spec.get("max_volumetric_speed"),
             )
             if stats.get("time_s", 0) > 0:
                 correction = float(cfg.get("prusa_time_correction") or 1.0)
@@ -553,6 +549,18 @@ async def process_single_file(
             _apply_manual_orientation(model_saved_path, orient_x, orient_y, orient_z)
             auto_orient = False  # don't double-orient
 
+        # Resolve the effective nozzle from the compound printer id, e.g.
+        # bambu_a1_08 -> 0.8. This value must reach the generated INI.
+        _nozzle_diameter = None
+        try:
+            from app.printers import resolve_printer
+
+            resolved = resolve_printer(str(pricing_config.get("printer_model") or ""))
+            if resolved and resolved.get("_nozzle") is not None:
+                _nozzle_diameter = float(resolved["_nozzle"])
+        except Exception:
+            pass
+
         # ── Geometry ──
         volume, surface_area, dimensions = calculate_geometry(model_saved_path)
         if volume == 0:
@@ -642,6 +650,7 @@ async def process_single_file(
                 _resolved_printer=_printer_bed,
                 _speed_params=_speed_params,
                 _printer_profile_path=_printer_profile,
+                _nozzle_diameter=_nozzle_diameter,
             )
         )
 

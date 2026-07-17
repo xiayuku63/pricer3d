@@ -12,6 +12,8 @@ import { ensureThumbnailForFile } from './preview.js';
 import { loadQuoteHistory } from './history.js';
 import { t } from './i18n.js';
 import { uploadWithProgress, showProgress, showProgressSuccess, showProgressError, hideProgress, showToast } from './upload.js';
+import { getAffectedFilenamesForGlobalSlicerChange, getAffectedFilenamesForPresetChange } from './quote-config.js';
+import { getResultOrientation, withResultOrientation } from './orientation-state.js';
 
 let _dom = {};
 export function setApiDom(d) { _dom = d; }
@@ -46,6 +48,34 @@ function _getActiveSlicerPresetId() {
         ? quoteOptions.slicer_preset_id : null;
 }
 
+function _getActiveSlicerParams() {
+    const value = (id, fallback) => {
+        const element = document.getElementById(id);
+        return element && element.value !== '' ? Number(element.value) : fallback;
+    };
+    return {
+        layer_height: value('gen-layer-height', 0.2),
+        perimeters: value('gen-wall-count', 3),
+        fill_density: value('gen-infill', 20),
+    };
+}
+
+export function getSlicerConfigSnapshot() {
+    return {
+        printerModel: _getActivePrinterModel(),
+        presetId: _getActiveSlicerPresetId(),
+        params: _getActiveSlicerParams(),
+    };
+}
+
+export function getAffectedFilenamesForSlicerConfigChange(previous, next) {
+    return getAffectedFilenamesForGlobalSlicerChange(currentResults, previous, next);
+}
+
+export function getAffectedFilenamesForSlicerPresetChange(presetId, nextParams) {
+    return getAffectedFilenamesForPresetChange(currentResults, presetId, nextParams);
+}
+
 export async function quoteSingleFileWithOptions(file, options, signal) {
     const formData = new FormData();
     formData.append("files", file);
@@ -53,6 +83,7 @@ export async function quoteSingleFileWithOptions(file, options, signal) {
     const printerModel = options._printer_model || _getActivePrinterModel();
     if (printerModel) formData.append("printer_model", printerModel);
     formData.append("material", options.material);
+    if (options.brand) formData.append("brand", options.brand);
     formData.append("color", options.color);
     formData.append("quantity", String(options.quantity));
     // Use per-file preset if provided, else global
@@ -70,14 +101,19 @@ export async function quoteSingleFileWithOptions(file, options, signal) {
     if (ifEl && ifEl.value) formData.append("infill", ifEl.value);
     formData.append("use_prusaslicer", "true");
     const autoOrientCheckbox1 = document.getElementById('batch-auto-orient');
+    const orientation = options.orientation || options._orientation;
     // 如果传了指定朝向，不再走自动摆放（避免双重旋转）
-    if (autoOrientCheckbox1 && autoOrientCheckbox1.checked && !options.orient_x && !options.orient_y && !options.orient_z) {
+    if (autoOrientCheckbox1 && autoOrientCheckbox1.checked && !orientation
+        && !options.orient_x && !options.orient_y && !options.orient_z) {
         formData.append('auto_orient', 'true');
     }
     // 传递指定朝向 (来自"保存"按钮)
-    if (options.orient_x != null) formData.append('orient_x', String(options.orient_x));
-    if (options.orient_y != null) formData.append('orient_y', String(options.orient_y));
-    if (options.orient_z != null) formData.append('orient_z', String(options.orient_z));
+    const orientX = options.orient_x != null ? options.orient_x : orientation?.x;
+    const orientY = options.orient_y != null ? options.orient_y : orientation?.y;
+    const orientZ = options.orient_z != null ? options.orient_z : orientation?.z;
+    if (orientX != null) formData.append('orient_x', String(orientX));
+    if (orientY != null) formData.append('orient_y', String(orientY));
+    if (orientZ != null) formData.append('orient_z', String(orientZ));
     const fetchOpts = { method: 'POST', body: formData };
     if (signal) fetchOpts.signal = signal;
     const response = await authFetch('/api/quote', fetchOpts);
@@ -114,6 +150,7 @@ async function _quoteSelectedFilesInternal(selectedFiles, useProgress) {
     const printerModel = _getActivePrinterModel();
     if (printerModel) formData.append("printer_model", printerModel);
     formData.append("material", quoteOptions.material);
+    if (quoteOptions.brand) formData.append("brand", quoteOptions.brand);
     formData.append("color", quoteOptions.color);
     formData.append("quantity", String(quoteOptions.quantity));
     const presetId = _getActiveSlicerPresetId();
@@ -170,18 +207,29 @@ export function mergeResultsByFilename(incomingResults) {
     (incomingResults || []).forEach((item) => {
         if (!item || !item.filename) return;
         const existingIdx = idxByFilename.get(item.filename);
-        if (existingIdx === undefined) { currentResults.push(item); return; }
+        if (existingIdx === undefined) {
+        currentResults.push({
+                ...item,
+                _printer_model_explicit: item._printer_model_explicit ?? Boolean(item._checklist_source),
+                _slicer_preset_explicit: item._slicer_preset_explicit ?? Boolean(item._checklist_source),
+            });
+            return;
+        }
         // Preserve per-file fields from existing item
         const existing = currentResults[existingIdx];
+        const preservedOrientation = getResultOrientation(item) || getResultOrientation(existing);
         currentResults[existingIdx] = {
-            ...item,
+            ...(preservedOrientation ? withResultOrientation(item, preservedOrientation) : item),
             // Preserve color from existing item when incoming color is empty/undefined
             // This ensures inline recolors persist through API responses
             color: (item.color && String(item.color).trim())
                 ? item.color
                 : (existing.color || item.color),
-            _printer_model: existing._printer_model || item._printer_model,
-            _slicer_preset_id: existing._slicer_preset_id !== undefined ? existing._slicer_preset_id : item._slicer_preset_id,
+            brand: item.brand !== undefined ? item.brand : existing.brand,
+            _printer_model: item._printer_model !== undefined ? item._printer_model : existing._printer_model,
+            _slicer_preset_id: item._slicer_preset_id !== undefined ? item._slicer_preset_id : existing._slicer_preset_id,
+            _printer_model_explicit: existing._printer_model_explicit ?? item._printer_model_explicit ?? false,
+            _slicer_preset_explicit: existing._slicer_preset_explicit ?? item._slicer_preset_explicit ?? false,
             _checklist_params: item._checklist_params !== undefined ? item._checklist_params : existing._checklist_params,
             _checklist_source: item._checklist_source || existing._checklist_source,
             _warnings: item._warnings || existing._warnings,
@@ -196,7 +244,7 @@ export function normalizeResultsWithCurrentOptions() {
         const next = { ...item };
         const selectedMaterial = materialNames.has(next.material) ? next.material : quoteOptions.material;
         next.material = selectedMaterial;
-        const allowedColors = getColorsForMaterial(selectedMaterial);
+        const allowedColors = getColorsForMaterial(selectedMaterial, next.brand);
         next.color = pickAllowedColor(allowedColors, next.color, quoteOptions.color);
         const q = Number.parseInt(next.quantity, 10);
         next.quantity = Number.isFinite(q) && q >= 1 ? q : (quoteOptions.quantity || 1);
@@ -204,10 +252,14 @@ export function normalizeResultsWithCurrentOptions() {
     }));
 }
 
-export async function reQuoteAllSelectedFiles(reasonLabel) {
+export async function reQuoteAllSelectedFiles(reasonLabel, shouldRequote) {
     const { fileNameDisplay, errorContainer, errorMsg } = _dom;
     if (!authToken) return;
-    const files = Array.from(selectedFilesMap.values());
+    const files = Array.from(selectedFilesMap.values()).filter((file) => {
+        if (typeof shouldRequote !== 'function') return true;
+        const result = currentResults.find((item) => item && item.filename === file.name) || null;
+        return shouldRequote(result, file);
+    });
     if (!files.length) return;
     if (errorMsg) errorMsg.textContent = '';
     if (errorContainer) errorContainer.classList.add('hidden');
@@ -217,12 +269,14 @@ export async function reQuoteAllSelectedFiles(reasonLabel) {
     const controller = _newAbortController();
     const signal = controller.signal;
 
+    const filesToRequote = new Set(files.map((file) => file.name));
     currentResults.splice(0, currentResults.length, ...currentResults.map((item) => {
         if (!item || !item.filename) return item;
+        if (!filesToRequote.has(item.filename)) return item;
         const next = { ...item };
         const materialNames = new Set(MATERIAL_OPTIONS.map((m) => m && m.name).filter(Boolean));
         next.material = materialNames.has(next.material) ? next.material : quoteOptions.material;
-        const allowedColors = getColorsForMaterial(next.material);
+        const allowedColors = getColorsForMaterial(next.material, next.brand);
         next.color = pickAllowedColor(allowedColors, next.color, quoteOptions.color);
         next._recalculating = true;
         return next;
@@ -237,24 +291,35 @@ export async function reQuoteAllSelectedFiles(reasonLabel) {
         const file = files[i];
         const existing = currentResults.find((r) => r && r.filename === file.name) || null;
         const material = existing && existing.material ? existing.material : quoteOptions.material;
-        const allowedColors = getColorsForMaterial(material);
+        const allowedColors = getColorsForMaterial(material, existing && existing.brand);
         const color = pickAllowedColor(allowedColors, existing && existing.color, quoteOptions.color);
         const quantityRaw = existing && existing.quantity ? existing.quantity : quoteOptions.quantity;
         const quantity = Math.max(1, Number.parseInt(quantityRaw, 10) || 1);
-        // Per-file printer + preset
-        const pm = (existing && existing._printer_model) ? existing._printer_model : '';
-        const sp = (existing && existing._slicer_preset_id !== undefined) ? existing._slicer_preset_id : null;
+        // Keep per-file overrides when present, otherwise use the active
+        // defaults. A user-center save updates quoteOptions before re-quote.
+        const pm = existing?._printer_model_explicit
+            ? (existing._printer_model || '')
+            : (quoteOptions.printer_model || _getActivePrinterModel() || '');
+        const sp = existing?._slicer_preset_explicit
+            ? (existing._slicer_preset_id ?? null)
+            : (quoteOptions.slicer_preset_id ?? _getActiveSlicerPresetId() ?? null);
+        const orientation = getResultOrientation(existing);
         if (fileNameDisplay) fileNameDisplay.textContent = `${reasonLabel}：${i + 1}/${files.length}（${file.name}）`;
         try {
             await ensureThumbnailForFile(file, color);
             if (signal.aborted) break;
-            const opts = { material, color, quantity, _printer_model: pm };
-            if (sp !== null) opts._slicer_preset_id = sp;
+            // null is meaningful: it explicitly selects "no preset" and must
+            // not fall back to the current global preset.
+            const opts = { material, color, quantity, _printer_model: pm, _slicer_preset_id: sp, orientation };
+            if (existing?.brand) opts.brand = existing.brand;
             const updated = await quoteSingleFileWithOptions(file, opts, signal);
-            mergeResultsByFilename([updated]);
+            mergeResultsByFilename([orientation ? withResultOrientation(updated, orientation) : updated]);
         } catch (err) {
             // AbortError: 静默处理
-            if (err.name === 'AbortError') break;
+            // Chromium may surface an aborted fetch as TypeError("Failed to fetch")
+            // instead of AbortError. Never replace a valid result with a failure
+            // while this recalculation has been superseded.
+            if (err.name === 'AbortError' || signal.aborted) break;
             mergeResultsByFilename([{ filename: file.name, status: 'failed', error: err.message || '重算失败', material, color, quantity }]);
         }
         renderResultsTable();

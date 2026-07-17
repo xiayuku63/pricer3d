@@ -2,7 +2,7 @@
 import {
     quoteOptions, currentResults, setCurrentResults,
     MATERIAL_OPTIONS, renderColorDropdown, getActivePrinterCompoundId,
-    getUsedBrandOptions, getMaterialsByBrand,
+    getUsedBrandOptions, getMaterialsByBrand, getColorsForMaterial, pickAllowedColor,
 } from './state.js';
 import { renderResultsTable, recalcSummaryFromCurrentResults, refreshOptionsSummary } from './quote-render.js';
 import { reQuoteAllSelectedFiles } from './quote-api.js';
@@ -50,9 +50,16 @@ export function refreshBatchColorDropdown() {
     const materialSelect = document.getElementById('batch-material');
     if (!container || !materialSelect) return;
     const material = materialSelect.value;
+    const brandSelect = document.getElementById('batch-brand');
+    const brand = brandSelect ? brandSelect.value : quoteOptions.brand;
     const colorInput = container.querySelector('.row-color-value');
-    const currentColor = colorInput ? colorInput.value : quoteOptions.color;
-    const rendered = renderColorDropdown(material, currentColor, true);
+    const allowedColors = getColorsForMaterial(material, brand);
+    const currentColor = pickAllowedColor(
+        allowedColors,
+        colorInput ? colorInput.value : quoteOptions.color,
+        quoteOptions.color,
+    );
+    const rendered = renderColorDropdown(material, currentColor, true, brand);
     container.innerHTML = rendered.html;
 }
 
@@ -86,9 +93,11 @@ export async function batchApplyToAll() {
     // 1) 先更新模型数据（包括 per-file printer + preset）
     setCurrentResults(currentResults.map(item => {
         if (!item || !item.filename) return item;
-        return { ...item, material, color, quantity,
+        return { ...item, brand, material, color, quantity,
             _printer_model: getActivePrinterCompoundId(),
             _slicer_preset_id: quoteOptions.slicer_preset_id,
+            _printer_model_explicit: true,
+            _slicer_preset_explicit: true,
             _recalculating: true };
     }));
 

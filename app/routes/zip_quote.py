@@ -27,7 +27,12 @@ async def zip_preview(
     """POST /api/quote/zip/preview"""
     try:
         return await build_zip_preview_response(file)
-    except HTTPException:
+    except HTTPException as e:
+        logger.warning(
+            "ZIP preview rejected: filename=%s detail=%s",
+            file.filename,
+            e.detail,
+        )
         raise
     except Exception as e:
         logger.error(f"ZIP preview failed: {str(e)}", exc_info=True)
@@ -42,6 +47,9 @@ async def zip_quote(
     quantity: int = Form(1),
     printer_model: Optional[str] = Form(default=None),
     slicer_preset_id: Optional[int] = Form(default=None),
+    layer_height: float = Form(0.2),
+    wall_count: int = Form(3),
+    infill: int = Form(20),
     session_id: Optional[str] = Form(default=None),
     current_user=Depends(get_current_user),
 ):
@@ -55,6 +63,9 @@ async def zip_quote(
             quantity=quantity,
             printer_model=printer_model,
             slicer_preset_id=slicer_preset_id,
+            layer_height=layer_height,
+            wall_count=wall_count,
+            infill=infill,
             session_id=session_id,
             current_user=current_user,
         )

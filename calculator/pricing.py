@@ -153,6 +153,7 @@ def normalize_materials(user_materials: list) -> list:
 
         _ht = m.get("hotend_temp") or m.get("hotend_temp_min") or m.get("hotend_temp_max")
         _bt = m.get("bed_temp") or m.get("bed_temp_min") or m.get("bed_temp_max")
+        _mvs = m.get("max_volumetric_speed") or m.get("max_flow_speed") or m.get("max_flow")
         if not _ht:
             _ht = next((d.get("hotend_temp", 220) for d in DEFAULT_MATERIALS if d["name"] == name), 220)
         if not _bt:
@@ -165,6 +166,7 @@ def normalize_materials(user_materials: list) -> list:
                 "price_per_kg": price,
                 "hotend_temp": int(float(_ht)),
                 "bed_temp": int(float(_bt)),
+                "max_volumetric_speed": float(_mvs) if _mvs is not None else None,
             }
         )
 

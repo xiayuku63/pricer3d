@@ -32,6 +32,16 @@
     }
 }
 
+/* ── Mobile navigation state ── */
+#mobile-nav-drawer.open {
+    transform: translateX(0) !important;
+}
+
+#mobile-nav-backdrop.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
 /* ── Mobile layout adjustments ── */
 @media (max-width: 640px) {
     /* Page shell padding */
@@ -183,6 +193,11 @@
     #upload-progress-container {
         max-width: 100%;
     }
+}
+
+/* Keep upload progress visually separate from the drop target. */
+#upload-progress-container {
+    border-radius: 10px;
 }
 
 /* ── File preview chips: wrap nicely ── */

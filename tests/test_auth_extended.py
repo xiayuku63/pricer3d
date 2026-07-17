@@ -531,17 +531,39 @@ class TestNormalizeMaterials:
         result = normalize_materials(raw)
         assert result[0]["price_per_kg"] == 100.0  # 0.1 * 1000
 
-    def test_colors_normalized(self):
-        """颜色列表应被标准化。"""
+    def test_legacy_color_palette_is_collapsed_to_one_color(self):
+        """旧颜色列表只保留第一项并输出单颜色字段。"""
         raw = [{"name": "Test", "density": 1.0, "price_per_kg": 80.0, "colors": ["Red", "Blue"]}]
         result = normalize_materials(raw)
-        assert len(result[0]["colors"]) == 2
+        assert result[0]["color"] == {"name": "Red", "hex": "#dc2626"}
+        assert "colors" not in result[0]
 
     def test_brand_defaults_to_generic(self):
         """品牌默认为 Generic。"""
         raw = [{"name": "TestMat", "density": 1.0, "price_per_kg": 80.0}]
         result = normalize_materials(raw)
         assert result[0]["brand"] == "Generic"
+
+    def test_duplicate_material_names_are_supported_when_colors_differ(self):
+        raw = [
+            {
+                "name": "PLA",
+                "brand": "Eryone",
+                "density": 1.24,
+                "price_per_kg": 80.0,
+                "color": {"name": "White", "hex": "#ffffff"},
+            },
+            {
+                "name": "PLA",
+                "brand": "Eryone",
+                "density": 1.24,
+                "price_per_kg": 80.0,
+                "color": {"name": "Blue", "hex": "#123456"},
+            },
+        ]
+        result = normalize_materials(raw)
+        assert len(result) == 2
+        assert [m["color"]["hex"] for m in result] == ["#ffffff", "#123456"]
 
 
 # ========================================================================

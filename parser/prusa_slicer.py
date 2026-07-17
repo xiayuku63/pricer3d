@@ -115,7 +115,7 @@ def prusa_executable_diagnostics() -> dict:
         diag["found"] = True
         diag["path"] = exe
         try:
-            cmd = shlex.split(exe) if (" " in exe or "\t" in exe) else [exe]
+            cmd = _executable_command(exe)
             out = subprocess.check_output(cmd + ["--help"], stderr=subprocess.STDOUT, timeout=10, shell=False)
             lines = out.decode("utf-8", errors="replace").split("\n")
             for line in lines:
@@ -130,6 +130,22 @@ def prusa_executable_diagnostics() -> dict:
         except Exception as e:
             diag["version"] = f"error: {e}"
     return diag
+
+
+def _executable_command(exe: str) -> list[str]:
+    """Build argv for a slicer executable or an optional WSL wrapper.
+
+    A native executable path is already one argv item, even when it contains
+    spaces (for example ``C:\\Program Files\\...``). Only wrapper commands
+    such as ``wsl.exe -d Ubuntu prusa-slicer`` need shell-style splitting.
+    """
+    stripped = exe.strip()
+    if not stripped:
+        return []
+    first = stripped.split(None, 1)[0].lower()
+    if first in {"wsl", "wsl.exe"}:
+        return shlex.split(stripped, posix=False)
+    return [stripped]
 
 
 # ── G-code parsing ──
@@ -295,6 +311,11 @@ def generate_slice_config(
     bottom_shell_layers: Optional[int] = None,
     hotend_temp: Optional[int] = None,
     bed_temp: Optional[int] = None,
+    nozzle_diameter: Optional[float] = None,
+    max_print_speed: Optional[float] = None,
+    max_acceleration: Optional[float] = None,
+    jerk_limit: Optional[float] = None,
+    max_volumetric_speed: Optional[float] = None,
 ) -> str:
     """
     Generate a combined PrusaSlicer INI config file for a quote request.
@@ -341,29 +362,47 @@ def generate_slice_config(
 
     ps = sections[print_section]
 
-    # When a user preset is active, the preset defines slicing parameters —
-    # do NOT override them with quote form defaults. Only override when
-    # no preset is selected (or using system default).
-    _is_user_preset = (
-        slicer_preset is not None
-        and isinstance(slicer_preset, dict)
-        and slicer_preset.get("content")
-        and not slicer_preset.get("is_default")
-    )
+    # Request-level values must override the profile's baked-in defaults.
+    # Otherwise every nozzle selection would still slice as the profile nozzle.
+    if max_print_speed is not None:
+        ps["max_print_speed"] = str(max_print_speed)
+    if max_volumetric_speed is not None:
+        # Material flow limit belongs to the filament section in PrusaSlicer.
+        # Keep the print-level value aligned too because older profiles use it.
+        ps["max_volumetric_speed"] = str(max_volumetric_speed)
+        for sec_name in sections:
+            if sec_name.startswith("filament:"):
+                sections[sec_name]["filament_max_volumetric_speed"] = str(max_volumetric_speed)
+                break
+    for sec_name in sections:
+        if not sec_name.startswith("machine:"):
+            continue
+        if nozzle_diameter is not None:
+            sections[sec_name]["nozzle_diameter"] = str(nozzle_diameter)
+        if max_acceleration is not None:
+            sections[sec_name]["machine_max_acceleration_extruding"] = str(max_acceleration)
+            sections[sec_name]["machine_max_acceleration_x"] = str(max_acceleration)
+            sections[sec_name]["machine_max_acceleration_y"] = str(max_acceleration)
+        if jerk_limit is not None:
+            sections[sec_name]["machine_max_jerk_x"] = str(jerk_limit)
+            sections[sec_name]["machine_max_jerk_y"] = str(jerk_limit)
+        break
 
-    if not _is_user_preset:
-        ps["layer_height"] = str(layer_height)
-        ps["first_layer_height"] = str(round(min(layer_height * 1.75, 0.35), 2))
-        ps["fill_density"] = f"{infill_percent}%"
-        ps["sparse_infill_density"] = f"{infill_percent}%"
-        ps["perimeters"] = str(perimeters)
-        ps["wall_loops"] = str(perimeters)
-        ps["top_shell_layers"] = (
-            str(top_shell_layers) if top_shell_layers is not None else str(max(3, min(perimeters + 2, 10)))
-        )
-        ps["bottom_shell_layers"] = (
-            str(bottom_shell_layers) if bottom_shell_layers is not None else str(max(3, min(perimeters + 2, 10)))
-        )
+    # The model-page controls are the effective quote request. A selected
+    # preset may provide additional PrusaSlicer settings, but it must not
+    # silently replace the layer height, walls, or infill the user selected.
+    ps["layer_height"] = str(layer_height)
+    ps["first_layer_height"] = str(round(min(layer_height * 1.75, 0.35), 2))
+    ps["fill_density"] = f"{infill_percent}%"
+    ps["sparse_infill_density"] = f"{infill_percent}%"
+    ps["perimeters"] = str(perimeters)
+    ps["wall_loops"] = str(perimeters)
+    ps["top_shell_layers"] = (
+        str(top_shell_layers) if top_shell_layers is not None else str(max(3, min(perimeters + 2, 10)))
+    )
+    ps["bottom_shell_layers"] = (
+        str(bottom_shell_layers) if bottom_shell_layers is not None else str(max(3, min(perimeters + 2, 10)))
+    )
 
     # ── Ensure fill_pattern is compatible with fill_density ──
     # PrusaSlicer rejects many patterns at 100% density.
@@ -465,6 +504,11 @@ def run_prusa_slice(
     bottom_shell_layers: Optional[int] = None,
     hotend_temp: Optional[int] = None,
     bed_temp: Optional[int] = None,
+    nozzle_diameter: Optional[float] = None,
+    max_print_speed: Optional[float] = None,
+    max_acceleration: Optional[float] = None,
+    jerk_limit: Optional[float] = None,
+    max_volumetric_speed: Optional[float] = None,
 ) -> dict:
     """
     Run PrusaSlicer headless. Merges system/user/quote config into temp INI.
@@ -498,6 +542,11 @@ def run_prusa_slice(
         bottom_shell_layers=bottom_shell_layers,
         hotend_temp=hotend_temp,
         bed_temp=bed_temp,
+        nozzle_diameter=nozzle_diameter,
+        max_print_speed=max_print_speed,
+        max_acceleration=max_acceleration,
+        jerk_limit=jerk_limit,
+        max_volumetric_speed=max_volumetric_speed,
     )
 
     preset_label = "系统默认"
@@ -508,7 +557,7 @@ def run_prusa_slice(
         preset_label = str(slicer_preset["name"])
 
     # ── Detect WSL passthrough and translate paths ──
-    cmd_parts = shlex.split(exe)
+    cmd_parts = _executable_command(exe)
     _is_wsl = cmd_parts and cmd_parts[0] in ("wsl", "wsl.exe")
 
     def _wsl_path(p: str) -> str:
@@ -532,9 +581,6 @@ def run_prusa_slice(
         "--load",
         _wsl_path(config_path),
     ]
-    # WSL prusa-slicer (2.8.x) does not support --headless
-    if not _is_wsl:
-        cmd.append("--headless")
     cmd.extend(
         [
             "--export-gcode",
