@@ -21,7 +21,7 @@ import { t } from '../i18n.js';
 import { openLoginModal } from '../auth.js';
 import { renderSlicerPresetsUI, fetchSlicerPresets, fetchPrinterModels } from '../presets.js';
 import { refreshOptionsSummary, normalizeResultsWithCurrentOptions, renderResultsTable, recalcSummaryFromCurrentResults, reQuoteAllSelectedFiles, refreshBatchMaterialDropdown, refreshBatchBrandDropdown } from '../quote.js';
-import { _initColorWheelCanvas, updateDropdowns, refreshQuoteColorDropdowns, dom } from './common.js';
+import { _initColorWheelCanvas, updateDropdowns, refreshDefaultMaterialControls, dom } from './common.js';
 
 // ── Restore default materials ──
 const _DEFAULT_MATERIALS = [
@@ -187,13 +187,6 @@ export function renderUserCenterUI() {
         cfgSupportPricePerG, cfgUnitCostFormula, cfgTotalCostFormula,
     } = dom;
 
-    // Preserve the user's current selections while the material table is
-    // re-rendered. This matters when a second color record is added for the
-    // currently selected material.
-    const existingDefaultBrand = document.getElementById('uc-default-brand')?.value || '';
-    const existingDefaultMaterial = document.getElementById('uc-default-material')?.value || '';
-    const existingDefaultColor = document.getElementById('uc-default-color-dropdown')?.getAttribute('data-selected-color') || '';
-
     if (materialsTbody) {
         const majorBrands = [
             { value: 'Generic', label: t('material.genericBrand') },
@@ -215,16 +208,6 @@ export function renderUserCenterUI() {
             { value: 'Voron', label: 'Voron' },
             { value: 'custom', label: t('material.brandCustom') },
         ];
-
-        // Populate default brand dropdown (all brands including MAJOR_BRANDS)
-        const defaultBrandSel = document.getElementById('uc-default-brand');
-        if (defaultBrandSel) {
-            const usedBrands = getUsedBrandOptions();
-            defaultBrandSel.innerHTML = usedBrands.map(b =>
-                `<option value="${escapeHtml(b)}" ${defaultBrand === b ? 'selected' : ''}>${escapeHtml(b)}</option>`
-            ).join('');
-            if (!defaultBrandSel.value && defaultBrandSel.options.length) defaultBrandSel.value = defaultBrandSel.options[0].value;
-        }
 
         materialsTbody.innerHTML = MATERIAL_OPTIONS.map((m, idx) => {
             const brand = m.brand || 'Generic';
@@ -297,80 +280,8 @@ export function renderUserCenterUI() {
         }
     }
 
-    // Populate default brand dropdown (all brands including MAJOR_BRANDS)
-    const defaultBrandSel = document.getElementById('uc-default-brand');
-    if (defaultBrandSel) {
-        const usedBrands = getUsedBrandOptions();
-        defaultBrandSel.innerHTML = usedBrands.map(b =>
-            `<option value="${escapeHtml(b)}" ${defaultBrand === b ? 'selected' : ''}>${escapeHtml(b)}</option>`
-        ).join('');
-        // 如果已选品牌不在列表中，重置为第一个
-        if (!defaultBrandSel.value && defaultBrandSel.options.length) {
-            defaultBrandSel.value = defaultBrandSel.options[0].value;
-        }
-        if (defaultBrandSel.value !== defaultBrand) {
-            quoteOptions.brand = defaultBrandSel.value;
-        }
-    }
-
-    // Refresh the default material and color controls from the current material records.
-    // This is called after adding/editing a row so duplicate material colors appear immediately.
-    const defaultMaterialSel = document.getElementById('uc-default-material');
-    const colorDropdownContainer = document.getElementById('uc-default-color-dropdown');
-    const refreshDefaultMaterialControls = (brand, preferredMaterial, preferredColor) => {
-        if (!defaultMaterialSel) return;
-        const materials = getMaterialsByBrand(brand);
-        defaultMaterialSel.innerHTML = materials.map(m =>
-            `<option value="${escapeHtml(m.name)}">${escapeHtml(m.name)}</option>`
-        ).join('');
-        const nextMaterial = materials.some(m => m.name === preferredMaterial)
-            ? preferredMaterial
-            : (materials[0]?.name || '');
-        defaultMaterialSel.value = nextMaterial;
-        quoteOptions.brand = brand || '';
-        quoteOptions.material = nextMaterial;
-        if (colorDropdownContainer && nextMaterial) {
-            const rendered = renderColorDropdown(nextMaterial, preferredColor || '', false, brand);
-            colorDropdownContainer.innerHTML = rendered.html;
-            _initColorWheelCanvas(colorDropdownContainer);
-            colorDropdownContainer.setAttribute('data-selected-color', rendered.selected || '');
-            quoteOptions.color = rendered.selected || quoteOptions.color;
-        }
-    };
-    refreshDefaultMaterialControls(
-        existingDefaultBrand || defaultBrandSel?.value || defaultBrand || '',
-        existingDefaultMaterial || defaultMaterial || '',
-        existingDefaultColor || defaultColor || '',
-    );
-
-    // Brand → Material filtering
-    const _brandSel = document.getElementById('uc-default-brand');
-    if (_brandSel) {
-        _brandSel.onchange = () => {
-            refreshDefaultMaterialControls(_brandSel.value, '', '');
-        };
-    }
-
-    /* Keep these handlers stable across repeated table renders. */
-    if (defaultMaterialSel) {
-        defaultMaterialSel.onchange = () => {
-            refreshDefaultMaterialControls(defaultBrandSel ? defaultBrandSel.value : '', defaultMaterialSel.value, '');
-        };
-    }
-
-    /* The color selector is rendered by refreshDefaultMaterialControls. */
-    if (colorDropdownContainer) {
-        colorDropdownContainer.onclick = (e) => {
-            const item = e.target.closest('.color-dd-item');
-            if (item) {
-                const hex = item.getAttribute('data-color-hex');
-                if (hex) {
-                    colorDropdownContainer.setAttribute('data-selected-color', hex);
-                    quoteOptions.color = hex;
-                }
-            }
-        };
-    }
+    // Front default controls live in the quote workspace now.
+    refreshDefaultMaterialControls({ preserveValues: false, updateQuoteOptions: false });
 
     if (cfgMachineHourlyRate) cfgMachineHourlyRate.value = String(PRICING_CONFIG.machine_hourly_rate_cny ?? 15);
     if (cfgSetupFee) cfgSetupFee.value = String(PRICING_CONFIG.setup_fee_cny ?? 0);

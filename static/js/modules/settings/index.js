@@ -4,6 +4,7 @@ export {
     fetchUserSettings,
     updateDropdowns,
     refreshQuoteColorDropdowns,
+    refreshDefaultMaterialControls,
     buildPrinterOptionsHtml,
     updateUploadLimitHint,
 } from './common.js';

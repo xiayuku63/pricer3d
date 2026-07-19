@@ -176,8 +176,8 @@ export function initColorDropdownUI({ quoteOptions, currentResults, selectedFile
                 return;
             }
 
-            if (wrapper.closest('#uc-default-color-dropdown')) {
-                const defaultColorContainer = wrapper.closest('#uc-default-color-dropdown');
+            if (wrapper.closest('#uc-default-color-dropdown, #front-default-color-dropdown')) {
+                const defaultColorContainer = wrapper.closest('#uc-default-color-dropdown, #front-default-color-dropdown');
                 defaultColorContainer.setAttribute('data-selected-color', hex);
                 quoteOptions.color = hex;
                 return;

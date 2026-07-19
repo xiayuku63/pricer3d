@@ -24,6 +24,13 @@ let layFaceState = 'idle';
 let layFaceAbortController = null;
 let layFaceEscapeBound = false;
 
+function setButtonLabelText(button, label) {
+    if (!button) return;
+    const labelEl = button.querySelector('[data-button-label], [data-orientation-label]');
+    if (labelEl) labelEl.textContent = label;
+    else button.textContent = label;
+}
+
 export function initOrientationUI(d) { dom = d; }
 
 // ── Face click handler (set from main.js) ──
@@ -39,9 +46,7 @@ function setLayFaceHint(visible, message = null) {
 function setLayFaceButtonLabel(label, { disabled = false, active = false } = {}) {
     const { layFaceBtn } = dom;
     if (!layFaceBtn) return;
-    const labelEl = layFaceBtn.querySelector('[data-orientation-label]');
-    if (labelEl) labelEl.textContent = label;
-    else layFaceBtn.textContent = label;
+    setButtonLabelText(layFaceBtn, label);
     layFaceBtn.disabled = disabled;
     layFaceBtn.setAttribute('aria-pressed', String(active));
     layFaceBtn.dataset.state = active ? 'active' : (disabled ? 'loading' : 'idle');
@@ -379,9 +384,9 @@ export async function learnedAutoOrient() {
                 const timeMin = Math.round(p.print_time_s / 60);
                 label = `✓ ${p.filament_cm3.toFixed(1)}cm³ / ${timeMin}min`;
             }
-            orientLearnedBtn.textContent = label;
+            setButtonLabelText(orientLearnedBtn, label);
             setTimeout(() => {
-                orientLearnedBtn.textContent = t('orientation.autoLearn');
+                setButtonLabelText(orientLearnedBtn, t('orientation.autoLearn'));
             }, 2000);
         }
 
@@ -389,9 +394,9 @@ export async function learnedAutoOrient() {
     } catch (e) {
         console.error('智能摆放失败:', e);
         if (orientLearnedBtn) {
-            orientLearnedBtn.textContent = t('orientation.learnedFailed');
+            setButtonLabelText(orientLearnedBtn, t('orientation.learnedFailed'));
             setTimeout(() => {
-                orientLearnedBtn.textContent = t('orientation.autoLearn');
+                setButtonLabelText(orientLearnedBtn, t('orientation.autoLearn'));
             }, 3000);
         }
     } finally {
@@ -425,7 +430,7 @@ export async function saveOrientationAndRequote() {
     const orient = syncOrientationFromMesh() || quoteOptions.orientation || { x: 0, y: 0, z: 0 };
     if (orientSaveBtn) {
         orientSaveBtn.disabled = true;
-        orientSaveBtn.textContent = 'Saving quote...';
+        setButtonLabelText(orientSaveBtn, t('orientation.savingQuote'));
     }
 
     try {
@@ -462,7 +467,7 @@ export async function saveOrientationAndRequote() {
         recalcSummaryFromCurrentResults();
 
         if (orientSaveBtn) {
-            orientSaveBtn.textContent = 'Saved ?';
+            setButtonLabelText(orientSaveBtn, t('orientation.savedQuote'));
             orientSaveBtn.disabled = false;
         }
 
@@ -474,9 +479,9 @@ export async function saveOrientationAndRequote() {
     } catch (e) {
         console.error('Failed to save orientation:', e);
         if (orientSaveBtn) {
-            orientSaveBtn.textContent = 'Save failed';
+            setButtonLabelText(orientSaveBtn, t('orientation.saveQuoteFailed'));
             setTimeout(() => {
-                orientSaveBtn.textContent = 'Save orientation and re-quote';
+                setButtonLabelText(orientSaveBtn, t('orientation.saveQuote'));
             }, 3000);
         }
     } finally {

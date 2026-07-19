@@ -40,27 +40,7 @@
 
                                     <!-- Sub-pane: materials -->
                                     <div id="pp-sub-materials" class="pp-sub-pane space-y-4">
-                                        <p class="text-xs tw-text-muted" data-i18n="settings.materialHint">管理打印材料的名称、密度、单价和可选颜色。 <span class="inline-flex items-center gap-1 ml-1 px-1.5 py-px rounded text-[10px]" style="background-color: var(--color-warning-bg); color: var(--color-warning-text); border: 1px solid var(--color-warning-border);">默认项<span class="tw-text-muted font-normal">· 点底部「保存设置」生效</span></span></p>
-
-                                        <!-- Default brand, material & color selectors -->
-                                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-xl">
-                                            <div>
-                                                <label class="block text-xs tw-text-secondary" data-i18n="settings.defaultBrand">默认品牌</label>
-                                                <select id="uc-default-brand" class="tw-input mt-1 block w-full py-2 px-3 rounded-md text-sm tw-bg-surface">
-                                                    </select>
-                                            </div>
-                                            <div>
-                                                <label class="block text-xs tw-text-secondary" data-i18n="settings.defaultMaterial">默认材料</label>
-                                                <select id="uc-default-material" class="tw-input mt-1 block w-full py-2 px-3 rounded-md text-sm tw-bg-surface">
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label class="block text-xs tw-text-secondary" data-i18n="settings.defaultColor">默认颜色</label>
-                                                <div id="uc-default-color-dropdown" class="mt-1 uc-default-color-dropdown">
-                                                    <!-- renderColorDropdown 渲染 -->
-                                                </div>
-                                            </div>
-                                        </div>
+                                        <p class="text-xs tw-text-muted" data-i18n="settings.materialHint">管理打印材料的名称、密度、单价和可选颜色。</p>
                                         
                                         <!-- Materials table -->
                                         <div class="pt-4 mt-4" style="border-top: 1px solid var(--color-border);">
@@ -94,24 +74,7 @@
 
                                     <!-- Sub-pane: printer -->
                                     <div id="pp-sub-printer" class="pp-sub-pane hidden space-y-4">
-                                        <p class="text-xs tw-text-muted" data-i18n="settings.printerHint">选择打印机型号和喷嘴直径，切片时将自动加载对应配置。 <span class="inline-flex items-center gap-1 ml-1 px-1.5 py-px rounded text-[10px]" style="background-color: var(--color-warning-bg); color: var(--color-warning-text); border: 1px solid var(--color-warning-border);">默认项<span class="tw-text-muted font-normal">· 点底部「保存设置」生效</span></span></p>
-                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md">
-                                            <div>
-                                                <label class="block text-xs tw-text-secondary" data-i18n="printer.model">打印机型号</label>
-                                                <select id="cfg-printer-model-main" class="tw-input mt-1 block w-full py-2 px-3 rounded-md text-sm">
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label class="block text-xs tw-text-secondary" data-i18n="printer.nozzle">喷嘴直径</label>
-                                                <select id="cfg-nozzle-diameter" class="tw-input mt-1 block w-full py-2 px-3 rounded-md text-sm">
-                                                    <option value="0.2">0.2 mm</option>
-                                                    <option value="0.4" selected>0.4 mm</option>
-                                                    <option value="0.6">0.6 mm</option>
-                                                    <option value="0.8">0.8 mm</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                        <div id="printer-bed-info" class="text-xs tw-text-muted mt-1"></div>
+                                        <p class="text-xs tw-text-muted" data-i18n="settings.printerHint">管理启用机型和自定义打印机参数。</p>
 
                                         <!-- Enabled printers -->
                                         <div class="pt-4 mt-4" style="border-top: 1px solid var(--color-border);">
@@ -177,14 +140,7 @@
 
                                     <!-- ═══ Slicer pane (简化版) ═══ -->
                                     <div id="pp-sub-slicer" class="pp-sub-pane hidden space-y-4">
-                                        <p class="text-xs tw-text-muted" data-i18n="settings.slicerHint">选择影响打印时间和重量的关键参数。 <span class="inline-flex items-center gap-1 ml-1 px-1.5 py-px rounded text-[10px]" style="background-color: var(--color-warning-bg); color: var(--color-warning-text); border: 1px solid var(--color-warning-border);">默认项<span class="tw-text-muted font-normal">· 点底部「保存设置」生效</span></span></p>
-
-                                        <!-- Default preset selector -->
-                                        <div id="uc-default-preset-dropdown" class="uc-default-preset-dropdown">
-                                            <label class="block text-xs tw-text-secondary" data-i18n="settings.defaultPreset">默认切片预设</label>
-                                            <select id="gen-preset-select" class="tw-input mt-1 block w-full py-2 px-3 rounded-md text-sm">
-                                            </select>
-                                        </div>
+                                        <p class="text-xs tw-text-muted" data-i18n="settings.slicerHint">选择影响打印时间和重量的关键参数。</p>
 
                                         <!-- Key parameters -->
                                         <div class="space-y-3">

@@ -20,13 +20,15 @@ test('each nozzle has a standard 2-wall 15-percent preset and restricted layer h
 
 test('changing the nozzle synchronizes its standard preset', async () => {
     const source = await readFile(printersUrl, 'utf8');
-    assert.match(source, /syncStandardPresetForNozzle\(\);/);
+    assert.match(source, /const frontDefaultPrinter = document\.getElementById\('front-default-printer-model'\);/);
+    assert.match(source, /_populateNozzleDropdown\('front-default-nozzle-diameter', frontDefaultPrinter\.value\)/);
 });
 
 test('settings save snapshots and restores the selected nozzle around async refreshes', async () => {
     const source = await readFile(profileUrl, 'utf8');
-    assert.match(source, /const nozzle = String\(\(cfgNozzle && cfgNozzle\.value\) \|\| defaultNozzle \|\| ''\)\.trim\(\);/);
-    assert.match(source, /const refreshedNozzle = document\.getElementById\('cfg-nozzle-diameter'\);/);
+    assert.match(source, /const nozzleSel = document\.getElementById\('front-default-nozzle-diameter'\);/);
+    assert.match(source, /const nozzle = String\(\(nozzleSel && nozzleSel\.value\) \|\| defaultNozzle \|\| ''\)\.trim\(\);/);
+    assert.match(source, /const refreshedNozzle = document\.getElementById\('front-default-nozzle-diameter'\);/);
     assert.match(source, /refreshedNozzle\.value = savedNozzle;/);
 });
 

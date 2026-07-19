@@ -40,6 +40,7 @@ import {
 import {
     initSettings, fetchUserSettings, updateDropdowns, refreshQuoteColorDropdowns,
     buildPrinterOptionsHtml, renderUserCenterUI,
+    refreshDefaultMaterialControls,
     syncPricingFromInputs, validateCurrentFormulas,
     saveUserSettings, setAsDefaults, changePassword,
     restoreDefaultMaterials,
@@ -323,16 +324,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (batchSlicerPreset) {
         batchSlicerPreset.addEventListener('change', async () => {
             const val = batchSlicerPreset.value;
-            const paramsEl = document.getElementById('batch-preset-params');
             const layerEl = document.getElementById('gen-layer-height');
             const wallEl = document.getElementById('gen-wall-count');
             const infillEl = document.getElementById('gen-infill');
             if (!val) {
                 quoteOptions.slicer_preset_id = null;
                 saveSlicerPresetSelection();
-                if (paramsEl) { paramsEl.classList.add('hidden'); paramsEl.textContent = ''; }
-                // Sync gen-preset-select in user center
-                const genSel = document.getElementById('gen-preset-select');
+                const genSel = document.getElementById('front-default-slicer-preset');
                 if (genSel) genSel.value = '';
                 setDefaultSlicerPresetId(null);
                 await reQuoteAllSelectedFiles(t('quote.recalculate'));
@@ -340,8 +338,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             quoteOptions.slicer_preset_id = Number(val);
             saveSlicerPresetSelection();
-            // Sync gen-preset-select in user center
-            const genSel = document.getElementById('gen-preset-select');
+            const genSel = document.getElementById('front-default-slicer-preset');
             if (genSel) genSel.value = val;
             setDefaultSlicerPresetId(Number(val));
             // Show param summary
@@ -356,10 +353,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (layerEl && p.layer_height != null) layerEl.value = Number(p.layer_height).toFixed(2);
                         if (wallEl && p.perimeters != null) wallEl.value = String(p.perimeters);
                         if (infillEl && p.fill_density != null) infillEl.value = String(p.fill_density);
-                        if (paramsEl) {
-                            paramsEl.textContent = `层高:${p.layer_height || '-'} 墙:${p.perimeters || '-'} 填充:${p.fill_density || '-'}%`;
-                            paramsEl.classList.remove('hidden');
-                        }
                     }
                 }
             } catch (e) { /* ignore */ }
@@ -407,6 +400,7 @@ document.addEventListener('DOMContentLoaded', () => {
         },
         settings: {
             renderUserCenterUI,
+            refreshDefaultMaterialControls,
             syncPricingFromInputs,
             validateCurrentFormulas,
             saveUserSettings,

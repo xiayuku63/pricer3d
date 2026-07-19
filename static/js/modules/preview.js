@@ -203,6 +203,12 @@ export async function buildThumbnails(selectedFiles, colorByFilename = {}) {
 // ── Preview modal ──
 export function openPreviewModal(onFaceClickCb) {
     const { previewModal, previewContainer, viewCube, layFaceBtn, orientSaveBtn, orientLearnedBtn } = dom;
+    const setButtonLabel = (button, label) => {
+        if (!button) return;
+        const labelEl = button.querySelector('[data-button-label], [data-orientation-label]');
+        if (labelEl) labelEl.textContent = label;
+        else button.textContent = label;
+    };
     if (previewModal) previewModal.classList.remove('hidden');
     const width = previewContainer?.clientWidth || 1000;
     const height = previewContainer?.clientHeight || 700;
@@ -224,8 +230,8 @@ export function openPreviewModal(onFaceClickCb) {
         layFaceBtn.disabled = false;
         layFaceBtn.setAttribute('aria-pressed', 'false');
     }
-    if (orientSaveBtn) { orientSaveBtn.textContent = '保存当前方向并报价'; orientSaveBtn.disabled = false; }
-    if (orientLearnedBtn) { orientLearnedBtn.textContent = t('orientation.autoLearn'); orientLearnedBtn.disabled = false; }
+    if (orientSaveBtn) { setButtonLabel(orientSaveBtn, t('orientation.saveQuote')); orientSaveBtn.disabled = false; }
+    if (orientLearnedBtn) { setButtonLabel(orientLearnedBtn, t('orientation.autoLearn')); orientLearnedBtn.disabled = false; }
 }
 
 export function closePreviewModal() {

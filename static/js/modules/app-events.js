@@ -36,6 +36,7 @@ export function initSettingsAreaEvents({
 
     const {
         renderUserCenterUI,
+        refreshDefaultMaterialControls,
         syncPricingFromInputs,
         validateCurrentFormulas,
         saveUserSettings,
@@ -73,7 +74,7 @@ export function initSettingsAreaEvents({
 
     bind(dom.userCenterCloseBtn, 'click', hideUserCenter);
     bind(dom.userCenterBackdrop, 'click', hideUserCenter);
-    bind(dom.userCenterSaveBtn, 'click', saveUserSettings);
+    bind(dom.frontDefaultSaveBtn, 'click', () => saveUserSettings({ source: 'front' }));
     bind(dom.userCenterSetDefaultsBtn, 'click', setAsDefaults);
     bind(dom.ucChangePasswordBtn, 'click', changePassword);
 
@@ -96,37 +97,52 @@ export function initSettingsAreaEvents({
     bind(document.getElementById('custom-pp-save-btn'), 'click', saveCustomPrinter);
     bind(document.getElementById('custom-pp-cancel-btn'), 'click', hideCustomPrinterForm);
 
-    const ucPrinterSel = document.getElementById('cfg-printer-model-main');
-    if (ucPrinterSel) {
-        ucPrinterSel.addEventListener('change', () => {
+    const frontDefaultBrandSel = document.getElementById('front-default-brand');
+    if (frontDefaultBrandSel) {
+        frontDefaultBrandSel.addEventListener('change', () => {
+            quoteOptions.brand = frontDefaultBrandSel.value || '';
+            refreshDefaultMaterialControls('front', { preserveValues: true, updateQuoteOptions: true });
+        });
+    }
+
+    const frontDefaultMaterialSel = document.getElementById('front-default-material');
+    if (frontDefaultMaterialSel) {
+        frontDefaultMaterialSel.addEventListener('change', () => {
+            quoteOptions.material = frontDefaultMaterialSel.value || '';
+            refreshDefaultMaterialControls('front', { preserveValues: true, updateQuoteOptions: true });
+        });
+    }
+
+    const frontDefaultPrinterSel = document.getElementById('front-default-printer-model');
+    if (frontDefaultPrinterSel) {
+        frontDefaultPrinterSel.addEventListener('change', () => {
             const batchPrinter = document.getElementById('batch-printer-model');
-            if (batchPrinter && ucPrinterSel.value) {
-                batchPrinter.value = ucPrinterSel.value;
+            if (batchPrinter && frontDefaultPrinterSel.value) {
+                batchPrinter.value = frontDefaultPrinterSel.value;
                 batchPrinter.dispatchEvent(new Event('change'));
             }
         });
     }
 
-    const ucNozzleSel = document.getElementById('cfg-nozzle-diameter');
-    if (ucNozzleSel) {
-        ucNozzleSel.addEventListener('change', () => {
+    const frontDefaultNozzleSel = document.getElementById('front-default-nozzle-diameter');
+    if (frontDefaultNozzleSel) {
+        frontDefaultNozzleSel.addEventListener('change', () => {
             const batchNozzle = document.getElementById('batch-nozzle-diameter');
-            if (batchNozzle && ucNozzleSel.value) {
-                batchNozzle.value = ucNozzleSel.value;
+            if (batchNozzle && frontDefaultNozzleSel.value) {
+                batchNozzle.value = frontDefaultNozzleSel.value;
                 batchNozzle.dispatchEvent(new Event('change'));
             }
         });
     }
 
-    const ucMaterialSel = document.getElementById('uc-default-material');
-    if (ucMaterialSel) {
-        ucMaterialSel.addEventListener('change', () => {
-            const batchMat = document.getElementById('batch-material');
-            if (batchMat && ucMaterialSel.value) {
-                batchMat.value = ucMaterialSel.value;
-                batchMat.dispatchEvent(new Event('change'));
+    const frontDefaultPresetSel = document.getElementById('front-default-slicer-preset');
+    if (frontDefaultPresetSel) {
+        frontDefaultPresetSel.addEventListener('change', () => {
+            const batchPreset = document.getElementById('batch-slicer-preset');
+            if (batchPreset) {
+                batchPreset.value = frontDefaultPresetSel.value;
+                batchPreset.dispatchEvent(new Event('change'));
             }
-            if (ucMaterialSel.value) quoteOptions.material = ucMaterialSel.value;
         });
     }
 
@@ -192,8 +208,8 @@ export function initSettingsAreaEvents({
                 renderUserCenterUI();
             } else if (field === 'brand') {
                 MATERIAL_OPTIONS[idx].brand = target.value;
-                const brandSel = document.getElementById('uc-default-brand');
-                const matSel = document.getElementById('uc-default-material');
+                const brandSel = document.getElementById('front-default-brand');
+                const matSel = document.getElementById('front-default-material');
                 if (brandSel) {
                     const usedBrands = getUsedBrandOptions();
                     const prevBrand = brandSel.value;
