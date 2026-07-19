@@ -20,50 +20,87 @@ import {
 import { t } from '../i18n.js';
 import { openLoginModal } from '../auth.js';
 import { renderSlicerPresetsUI, fetchSlicerPresets, fetchPrinterModels } from '../presets.js';
-import { refreshOptionsSummary, normalizeResultsWithCurrentOptions, renderResultsTable, recalcSummaryFromCurrentResults, reQuoteAllSelectedFiles, getSlicerConfigSnapshot, getAffectedFilenamesForSlicerConfigChange, refreshBatchMaterialDropdown, refreshBatchBrandDropdown } from '../quote.js';
+import { refreshOptionsSummary, normalizeResultsWithCurrentOptions, renderResultsTable, recalcSummaryFromCurrentResults, reQuoteAllSelectedFiles } from '../quote.js';
 import { updateDropdowns, dom } from './common.js';
 import { syncPricingFromInputs, validateCurrentFormulas } from './pricing.js';
 
+function _collectDefaultSettings() {
+    const printerSel = document.getElementById('front-default-printer-model');
+    const nozzleSel = document.getElementById('front-default-nozzle-diameter');
+    const presetSel = document.getElementById('front-default-slicer-preset');
+    const brandSel = document.getElementById('front-default-brand');
+    const materialSel = document.getElementById('front-default-material');
+    const colorContainer = document.getElementById('front-default-color-dropdown');
+    const printerId = (printerSel && printerSel.value) ? printerSel.value : defaultPrinterId;
+    const nozzle = String((nozzleSel && nozzleSel.value) || defaultNozzle || '').trim();
+    const presetRawValue = presetSel ? String(presetSel.value || '').trim() : '';
+    const presetId = presetRawValue ? Number(presetRawValue) : null;
+    const effectivePresetId = presetId || null;
+    const newDefaultBrand = (brandSel && brandSel.value) ? brandSel.value : null;
+    const newDefaultMaterial = (materialSel && materialSel.value) ? materialSel.value : null;
+    const newDefaultColor = colorContainer ? (colorContainer.getAttribute('data-selected-color') || null) : null;
+    return {
+        printerId: printerId || null,
+        nozzle: nozzle || null,
+        presetId,
+        effectivePresetId,
+        newDefaultBrand,
+        newDefaultMaterial,
+        newDefaultColor,
+    };
+}
+
+function _setButtonLoadingState(button, text) {
+    if (!button) return '';
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = text;
+    return originalText;
+}
+
+function _restoreButtonState(button, text) {
+    if (!button) return;
+    button.disabled = false;
+    button.textContent = text;
+    button.classList.remove('bg-green-600');
+    button.classList.add('bg-indigo-600');
+}
+
+function _showButtonSavedState(button) {
+    if (!button) return;
+    button.textContent = t('settings.saved');
+    button.classList.add('bg-green-600');
+    button.classList.remove('bg-indigo-600');
+}
+
 // ── Save user settings ──
-export async function saveUserSettings() {
-    const { userCenterModal, userCenterMsg, userCenterSaveBtn } = dom;
+export async function saveUserSettings(options = {}) {
+    const {
+        saveBtn = dom.frontDefaultSaveBtn,
+        messageEl = dom.frontDefaultMsg,
+    } = options;
     if (!authToken) return;
-    const previousSlicerConfig = getSlicerConfigSnapshot();
-    const previousPricingConfig = JSON.stringify(PRICING_CONFIG);
     
     // Show loading state on button
-    const originalBtnText = userCenterSaveBtn ? userCenterSaveBtn.textContent : '';
-    if (userCenterSaveBtn) {
-        userCenterSaveBtn.disabled = true;
-        userCenterSaveBtn.textContent = t('settings.saving');
-    }
+    const originalBtnText = _setButtonLoadingState(saveBtn, t('settings.saving'));
     
     try {
         const formulaOk = await validateCurrentFormulas();
         if (!formulaOk) {
-            if (userCenterSaveBtn) { userCenterSaveBtn.disabled = false; userCenterSaveBtn.textContent = originalBtnText; }
+            _restoreButtonState(saveBtn, originalBtnText);
             return;
         }
         syncPricingFromInputs();
 
-        // Capture user center printer / nozzle / preset as defaults
-        const cfgModel = document.getElementById("cfg-printer-model-main");
-        const cfgNozzle = document.getElementById("cfg-nozzle-diameter");
-        const genPreset = document.getElementById("gen-preset-select");
-        const printerId = (cfgModel && cfgModel.value) ? cfgModel.value : defaultPrinterId;
-        // Snapshot the user's selection before any async preset/printer
-        // refresh can rebuild the controls and restore the previous default.
-        const nozzle = String((cfgNozzle && cfgNozzle.value) || defaultNozzle || '').trim();
-        const presetId = (genPreset && genPreset.value) ? Number(genPreset.value) : null;
-        const effectivePresetId = presetId || defaultSlicerPresetId;
-
-        // Capture default brand, material and color
-        const defaultBrandSel = document.getElementById("uc-default-brand");
-        const defaultMaterialSel = document.getElementById("uc-default-material");
-        const colorDropdownContainer = document.getElementById("uc-default-color-dropdown");
-        const newDefaultBrand = (defaultBrandSel && defaultBrandSel.value) ? defaultBrandSel.value : null;
-        const newDefaultMaterial = (defaultMaterialSel && defaultMaterialSel.value) ? defaultMaterialSel.value : null;
-        const newDefaultColor = colorDropdownContainer ? (colorDropdownContainer.getAttribute('data-selected-color') || null) : null;
+        // Capture front defaults
+        const {
+            printerId,
+            nozzle,
+            effectivePresetId,
+            newDefaultBrand,
+            newDefaultMaterial,
+            newDefaultColor,
+        } = _collectDefaultSettings();
 
         const isMemberSave = currentUser?.membership_level === 'member';
         const pricingToSend = isMemberSave ? PRICING_CONFIG : (() => {
@@ -97,7 +134,7 @@ export async function saveUserSettings() {
         const res = await authFetch('/api/user/settings', {
             method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
         });
-        if (res.status === 401) { if (userCenterModal) userCenterModal.classList.add('hidden'); openLoginModal(); return; }
+        if (res.status === 401) { openLoginModal(); return; }
         if (!res.ok) {
             let data = null;
             try { data = await res.json(); } catch (e) {}
@@ -113,12 +150,8 @@ export async function saveUserSettings() {
             throw new Error(`喷嘴直径保存失败：服务端返回 ${savedNozzle || '空值'}，期望 ${nozzle || '空值'}`);
         }
         // Show success feedback on button
-        if (userCenterSaveBtn) {
-            userCenterSaveBtn.textContent = t('settings.saved');
-            userCenterSaveBtn.classList.add('bg-green-600');
-            userCenterSaveBtn.classList.remove('bg-indigo-600');
-        }
-        if (userCenterMsg) { userCenterMsg.classList.remove('hidden'); }
+        _showButtonSavedState(saveBtn);
+        if (messageEl) { messageEl.classList.remove('hidden'); }
 
         // Save brand settings (member only)
         if (currentUser?.membership_level === 'member') {
@@ -158,46 +191,23 @@ export async function saveUserSettings() {
             quoteOptions.material = validMaterials[0].name;
         }
         quoteOptions.color = newDefaultColor || quoteOptions.color;
-        // Sync batch toolbar with new defaults
         await fetchPrinterModels();
         await fetchSlicerPresets();
-        const refreshedNozzle = document.getElementById('cfg-nozzle-diameter');
+        const refreshedNozzle = document.getElementById('front-default-nozzle-diameter');
         if (refreshedNozzle && savedNozzle) refreshedNozzle.value = savedNozzle;
-        const refreshedBatchNozzle = document.getElementById('batch-nozzle-diameter');
-        if (refreshedBatchNozzle && savedNozzle && Array.from(refreshedBatchNozzle.options).some((option) => option.value === savedNozzle)) {
-            refreshedBatchNozzle.value = savedNozzle;
-        }
         updateDropdowns();
         if (refreshedNozzle && savedNozzle) refreshedNozzle.value = savedNozzle;
         normalizeResultsWithCurrentOptions();
         renderResultsTable();
         recalcSummaryFromCurrentResults();
-        // Close modal after brief delay to show feedback
         setTimeout(() => {
-            if (userCenterModal) userCenterModal.classList.add('hidden');
-            // Restore button state
-            if (userCenterSaveBtn) {
-                userCenterSaveBtn.disabled = false;
-                userCenterSaveBtn.textContent = originalBtnText;
-                userCenterSaveBtn.classList.remove('bg-green-600');
-                userCenterSaveBtn.classList.add('bg-indigo-600');
-            }
-            if (userCenterMsg) userCenterMsg.classList.add('hidden');
+            _restoreButtonState(saveBtn, originalBtnText);
+            if (messageEl) messageEl.classList.add('hidden');
         }, 1200);
-        const nextSlicerConfig = getSlicerConfigSnapshot();
-        const affectedBySlicer = new Set(getAffectedFilenamesForSlicerConfigChange(previousSlicerConfig, nextSlicerConfig));
-        const pricingChanged = previousPricingConfig !== JSON.stringify(PRICING_CONFIG);
-        if (pricingChanged) {
-            await reQuoteAllSelectedFiles(t('settings.recalcAfterSave'));
-        } else if (affectedBySlicer.size > 0) {
-            await reQuoteAllSelectedFiles(t('settings.recalcAfterSave'), (result) => affectedBySlicer.has(result?.filename));
-        }
+        await reQuoteAllSelectedFiles(t('settings.recalcAfterSave'));
     } catch (e) {
         // Restore button state on error
-        if (userCenterSaveBtn) {
-            userCenterSaveBtn.disabled = false;
-            userCenterSaveBtn.textContent = originalBtnText;
-        }
+        _restoreButtonState(saveBtn, originalBtnText);
         alert(e.message);
     }
 }

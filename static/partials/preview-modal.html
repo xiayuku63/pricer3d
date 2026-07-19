@@ -2,10 +2,10 @@
             <div id="preview-modal" class="hidden fixed inset-0 z-50">
                 <div id="preview-backdrop" class="absolute inset-0" style="background-color: var(--color-overlay);"></div>
                 <div class="relative z-10 h-full w-full flex items-center justify-center p-4">
-                    <div class="w-full max-w-5xl tw-card shadow-xl overflow-hidden" style="border-radius: var(--radius-lg);">
-                        <div class="px-4 py-3 flex items-center justify-between" style="border-bottom: 1px solid var(--color-border);">
-                            <h4 class="text-sm font-semibold tw-text-strong">模型在线预览</h4>
-                            <button id="preview-close-btn" type="button" class="p-1.5 rounded-lg hover:bg-gray-100 tw-text-muted hover:tw-text transition-colors" aria-label="关闭预览">
+                    <div class="w-full max-w-5xl tw-card apple-preview-shell shadow-xl overflow-hidden" style="border-radius: var(--radius-lg);">
+                        <div class="apple-preview-header px-4 py-3 flex items-center justify-between" style="border-bottom: 1px solid var(--color-border);">
+                            <h4 class="text-sm font-semibold tw-text-strong" data-i18n="preview.title">3D 预览</h4>
+                            <button id="preview-close-btn" type="button" class="p-1.5 rounded-lg tw-btn-ghost tw-text-muted hover:tw-text transition-colors" aria-label="关闭预览">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                             </button>
                         </div>
@@ -22,42 +22,46 @@
                                     <button data-view="right"  class="view-cube-btn w-9 h-9 rounded text-[10px] font-bold tw-card border shadow-sm transition-colors backdrop-blur-sm" style="border-color: var(--color-border-strong); color: var(--color-text);">右</button>
                                 </div>
                             </div>
-                            <div class="w-full md:w-1/4 p-3 flex flex-col gap-2" style="background-color: var(--color-bg); border-top: 1px solid var(--color-border); md:border-t-0; md:border-left: 1px solid var(--color-border);">
-                                <div class="text-[11px] font-semibold tw-text-muted uppercase tracking-wider">方向调整</div>
-                                <div class="flex flex-col gap-1.5">
-                                    <button id="orient-learned-btn" type="button" title="自动选择最优打印面" class="w-full py-2 px-3 rounded-lg text-white text-xs font-semibold shadow-sm min-h-[40px] transition-all active:scale-[0.98] flex items-center gap-2" style="background: linear-gradient(to right, var(--color-success-400), var(--color-success));">
+                            <div class="apple-preview-sidebar w-full md:w-1/4 p-3 flex flex-col gap-3" style="border-top: 1px solid var(--color-border); md:border-t-0; md:border-left: 1px solid var(--color-border);">
+                                <div class="apple-preview-section">
+                                    <div class="apple-preview-heading" data-i18n="orientation.adjustTitle">方向调整</div>
+                                    <div class="mt-2 flex flex-col gap-2">
+                                    <button id="orient-learned-btn" type="button" title="自动选择最优打印面" class="apple-preview-btn apple-preview-btn-success text-xs font-semibold transition-all active:scale-[0.98]" data-preview-button="smart-orient">
                                         <svg class="w-4 h-4 flex-shrink-0"><use href="/static/partials/preview-icons.svg#icon-smart"></use></svg>
-                                        <span>智能摆放</span>
+                                        <span data-button-label data-i18n="orientation.autoLearn">智能摆放</span>
                                     </button>
-                                    <button id="lay-face-btn" type="button" title="点击模型面片手动选择摆放面" class="w-full py-2 px-3 rounded-lg text-white text-xs font-semibold shadow-sm min-h-[40px] transition-all active:scale-[0.98] flex items-center gap-2" style="background: linear-gradient(to right, var(--color-warning-400), var(--color-danger));">
-                                        <span data-orientation-label>手动摆放</span>
+                                    <button id="lay-face-btn" type="button" title="点击模型面片手动选择摆放面" class="apple-preview-btn apple-preview-btn-secondary text-xs font-semibold transition-all active:scale-[0.98]" data-preview-button="manual-orient">
+                                        <svg class="w-4 h-4 flex-shrink-0"><use href="/static/partials/preview-icons.svg#icon-smart"></use></svg>
+                                        <span data-orientation-label data-i18n="orientation.autoOrient">手动摆放</span>
                                     </button>
-                                    <p id="lay-face-hint" aria-live="polite" class="hidden rounded-lg px-2.5 py-2 text-[11px] leading-4" style="background-color: rgba(59, 130, 246, 0.08); color: var(--color-primary); border: 1px solid rgba(59, 130, 246, 0.18);">
+                                    <p id="lay-face-hint" aria-live="polite" class="apple-preview-hint hidden px-2.5 py-2 text-[11px] leading-4" data-i18n="orientation.pickFaceHint">
                                         请选择一个要贴合打印平台的底面
                                     </p>
-                                    <div class="flex gap-1.5">
-                                        <button id="orient-center-btn" type="button" title="将模型移至打印平台中央" class="flex-1 py-2 px-2 rounded-lg min-h-[40px] transition-all active:scale-[0.98] flex items-center justify-center gap-1.5" style="border: 1px solid var(--color-border-strong); color: var(--color-text);">
+                                    <div class="apple-preview-button-grid">
+                                        <button id="orient-center-btn" type="button" title="将模型移至打印平台中央" class="apple-preview-btn text-xs transition-all active:scale-[0.98] min-w-0">
                                             <svg class="w-4 h-4 flex-shrink-0"><use href="/static/partials/preview-icons.svg#icon-center"></use></svg>
-                                            <span>模型居中</span>
+                                            <span data-i18n="orientation.centerModel">模型居中</span>
                                         </button>
-                                        <button id="orient-reset-btn" type="button" title="恢复模型原始朝向" class="flex-1 py-2 px-2 rounded-lg min-h-[40px] transition-all active:scale-[0.98] flex items-center justify-center gap-1.5" style="border: 1px solid var(--color-border-strong); color: var(--color-text);">
+                                        <button id="orient-reset-btn" type="button" title="恢复模型原始朝向" class="apple-preview-btn text-xs transition-all active:scale-[0.98] min-w-0">
                                             <svg class="w-4 h-4 flex-shrink-0"><use href="/static/partials/preview-icons.svg#icon-reset"></use></svg>
-                                            <span>重置方向</span>
+                                            <span data-i18n="orientation.resetDirection">重置方向</span>
                                         </button>
                                     </div>
                                 </div>
-                                <div class="my-2" style="border-top: 1px solid var(--color-border);"></div>
-                                <div class="text-[11px] font-semibold tw-text-muted uppercase tracking-wider">操作</div>
-                                <div class="flex flex-col gap-1.5">
-                                    <button id="orient-train-btn" type="button" title="标记当前方向为训练样本" class="w-full py-2 px-3 rounded-lg border border-dashed min-h-[40px] transition-all active:scale-[0.98] flex items-center justify-center gap-2" style="border-color: var(--color-warning-300); color: var(--color-warning-600); font-size: 0.75rem; font-weight: 500;">
+                                </div>
+                                <div class="apple-preview-section">
+                                    <div class="apple-preview-heading" data-i18n="orientation.actionsTitle">操作</div>
+                                    <div class="mt-2 flex flex-col gap-2">
+                                    <button id="orient-train-btn" type="button" title="标记当前方向为训练样本" class="apple-preview-btn apple-preview-btn-warning text-xs font-medium transition-all active:scale-[0.98]">
                                         <svg class="w-4 h-4 flex-shrink-0"><use href="/static/partials/preview-icons.svg#icon-star"></use></svg>
-                                        <span>标记为最优方向</span>
+                                        <span data-i18n="orientation.markBest">标记为最优方向</span>
                                     </button>
-                                    <button id="orient-save-btn" type="button" title="保存方向并重新切片报价" class="w-full py-2 px-3 rounded-lg text-white text-xs font-semibold shadow-sm min-h-[40px] transition-all active:scale-[0.98] flex items-center justify-center gap-2" style="background: linear-gradient(to right, var(--color-primary-400), var(--color-primary));">
+                                    <button id="orient-save-btn" type="button" title="保存方向并重新切片报价" class="apple-preview-btn apple-preview-btn-primary text-xs font-semibold transition-all active:scale-[0.98]">
                                         <svg class="w-4 h-4 flex-shrink-0"><use href="/static/partials/preview-icons.svg#icon-save"></use></svg>
-                                        <span>保存当前方向并报价</span>
+                                        <span data-button-label data-i18n="orientation.saveQuote">保存当前方向并报价</span>
                                     </button>
-                                    <p id="orient-train-status" class="hidden text-xs tw-text-success text-center"></p>
+                                    <p id="orient-train-status" class="apple-preview-status hidden text-xs text-center"></p>
+                                    </div>
                                 </div>
                             </div>
                         </div>

@@ -61,5 +61,7 @@ test('default material color hides the visible HEX label without changing the dr
 });
 
 test('portal color selection persists the default color container value', () => {
-    assert.match(appShellSource, /if \(wrapper\.closest\('#uc-default-color-dropdown'\)\) \{[\s\S]*?const defaultColorContainer = wrapper\.closest\('#uc-default-color-dropdown'\);[\s\S]*?defaultColorContainer\.setAttribute\('data-selected-color', hex\);/);
+    assert.match(appShellSource, /if \(wrapper\.closest\('#uc-default-color-dropdown, #front-default-color-dropdown'\)\)/);
+    assert.match(appShellSource, /const defaultColorContainer = wrapper\.closest\('#uc-default-color-dropdown, #front-default-color-dropdown'\);/);
+    assert.match(appShellSource, /defaultColorContainer\.setAttribute\('data-selected-color', hex\);/);
 });

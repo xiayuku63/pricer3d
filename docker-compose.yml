@@ -1,23 +1,25 @@
 services:
   app:
-    build: .
+    build:
+      context: ${PRICER3D_APP_SOURCE:-.}
     container_name: pricer3d-app
     restart: unless-stopped
     ports:
-      - "127.0.0.1:5000:5000"
+      - "127.0.0.1:5001:5000"
     volumes:
-      - .:/app
+      - ${PRICER3D_APP_SOURCE:-.}:/app
       - /app/venv
       - /app/__pycache__
       - pricer3d_data:/app/data
       - /mnt/c/Users/Administrator/Desktop/pricer3d_outputs:/app/desktop_outputs
     env_file:
-      - .env
+      - ${PRICER3D_ENV_FILE:-.env}
     environment:
       - UPLOADS_DIR=/app/data/uploads
       - OUTPUTS_DIR=/app/data/outputs
       - USER_DATA_DIR=/app/data/user
       - DB_PATH=/app/data/app.db
+      - PRUSA_EXECUTABLE=/app/tools/prusa-slicer/usr/bin/prusa-slicer
 
 volumes:
   pricer3d_data:

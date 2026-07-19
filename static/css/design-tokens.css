@@ -368,8 +368,14 @@
   background-color: var(--color-surface) !important;
 }
 .dark select option:hover,
-.dark select option:checked {
-  background-color: var(--color-bg-hover) !important;
+.dark select option:checked,
+.dark select option:focus {
+  background-color: #0069d1 !important;
+  color: #ffffff !important;
+}
+.dark select option[selected] {
+  background-color: #0069d1 !important;
+  color: #ffffff !important;
 }
 
 /* ════════════════════════════════════════════════════════════════════

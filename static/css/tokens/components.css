@@ -348,10 +348,9 @@ select:focus-visible,
 }
 
 .color-dd-trigger-compact {
-  min-height: 30px;
+  height: 26px;
+  min-height: 0;
 }
-
-.color-dd-list .color-dd-item {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -377,13 +376,13 @@ select:focus-visible,
 }
 
 .color-dd-list .color-dd-item.color-dd-item-active {
-  background-color: #808080 !important;
+  background-color: #0069d1 !important;
   color: #ffffff !important;
 }
 
 .color-dd-list .color-dd-item.color-dd-item-active:hover,
 .color-dd-list .color-dd-item.color-dd-item-active:active {
-  background-color: #808080 !important;
+  background-color: #0069d1 !important;
 }
 
 .color-dd-list.color-dd-has-preview .color-dd-item.color-dd-item-active:not(.color-dd-item-preview) {
@@ -392,7 +391,7 @@ select:focus-visible,
 }
 
 .color-dd-list .color-dd-item.color-dd-item-preview {
-  background-color: #808080 !important;
+  background-color: #0069d1 !important;
   color: #ffffff !important;
 }
 
@@ -406,7 +405,7 @@ select:focus-visible,
 
 .color-dd-list .color-dd-item:hover,
 .color-dd-list .color-dd-item:focus-visible {
-  background-color: #808080 !important;
+  background-color: #0069d1 !important;
   color: #ffffff !important;
   outline: none;
 }
@@ -462,37 +461,118 @@ select:focus-visible,
 }
 
 /* The default color only needs to show a swatch and the menu affordance. */
-#uc-default-color-dropdown {
+#front-default-brand {
   width: 120px;
 }
 
-#uc-default-color-dropdown .color-dd-wrapper,
-#uc-default-color-dropdown .color-dd-trigger {
-  width: 100%;
+#front-default-material {
+  width: 120px;
 }
 
-/* Keep the preset selector compact while leaving the parameter controls below unchanged. */
-#uc-default-preset-dropdown {
-  width: 360px;
-  max-width: 100%;
+#front-default-printer-model {
+  width: 155px;
 }
 
-#uc-default-preset-dropdown .tw-input {
-  width: 100%;
+#front-default-nozzle-diameter {
+  width: 72px;
+}
+
+#front-default-slicer-preset {
+  width: 160px;
+}
+
+#front-default-color-dropdown {
+  width: 58px;
+  min-height: 26px;
+  margin-left: 0;
+}
+
+#front-default-color-dropdown .color-dd-wrapper {
+  width: 58px;
+  height: 26px;
+}
+
+#front-default-color-dropdown .color-dd-trigger {
+  width: 58px;
+  height: 26px;
+  min-height: 0;
+  padding: 2px 8px;
+}
+
+#front-default-color-dropdown .color-dd-trigger-label {
+  display: none;
+}
+
+#quote-default-settings-bar {
+  z-index: 30;
+}
+
+#quote-default-settings-bar,
+#batch-edit-bar {
+  min-width: 0;
+  min-height: 72px;
+  align-content: center;
+}
+
+/* 统一两侧属性选择框宽度 */
+#front-default-printer-model,
+#batch-printer-model {
+  width: 155px;
+  max-width: 155px;
+}
+
+#front-default-nozzle-diameter,
+#batch-nozzle-diameter {
+  width: 72px;
+}
+
+#front-default-slicer-preset,
+#batch-slicer-preset {
+  width: 160px;
+  max-width: 160px;
+}
+
+#front-default-brand,
+#batch-brand {
+  width: 120px;
+  max-width: 120px;
+}
+
+#front-default-material,
+#batch-material {
+  width: 120px;
+  max-width: 120px;
+}
+
+#batch-quantity {
+  height: 26px;
+}
+
+#quote-default-settings-bar > .flex.items-center {
+  flex-shrink: 0;
+}
+
+#batch-edit-bar > .flex.items-center {
+  flex-shrink: 0;
 }
 
 @media (max-width: 639px) {
-  #uc-default-color-dropdown,
-  #uc-default-preset-dropdown {
+  #front-default-brand,
+  #front-default-material,
+  #front-default-printer-model,
+  #front-default-nozzle-diameter,
+  #front-default-slicer-preset,
+  #front-default-color-dropdown {
     width: 100%;
   }
 }
 
 .color-dd-trigger-compact {
   justify-content: center;
-  min-height: 30px;
+  height: 26px;
+  min-height: 0;
   width: 58px;
-  padding: 4px 8px;
+  padding: 2px 8px;
   gap: 6px;
 }
 
@@ -518,6 +598,15 @@ select:focus-visible,
 .color-dd-item {
   border: 0;
   border-bottom: 1px solid var(--color-border);
+  height: 30px;
+  min-height: 0;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.color-dd-item .color-dd-item-swatch {
+  width: 16px !important;
+  height: 16px !important;
 }
 
 .color-dd-item:last-child {
@@ -700,6 +789,117 @@ select:focus-visible,
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
 }
 
+.apple-preview-shell {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(244, 247, 252, 0.88));
+}
+
+.apple-preview-header {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(248, 249, 252, 0.74));
+}
+
+.apple-preview-sidebar {
+  background: linear-gradient(180deg, rgba(248, 250, 255, 0.92), rgba(242, 246, 252, 0.86));
+}
+
+.apple-preview-section {
+  padding: 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(247, 249, 253, 0.64));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+
+.apple-preview-heading {
+  font-size: 11px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.apple-preview-button-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.apple-preview-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.76);
+  color: var(--color-text-strong) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.84), 0 8px 18px rgba(15, 23, 42, 0.05);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, color 0.2s ease;
+}
+
+.apple-preview-btn:hover {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(0, 122, 255, 0.18);
+  transform: translateY(-1px);
+}
+
+.apple-preview-btn:active {
+  background: var(--color-bg-active);
+  transform: translateY(0);
+}
+
+.apple-preview-btn:disabled {
+  opacity: 0.68;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.apple-preview-btn-primary {
+  border-color: rgba(0, 122, 255, 0.28);
+  background: linear-gradient(180deg, rgba(0, 122, 255, 0.92), rgba(0, 122, 255, 0.84));
+  color: #fff !important;
+  box-shadow: 0 12px 24px rgba(0, 122, 255, 0.22);
+}
+
+.apple-preview-btn-primary:hover {
+  background: linear-gradient(180deg, rgba(10, 132, 255, 0.96), rgba(0, 122, 255, 0.9));
+  border-color: rgba(0, 122, 255, 0.32);
+}
+
+.apple-preview-btn-success {
+  border-color: rgba(52, 199, 89, 0.24);
+  background: linear-gradient(180deg, rgba(241, 255, 246, 0.96), rgba(231, 249, 239, 0.88));
+}
+
+.apple-preview-btn-warning {
+  border-color: rgba(255, 159, 10, 0.26);
+  background: linear-gradient(180deg, rgba(255, 251, 244, 0.96), rgba(255, 245, 230, 0.9));
+  color: var(--color-warning-text) !important;
+}
+
+.apple-preview-btn-secondary[data-state="active"] {
+  border-color: rgba(0, 122, 255, 0.28);
+  background: linear-gradient(180deg, rgba(236, 245, 255, 0.96), rgba(226, 239, 255, 0.9));
+  color: var(--color-primary-text) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88), 0 10px 20px rgba(0, 122, 255, 0.12);
+}
+
+.apple-preview-hint {
+  border-radius: 14px;
+  background: rgba(0, 122, 255, 0.08);
+  color: var(--color-primary);
+  border: 1px solid rgba(0, 122, 255, 0.18);
+}
+
+.apple-preview-status {
+  min-height: 18px;
+  color: var(--color-text-muted);
+}
+
 .dark body {
   background:
     radial-gradient(circle at top left, rgba(59, 143, 255, 0.16), transparent 22%),
@@ -712,8 +912,42 @@ select:focus-visible,
 .dark .apple-toolbar,
 .dark .apple-upload-zone,
 .dark .apple-table-wrap,
-.dark .apple-muted-pill {
+.dark .apple-muted-pill,
+.dark .apple-preview-section,
+.dark .apple-preview-shell,
+.dark .apple-preview-header,
+.dark .apple-preview-sidebar {
   border-color: rgba(94, 124, 168, 0.34);
+}
+
+.dark .apple-preview-btn {
+  background: rgba(15, 23, 42, 0.68);
+  color: #f8fafc !important;
+  border-color: rgba(94, 124, 168, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 8px 18px rgba(2, 6, 23, 0.22);
+}
+
+.dark .apple-preview-btn:hover {
+  background: rgba(30, 41, 59, 0.88);
+}
+
+.dark .apple-preview-btn-success {
+  background: linear-gradient(180deg, rgba(22, 101, 52, 0.38), rgba(20, 83, 45, 0.28));
+}
+
+.dark .apple-preview-btn-warning {
+  background: linear-gradient(180deg, rgba(120, 53, 15, 0.4), rgba(101, 45, 11, 0.3));
+}
+
+.dark .apple-preview-btn-secondary[data-state="active"] {
+  background: linear-gradient(180deg, rgba(30, 64, 175, 0.44), rgba(29, 78, 216, 0.34));
+  color: #dbeafe !important;
+}
+
+.dark .apple-preview-hint {
+  background: rgba(59, 130, 246, 0.16);
+  border-color: rgba(96, 165, 250, 0.24);
+  color: #bfdbfe;
 }
 
 #user-center-modal {

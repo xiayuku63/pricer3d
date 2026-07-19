@@ -59,8 +59,8 @@ export async function fetchPrinterModels() {
         if (nozzles.length) sel.value = String(preferred);
     }
 
-    // ── Populate printer model tab ──
-    for (const selId of ["cfg-printer-model-main"]) {
+    // ── Populate default-printer selectors ──
+    for (const selId of ["front-default-printer-model"]) {
         const sel = document.getElementById(selId);
         if (!sel) continue;
         sel.innerHTML = '';
@@ -78,11 +78,9 @@ export async function fetchPrinterModels() {
             // Manually trigger nozzle/bed info for the selected model
             var printer = visibleModels.find(function(p) { return p.id === prefId; });
             if (printer) {
-                if (dom.cfgNozzleDiameter) {
-                    dom.cfgNozzleDiameter.value = String(_preferredNozzle(printer, currentCfgNozzle));
-                }
-                if (dom.printerBedInfo) {
-                    dom.printerBedInfo.textContent = t('printer.bedInfo', { x: printer.bed_width, y: printer.bed_depth, z: printer.bed_height });
+                if (selId === 'front-default-printer-model') {
+                    const frontDefaultNozzle = document.getElementById('front-default-nozzle-diameter');
+                    if (frontDefaultNozzle) frontDefaultNozzle.value = String(_preferredNozzle(printer, frontDefaultNozzle.value));
                 }
             }
         }
@@ -133,6 +131,14 @@ export async function fetchPrinterModels() {
         }
     }
 
+    const frontDefaultPrinter = document.getElementById('front-default-printer-model');
+    const frontDefaultNozzle = document.getElementById('front-default-nozzle-diameter');
+    if (frontDefaultPrinter && frontDefaultNozzle) {
+        frontDefaultPrinter.addEventListener('change', () => {
+            _populateNozzleDropdown('front-default-nozzle-diameter', frontDefaultPrinter.value);
+        });
+    }
+
     // ── Populate preset form printer selector ──
     const genSel = document.getElementById("gen-printer-model");
     if (genSel) {
@@ -147,57 +153,6 @@ export async function fetchPrinterModels() {
     }
 
     // ── Auto-fill nozzle + bed info when printer changes in printer tab ──
-    const cfgPrinter = document.getElementById("cfg-printer-model-main");
-    if (cfgPrinter && dom.cfgNozzleDiameter) {
-        var resolveNozzle = function(printer) {
-            return String(_preferredNozzle(printer, currentCfgNozzle));
-        };
-        var updateNozzleAndBed = function() {
-            var printer = visibleModels.find(function(p) { return p.id === cfgPrinter.value; });
-            if (printer) {
-                dom.cfgNozzleDiameter.value = resolveNozzle(printer);
-                if (dom.printerBedInfo) {
-                    dom.printerBedInfo.textContent = t('printer.bedInfo', { x: printer.bed_width, y: printer.bed_depth, z: printer.bed_height });
-                }
-                setBedLabel(printer.bed_width, printer.bed_depth, printer.bed_height);
-                updateBedSize(printer.bed_width, printer.bed_depth);
-                updatePrinterDetailPanel(printer);
-            } else {
-                updatePrinterDetailPanel(null);
-            }
-        };
-        cfgPrinter.onchange = updateNozzleAndBed;
-        // Trigger initial fill
-        var printer = visibleModels.find(function(p) { return p.id === cfgPrinter.value; });
-        if (printer) {
-            dom.cfgNozzleDiameter.value = resolveNozzle(printer);
-            if (dom.printerBedInfo) {
-                dom.printerBedInfo.textContent = t('printer.bedInfo', { x: printer.bed_width, y: printer.bed_depth, z: printer.bed_height });
-            }
-            setBedLabel(printer.bed_width, printer.bed_depth, printer.bed_height);
-            updateBedSize(printer.bed_width, printer.bed_depth);
-            updatePrinterDetailPanel(printer);
-        }
-    }
-
-    // ── Update detail panel when nozzle changes ──
-    if (dom.cfgNozzleDiameter) {
-        dom.cfgNozzleDiameter.addEventListener('change', function() {
-            var cfgPrinterEl = document.getElementById("cfg-printer-model-main");
-            var printer = cfgPrinterEl ? visibleModels.find(function(p) { return p.id === cfgPrinterEl.value; }) : null;
-            if (printer) {
-                var pdNozzle = document.getElementById('pd-nozzle');
-                if (pdNozzle) pdNozzle.textContent = dom.cfgNozzleDiameter.value + ' mm';
-            }
-            // Update layer height range hint when nozzle changes
-            if (typeof updateLayerHeightRangeHint === 'function') updateLayerHeightRangeHint();
-            if (typeof syncStandardPresetForNozzle === 'function') syncStandardPresetForNozzle();
-        });
-        // Initial hint update
-        if (typeof updateLayerHeightRangeHint === 'function') updateLayerHeightRangeHint();
-        if (typeof syncStandardPresetForNozzle === 'function') syncStandardPresetForNozzle();
-    }
-
     // ── Update 3D viewer bed size to match the currently selected batch printer ──
     var _batchSelFinal = document.getElementById("batch-printer-model");
     if (_batchSelFinal && _batchSelFinal.value) {

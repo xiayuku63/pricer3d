@@ -148,6 +148,7 @@ export function updateDropdowns() {
         const presetId = String(quoteOptions.slicer_preset_id || '');
         if (presetId && presetOpts.includes(presetId)) batchPresetSel.value = presetId;
     }
+    refreshDefaultMaterialControls({ preserveValues: false, updateQuoteOptions: false });
 }
 
 export function refreshQuoteColorDropdowns() {
@@ -156,6 +157,58 @@ export function refreshQuoteColorDropdowns() {
     if (optColor) optColor.innerHTML = rendered.html;
     _initColorWheelCanvas(optColor);
     quoteOptions.color = rendered.selected;
+}
+
+function _renderDefaultColorDropdown(container, materialName, preferredColor, brand, shouldUpdateQuoteOptions) {
+    if (!container || !materialName) return '';
+    const rendered = renderColorDropdown(materialName, preferredColor || '', true, brand);
+    container.innerHTML = rendered.html;
+    _initColorWheelCanvas(container);
+    container.setAttribute('data-selected-color', rendered.selected || '');
+    if (shouldUpdateQuoteOptions) quoteOptions.color = rendered.selected || quoteOptions.color;
+    return rendered.selected || '';
+}
+
+export function refreshDefaultMaterialControls(options = {}) {
+    const { preserveValues = false, updateQuoteOptions = false } = options;
+    const brandSel = document.getElementById('front-default-brand');
+    const materialSel = document.getElementById('front-default-material');
+    const colorContainer = document.getElementById('front-default-color-dropdown');
+    if (!brandSel || !materialSel) return;
+
+    const usedBrands = getUsedBrandOptions();
+    const desiredBrand = preserveValues ? (brandSel.value || '') : (defaultBrand || brandSel.value || '');
+    brandSel.innerHTML = usedBrands.map((brand) =>
+        `<option value="${escapeHtml(brand)}">${escapeHtml(brand)}</option>`
+    ).join('');
+    const activeBrand = usedBrands.includes(desiredBrand)
+        ? desiredBrand
+        : (usedBrands[0] || '');
+    brandSel.value = activeBrand;
+
+    const materials = getMaterialsByBrand(activeBrand);
+    const desiredMaterial = preserveValues ? (materialSel.value || '') : (defaultMaterial || materialSel.value || '');
+    materialSel.innerHTML = materials.map((material) =>
+        `<option value="${escapeHtml(material.name)}">${escapeHtml(material.name)}</option>`
+    ).join('');
+    const nextMaterial = materials.some((material) => material.name === desiredMaterial)
+        ? desiredMaterial
+        : (materials[0]?.name || '');
+    materialSel.value = nextMaterial;
+
+    const desiredColor = preserveValues
+        ? (colorContainer?.getAttribute('data-selected-color') || '')
+        : (defaultColor || '');
+    if (colorContainer && nextMaterial) {
+        _renderDefaultColorDropdown(colorContainer, nextMaterial, desiredColor, activeBrand, updateQuoteOptions);
+    }
+
+    if (updateQuoteOptions) {
+        quoteOptions.brand = activeBrand || '';
+        quoteOptions.material = nextMaterial || '';
+        const nextColor = colorContainer?.getAttribute('data-selected-color') || '';
+        if (nextColor) quoteOptions.color = nextColor;
+    }
 }
 
 export function buildPrinterOptionsHtml(selectedId) {

@@ -43,6 +43,15 @@ export function collectAppDomRefs() {
         addMaterialBtn: $('add-material-btn'), userCenterMsg: $('user-center-msg'),
         userCenterHint: $('user-center-hint'),
 
+        frontDefaultBrand: $('front-default-brand'),
+        frontDefaultPrinterModel: $('front-default-printer-model'),
+        frontDefaultNozzleDiameter: $('front-default-nozzle-diameter'),
+        frontDefaultSlicerPreset: $('front-default-slicer-preset'),
+        frontDefaultMaterial: $('front-default-material'),
+        frontDefaultColorDropdown: $('front-default-color-dropdown'),
+        frontDefaultSaveBtn: $('front-default-save-btn'),
+        frontDefaultMsg: $('front-default-msg'),
+
         cfgMachineHourlyRate: $('cfg-machine-hourly-rate'), cfgSetupFee: $('cfg-setup-fee'),
         cfgMinJobFee: $('cfg-min-job-fee'), cfgMaterialWaste: $('cfg-material-waste'),
         cfgSupportPercent: $('cfg-support-percent'), cfgPostPerPart: $('cfg-post-per-part'),

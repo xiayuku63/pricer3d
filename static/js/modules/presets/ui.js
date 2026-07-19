@@ -39,11 +39,6 @@ async function _syncBatchPresetControls() {
         if (layer && params.layer_height != null) layer.value = Number(params.layer_height).toFixed(2);
         if (walls && params.perimeters != null) walls.value = String(params.perimeters);
         if (infill && params.fill_density != null) infill.value = String(params.fill_density);
-        const summary = document.getElementById('batch-preset-params');
-        if (summary) {
-            summary.textContent = `层高:${params.layer_height ?? '-'} 墙:${params.perimeters ?? '-'} 填充:${params.fill_density ?? '-'}%`;
-            summary.classList.remove('hidden');
-        }
     } catch (error) {
         console.warn('Failed to sync initial batch slicer preset:', error);
     }
@@ -63,41 +58,24 @@ export function initPresets(d) {
 function _updatePrinterOptions() {
     const visibleModels = _printerModels.filter(p => getEnabledPrinters().includes(p.id));
 
-    // Update cfg-printer-model-main
-    const cfgSel = document.getElementById('cfg-printer-model-main');
-    if (cfgSel) {
-        const currentVal = cfgSel.value;
-        cfgSel.innerHTML = '';
-        visibleModels.forEach(p => {
-            const opt = document.createElement("option");
+    // Update printer selects
+    ['batch-printer-model', 'front-default-printer-model'].forEach((selId) => {
+        const sel = document.getElementById(selId);
+        if (!sel) return;
+        const currentVal = sel.value;
+        sel.innerHTML = '';
+        visibleModels.forEach((p) => {
+            const opt = document.createElement('option');
             opt.value = p.id;
             opt.textContent = p.name;
-            cfgSel.appendChild(opt);
+            sel.appendChild(opt);
         });
-        if (currentVal && visibleModels.find(p => p.id === currentVal)) {
-            cfgSel.value = currentVal;
+        if (currentVal && visibleModels.find((p) => p.id === currentVal)) {
+            sel.value = currentVal;
         } else if (visibleModels.length) {
-            cfgSel.value = visibleModels[0].id;
+            sel.value = visibleModels[0].id;
         }
-    }
-
-    // Update batch-printer-model
-    const batchSel = document.getElementById('batch-printer-model');
-    if (batchSel) {
-        const currentVal = batchSel.value;
-        batchSel.innerHTML = '';
-        visibleModels.forEach(p => {
-            const opt = document.createElement("option");
-            opt.value = p.id;
-            opt.textContent = p.name;
-            batchSel.appendChild(opt);
-        });
-        if (currentVal && visibleModels.find(p => p.id === currentVal)) {
-            batchSel.value = currentVal;
-        } else if (visibleModels.length) {
-            batchSel.value = visibleModels[0].id;
-        }
-    }
+    });
 
     // Update batch-slicer-preset
     renderSlicerPresetsUI();
@@ -126,6 +104,19 @@ export function renderSlicerPresetsUI() {
             ...items.map(function(p) { return '<option value="' + p.id + '"' + (String(p.id) === genCurrentVal ? ' selected' : '') + '>' + (p.name || '#' + p.id) + '</option>'; })
         ].join('');
         if (!genPresetSelect.value && items.length) genPresetSelect.value = String(items[0].id);
+    }
+
+    const frontPreset = document.getElementById('front-default-slicer-preset');
+    if (frontPreset) {
+        const items = slicerPresets || [];
+        var frontCurrentVal = (defaultSlicerPresetId !== null && defaultSlicerPresetId !== undefined
+            && items.some(function(p) { return p.id === defaultSlicerPresetId; }))
+            ? String(defaultSlicerPresetId) : "";
+        frontPreset.innerHTML = [
+            '<option value="">' + t('quote.presetNone') + '</option>',
+            ...items.map(function(p) { return '<option value="' + p.id + '"' + (String(p.id) === frontCurrentVal ? ' selected' : '') + '>' + (p.name || '#' + p.id) + '</option>'; })
+        ].join('');
+        if (!frontCurrentVal) frontPreset.value = '';
     }
 
     // Populate the model-page batch preset selector
@@ -191,7 +182,7 @@ export function _onPresetRadioChange(val) {
 }
 
 export function preloadPrinterSelectors() {
-    for (const selId of ["cfg-printer-model-main", "gen-printer-model"]) {
+    for (const selId of ["gen-printer-model", "front-default-printer-model"]) {
         const sel = document.getElementById(selId);
         if (!sel) continue;
         sel.innerHTML = "";

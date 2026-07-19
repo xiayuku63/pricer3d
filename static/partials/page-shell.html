@@ -131,8 +131,42 @@
                             </div>
                         </dl>
 
+                        <div id="quote-default-settings-bar" class="apple-toolbar mt-5 flex items-center gap-3 p-4 flex-wrap relative z-20">
+                            <span class="text-xs font-medium whitespace-nowrap" style="color: var(--color-primary-text);" data-i18n="settings.defaultSettings">默认设置：</span>
+                            <div class="flex items-center gap-1.5">
+                                <label class="text-[11px] tw-text-secondary" data-i18n="quote.printerModel">打印机</label>
+                                <select id="front-default-printer-model" class="text-[11px] border rounded px-2 py-1 tw-card" style="border-color: var(--color-border-strong); max-width:155px"></select>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <label class="text-[11px] tw-text-secondary" data-i18n="quote.nozzleDiameter">喷嘴</label>
+                                <select id="front-default-nozzle-diameter" class="text-[11px] border rounded px-2 py-1 tw-card" style="border-color: var(--color-border-strong); width:72px">
+                                    <option value="0.2">0.2mm</option><option value="0.4" selected>0.4mm</option><option value="0.6">0.6mm</option><option value="0.8">0.8mm</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <label class="text-[11px] tw-text-secondary" data-i18n="quote.preset">预设</label>
+                                <select id="front-default-slicer-preset" class="text-[11px] border rounded px-2 py-1 tw-card" style="border-color: var(--color-border-strong); max-width:160px">
+                                    <option value="">不使用预设</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <label class="text-[11px] tw-text-secondary" data-i18n="quote.brand">品牌</label>
+                                <select id="front-default-brand" class="text-[11px] border rounded px-2 py-1 tw-card" style="border-color: var(--color-border-strong); max-width:120px"></select>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <label class="text-[11px] tw-text-secondary" data-i18n="quote.material">材料</label>
+                                <select id="front-default-material" class="text-[11px] border rounded px-2 py-1 tw-card" style="border-color: var(--color-border-strong);"></select>
+                            </div>
+                            <div class="flex items-center gap-1.5" id="front-default-color-cell">
+                                <label class="text-[11px] tw-text-secondary" data-i18n="quote.color">颜色</label>
+                                <div id="front-default-color-dropdown"></div>
+                            </div>
+                            <button id="front-default-save-btn" type="button" class="tw-btn-primary text-[11px] px-3 py-1.5 whitespace-nowrap ml-auto" data-i18n="settings.saveDefaults">保存默认设置</button>
+                            <span id="front-default-msg" class="text-[11px] tw-text-primary hidden"></span>
+                        </div>
+
                         <!-- 批量设置工具栏 -->
-                        <div id="batch-edit-bar" class="apple-toolbar mt-5 flex items-center gap-3 p-4 flex-wrap relative z-20">
+                        <div id="batch-edit-bar" class="apple-toolbar mt-3 flex items-center gap-3 p-4 flex-wrap relative z-20">
                             <span class="text-xs font-medium whitespace-nowrap" style="color: var(--color-primary-text);" data-i18n="quote.batchSettings">批量设置：</span>
                             <div class="flex items-center gap-1.5">
                                 <label class="text-[11px] tw-text-secondary" data-i18n="quote.printerModel">打印机</label>
@@ -149,7 +183,6 @@
                                 <select id="batch-slicer-preset" class="text-[11px] border rounded px-2 py-1 tw-card" style="border-color: var(--color-border-strong); max-width:160px">
                                     <option value="">不使用预设</option>
                                 </select>
-                                <span id="batch-preset-params" class="text-[10px] tw-text-muted hidden"></span>
                             </div>
                             <div class="flex items-center gap-1.5">
                                 <label class="text-[11px] tw-text-secondary" data-i18n="quote.brand">品牌</label>
