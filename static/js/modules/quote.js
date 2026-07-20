@@ -37,6 +37,7 @@ import {
 import {
     refreshBatchBrandDropdown, refreshBatchMaterialDropdown,
     refreshBatchColorDropdown, batchApplyToAll,
+    snapshotBatchDirty, maybeSnapshotBatchDirty, markBatchDirty,
 } from './quote-batch.js';
 import { MATERIAL_INFO } from './quote-data.js';
 import { updateBedSize, setBedLabel } from './viewer.js';
@@ -62,6 +63,9 @@ export {
     refreshBatchMaterialDropdown,
     refreshBatchColorDropdown,
     batchApplyToAll,
+    snapshotBatchDirty,
+    maybeSnapshotBatchDirty,
+    markBatchDirty,
 };
 
 let dom = {};

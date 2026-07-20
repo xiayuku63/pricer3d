@@ -367,7 +367,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const genSel = document.getElementById('front-default-slicer-preset');
                 if (genSel) genSel.value = '';
                 setDefaultSlicerPresetId(null);
-                await reQuoteAllSelectedFiles(t('quote.recalculate'));
                 return;
             }
             quoteOptions.slicer_preset_id = Number(val);
@@ -390,7 +389,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             } catch (e) { /* ignore */ }
-            await reQuoteAllSelectedFiles(t('quote.recalculate'));
         });
     }
 
@@ -564,7 +562,4 @@ document.addEventListener('DOMContentLoaded', () => {
         // Check if this user needs the onboarding guide
         if (authToken) checkOnboarding();
     });
-
-    // Snapshot batch field initial values after everything is loaded
-    setTimeout(() => snapshotBatchDirty(), 500);
 });

@@ -99,6 +99,12 @@ export function getBatchDirtyFields() {
     return new Set(_batchDirty);
 }
 
+export function maybeSnapshotBatchDirty() {
+    if (_batchDirty.size > 0) return false;
+    snapshotBatchDirty();
+    return true;
+}
+
 // ── Brand dropdown ──
 export function refreshBatchBrandDropdown() {
     const sel = document.getElementById('batch-brand');
