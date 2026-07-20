@@ -75,6 +75,11 @@ export function initSettingsAreaEvents({
     bind(dom.userCenterCloseBtn, 'click', hideUserCenter);
     bind(dom.userCenterBackdrop, 'click', hideUserCenter);
     bind(dom.frontDefaultSaveBtn, 'click', () => saveUserSettings({ source: 'front' }));
+    bind(dom.userCenterSaveBtn, 'click', () => saveUserSettings({
+        saveBtn: dom.userCenterSaveBtn,
+        messageEl: dom.userCenterMsg,
+        source: 'user-center',
+    }));
     bind(dom.userCenterSetDefaultsBtn, 'click', setAsDefaults);
     bind(dom.ucChangePasswordBtn, 'click', changePassword);
 

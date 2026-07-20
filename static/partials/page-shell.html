@@ -135,27 +135,32 @@
                             <span class="text-xs font-medium whitespace-nowrap" style="color: var(--color-primary-text);" data-i18n="settings.defaultSettings">默认设置：</span>
                             <div class="flex items-center gap-1.5">
                                 <label class="text-[11px] tw-text-secondary" data-i18n="quote.printerModel">打印机</label>
-                                <select id="front-default-printer-model" class="text-[11px] border rounded px-2 py-1 tw-card" style="border-color: var(--color-border-strong); max-width:155px"></select>
+                                <div class="styled-select-host" data-styled-select-host>
+                                    <select id="front-default-printer-model" class="text-[11px] border rounded px-2 py-1 tw-card" style="border-color: var(--color-border-strong); max-width:155px"></select>
+                                </div>
                             </div>
                             <div class="flex items-center gap-1.5">
                                 <label class="text-[11px] tw-text-secondary" data-i18n="quote.nozzleDiameter">喷嘴</label>
+                                <div class="styled-select-host" data-styled-select-host>
                                 <select id="front-default-nozzle-diameter" class="text-[11px] border rounded px-2 py-1 tw-card" style="border-color: var(--color-border-strong); width:72px">
                                     <option value="0.2">0.2mm</option><option value="0.4" selected>0.4mm</option><option value="0.6">0.6mm</option><option value="0.8">0.8mm</option>
-                                </select>
+                                </select></div>
                             </div>
                             <div class="flex items-center gap-1.5">
                                 <label class="text-[11px] tw-text-secondary" data-i18n="quote.preset">预设</label>
-                                <select id="front-default-slicer-preset" class="text-[11px] border rounded px-2 py-1 tw-card" style="border-color: var(--color-border-strong); max-width:160px">
-                                    <option value="">不使用预设</option>
-                                </select>
+                                <div class="styled-select-host" data-styled-select-host>
+                                    <select id="front-default-slicer-preset" class="text-[11px] border rounded px-2 py-1 tw-card" style="border-color: var(--color-border-strong); max-width:160px">
+                                        <option value="">不使用预设</option>
+                                    </select>
+                                </div>
                             </div>
                             <div class="flex items-center gap-1.5">
                                 <label class="text-[11px] tw-text-secondary" data-i18n="quote.brand">品牌</label>
-                                <select id="front-default-brand" class="text-[11px] border rounded px-2 py-1 tw-card" style="border-color: var(--color-border-strong); max-width:120px"></select>
+                                <div class="styled-select-host" data-styled-select-host><select id="front-default-brand" class="text-[11px] border rounded px-2 py-1 tw-card" style="border-color: var(--color-border-strong); max-width:120px"></select></div>
                             </div>
                             <div class="flex items-center gap-1.5">
                                 <label class="text-[11px] tw-text-secondary" data-i18n="quote.material">材料</label>
-                                <select id="front-default-material" class="text-[11px] border rounded px-2 py-1 tw-card" style="border-color: var(--color-border-strong);"></select>
+                                <div class="styled-select-host" data-styled-select-host><select id="front-default-material" class="text-[11px] border rounded px-2 py-1 tw-card" style="border-color: var(--color-border-strong);"></select></div>
                             </div>
                             <div class="flex items-center gap-1.5" id="front-default-color-cell">
                                 <label class="text-[11px] tw-text-secondary" data-i18n="quote.color">颜色</label>
@@ -168,40 +173,39 @@
                         <!-- 批量设置工具栏 -->
                         <div id="batch-edit-bar" class="apple-toolbar mt-3 flex items-center gap-3 p-4 flex-wrap relative z-20">
                             <span class="text-xs font-medium whitespace-nowrap" style="color: var(--color-primary-text);" data-i18n="quote.batchSettings">批量设置：</span>
-                            <div class="flex items-center gap-1.5">
+                            <div class="flex items-center gap-1.5" data-batch-field="_printer_model">
                                 <label class="text-[11px] tw-text-secondary" data-i18n="quote.printerModel">打印机</label>
-                                <select id="batch-printer-model" class="text-[11px] border rounded px-2 py-1 tw-card" style="border-color: var(--color-border-strong); max-width:155px"></select>
+                                <div class="styled-select-host" data-styled-select-host><select id="batch-printer-model" class="text-[11px] border rounded px-2 py-1 tw-card" style="border-color: var(--color-border-strong); max-width:155px"></select></div>
                             </div>
-                            <div class="flex items-center gap-1.5">
+                            <div class="flex items-center gap-1.5" data-batch-field="_nozzle_diameter">
                                 <label class="text-[11px] tw-text-secondary" data-i18n="quote.nozzleDiameter">喷嘴</label>
-                                <select id="batch-nozzle-diameter" class="text-[11px] border rounded px-2 py-1 tw-card" style="border-color: var(--color-border-strong); width:72px">
-                                    <option value="0.2">0.2</option><option value="0.4" selected>0.4</option><option value="0.6">0.6</option><option value="0.8">0.8</option>
-                                </select>
+                                <div class="styled-select-host" data-styled-select-host><select id="batch-nozzle-diameter" class="text-[11px] border rounded px-2 py-1 tw-card" style="border-color: var(--color-border-strong); width:72px">
+                                    <option value="0.2">0.2mm</option><option value="0.4" selected>0.4mm</option><option value="0.6">0.6mm</option><option value="0.8">0.8mm</option>
+                                </select></div>
                             </div>
-                            <div class="flex items-center gap-1.5">
+                            <div class="flex items-center gap-1.5" data-batch-field="_slicer_preset_id">
                                 <label class="text-[11px] tw-text-secondary" data-i18n="quote.preset">预设</label>
-                                <select id="batch-slicer-preset" class="text-[11px] border rounded px-2 py-1 tw-card" style="border-color: var(--color-border-strong); max-width:160px">
+                                <div class="styled-select-host" data-styled-select-host><select id="batch-slicer-preset" class="text-[11px] border rounded px-2 py-1 tw-card" style="border-color: var(--color-border-strong); max-width:160px">
                                     <option value="">不使用预设</option>
-                                </select>
+                                </select></div>
                             </div>
-                            <div class="flex items-center gap-1.5">
+                            <div class="flex items-center gap-1.5" data-batch-field="brand">
                                 <label class="text-[11px] tw-text-secondary" data-i18n="quote.brand">品牌</label>
-                                <select id="batch-brand" class="text-[11px] border rounded px-2 py-1 tw-card" style="border-color: var(--color-border-strong); max-width:120px">
-                                </select>
+                                <div class="styled-select-host" data-styled-select-host><select id="batch-brand" class="text-[11px] border rounded px-2 py-1 tw-card" style="border-color: var(--color-border-strong); max-width:120px"></select></div>
                             </div>
-                            <div class="flex items-center gap-1.5">
+                            <div class="flex items-center gap-1.5" data-batch-field="material">
                                 <label class="text-[11px] tw-text-secondary" data-i18n="quote.material">材料</label>
-                                <select id="batch-material" class="text-[11px] border rounded px-2 py-1 tw-card" style="border-color: var(--color-border-strong);"></select>
+                                <div class="styled-select-host" data-styled-select-host><select id="batch-material" class="text-[11px] border rounded px-2 py-1 tw-card" style="border-color: var(--color-border-strong);"></select></div>
                             </div>
-                            <div class="flex items-center gap-1.5" id="batch-color-cell">
+                            <div class="flex items-center gap-1.5" data-batch-field="color" id="batch-color-cell">
                                 <label class="text-[11px] tw-text-secondary" data-i18n="quote.color">颜色</label>
                                 <div id="batch-color-dropdown"></div>
                             </div>
-                            <div class="flex items-center gap-1.5">
+                            <div class="flex items-center gap-1.5" data-batch-field="quantity">
                                 <label class="text-[11px] tw-text-secondary" data-i18n="quote.quantity">数量</label>
                                 <input id="batch-quantity" type="number" min="1" value="1" class="w-16 text-[11px] border rounded px-2 py-1 tw-bg-surface" style="border-color: var(--color-border-strong);" />
                             </div>
-                            <button id="batch-apply-btn" type="button" class="tw-btn-primary text-[11px] px-3 py-1.5 whitespace-nowrap" data-i18n="quote.applyToAll">应用到全部</button>
+                            <button id="batch-apply-btn" type="button" class="tw-btn-primary text-[11px] px-3 py-1.5 whitespace-nowrap" data-i18n="quote.applyToAll">应用修改到全部</button>
                             <span id="batch-msg" class="text-[11px] tw-text-primary hidden"></span>
                             <label class="inline-flex items-center gap-1 text-[11px] tw-text-secondary cursor-pointer ml-auto">
                               <input type="checkbox" id="batch-auto-orient" class="rounded" style="border-color: var(--color-border-strong); color: var(--color-success);">

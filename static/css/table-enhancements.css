@@ -21,9 +21,9 @@
 #batch-results-body tr[data-row-file] .row-edit:focus,
 #batch-results-body tr[data-row-file] .color-native-select:focus-visible {
     outline: none;
-    border-color: rgba(0, 122, 255, 0.42) !important;
+    border-color: #0069d1 !important;
     background-color: rgba(255, 255, 255, 0.94) !important;
-    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+    box-shadow: 0 0 0 3px rgba(0, 105, 209, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
 }
 #batch-results-body tr[data-row-file] .color-select-wrap {
     display: block;
@@ -244,6 +244,52 @@ td[data-role="status-cell"] {
 #batch-results-body tr.selected-row {
     background-color: color-mix(in srgb, var(--color-primary-200) 30%, transparent) !important;
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-primary) 30%, transparent);
+}
+
+/* ── Batch bar dirty-field indicators ── */
+#batch-edit-bar .batch-dirty select,
+#batch-edit-bar .batch-dirty input,
+#batch-edit-bar .batch-dirty .styled-select-trigger,
+#batch-edit-bar .batch-dirty .color-dd-trigger {
+    border-color: var(--color-success, #22c55e) !important;
+    background-color: rgba(34, 197, 94, 0.12) !important;
+    box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.88) !important;
+}
+
+#batch-edit-bar .batch-dirty .styled-select-trigger,
+#batch-edit-bar .batch-dirty .color-dd-trigger {
+    color: color-mix(in srgb, var(--color-success, #22c55e) 55%, var(--color-text)) !important;
+}
+
+#batch-edit-bar .batch-dirty .styled-select-trigger .styled-select-chevron,
+#batch-edit-bar .batch-dirty .color-dd-trigger svg {
+    color: var(--color-success, #22c55e) !important;
+}
+
+#batch-edit-bar .batch-dirty input:focus,
+#batch-edit-bar .batch-dirty input:focus-visible,
+#batch-edit-bar .batch-dirty .styled-select-wrapper:focus-within .styled-select-trigger,
+#batch-edit-bar .batch-dirty .styled-select-wrapper.is-open .styled-select-trigger,
+#batch-edit-bar .batch-dirty .color-dd-wrapper:focus-within .color-dd-trigger,
+#batch-edit-bar .batch-dirty .color-dd-wrapper.is-open .color-dd-trigger {
+    border-color: rgba(0, 122, 255, 0.42) !important;
+    background-color: rgba(255, 255, 255, 0.94) !important;
+    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+}
+#batch-edit-bar .batch-dirty {
+    position: relative;
+}
+#batch-edit-bar .batch-dirty::after {
+    content: '';
+    position: absolute;
+    top: -3px;
+    right: -3px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: var(--color-success, #22c55e);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
+    pointer-events: none;
 }
 
 /* Table header sticky */

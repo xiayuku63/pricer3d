@@ -70,6 +70,7 @@ import {
     handleRowEditChange, refreshOptionsSummary, setOpenLoginModalRef,
     refreshBatchMaterialDropdown, refreshBatchColorDropdown, batchApplyToAll,
     refreshBatchBrandDropdown,
+    snapshotBatchDirty, markBatchDirty,
     handleCardEditChange, exportCSV, exportExcel,
     initTableEnhancements,
     openMaterialCompare,
@@ -87,6 +88,7 @@ import {
     centerModel, resetOrientationHandler, toggleLayFace, submitTraining, learnedAutoOrient, saveOrientationAndRequote,
 } from './modules/orientation-ui.js';
 import { initTheme } from './modules/theme.js';
+import { initStyledSelectDropdowns } from './modules/styled-select.js';
 import { t, lang, toggleLang, langFlag, langLabel, initI18n } from './modules/i18n.js';
 import { initOnboarding, checkAndStart as checkOnboarding, startGuide } from './modules/onboarding.js';
 import { initZipUpload, handleFileSelection } from './modules/zip-upload.js';
@@ -101,6 +103,7 @@ import { initSettingsAreaEvents, initResultsAreaEvents } from './modules/app-eve
 document.addEventListener('DOMContentLoaded', () => {
     // Apply theme immediately (before any rendering)
     initTheme();
+    initStyledSelectDropdowns();
     // Init i18n (language switcher)
     initI18n();
     // Init live clock
@@ -268,6 +271,12 @@ document.addEventListener('DOMContentLoaded', () => {
         refreshOptionsSummary,
     });
 
+    // Listen for batch color changes (dispatched from app-shell.js)
+    const batchColorContainer = document.getElementById('batch-color-dropdown');
+    if (batchColorContainer) {
+        batchColorContainer.addEventListener('batch-color-change', () => markBatchDirty('color'));
+    }
+
     // ── Global: G-code 详情展开/收起 ──
     document.addEventListener('click', (e) => {
         const btn = e.target.closest('[data-toggle-gcode]');
@@ -303,26 +312,51 @@ document.addEventListener('DOMContentLoaded', () => {
     _bind(dom.optionsCloseBtn, 'click', () => dom.optionsModal.classList.add('hidden'));
     _bind(dom.optionsBackdrop, 'click', () => dom.optionsModal.classList.add('hidden'));
 
-    // Batch edit bar
+    // Batch edit bar — event binding with dirty tracking
     const batchBrand = document.getElementById('batch-brand');
     const batchMaterial = document.getElementById('batch-material');
     const batchApplyBtn = document.getElementById('batch-apply-btn');
     const batchQuantity = document.getElementById('batch-quantity');
     const batchPrinterModel = document.getElementById('batch-printer-model');
+    const batchNozzle = document.getElementById('batch-nozzle-diameter');
     const batchSlicerPreset = document.getElementById('batch-slicer-preset');
 
-    if (batchBrand) batchBrand.addEventListener('change', refreshBatchMaterialDropdown);
-    if (batchMaterial) batchMaterial.addEventListener('change', refreshBatchColorDropdown);
+    function _onBatchChange(field) {
+        return function() {
+            markBatchDirty(field);
+        };
+    }
+
+    if (batchBrand) {
+        batchBrand.addEventListener('change', () => {
+            refreshBatchMaterialDropdown();
+            markBatchDirty('brand');
+        });
+    }
+    if (batchMaterial) {
+        batchMaterial.addEventListener('change', () => {
+            refreshBatchColorDropdown();
+            markBatchDirty('material');
+        });
+    }
+    if (batchPrinterModel) {
+        batchPrinterModel.addEventListener('change', _onBatchChange('_printer_model'));
+    }
+    if (batchNozzle) {
+        batchNozzle.addEventListener('change', _onBatchChange('_nozzle_diameter'));
+    }
     if (batchApplyBtn) batchApplyBtn.addEventListener('click', batchApplyToAll);
     _bind(document.getElementById('batch-recalculate-btn'), 'click', () => reQuoteAllSelectedFiles(t('quote.recalculate')));
     if (batchQuantity) {
+        batchQuantity.addEventListener('change', _onBatchChange('quantity'));
         batchQuantity.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') { e.preventDefault(); batchApplyToAll(); }
         });
     }
-    // Batch preset change → show params summary + update quoteOptions
+    // Batch preset change → show params summary + update quoteOptions + mark dirty
     if (batchSlicerPreset) {
         batchSlicerPreset.addEventListener('change', async () => {
+            markBatchDirty('_slicer_preset_id');
             const val = batchSlicerPreset.value;
             const layerEl = document.getElementById('gen-layer-height');
             const wallEl = document.getElementById('gen-wall-count');
@@ -530,4 +564,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Check if this user needs the onboarding guide
         if (authToken) checkOnboarding();
     });
+
+    // Snapshot batch field initial values after everything is loaded
+    setTimeout(() => snapshotBatchDirty(), 500);
 });
