@@ -20,6 +20,7 @@ import {
 import { t } from '../i18n.js';
 import { renderSlicerPresetsUI, fetchSlicerPresets, fetchPrinterModels } from '../presets.js';
 import { refreshOptionsSummary, normalizeResultsWithCurrentOptions, renderResultsTable, recalcSummaryFromCurrentResults, reQuoteAllSelectedFiles, refreshBatchMaterialDropdown, refreshBatchBrandDropdown } from '../quote.js';
+import { refreshStyledSelectDropdowns } from '../styled-select.js';
 
 export let dom = {};
 
@@ -148,6 +149,7 @@ export function updateDropdowns() {
         const presetId = String(quoteOptions.slicer_preset_id || '');
         if (presetId && presetOpts.includes(presetId)) batchPresetSel.value = presetId;
     }
+    refreshStyledSelectDropdowns();
     refreshDefaultMaterialControls({ preserveValues: false, updateQuoteOptions: false });
 }
 

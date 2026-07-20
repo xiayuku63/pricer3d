@@ -54,7 +54,7 @@ export async function fetchPrinterModels() {
         const nozzles = (model && model.nozzles) ? model.nozzles : [0.4];
         const preferred = _preferredNozzle(model, sel.value);
         sel.innerHTML = nozzles.map(n =>
-            '<option value="' + n + '"' + (_sameNozzle(n, preferred) ? ' selected' : '') + '>' + n + ' mm</option>'
+            '<option value="' + n + '"' + (_sameNozzle(n, preferred) ? ' selected' : '') + '>' + n + 'mm</option>'
         ).join('');
         if (nozzles.length) sel.value = String(preferred);
     }

@@ -10,6 +10,8 @@ const pageShellUrl = new URL('../static/partials/page-shell.html', import.meta.u
 const pageShellSource = await readFile(pageShellUrl, 'utf8');
 const componentsUrl = new URL('../static/css/tokens/components.css', import.meta.url);
 const componentsSource = await readFile(componentsUrl, 'utf8');
+const styledSelectUrl = new URL('../static/js/modules/styled-select.js', import.meta.url);
+const styledSelectSource = await readFile(styledSelectUrl, 'utf8');
 const tableEnhancementsUrl = new URL('../static/css/table-enhancements.css', import.meta.url);
 const readTableEnhancementsSource = await readFile(tableEnhancementsUrl, 'utf8');
 
@@ -36,28 +38,22 @@ test('custom popup menus share the unified dropdown option styling', () => {
     assert.doesNotMatch(appShellSource, /item\.classList\.toggle\('tw-dropdown-option-active', selected\);/);
 });
 
-test('color popup uses native-like focus, white menu background, gray selection, and square corners', () => {
-    assert.match(componentsSource, /\.color-dd-trigger:focus[\s\S]*?box-shadow: 0 0 0 3px rgba\(0, 122, 255, 0\.12\)/);
-    assert.match(componentsSource, /\.color-dd-list \{[\s\S]*?background-color: var\(--color-surface-solid\) !important;[\s\S]*?border-radius: 0 !important;/);
-    assert.match(componentsSource, /\.color-dd-list \.color-dd-item\.color-dd-item-active \{[\s\S]*?background-color: #808080 !important;[\s\S]*?color: #ffffff !important;/);
-    assert.match(componentsSource, /\.color-dd-item-swatch \{[\s\S]*?border-color: var\(--color-border-input\);/);
-    assert.match(componentsSource, /\.color-dd-list \.color-dd-item\.color-dd-item-active \.color-dd-item-swatch \{[\s\S]*?box-shadow: none;/);
-    assert.match(componentsSource, /\.color-dd-list \.color-dd-item:hover,[\s\S]*?background-color: #808080 !important;[\s\S]*?color: #ffffff !important;/);
-    assert.match(appShellSource, /list\.classList\.add\('color-dd-has-preview'\)/);
-    assert.match(appShellSource, /item\.classList\.add\('color-dd-item-preview'\)/);
-    assert.match(componentsSource, /\.color-dd-list\.color-dd-has-preview \.color-dd-item\.color-dd-item-active:not\(\.color-dd-item-preview\)/);
-});
-
-test('native selects and the color trigger share the blue focus ring', () => {
-    assert.match(componentsSource, /select:focus,[\s\S]*?select:focus-visible,[\s\S]*?\.color-dd-trigger:focus-visible/);
-    assert.match(componentsSource, /select:focus[\s\S]*?box-shadow: 0 0 0 3px rgba\(0, 122, 255, 0\.12\)/);
-    assert.match(componentsSource, /select:focus[\s\S]*?border-color: rgba\(0, 122, 255, 0\.42\) !important/);
-    assert.match(componentsSource, /\.color-dd-trigger:focus[\s\S]*?box-shadow: 0 0 0 3px rgba\(0, 122, 255, 0\.12\)/);
-    assert.match(readTableEnhancementsSource, /\.row-edit:focus[\s\S]*?box-shadow: 0 0 0 3px rgba\(0, 122, 255, 0\.12\)[\s\S]*?!important/);
+test('styled select wraps the default and batch controls with a blue popup highlight', () => {
+    assert.match(styledSelectSource, /DEFAULT_SELECT_IDS = \[/);
+    assert.match(styledSelectSource, /initStyledSelectDropdowns\(selectIds = DEFAULT_SELECT_IDS\)/);
+    assert.match(styledSelectSource, /styled-select-item tw-dropdown-option/);
+    assert.match(componentsSource, /\.styled-select-item\.tw-dropdown-option-active,[\s\S]*?background-color: #006ad0 !important;/);
+    assert.match(componentsSource, /\.styled-select-trigger:focus,[\s\S]*?box-shadow: 0 0 0 3px rgba\(0, 122, 255, 0\.12\)/);
+    assert.match(pageShellSource, /data-styled-select-host/);
+    assert.match(pageShellSource, /front-default-printer-model/);
+    assert.match(pageShellSource, /batch-material/);
+    assert.match(componentsSource, /\.styled-select-wrapper \{/);
 });
 
 test('default material color hides the visible HEX label without changing the dropdown value', () => {
     assert.match(componentsSource, /#uc-default-color-dropdown \.color-dd-trigger-label \{[\s\S]*?display: none;/);
+    assert.match(componentsSource, /\.color-dd-item-active \{[\s\S]*?background-color: #006ad0 !important;[\s\S]*?color: #ffffff !important;/);
+    assert.match(componentsSource, /\.color-dd-item:hover,[\s\S]*?\.color-dd-item-active:focus-visible[\s\S]*?background-color: #006ad0 !important;/);
 });
 
 test('portal color selection persists the default color container value', () => {

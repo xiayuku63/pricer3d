@@ -34,6 +34,7 @@ export function initColorDropdownUI({ quoteOptions, currentResults, selectedFile
         list.querySelectorAll('.color-dd-item-preview').forEach((item) => item.classList.remove('color-dd-item-preview'));
         resetPanel(list);
         list.classList.add('hidden');
+        wrapper?.classList.remove('is-open');
         const trigger = wrapper?.querySelector('.color-dd-trigger');
         if (trigger) trigger.setAttribute('aria-expanded', 'false');
     }
@@ -191,6 +192,9 @@ export function initColorDropdownUI({ quoteOptions, currentResults, selectedFile
 
             if (wrapper.closest('#batch-color-dropdown')) {
                 quoteOptions.color = hex;
+                // Dispatch a custom event so batch.js can mark the color as dirty
+                const evt = new CustomEvent('batch-color-change', { bubbles: true, detail: { hex } });
+                wrapper.dispatchEvent(evt);
             }
             return;
         }
@@ -208,6 +212,7 @@ export function initColorDropdownUI({ quoteOptions, currentResults, selectedFile
             });
             if (wasHidden) {
                 list.classList.remove('hidden');
+                wrapper.classList.add('is-open');
                 trigger.setAttribute('aria-expanded', 'true');
                 positionColorList(trigger, list, wrapper);
             } else {

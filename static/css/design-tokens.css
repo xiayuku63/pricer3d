@@ -9,6 +9,19 @@
 @import './tokens/spacing.css';
 @import './tokens/components.css';
 
+/* Default and batch setting select popups use the same highlight color. */
+#quote-default-settings-bar select option:checked,
+#quote-default-settings-bar select option:hover,
+#quote-default-settings-bar select option:focus,
+#batch-edit-bar select option:checked,
+#batch-edit-bar select option:hover,
+#batch-edit-bar select option:focus,
+#quote-default-settings-bar select option[selected],
+#batch-edit-bar select option[selected] {
+  background-color: #006ad0 !important;
+  color: #ffffff !important;
+}
+
 /* ════════════════════════════════════════════════════════════════════
    暗色模式 — 通过 .dark 类切换所有 CSS 变量
    配色方案：方案 A「蓝黑增强」(Blue Black Enhanced)
@@ -370,11 +383,11 @@
 .dark select option:hover,
 .dark select option:checked,
 .dark select option:focus {
-  background-color: #0069d1 !important;
+  background-color: #006ad0 !important;
   color: #ffffff !important;
 }
 .dark select option[selected] {
-  background-color: #0069d1 !important;
+  background-color: #006ad0 !important;
   color: #ffffff !important;
 }
 
