@@ -19,7 +19,7 @@ import {
 } from '../state.js';
 import { t } from '../i18n.js';
 import { renderSlicerPresetsUI, fetchSlicerPresets, fetchPrinterModels } from '../presets.js';
-import { refreshOptionsSummary, normalizeResultsWithCurrentOptions, renderResultsTable, recalcSummaryFromCurrentResults, reQuoteAllSelectedFiles, refreshBatchMaterialDropdown, refreshBatchBrandDropdown } from '../quote.js';
+import { refreshOptionsSummary, normalizeResultsWithCurrentOptions, renderResultsTable, recalcSummaryFromCurrentResults, reQuoteAllSelectedFiles, refreshBatchMaterialDropdown, refreshBatchBrandDropdown, maybeSnapshotBatchDirty } from '../quote.js';
 import { refreshStyledSelectDropdowns } from '../styled-select.js';
 
 export let dom = {};
@@ -151,6 +151,7 @@ export function updateDropdowns() {
     }
     refreshStyledSelectDropdowns();
     refreshDefaultMaterialControls({ preserveValues: false, updateQuoteOptions: false });
+    maybeSnapshotBatchDirty();
 }
 
 export function refreshQuoteColorDropdowns() {

@@ -21,6 +21,15 @@ test('batch controls bind dirty markers to their own field ids', async () => {
     assert.match(source, /batchPrinterModel\.addEventListener\('change', _onBatchChange\('_printer_model'\)\);/);
     assert.match(source, /batchNozzle\.addEventListener\('change', _onBatchChange\('_nozzle_diameter'\)\);/);
     assert.match(source, /markBatchDirty\('_slicer_preset_id'\);/);
+    assert.doesNotMatch(source, /batchSlicerPreset\.addEventListener\('change',[\s\S]*?await reQuoteAllSelectedFiles\(/);
+});
+
+test('batch dirty baseline snapshots after dropdown refresh instead of a fixed timeout', async () => {
+    const settingsCommonUrl = new URL('../static/js/modules/settings/common.js', import.meta.url);
+    const settingsSource = await readFile(settingsCommonUrl, 'utf8');
+    const mainSource = await readFile(mainUrl, 'utf8');
+    assert.match(settingsSource, /maybeSnapshotBatchDirty\(\);/);
+    assert.doesNotMatch(mainSource, /setTimeout\(\(\) => snapshotBatchDirty\(\), 500\);/);
 });
 
 test('batch page shell separates the nozzle dirty wrapper and keeps mm labels', async () => {
