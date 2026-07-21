@@ -18,6 +18,9 @@ RUN wget -q -O /usr/local/bin/prusa-slicer.AppImage \
     && chmod +x /usr/local/bin/prusa-slicer.AppImage \
     && ln -sf /usr/local/bin/prusa-slicer.AppImage /usr/local/bin/prusa-slicer
 
+# AppImage needs extraction in Docker (no FUSE available)
+ENV APPIMAGE_EXTRACT_AND_RUN=1
+
 WORKDIR /app
 COPY requirements.txt .
 

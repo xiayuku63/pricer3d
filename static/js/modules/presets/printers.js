@@ -5,12 +5,40 @@ import {
     getEnabledPrinters,
     defaultPrinterId, defaultNozzle,
     quoteOptions, getActivePrinterCompoundId,
+    loadFrontSettingsSnapshot, saveFrontSettingsSnapshot,
+    loadBatchSettingsSnapshot, saveBatchSettingsSnapshot,
 } from '../state.js';
 import { t } from '../i18n.js';
 import { updateBedSize, setBedLabel } from '../viewer.js';
+import { refreshStyledSelectDropdowns } from '../styled-select.js';
 import { dom, _printerModels, _syncBatchPrinter, setPrinterModels } from './ui.js';
 import { updatePrinterDetailPanel } from './printer.js';
-import { updateLayerHeightRangeHint, syncStandardPresetForNozzle } from './slicer.js';
+import { updateLayerHeightRangeHint, syncStandardPresetForNozzle, syncSlicerPresetForNozzle, getStandardPresetNameForNozzle } from './slicer.js';
+import { renderSlicerPresetsUI } from './ui.js';
+
+function _selectFrontDefaultStandardPreset(nozzleValue) {
+    const preset = document.getElementById('front-default-slicer-preset');
+    const targetName = getStandardPresetNameForNozzle(nozzleValue);
+    if (!preset) return;
+    const selected = Array.from(preset.options).find((opt) => String(opt.textContent || '').trim() === targetName);
+    preset.value = selected ? selected.value : '';
+}
+
+function _saveFrontSnapshot() {
+    saveFrontSettingsSnapshot({
+        printer_model: document.getElementById('front-default-printer-model')?.value || '',
+        nozzle_diameter: document.getElementById('front-default-nozzle-diameter')?.value || '',
+        slicer_preset_id: document.getElementById('front-default-slicer-preset')?.value || '',
+    });
+}
+
+function _saveBatchSnapshot() {
+    saveBatchSettingsSnapshot({
+        printer_model: document.getElementById('batch-printer-model')?.value || '',
+        nozzle_diameter: document.getElementById('batch-nozzle-diameter')?.value || '',
+        slicer_preset_id: document.getElementById('batch-slicer-preset')?.value || '',
+    });
+}
 
 export async function fetchPrinterModels() {
     const resp = await authFetch("/api/slicer/printers");
@@ -27,6 +55,8 @@ export async function fetchPrinterModels() {
 
     const currentCfgNozzle = document.getElementById('cfg-nozzle-diameter')?.value || '';
     const currentBatchNozzle = document.getElementById('batch-nozzle-diameter')?.value || '';
+    const frontSnapshot = loadFrontSettingsSnapshot();
+    const batchSnapshot = loadBatchSettingsSnapshot();
 
     function _sameNozzle(left, right) {
         const a = Number.parseFloat(left);
@@ -38,6 +68,14 @@ export async function fetchPrinterModels() {
         const nozzles = (model && model.nozzles) ? model.nozzles : [0.4];
         const candidates = [currentValue, defaultNozzle, model?.nozzle, nozzles[0]];
         return candidates.find((candidate) => nozzles.some((n) => _sameNozzle(n, candidate))) ?? nozzles[0];
+    }
+
+    function _pickVisibleModelId(candidates, fallbackId) {
+        const candidateList = Array.isArray(candidates) ? candidates : [candidates];
+        for (const candidate of candidateList) {
+            if (candidate && visibleModels.some((model) => model.id === candidate)) return candidate;
+        }
+        return fallbackId || '';
     }
 
     // ── Helper: get compound id for model + nozzle ──
@@ -73,6 +111,9 @@ export async function fetchPrinterModels() {
         // Prefer user's saved default; let onchange handler fill nozzle + bed
         var prefId = defaultPrinterId && visibleModels.some(function(p) { return p.id === defaultPrinterId; })
             ? defaultPrinterId : (visibleModels.length > 0 ? visibleModels[0].id : "");
+        if (frontSnapshot?.printer_model && visibleModels.some(function(p) { return p.id === frontSnapshot.printer_model; })) {
+            prefId = frontSnapshot.printer_model;
+        }
         if (prefId) {
             sel.value = prefId;
             // Manually trigger nozzle/bed info for the selected model
@@ -80,7 +121,7 @@ export async function fetchPrinterModels() {
             if (printer) {
                 if (selId === 'front-default-printer-model') {
                     const frontDefaultNozzle = document.getElementById('front-default-nozzle-diameter');
-                    if (frontDefaultNozzle) frontDefaultNozzle.value = String(_preferredNozzle(printer, frontDefaultNozzle.value));
+                    if (frontDefaultNozzle) frontDefaultNozzle.value = String(_preferredNozzle(printer, frontSnapshot?.nozzle_diameter || frontDefaultNozzle.value));
                 }
             }
         }
@@ -97,20 +138,25 @@ export async function fetchPrinterModels() {
             batchSel.appendChild(opt);
         });
         if (visibleModels.length > 0) {
-            // Prefer user's saved default, else fall back to first visible model
-            var preferredId = defaultPrinterId && visibleModels.some(function(p) { return p.id === defaultPrinterId; })
-                ? defaultPrinterId : visibleModels[0].id;
+            // Batch controls drive import-time slicing, so authenticated defaults
+            // must win on page load. Local snapshots are only a fallback.
+            var preferredId = _pickVisibleModelId(
+                [batchSel.value, defaultPrinterId, batchSnapshot?.printer_model],
+                visibleModels[0].id,
+            );
             batchSel.value = preferredId;
             _populateNozzleDropdown("batch-nozzle-diameter", preferredId);
-            // If user has a saved nozzle default, set it after populating
-            if (defaultNozzle || currentBatchNozzle) {
+            // Keep the current in-session choice when present; otherwise use the
+            // saved default nozzle before falling back to older local snapshots.
+            if (defaultNozzle || currentBatchNozzle || batchSnapshot?.nozzle_diameter) {
                 var batchNozzleEl = document.getElementById("batch-nozzle-diameter");
                 if (batchNozzleEl) {
                     const batchModel = visibleModels.find(function(p) { return p.id === preferredId; });
-                    batchNozzleEl.value = String(_preferredNozzle(batchModel, currentBatchNozzle));
+                    batchNozzleEl.value = String(_preferredNozzle(batchModel, currentBatchNozzle || defaultNozzle || batchSnapshot?.nozzle_diameter));
                 }
             }
             _syncBatchPrinter();
+            _saveBatchSnapshot();
         }
     }
 
@@ -120,6 +166,8 @@ export async function fetchPrinterModels() {
         batchSel.addEventListener("change", () => {
             _populateNozzleDropdown("batch-nozzle-diameter", batchSel.value);
             _syncBatchPrinter();
+            renderSlicerPresetsUI();
+            _saveBatchSnapshot();
             var _changedPrinter = _printerModels.find(function(p) { return p.id === batchSel.value; });
             if (_changedPrinter && _changedPrinter.bed_width && _changedPrinter.bed_depth) {
                 setBedLabel(_changedPrinter.bed_width, _changedPrinter.bed_depth, _changedPrinter.bed_height);
@@ -127,7 +175,11 @@ export async function fetchPrinterModels() {
             }
         });
         if (batchNozzle) {
-            batchNozzle.addEventListener("change", _syncBatchPrinter);
+            batchNozzle.addEventListener("change", () => {
+                _syncBatchPrinter();
+                renderSlicerPresetsUI();
+                _saveBatchSnapshot();
+            });
         }
     }
 
@@ -136,6 +188,14 @@ export async function fetchPrinterModels() {
     if (frontDefaultPrinter && frontDefaultNozzle) {
         frontDefaultPrinter.addEventListener('change', () => {
             _populateNozzleDropdown('front-default-nozzle-diameter', frontDefaultPrinter.value);
+            renderSlicerPresetsUI();
+            _selectFrontDefaultStandardPreset(frontDefaultNozzle.value);
+            _saveFrontSnapshot();
+        });
+        frontDefaultNozzle.addEventListener('change', () => {
+            renderSlicerPresetsUI();
+            _selectFrontDefaultStandardPreset(frontDefaultNozzle.value);
+            _saveFrontSnapshot();
         });
     }
 
@@ -151,6 +211,48 @@ export async function fetchPrinterModels() {
         });
         if (visibleModels.length > 0) genSel.value = visibleModels[0].id;
     }
+
+    const cfgNozzle = document.getElementById('cfg-nozzle-diameter');
+    const printerBedInfo = document.getElementById('printer-bed-info');
+    function _syncPrinterSlicerControls() {
+        const printerId = genSel?.value;
+        const printer = _printerModels.find((item) => item.id === printerId);
+        if (cfgNozzle && printer) {
+            const nozzles = Array.isArray(printer.nozzles) && printer.nozzles.length ? printer.nozzles : [printer.nozzle || 0.4];
+            const preferred = _preferredNozzle(printer, cfgNozzle.value || currentCfgNozzle);
+            cfgNozzle.innerHTML = nozzles.map((n) =>
+                '<option value="' + n + '"' + (_sameNozzle(n, preferred) ? ' selected' : '') + '>' + n + 'mm</option>'
+            ).join('');
+            cfgNozzle.value = String(preferred);
+        }
+        if (printerBedInfo) {
+            printerBedInfo.textContent = printer
+                ? `${printer.bed_width}x${printer.bed_depth}x${printer.bed_height} mm`
+                : '';
+        }
+        updateLayerHeightRangeHint();
+        void syncStandardPresetForNozzle();
+    }
+
+    if (genSel) {
+        genSel.addEventListener('change', _syncPrinterSlicerControls);
+    }
+    if (cfgNozzle) {
+        cfgNozzle.addEventListener('change', () => {
+            updateLayerHeightRangeHint();
+            void syncStandardPresetForNozzle();
+        });
+    }
+    _syncPrinterSlicerControls();
+    _saveFrontSnapshot();
+    refreshStyledSelectDropdowns([
+        'front-default-printer-model',
+        'front-default-nozzle-diameter',
+        'front-default-slicer-preset',
+        'batch-printer-model',
+        'batch-nozzle-diameter',
+        'batch-slicer-preset',
+    ]);
 
     // ── Auto-fill nozzle + bed info when printer changes in printer tab ──
     // ── Update 3D viewer bed size to match the currently selected batch printer ──

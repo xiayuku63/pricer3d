@@ -26,8 +26,32 @@ from app.db import get_db_session
 from app.deps import get_membership_effective, is_member_user
 from app.models_orm import QuoteHistory, User
 from calculator.cost import process_single_file
+from app.material_resolver import merge_user_material_with_catalog
 
 logger = logging.getLogger(__name__)
+
+
+def _load_user_quote_settings(user_id: int) -> tuple[list, dict, Optional[str], Optional[str], Optional[int]]:
+    """Load user materials, pricing config, and slicing defaults."""
+    with get_db_session() as db:
+        row = (
+            db.query(
+                User.materials,
+                User.pricing_config,
+                User.default_printer_id,
+                User.default_nozzle,
+                User.default_slicer_preset_id,
+            )
+            .filter(User.id == user_id)
+            .first()
+        )
+
+    user_materials = json.loads(row.materials) if row and row.materials else DEFAULT_MATERIALS
+    pricing_config = json.loads(row.pricing_config) if row and row.pricing_config else DEFAULT_PRICING_CONFIG
+    default_printer_id = row.default_printer_id if row else None
+    default_nozzle = row.default_nozzle if row else None
+    default_slicer_preset_id = row.default_slicer_preset_id if row else None
+    return user_materials, pricing_config, default_printer_id, default_nozzle, default_slicer_preset_id
 
 
 def _extract_preset_core_params(preset: Optional[dict]) -> dict:
@@ -84,15 +108,58 @@ def _extract_preset_core_params(preset: Optional[dict]) -> dict:
     return values
 
 
-def _material_color_matches(material: dict, requested_color: str) -> bool:
-    raw_color = material.get("color") if isinstance(material, dict) else None
-    values = []
-    if isinstance(raw_color, dict):
-        values.extend([raw_color.get("hex"), raw_color.get("name")])
-    elif raw_color:
-        values.append(raw_color)
-    requested = str(requested_color or "").strip().lower()
-    return bool(requested) and any(str(value or "").strip().lower() == requested for value in values)
+def _resolve_effective_slicer_params(
+    layer_height: float,
+    wall_count: int,
+    infill: int,
+    slicer_preset: Optional[dict],
+) -> tuple[float, int, int]:
+    """Resolve core slicer params with preset values taking precedence."""
+    preset_params = _extract_preset_core_params(slicer_preset)
+    return (
+        preset_params.get("layer_height", float(layer_height or 0.2)),
+        preset_params.get("perimeters", int(wall_count or 3)),
+        preset_params.get("infill", int(infill or 20)),
+    )
+
+
+def _resolve_effective_slicer_preset(user_id: int, slicer_preset_id: Optional[int], default_slicer_preset_id: Optional[int]):
+    """Resolve the active user slicer preset from request value or user defaults."""
+    from app.slicer_presets import get_slicer_preset_by_id
+
+    effective_preset_id = slicer_preset_id if slicer_preset_id is not None else default_slicer_preset_id
+    if effective_preset_id is None:
+        return None, None
+
+    sid = int(effective_preset_id)
+    if sid <= 0:
+        return sid, None
+
+    slicer_preset = get_slicer_preset_by_id(int(user_id), sid)
+    if slicer_preset is None:
+        raise HTTPException(status_code=400, detail="切片预设不存在或无权限")
+    return sid, slicer_preset
+
+
+def _resolve_effective_printer_model(printer_model: Optional[str], default_printer_id: Optional[str], default_nozzle: Optional[str]) -> Optional[str]:
+    """Resolve the effective printer compound id from request value or user defaults."""
+    from app.printers import resolve_printer
+
+    if printer_model:
+        resolved = resolve_printer(str(printer_model))
+        return (resolved.get("_compound_id") or str(printer_model)) if resolved else str(printer_model)
+
+    if default_printer_id:
+        nozzle = None
+        if default_nozzle not in (None, ""):
+            try:
+                nozzle = float(default_nozzle)
+            except (TypeError, ValueError):
+                nozzle = None
+        resolved = resolve_printer(str(default_printer_id), nozzle)
+        return (resolved.get("_compound_id") or str(default_printer_id)) if resolved else str(default_printer_id)
+
+    return None
 
 
 async def build_quote_payload(
@@ -124,7 +191,6 @@ async def build_quote_payload(
         try_get_idempotent_response,
         write_audit_event,
     )
-    from app.slicer_presets import get_slicer_preset_by_id
     from sqlalchemy import func as sqlfunc
 
     idem_key = get_idempotency_key_from_request(request)
@@ -163,15 +229,19 @@ async def build_quote_payload(
                 status_code=400, detail=f"免费用户最多累计 {FREE_TOTAL_MODEL_LIMIT} 个模型，升级会员无限制"
             )
 
-    with get_db_session() as db:
-        row = db.query(User.materials, User.pricing_config).filter(User.id == current_user["id"]).first()
-    user_materials = json.loads(row.materials) if row and row.materials else DEFAULT_MATERIALS
-    pricing_config = json.loads(row.pricing_config) if row and row.pricing_config else DEFAULT_PRICING_CONFIG
+    (
+        user_materials,
+        pricing_config,
+        default_printer_id,
+        default_nozzle,
+        default_slicer_preset_id,
+    ) = _load_user_quote_settings(int(current_user["id"]))
 
     if use_prusaslicer is not None:
         pricing_config["use_prusaslicer"] = use_prusaslicer
-    if printer_model is not None:
-        pricing_config["printer_model"] = printer_model
+    effective_printer_model = _resolve_effective_printer_model(printer_model, default_printer_id, default_nozzle)
+    if effective_printer_model is not None:
+        pricing_config["printer_model"] = effective_printer_model
 
     material_names = {str(m.get("name")) for m in user_materials if isinstance(m, dict)}
     if material not in material_names:
@@ -185,8 +255,10 @@ async def build_quote_payload(
         and str(m.get("name")) == material
         and (not requested_brand or str(m.get("brand") or "Generic").strip() == requested_brand)
     ]
-    selected_material = next((m for m in material_candidates if _material_color_matches(m, color)), None)
-    selected_material = selected_material or (material_candidates[0] if material_candidates else None)
+    # Color is a preview-only concern. It should not block quoting or change
+    # which material spec drives slicing speed/time.
+    selected_material = material_candidates[0] if material_candidates else None
+    selected_material = merge_user_material_with_catalog(selected_material, material, requested_brand, color)
     if requested_brand and selected_material is None:
         raise HTTPException(status_code=400, detail="材料品牌参数不合法")
     effective_brand = str(selected_material.get("brand") or "Generic").strip() if selected_material else requested_brand
@@ -195,37 +267,25 @@ async def build_quote_payload(
         if selected_material
         else user_materials
     )
-    allowed_colors = []
-    if material_candidates:
-        for candidate in material_candidates:
-            raw_color = candidate.get("color")
-            if isinstance(raw_color, dict):
-                allowed_colors.extend([str(raw_color.get("hex", "")).strip(), str(raw_color.get("name", "")).strip()])
-            elif raw_color:
-                allowed_colors.append(str(raw_color).strip())
-        allowed_colors = [a for a in allowed_colors if a]
-    if allowed_colors and color not in allowed_colors:
-        raise HTTPException(status_code=400, detail="颜色参数不合法")
-
-    slicer_preset = None
-    if slicer_preset_id is not None:
-        sid = int(slicer_preset_id)
-        if sid > 0:
-            slicer_preset = get_slicer_preset_by_id(int(current_user["id"]), sid)
-            if slicer_preset is None:
-                raise HTTPException(status_code=400, detail="切片预设不存在或无权限")
+    effective_preset_id, slicer_preset = _resolve_effective_slicer_preset(
+        int(current_user["id"]),
+        slicer_preset_id,
+        default_slicer_preset_id,
+    )
 
     # A selected preset is the source of truth for its explicitly stored core
     # values. This protects the real slice from stale frontend fallback values
     # such as 0.20 / 3 / 20 when the page shows a 0.40 / 2 / 15% preset.
-    preset_params = _extract_preset_core_params(slicer_preset)
-    if preset_params:
-        layer_height = preset_params.get("layer_height", layer_height)
-        wall_count = preset_params.get("perimeters", wall_count)
-        infill = preset_params.get("infill", infill)
+    layer_height, wall_count, infill = _resolve_effective_slicer_params(
+        layer_height,
+        wall_count,
+        infill,
+        slicer_preset,
+    )
+    if slicer_preset:
         logger.info(
             "Effective slicer preset params: preset_id=%s name=%s layer_height=%s perimeters=%s infill=%s",
-            slicer_preset_id,
+            effective_preset_id,
             slicer_preset.get("name") if slicer_preset else None,
             layer_height,
             wall_count,
@@ -254,6 +314,7 @@ async def build_quote_payload(
                     orient_x,
                     orient_y,
                     orient_z,
+                    selected_material,
                 )
                 if isinstance(result, dict) and effective_brand:
                     result["brand"] = effective_brand
@@ -343,6 +404,7 @@ def _process_single_file_sync(
     orient_x: Optional[float] = None,
     orient_y: Optional[float] = None,
     orient_z: Optional[float] = None,
+    selected_material_spec: Optional[dict] = None,
 ):
     """Synchronous wrapper for process_single_file — runs in thread pool.
 
@@ -403,6 +465,7 @@ def _process_single_file_sync(
             orient_x,
             orient_y,
             orient_z,
+            selected_material_spec=selected_material_spec,
             printer_bed_resolver=printer_bed_resolver,
             speed_params_override=speed_params_override,
             printer_profile_path=printer_profile_path,

@@ -11,6 +11,7 @@ import { t } from '../i18n.js';
 import { reQuoteAllSelectedFiles, getSlicerConfigSnapshot, getAffectedFilenamesForSlicerConfigChange, getAffectedFilenamesForSlicerPresetChange } from '../quote.js';
 import { dom, _printerModels, _selectedPresetId, setMsg, renderSlicerPresetsUI } from './ui.js';
 import { fetchPrinterModels } from './printers.js';
+import { LAYER_HEIGHT_BY_NOZZLE, getNozzleSettings } from './nozzle-rules.js';
 
 async function _fetchPresetParams(presetId) {
     if (!presetId) return null;
@@ -332,20 +333,12 @@ export async function saveAsNewPreset() {
 }
 
 // ── Per-nozzle valid layer heights ──
-const LAYER_HEIGHT_BY_NOZZLE = {
-    '0.2': { min: 0.06, max: 0.14, valid: [0.06, 0.08, 0.10, 0.12, 0.14], defaultVal: 0.10 },
-    '0.4': { min: 0.08, max: 0.28, valid: [0.08, 0.12, 0.16, 0.20, 0.24, 0.28], defaultVal: 0.20 },
-    '0.6': { min: 0.18, max: 0.42, valid: [0.18, 0.24, 0.30, 0.36, 0.42], defaultVal: 0.30 },
-    '0.8': { min: 0.24, max: 0.56, valid: [0.24, 0.32, 0.40, 0.48, 0.56], defaultVal: 0.40 },
-};
-
 const STANDARD_WALL_COUNT = 2;
 const STANDARD_INFILL = 15;
 let _standardPresetSync = null;
 
 function _nozzleSettings(nozzleValue) {
-    const key = Number(nozzleValue || 0.4).toFixed(1);
-    return { key, settings: LAYER_HEIGHT_BY_NOZZLE[key] || LAYER_HEIGHT_BY_NOZZLE['0.4'] };
+    return getNozzleSettings(nozzleValue);
 }
 
 function _setStandardSlicerForm(settings) {
@@ -357,10 +350,19 @@ function _setStandardSlicerForm(settings) {
     if (infillSelect) infillSelect.value = String(STANDARD_INFILL);
 }
 
+export function getStandardPresetNameForNozzle(nozzleValue) {
+    const { settings } = _nozzleSettings(nozzleValue);
+    return `${settings.defaultVal.toFixed(2)}-${STANDARD_WALL_COUNT}-${STANDARD_INFILL}%`;
+}
+
 function _selectPresetAndSyncForm(preset) {
     if (!preset) return;
     const presetSelect = document.getElementById('gen-preset-select');
+    const batchPresetSelect = document.getElementById('batch-slicer-preset');
+    const frontPresetSelect = document.getElementById('front-default-slicer-preset');
     if (presetSelect) presetSelect.value = String(preset.id);
+    if (batchPresetSelect) batchPresetSelect.value = String(preset.id);
+    if (frontPresetSelect) frontPresetSelect.value = String(preset.id);
     quoteOptions.slicer_preset_id = Number(preset.id);
     saveSlicerPresetSelection();
     setDefaultSlicerPresetId(Number(preset.id));
@@ -370,6 +372,18 @@ function _selectPresetAndSyncForm(preset) {
     _setSelectClosest(document.getElementById('gen-infill'), params.fill_density || STANDARD_INFILL);
 }
 
+function _clearSelectedPreset() {
+    const presetSelect = document.getElementById('gen-preset-select');
+    const batchPresetSelect = document.getElementById('batch-slicer-preset');
+    const frontPresetSelect = document.getElementById('front-default-slicer-preset');
+    quoteOptions.slicer_preset_id = null;
+    saveSlicerPresetSelection();
+    setDefaultSlicerPresetId(null);
+    if (presetSelect) presetSelect.value = '';
+    if (batchPresetSelect) batchPresetSelect.value = '';
+    if (frontPresetSelect) frontPresetSelect.value = '';
+}
+
 /** Select or create the standard 2-wall/15% preset for the active nozzle. */
 export async function syncStandardPresetForNozzle() {
     const nozzleEl = document.getElementById('cfg-nozzle-diameter');
@@ -377,7 +391,7 @@ export async function syncStandardPresetForNozzle() {
     updateLayerHeightDropdown();
     _setStandardSlicerForm(settings);
 
-    const standardName = `${settings.defaultVal.toFixed(2)}-${STANDARD_WALL_COUNT}-${STANDARD_INFILL}%`;
+    const standardName = getStandardPresetNameForNozzle(key);
     const existing = (slicerPresets || []).find((preset) => String(preset.name || '').trim() === standardName);
     if (existing) {
         _selectPresetAndSyncForm(existing);
@@ -419,6 +433,31 @@ export async function syncStandardPresetForNozzle() {
         }
     })();
     return _standardPresetSync;
+}
+
+export function syncSlicerPresetForNozzle() {
+    const nozzleEl = document.getElementById('cfg-nozzle-diameter');
+    const nozzleValue = nozzleEl?.value || '0.4';
+    const { settings } = _nozzleSettings(nozzleValue);
+    const layerSelect = document.getElementById('gen-layer-height');
+    const wallSelect = document.getElementById('gen-wall-count');
+    const infillSelect = document.getElementById('gen-infill');
+
+    if (layerSelect) layerSelect.value = settings.defaultVal.toFixed(2);
+    if (wallSelect) wallSelect.value = String(STANDARD_WALL_COUNT);
+    if (infillSelect) infillSelect.value = String(STANDARD_INFILL);
+
+    const targetName = getStandardPresetNameForNozzle(nozzleValue);
+    const matched = (slicerPresets || []).find((preset) => String(preset.name || '').trim() === targetName);
+    if (matched) {
+        _selectPresetAndSyncForm(matched);
+    } else {
+        _clearSelectedPreset();
+    }
+
+    updateLayerHeightDropdown();
+    updateLayerHeightRangeHint();
+    return matched || null;
 }
 
 // ── Update layer height dropdown options based on current nozzle ──

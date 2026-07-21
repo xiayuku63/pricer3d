@@ -65,21 +65,6 @@ export async function fetchUserSettings() {
             setDefaultMaterial(data.default_material || null);
             setDefaultColor(data.default_color || null);
             setDefaultBrand(data.default_brand || null);
-            // Sync default preset to quote options so auto-quote uses it
-            if (data.default_slicer_preset_id) {
-                quoteOptions.slicer_preset_id = data.default_slicer_preset_id;
-                saveSlicerPresetSelection();
-            }
-            // Sync default material/color/brand to quote options
-            if (data.default_brand) {
-                quoteOptions.brand = data.default_brand;
-            }
-            if (data.default_material) {
-                quoteOptions.material = data.default_material;
-            }
-            if (data.default_color) {
-                quoteOptions.color = data.default_color;
-            }
         }
     } catch (e) { console.error("Failed to fetch user settings", e); }
 
@@ -130,25 +115,6 @@ export function updateDropdowns() {
     refreshOptionsSummary();
     refreshBatchBrandDropdown();
     refreshBatchMaterialDropdown();
-    // Sync batch printer with saved default
-    const batchPrinterSel = document.getElementById('batch-printer-model');
-    if (batchPrinterSel && defaultPrinterId) {
-        const opts = Array.from(batchPrinterSel.options).map(o => o.value);
-        if (opts.includes(defaultPrinterId)) batchPrinterSel.value = defaultPrinterId;
-    }
-    // Sync batch nozzle with saved default
-    const batchNozzleSel = document.getElementById('batch-nozzle-diameter');
-    if (batchNozzleSel && defaultNozzle) {
-        const nozzleOpts = Array.from(batchNozzleSel.options).map(o => o.value);
-        if (nozzleOpts.includes(String(defaultNozzle))) batchNozzleSel.value = String(defaultNozzle);
-    }
-    // Sync batch preset with saved default
-    const batchPresetSel = document.getElementById('batch-slicer-preset');
-    if (batchPresetSel) {
-        const presetOpts = Array.from(batchPresetSel.options).map(o => o.value);
-        const presetId = String(quoteOptions.slicer_preset_id || '');
-        if (presetId && presetOpts.includes(presetId)) batchPresetSel.value = presetId;
-    }
     refreshStyledSelectDropdowns();
     refreshDefaultMaterialControls({ preserveValues: false, updateQuoteOptions: false });
     maybeSnapshotBatchDirty();
@@ -212,6 +178,8 @@ export function refreshDefaultMaterialControls(options = {}) {
         const nextColor = colorContainer?.getAttribute('data-selected-color') || '';
         if (nextColor) quoteOptions.color = nextColor;
     }
+
+    refreshStyledSelectDropdowns(['front-default-brand', 'front-default-material']);
 }
 
 export function buildPrinterOptionsHtml(selectedId) {

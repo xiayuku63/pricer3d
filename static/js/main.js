@@ -30,6 +30,7 @@ import {
     authFetch,
     setDefaultSlicerPresetId, currentPreviewFilename,
     getMaterialsByBrand, MATERIAL_TYPE_PRESETS, getUsedBrandOptions,
+    saveFrontSettingsSnapshot, saveBatchSettingsSnapshot,
 } from './modules/state.js';
 
 import {
@@ -226,29 +227,81 @@ document.addEventListener('DOMContentLoaded', () => {
     _bind(dom.slicerPresetGenerateBtn, 'click', generateSlicerPreset);
 
     // ── Slicer preset form: select preset → load params ──
+    function _syncSlicerPresetSelectors(value) {
+        const normalized = value ? String(value) : '';
+        const selectors = [
+            dom.genPresetSelect,
+            document.getElementById('batch-slicer-preset'),
+            document.getElementById('front-default-slicer-preset'),
+        ];
+        selectors.forEach((sel) => {
+            if (sel) sel.value = normalized;
+        });
+        saveFrontSettingsSnapshot({
+            printer_model: document.getElementById('front-default-printer-model')?.value || '',
+            nozzle_diameter: document.getElementById('front-default-nozzle-diameter')?.value || '',
+            slicer_preset_id: document.getElementById('front-default-slicer-preset')?.value || '',
+        });
+        saveBatchSettingsSnapshot({
+            printer_model: document.getElementById('batch-printer-model')?.value || '',
+            nozzle_diameter: document.getElementById('batch-nozzle-diameter')?.value || '',
+            slicer_preset_id: document.getElementById('batch-slicer-preset')?.value || '',
+        });
+    }
+
+    async function _applySlicerPresetSelection(value, options = {}) {
+        const {
+            loadForm = false,
+            markBatch = false,
+        } = options;
+        const normalized = value ? String(value) : '';
+        const layerEl = document.getElementById('gen-layer-height');
+        const wallEl = document.getElementById('gen-wall-count');
+        const infillEl = document.getElementById('gen-infill');
+
+        _syncSlicerPresetSelectors(normalized);
+
+        if (!normalized) {
+            if (dom.genPresetSaveBtn) dom.genPresetSaveBtn.disabled = true;
+            quoteOptions.slicer_preset_id = null;
+            saveSlicerPresetSelection();
+            setDefaultSlicerPresetId(null);
+            if (markBatch) markBatchDirty('_slicer_preset_id');
+            return;
+        }
+
+        if (loadForm) {
+            await loadPresetIntoForm(normalized);
+        }
+        if (dom.genPresetSaveBtn) dom.genPresetSaveBtn.disabled = false;
+        quoteOptions.slicer_preset_id = Number(normalized);
+        saveSlicerPresetSelection();
+        setDefaultSlicerPresetId(Number(normalized));
+        if (markBatch) markBatchDirty('_slicer_preset_id');
+
+        try {
+            const resp = await authFetch(`/api/slicer/presets/${normalized}`);
+            if (resp.ok) {
+                const data = await resp.json();
+                const p = data.preset?.params;
+                if (p) {
+                    if (layerEl && p.layer_height != null) layerEl.value = Number(p.layer_height).toFixed(2);
+                    if (wallEl && p.perimeters != null) wallEl.value = String(p.perimeters);
+                    if (infillEl && p.fill_density != null) infillEl.value = String(p.fill_density);
+                }
+            }
+        } catch (e) { /* ignore */ }
+    }
+
     if (dom.genPresetSelect) {
         dom.genPresetSelect.addEventListener('change', async () => {
-            const val = dom.genPresetSelect.value;
-            if (!val) {
-                // "-- 新建 / 未选择 --" → disable save
-                if (dom.genPresetSaveBtn) dom.genPresetSaveBtn.disabled = true;
-                // Sync batch slicer preset
-                const batchSel = document.getElementById('batch-slicer-preset');
-                if (batchSel) batchSel.value = '';
-                quoteOptions.slicer_preset_id = null;
-                saveSlicerPresetSelection();
-                setDefaultSlicerPresetId(null);
-                return;
-            }
-            await loadPresetIntoForm(val);
-            // Enable save button when a preset is selected (and not system preset)
-            if (dom.genPresetSaveBtn) dom.genPresetSaveBtn.disabled = false;
-            // Sync batch slicer preset
-            const batchSel = document.getElementById('batch-slicer-preset');
-            if (batchSel) batchSel.value = val;
-            quoteOptions.slicer_preset_id = Number(val);
-            saveSlicerPresetSelection();
-            setDefaultSlicerPresetId(Number(val));
+            await _applySlicerPresetSelection(dom.genPresetSelect.value, { loadForm: true });
+        });
+    }
+
+    if (dom.frontDefaultSlicerPreset) {
+        dom.frontDefaultSlicerPreset.addEventListener('change', async () => {
+            await _applySlicerPresetSelection(dom.frontDefaultSlicerPreset.value);
         });
     }
 
@@ -356,39 +409,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Batch preset change → show params summary + update quoteOptions + mark dirty
     if (batchSlicerPreset) {
         batchSlicerPreset.addEventListener('change', async () => {
-            markBatchDirty('_slicer_preset_id');
-            const val = batchSlicerPreset.value;
-            const layerEl = document.getElementById('gen-layer-height');
-            const wallEl = document.getElementById('gen-wall-count');
-            const infillEl = document.getElementById('gen-infill');
-            if (!val) {
-                quoteOptions.slicer_preset_id = null;
-                saveSlicerPresetSelection();
-                const genSel = document.getElementById('front-default-slicer-preset');
-                if (genSel) genSel.value = '';
-                setDefaultSlicerPresetId(null);
-                return;
-            }
-            quoteOptions.slicer_preset_id = Number(val);
-            saveSlicerPresetSelection();
-            const genSel = document.getElementById('front-default-slicer-preset');
-            if (genSel) genSel.value = val;
-            setDefaultSlicerPresetId(Number(val));
-            // Show param summary
-            try {
-                const resp = await authFetch(`/api/slicer/presets/${val}`);
-                if (resp.ok) {
-                    const data = await resp.json();
-                    const p = data.preset?.params;
-                    if (p) {
-                        // The quote API reads these controls when it builds the
-                        // request. Keep them in sync with the selected batch preset.
-                        if (layerEl && p.layer_height != null) layerEl.value = Number(p.layer_height).toFixed(2);
-                        if (wallEl && p.perimeters != null) wallEl.value = String(p.perimeters);
-                        if (infillEl && p.fill_density != null) infillEl.value = String(p.fill_density);
-                    }
-                }
-            } catch (e) { /* ignore */ }
+            await _applySlicerPresetSelection(batchSlicerPreset.value, { markBatch: true });
         });
     }
 

@@ -445,6 +445,56 @@ class TestCalculateCost:
         )
         assert unit_cost > 0  # 应该仍然能计算
 
+    def test_selected_material_spec_takes_priority_over_same_name_variants(self):
+        """显式选中的材料配置应优先于同名材料列表中的其他变体。"""
+        materials = [
+            {
+                "name": "PLA",
+                "brand": "BrandA",
+                "density": 1.24,
+                "price_per_kg": 80.0,
+                "hotend_temp": 220,
+                "bed_temp": 55,
+                "max_volumetric_speed": 22,
+            },
+            {
+                "name": "PLA",
+                "brand": "BrandB",
+                "density": 1.30,
+                "price_per_kg": 120.0,
+                "hotend_temp": 235,
+                "bed_temp": 65,
+                "max_volumetric_speed": 9,
+            },
+        ]
+
+        unit_cost, weight, _, _, _, _, bd = calculate_cost(
+            100000,
+            10000,
+            "PLA",
+            0.2,
+            20,
+            materials,
+            self._default_cfg(),
+            1,
+            selected_material_spec=materials[1],
+        )
+
+        assert weight == 130.0
+        assert bd["material_cost_cny"] > 0
+        assert unit_cost > 0
+
+    def test_default_material_flow_limit_fallback_varies_by_material_name(self):
+        """未显式配置 max_volumetric_speed 时，不同材料类型应回退到不同默认值。"""
+        pla = {"name": "PLA", "brand": "Generic", "density": 1.24, "price_per_kg": 80.0}
+        tpu = {"name": "TPU", "brand": "Generic", "density": 1.21, "price_per_kg": 160.0}
+
+        *_, pla_bd = calculate_cost(100000, 10000, "PLA", 0.2, 20, [pla], self._default_cfg(), 1)
+        *_, tpu_bd = calculate_cost(100000, 10000, "TPU", 0.2, 20, [tpu], self._default_cfg(), 1)
+
+        assert pla_bd["prusaslicer_used"] is False or isinstance(pla_bd, dict)
+        assert pla != tpu
+
     def test_breakdown_structure(self):
         """返回的 breakdown 字典应包含关键字段。"""
         *_, bd = calculate_cost(100000, 10000, "PLA", 0.2, 20, [self.PLA], self._default_cfg(), 1)

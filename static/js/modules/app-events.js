@@ -105,49 +105,14 @@ export function initSettingsAreaEvents({
     const frontDefaultBrandSel = document.getElementById('front-default-brand');
     if (frontDefaultBrandSel) {
         frontDefaultBrandSel.addEventListener('change', () => {
-            quoteOptions.brand = frontDefaultBrandSel.value || '';
-            refreshDefaultMaterialControls('front', { preserveValues: true, updateQuoteOptions: true });
+            refreshDefaultMaterialControls({ preserveValues: true, updateQuoteOptions: false });
         });
     }
 
     const frontDefaultMaterialSel = document.getElementById('front-default-material');
     if (frontDefaultMaterialSel) {
         frontDefaultMaterialSel.addEventListener('change', () => {
-            quoteOptions.material = frontDefaultMaterialSel.value || '';
-            refreshDefaultMaterialControls('front', { preserveValues: true, updateQuoteOptions: true });
-        });
-    }
-
-    const frontDefaultPrinterSel = document.getElementById('front-default-printer-model');
-    if (frontDefaultPrinterSel) {
-        frontDefaultPrinterSel.addEventListener('change', () => {
-            const batchPrinter = document.getElementById('batch-printer-model');
-            if (batchPrinter && frontDefaultPrinterSel.value) {
-                batchPrinter.value = frontDefaultPrinterSel.value;
-                batchPrinter.dispatchEvent(new Event('change'));
-            }
-        });
-    }
-
-    const frontDefaultNozzleSel = document.getElementById('front-default-nozzle-diameter');
-    if (frontDefaultNozzleSel) {
-        frontDefaultNozzleSel.addEventListener('change', () => {
-            const batchNozzle = document.getElementById('batch-nozzle-diameter');
-            if (batchNozzle && frontDefaultNozzleSel.value) {
-                batchNozzle.value = frontDefaultNozzleSel.value;
-                batchNozzle.dispatchEvent(new Event('change'));
-            }
-        });
-    }
-
-    const frontDefaultPresetSel = document.getElementById('front-default-slicer-preset');
-    if (frontDefaultPresetSel) {
-        frontDefaultPresetSel.addEventListener('change', () => {
-            const batchPreset = document.getElementById('batch-slicer-preset');
-            if (batchPreset) {
-                batchPreset.value = frontDefaultPresetSel.value;
-                batchPreset.dispatchEvent(new Event('change'));
-            }
+            refreshDefaultMaterialControls({ preserveValues: true, updateQuoteOptions: false });
         });
     }
 
@@ -291,6 +256,30 @@ export function initSettingsAreaEvents({
                 '<button type="button" class="ce-swatch w-7 h-7 rounded-md border border-gray-300 hover:border-indigo-400 hover:shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 flex-shrink-0" style="background:' + sh + ';border-color:var(--color-border-input);" data-color-hex="' + sh + '" title="' + sh + '"></button>'
             ).join('');
         };
+        const hueSatToHex = (hue, sat) => {
+            const h = ((hue % 360) + 360) % 360 / 360;
+            const s = Math.max(0, Math.min(100, sat)) / 100;
+            const l2 = 0.5;
+            const q2 = l2 < 0.5 ? l2 * (1 + s) : l2 + s - l2 * s;
+            const p2 = 2 * l2 - q2;
+            const hue2rgb = (p3, q3, t) => {
+                if (t < 0) t += 1;
+                if (t > 1) t -= 1;
+                if (t < 1/6) return p3 + (q3 - p3) * 6 * t;
+                if (t < 1/2) return q3;
+                if (t < 2/3) return p3 + (q3 - p3) * (2/3 - t) * 6;
+                return p3;
+            };
+            const r = Math.round(hue2rgb(p2, q2, h + 1/3) * 255);
+            const g = Math.round(hue2rgb(p2, q2, h) * 255);
+            const b = Math.round(hue2rgb(p2, q2, h - 1/3) * 255);
+            return '#' + [r, g, b].map(v => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0')).join('');
+        };
+        const applyHueSatToPanel = (panel, canvas, hue, sat) => {
+            drawColorWheel(canvas, hue, sat);
+            updatePanelPreview(panel, hueSatToHex(hue, sat));
+            renderPanelShades(panel, hue, sat);
+        };
         const updatePanelPreview = (panel, hex) => {
             const previewSwatch = panel.querySelector('.cw-preview-swatch');
             const previewHex = panel.querySelector('.cw-preview-hex');
@@ -414,10 +403,25 @@ export function initSettingsAreaEvents({
             if (canvas) _colorCanvasPick(e.clientX, e.clientY, canvas);
         });
         document.addEventListener('mouseup', () => { _colorCanvasDrag = false; });
+        document.addEventListener('wheel', (e) => {
+            const canvas = e.target.closest('.color-picker-panel .cw-canvas');
+            if (!canvas) return;
+            e.preventDefault();
+            const panel = canvas.closest('.color-picker-panel');
+            if (!panel) return;
+            const currentHex = panel.dataset.pendingColor || panel.querySelector('.row-color-value')?.value || '#000000';
+            let [hue, sat] = getHueSatFromHex(currentHex);
+            const step = e.shiftKey ? 1 : 6;
+            if (e.altKey) {
+                sat = Math.max(0, Math.min(100, sat + (e.deltaY > 0 ? -step : step)));
+            } else {
+                hue = (hue + (e.deltaY > 0 ? step : -step) + 360) % 360;
+            }
+            applyHueSatToPanel(panel, canvas, hue, sat);
+        }, { passive: false });
 
         function _colorCanvasPick(clientX, clientY, canvas) {
             const panel = canvas.closest('.color-picker-panel');
-            const idx = parseInt(panel.getAttribute('data-idx'), 10);
             const rect = canvas.getBoundingClientRect();
             const x = (clientX - rect.left) * (canvas.width / rect.width);
             const y = (clientY - rect.top) * (canvas.height / rect.height);
@@ -430,28 +434,7 @@ export function initSettingsAreaEvents({
             if (angle < 0) angle += Math.PI * 2;
             const hue = (angle / (Math.PI * 2)) * 360;
             const sat = (dist / radius) * 100;
-            drawColorWheel(canvas, hue, sat);
-            // Compute hex from HSL(50% lightness)
-            const h = hue / 360; const s = sat / 100;
-            const l2 = 0.5;
-            const q2 = l2 < 0.5 ? l2 * (1 + s) : l2 + s - l2 * s;
-            const p2 = 2 * l2 - q2;
-            const hue2rgb = (p3, q3, t) => {
-                if (t < 0) t += 1;
-                if (t > 1) t -= 1;
-                if (t < 1/6) return p3 + (q3 - p3) * 6 * t;
-                if (t < 1/2) return q3;
-                if (t < 2/3) return p3 + (q3 - p3) * (2/3 - t) * 6;
-                return p3;
-            };
-            const r = Math.round(hue2rgb(p2, q2, h + 1/3) * 255);
-            const g = Math.round(hue2rgb(p2, q2, h) * 255);
-            const b = Math.round(hue2rgb(p2, q2, h - 1/3) * 255);
-            const hex = '#' + [r, g, b].map(v => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0')).join('');
-
-            updatePanelPreview(panel, hex);
-            // Regenerate monochrome shade swatches based on new hue/sat at fixed lightness range
-            renderPanelShades(panel, hue, sat);
+            applyHueSatToPanel(panel, canvas, hue, sat);
         }
 
         // Close color panels on outside click
@@ -473,7 +456,13 @@ export function initSettingsAreaEvents({
         );
         const color = ADD_MATERIAL_COLOR_CHOICES.find((candidate) => !usedColors.has(candidate.hex))
             || ADD_MATERIAL_COLOR_CHOICES[0];
-        MATERIAL_OPTIONS.push({ name: defaultType, brand, density: defaultPreset.density, price_per_kg: defaultPreset.price_per_kg, color: { ...color } });
+        MATERIAL_OPTIONS.push({
+            name: defaultType,
+            brand,
+            density: defaultPreset.density,
+            price_per_kg: defaultPreset.price_per_kg,
+            color: { ...color },
+        });
         renderUserCenterUI();
     });
     bind(document.getElementById('material-restore-defaults-btn'), 'click', restoreDefaultMaterials);

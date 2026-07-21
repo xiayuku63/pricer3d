@@ -329,6 +329,7 @@ class Material(Base):
     bed_temp_min = Column(Integer)
     bed_temp_max = Column(Integer)
     print_speed_max = Column(Float)  # 建议最大打印速度
+    max_volumetric_speed = Column(Float)  # 建议最大体积流量 mm^3/s
     description = Column(Text)
     active = Column(Integer, default=1)
     created_at = Column(String, nullable=False)

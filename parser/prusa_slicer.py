@@ -51,15 +51,19 @@ def prusa_executable() -> Optional[str]:
 
     Strategy:
     1. Respect explicit ``PRUSA_EXECUTABLE`` if set.
-    2. Linux (Docker): directly check ``/usr/bin/prusa-slicer`` (apt install).
-    3. Fall back to ``shutil.which()`` for PATH-based lookup.
-    4. Check well-known Windows install paths.
+    2. On Windows, only allow a WSL wrapper command.
+    3. On Linux, check standard local install paths.
+    4. Fall back to ``shutil.which()`` for PATH-based lookup on non-Windows.
     """
     import sys as _sys
 
+    def _is_wsl_command(value: str) -> bool:
+        stripped = value.strip()
+        return stripped.startswith("wsl ") or stripped.startswith("wsl.exe ")
+
     _env = os.getenv("PRUSA_EXECUTABLE", "").strip()
     if _env:
-        if _env.startswith("wsl ") or _env.startswith("wsl.exe "):
+        if _is_wsl_command(_env):
             # WSL passthrough is only valid on Windows
             if _sys.platform == "win32":
                 return _env  # WSL passthrough: "wsl prusa-slicer" or "wsl.exe prusa-slicer"
@@ -69,39 +73,46 @@ def prusa_executable() -> Optional[str]:
                 _sys.platform,
             )
             _env = ""  # fall through to auto-detection
+        elif _sys.platform == "win32":
+            logger.warning("Ignoring Windows PRUSA_EXECUTABLE='%s' because WSL-only mode is enforced", _env)
         elif os.path.isfile(_env):
             return _env
     _env_file = _env_file_prusa_executable().strip()
     if _env_file:
-        if _env_file.startswith("wsl ") or _env_file.startswith("wsl.exe "):
+        if _is_wsl_command(_env_file):
             if _sys.platform == "win32":
                 return _env_file
             logger.warning("Ignoring WSL path from .env file on %s platform", _sys.platform)
             _env_file = ""
+        elif _sys.platform == "win32":
+            logger.warning("Ignoring .env PRUSA_EXECUTABLE='%s' because WSL-only mode is enforced", _env_file)
         elif os.path.isfile(_env_file):
             return _env_file
+
+    if _sys.platform == "win32":
+        _wsl = shutil.which("wsl.exe") or shutil.which("wsl")
+        if _wsl:
+            return f"{_wsl} -- prusa-slicer"
+        return None
+
     # Linux: apt installs to /usr/bin/prusa-slicer
-    if _sys.platform != "win32":
-        _p = "/usr/bin/prusa-slicer"
-        if os.path.isfile(_p):
-            return _p
+    _p = "/usr/bin/prusa-slicer"
+    if os.path.isfile(_p):
+        return _p
     # Docker: AppImage installed at /usr/local/bin/prusa-slicer
     _p_docker = "/usr/local/bin/prusa-slicer"
     if os.path.isfile(_p_docker):
         return _p_docker
+
     # PATH-based lookup
     for _name in ("prusa-slicer", "prusa-slicer-console", "prusaslicer", "prusaslicer-console"):
         _c = shutil.which(_name)
         if _c:
             return _c
-    # Well-known paths
+
+    # Well-known Linux paths
     for _p in (
         "/snap/bin/prusa-slicer",
-        "C:/Program Files/Prusa3D/PrusaSlicer/prusa-slicer-console.exe",
-        "C:/Program Files/Prusa3D/PrusaSlicer/prusa-slicer.exe",
-        "C:/Program Files (x86)/Prusa3D/PrusaSlicer/prusa-slicer-console.exe",
-        os.path.expandvars(r"%LOCALAPPDATA%/Programs/PrusaSlicer/prusa-slicer-console.exe"),
-        os.path.expandvars(r"%LOCALAPPDATA%/Programs/PrusaSlicer/prusa-slicer.exe"),
     ):
         if os.path.isfile(_p):
             return _p
@@ -523,7 +534,7 @@ def run_prusa_slice(
 
         if _sys.platform == "win32":
             raise RuntimeError(
-                "PrusaSlicer not found on Windows - install PrusaSlicer, set PRUSA_EXECUTABLE=wsl prusa-slicer, or run: wsl -d Ubuntu apt-get install prusa-slicer"
+                "PrusaSlicer not found in WSL - set PRUSA_EXECUTABLE to a WSL command such as 'wsl.exe -d Ubuntu prusa-slicer', or run: wsl -d Ubuntu apt-get install prusa-slicer"
             )
         raise RuntimeError("PrusaSlicer not found - install: apt-get install prusa-slicer")
 

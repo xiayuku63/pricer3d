@@ -42,15 +42,15 @@ DEFAULT_PRICING_CONFIG = {
 # ── Default materials ──
 
 DEFAULT_MATERIALS = [
-    {"name": "PLA", "density": 1.24, "price_per_kg": 60.0, "hotend_temp": 220, "bed_temp": 55},
-    {"name": "PETG", "density": 1.27, "price_per_kg": 80.0, "hotend_temp": 240, "bed_temp": 70},
-    {"name": "ABS", "density": 1.04, "price_per_kg": 90.0, "hotend_temp": 250, "bed_temp": 90},
-    {"name": "ASA", "density": 1.04, "price_per_kg": 100.0, "hotend_temp": 260, "bed_temp": 100},
-    {"name": "TPU", "density": 1.20, "price_per_kg": 120.0, "hotend_temp": 220, "bed_temp": 50},
-    {"name": "PA", "density": 1.14, "price_per_kg": 100.0, "hotend_temp": 270, "bed_temp": 100},
-    {"name": "PC", "density": 1.20, "price_per_kg": 150.0, "hotend_temp": 290, "bed_temp": 90},
-    {"name": "PLA+", "density": 1.24, "price_per_kg": 70.0, "hotend_temp": 220, "bed_temp": 55},
-    {"name": "Flexible", "density": 1.20, "price_per_kg": 110.0, "hotend_temp": 220, "bed_temp": 50},
+    {"name": "PLA", "density": 1.24, "price_per_kg": 60.0, "hotend_temp": 220, "bed_temp": 55, "max_volumetric_speed": 21.0},
+    {"name": "PETG", "density": 1.27, "price_per_kg": 80.0, "hotend_temp": 240, "bed_temp": 70, "max_volumetric_speed": 12.0},
+    {"name": "ABS", "density": 1.04, "price_per_kg": 90.0, "hotend_temp": 250, "bed_temp": 90, "max_volumetric_speed": 14.0},
+    {"name": "ASA", "density": 1.04, "price_per_kg": 100.0, "hotend_temp": 260, "bed_temp": 100, "max_volumetric_speed": 14.0},
+    {"name": "TPU", "density": 1.20, "price_per_kg": 120.0, "hotend_temp": 220, "bed_temp": 50, "max_volumetric_speed": 6.0},
+    {"name": "PA", "density": 1.14, "price_per_kg": 100.0, "hotend_temp": 270, "bed_temp": 100, "max_volumetric_speed": 9.0},
+    {"name": "PC", "density": 1.20, "price_per_kg": 150.0, "hotend_temp": 290, "bed_temp": 90, "max_volumetric_speed": 10.0},
+    {"name": "PLA+", "density": 1.24, "price_per_kg": 70.0, "hotend_temp": 220, "bed_temp": 55, "max_volumetric_speed": 20.0},
+    {"name": "Flexible", "density": 1.20, "price_per_kg": 110.0, "hotend_temp": 220, "bed_temp": 50, "max_volumetric_speed": 6.0},
 ]
 
 DEFAULT_SUPPORTED_EXTENSIONS = {".stl", ".stp", ".step", ".obj", ".3mf"}
@@ -158,6 +158,8 @@ def normalize_materials(user_materials: list) -> list:
             _ht = next((d.get("hotend_temp", 220) for d in DEFAULT_MATERIALS if d["name"] == name), 220)
         if not _bt:
             _bt = next((d.get("bed_temp", 55) for d in DEFAULT_MATERIALS if d["name"] == name), 55)
+        if _mvs is None:
+            _mvs = next((d.get("max_volumetric_speed") for d in DEFAULT_MATERIALS if d["name"] == name), None)
 
         result.append(
             {

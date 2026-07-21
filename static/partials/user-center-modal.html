@@ -76,6 +76,23 @@
                                     <div id="pp-sub-printer" class="pp-sub-pane hidden space-y-4">
                                         <p class="text-xs tw-text-muted" data-i18n="settings.printerHint">管理启用机型和自定义打印机参数。</p>
 
+                                        <div class="space-y-3">
+                                            <div class="flex items-center gap-3 py-1.5">
+                                                <label class="w-28 text-xs tw-text-secondary flex-shrink-0" data-i18n="quote.printerModel">打印机</label>
+                                                <select id="gen-printer-model" class="tw-input flex-1 max-w-[240px] text-xs px-2 py-1.5"></select>
+                                            </div>
+                                            <div class="flex items-center gap-3 py-1.5">
+                                                <label class="w-28 text-xs tw-text-secondary flex-shrink-0" data-i18n="quote.nozzleDiameter">喷嘴</label>
+                                                <select id="cfg-nozzle-diameter" class="tw-input flex-1 max-w-[140px] text-xs px-2 py-1.5">
+                                                    <option value="0.2">0.2mm</option>
+                                                    <option value="0.4" selected>0.4mm</option>
+                                                    <option value="0.6">0.6mm</option>
+                                                    <option value="0.8">0.8mm</option>
+                                                </select>
+                                                <span id="printer-bed-info" class="text-[11px] tw-text-muted"></span>
+                                            </div>
+                                        </div>
+
                                         <!-- Enabled printers -->
                                         <div class="pt-4 mt-4" style="border-top: 1px solid var(--color-border);">
                                             <div class="flex justify-between items-center mb-2">
@@ -149,6 +166,7 @@
                                                 <select id="gen-layer-height" data-preset-param="layer_height" class="tw-input flex-1 max-w-[200px] text-xs px-2 py-1.5">
                                                     <option value="0.08" data-i18n="slicer.layerFine">0.08 精细</option><option value="0.10">0.10</option><option value="0.12">0.12</option><option value="0.16">0.16</option><option value="0.20" selected data-i18n="slicer.layerStandard">0.20 标准</option><option value="0.28" data-i18n="slicer.layerFast">0.28 快速</option><option value="0.32">0.32</option>
                                                 </select>
+                                                <span id="layer-height-range-hint" class="text-[11px] tw-text-muted"></span>
                                             </div>
                                             <div class="flex items-center gap-3 py-1.5">
                                                 <label class="w-28 text-xs tw-text-secondary flex-shrink-0" data-i18n="slicer.wallCount">外墙层数</label>

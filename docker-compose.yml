@@ -19,7 +19,7 @@ services:
       - OUTPUTS_DIR=/app/data/outputs
       - USER_DATA_DIR=/app/data/user
       - DB_PATH=/app/data/app.db
-      - PRUSA_EXECUTABLE=/app/tools/prusa-slicer/usr/bin/prusa-slicer
+      - PRUSA_EXECUTABLE=/usr/local/bin/prusa-slicer
 
 volumes:
   pricer3d_data:

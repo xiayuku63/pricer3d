@@ -1,8 +1,7 @@
 import os
 
 from parser.prusa_slicer import generate_slice_config
-from app.services.quote import _extract_preset_core_params
-from app.services.zip_quote import _resolve_zip_slicer_params
+from app.services.quote import _extract_preset_core_params, _resolve_effective_slicer_params
 
 
 def test_selected_preset_core_params_are_extracted_from_ini():
@@ -47,6 +46,24 @@ def test_effective_printer_and_material_settings_override_profile():
         os.unlink(path)
 
 
+def test_material_speed_and_temperature_settings_are_written_into_slice_config():
+    path = generate_slice_config(
+        printer_profile_path="profiles/prusa/printers/bambu_a1.ini",
+        hotend_temp=245,
+        bed_temp=80,
+        max_volumetric_speed=10,
+    )
+    try:
+        text = open(path, encoding="utf-8").read()
+        assert "temperature = 245" in text
+        assert "first_layer_temperature = 245" in text
+        assert "bed_temperature = 80" in text
+        assert "first_layer_bed_temperature = 80" in text
+        assert "filament_max_volumetric_speed = 10" in text
+    finally:
+        os.unlink(path)
+
+
 def test_model_page_parameters_override_selected_preset_parameters():
     preset = {
         "name": "0.20-2-15%",
@@ -67,9 +84,9 @@ def test_model_page_parameters_override_selected_preset_parameters():
         os.unlink(path)
 
 
-def test_zip_slicer_params_use_preset_values_and_page_values_as_fallbacks():
+def test_effective_slicer_params_use_preset_values_and_page_values_as_fallbacks():
     preset = {
         "content": b"layer_height = 0.40\nperimeters = 2\nfill_density = 15%\n",
     }
-    assert _resolve_zip_slicer_params(0.2, 3, 20, preset) == (0.4, 2, 15)
-    assert _resolve_zip_slicer_params(0.28, 4, 30, None) == (0.28, 4, 30)
+    assert _resolve_effective_slicer_params(0.2, 3, 20, preset) == (0.4, 2, 15)
+    assert _resolve_effective_slicer_params(0.28, 4, 30, None) == (0.28, 4, 30)

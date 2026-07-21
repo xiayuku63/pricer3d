@@ -41,6 +41,7 @@ test('custom popup menus share the unified dropdown option styling', () => {
 test('styled select wraps the default and batch controls with a blue popup highlight', () => {
     assert.match(styledSelectSource, /DEFAULT_SELECT_IDS = \[/);
     assert.match(styledSelectSource, /initStyledSelectDropdowns\(selectIds = DEFAULT_SELECT_IDS\)/);
+    assert.match(styledSelectSource, /export function refreshStyledSelectDropdowns\(selectIds = DEFAULT_SELECT_IDS\)/);
     assert.match(styledSelectSource, /styled-select-item tw-dropdown-option/);
     assert.match(componentsSource, /\.styled-select-item\.tw-dropdown-option-active,[\s\S]*?background-color: #006ad0 !important;/);
     assert.match(componentsSource, /\.styled-select-trigger:focus,[\s\S]*?box-shadow: 0 0 0 3px rgba\(0, 122, 255, 0\.12\)/);
@@ -48,6 +49,17 @@ test('styled select wraps the default and batch controls with a blue popup highl
     assert.match(pageShellSource, /front-default-printer-model/);
     assert.match(pageShellSource, /batch-material/);
     assert.match(componentsSource, /\.styled-select-wrapper \{/);
+});
+
+test('default material control refresh also refreshes the styled select wrapper options', async () => {
+    const commonSource = await readFile(new URL('../static/js/modules/settings/common.js', import.meta.url), 'utf8');
+    assert.match(commonSource, /refreshStyledSelectDropdowns\(\['front-default-brand', 'front-default-material'\]\);/);
+});
+
+test('styled select keeps the menu open while its own option list is scrolling', () => {
+    assert.match(styledSelectSource, /event\.target instanceof Element && event\.target\.closest\('\.styled-select-list'\)/);
+    assert.match(styledSelectSource, /document\.addEventListener\('scroll', \(event\) => \{/);
+    assert.match(componentsSource, /\.styled-select-list \{[\s\S]*?overflow-x: hidden !important;[\s\S]*?overflow-y: auto !important;/);
 });
 
 test('default material color hides the visible HEX label without changing the dropdown value', () => {

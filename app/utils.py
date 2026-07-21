@@ -168,11 +168,13 @@ def _normalize_color_value(value, fallback=None):
 def normalize_materials(raw_materials, fallback_colors: Optional[List[str]] = None):
     if not raw_materials:
         return DEFAULT_MATERIALS
+    defaults_by_name = {str(m.get("name") or "").strip(): m for m in DEFAULT_MATERIALS if isinstance(m, dict)}
     normalized = []
     for m in raw_materials:
         name = str(m.get("name") or "").strip()
         if not name:
             continue
+        default_spec = defaults_by_name.get(name, {})
         density = float(m.get("density") or 0) or 1.0
         if "price_per_kg" in m:
             price_per_kg = float(m.get("price_per_kg") or 0) or 0.0
@@ -188,6 +190,19 @@ def normalize_materials(raw_materials, fallback_colors: Optional[List[str]] = No
                 raw_color = legacy_colors[0]
         fallback = (fallback_colors or DEFAULT_COLORS or ["黑色"])[0]
         color = _normalize_color_value(raw_color, fallback)
+        hotend_temp = m.get("hotend_temp")
+        if hotend_temp is None:
+            hotend_temp = m.get("hotend_temp_min")
+        if hotend_temp is None:
+            hotend_temp = default_spec.get("hotend_temp")
+        bed_temp = m.get("bed_temp")
+        if bed_temp is None:
+            bed_temp = m.get("bed_temp_min")
+        if bed_temp is None:
+            bed_temp = default_spec.get("bed_temp")
+        max_volumetric_speed = m.get("max_volumetric_speed")
+        if max_volumetric_speed is None:
+            max_volumetric_speed = default_spec.get("max_volumetric_speed")
         normalized.append(
             {
                 "name": name,
@@ -195,6 +210,11 @@ def normalize_materials(raw_materials, fallback_colors: Optional[List[str]] = No
                 "density": density,
                 "price_per_kg": price_per_kg,
                 "color": color,
+                "hotend_temp": int(float(hotend_temp)) if hotend_temp is not None else None,
+                "bed_temp": int(float(bed_temp)) if bed_temp is not None else None,
+                "max_volumetric_speed": (
+                    float(max_volumetric_speed) if max_volumetric_speed is not None else None
+                ),
             }
         )
     return normalized or DEFAULT_MATERIALS
