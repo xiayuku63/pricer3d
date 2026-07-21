@@ -20,6 +20,11 @@ test('material color wheel still supports direct canvas editing', () => {
         /const canvas = e\.target\.closest\('\.color-picker-panel \.cw-canvas'\)/,
         'the canvas mousedown handler must remain available',
     );
+    assert.match(
+        appEventsSource,
+        /document\.addEventListener\('wheel', \(e\) => \{[\s\S]*?const canvas = e\.target\.closest\('\.color-picker-panel \.cw-canvas'\)/,
+        'the canvas wheel handler must remain available',
+    );
 });
 
 test('switching material color pickers closes the current panel', () => {

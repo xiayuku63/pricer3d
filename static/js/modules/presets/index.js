@@ -28,6 +28,7 @@ export {
     updateLayerHeightDropdown,
     updateLayerHeightRangeHint,
     syncStandardPresetForNozzle,
+    syncSlicerPresetForNozzle,
 } from './slicer.js';
 
 // ── Printer preset CRUD ──

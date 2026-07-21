@@ -45,7 +45,7 @@ export function initColorDropdownUI({ quoteOptions, currentResults, selectedFile
     }
 
     function positionColorList(trigger, list, wrapper) {
-        if (!wrapper.closest('#batch-results-body, #batch-results-cards, #batch-color-cell, #user-center-modal, #options-modal')) return;
+        if (!wrapper.closest('#batch-results-body, #batch-results-cards, #batch-color-cell, #front-default-color-cell, #quote-default-settings-bar, #batch-edit-bar, #user-center-modal, #options-modal')) return;
         const rect = trigger.getBoundingClientRect();
         if (!rect.width) return;
         const compact = wrapper.classList.contains('color-dd-wrapper-compact');

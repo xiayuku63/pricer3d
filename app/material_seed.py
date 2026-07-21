@@ -254,6 +254,7 @@ DEFAULT_MATERIALS = [
         "color": DEFAULT_COLOR_PALETTE[0],
         "hotend_temp": 220,
         "bed_temp": 55,
+        "max_volumetric_speed": 21.0,
     },
     {
         "name": "PLA+",
@@ -263,6 +264,7 @@ DEFAULT_MATERIALS = [
         "color": DEFAULT_COLOR_PALETTE[0],
         "hotend_temp": 220,
         "bed_temp": 55,
+        "max_volumetric_speed": 20.0,
     },
     {
         "name": "PLA Silk",
@@ -272,6 +274,7 @@ DEFAULT_MATERIALS = [
         "color": DEFAULT_COLOR_PALETTE[0],
         "hotend_temp": 220,
         "bed_temp": 55,
+        "max_volumetric_speed": 12.0,
     },
     {
         "name": "PLA Matte",
@@ -281,6 +284,7 @@ DEFAULT_MATERIALS = [
         "color": DEFAULT_COLOR_PALETTE[0],
         "hotend_temp": 220,
         "bed_temp": 55,
+        "max_volumetric_speed": 18.0,
     },
     {
         "name": "PLA-CF",
@@ -290,6 +294,7 @@ DEFAULT_MATERIALS = [
         "color": DEFAULT_COLOR_PALETTE[0],
         "hotend_temp": 230,
         "bed_temp": 60,
+        "max_volumetric_speed": 12.0,
     },
     {
         "name": "PETG",
@@ -299,6 +304,7 @@ DEFAULT_MATERIALS = [
         "color": DEFAULT_COLOR_PALETTE[0],
         "hotend_temp": 240,
         "bed_temp": 75,
+        "max_volumetric_speed": 12.0,
     },
     {
         "name": "PETG-CF",
@@ -308,6 +314,7 @@ DEFAULT_MATERIALS = [
         "color": DEFAULT_COLOR_PALETTE[0],
         "hotend_temp": 245,
         "bed_temp": 80,
+        "max_volumetric_speed": 10.0,
     },
     {
         "name": "ABS",
@@ -317,6 +324,7 @@ DEFAULT_MATERIALS = [
         "color": DEFAULT_COLOR_PALETTE[0],
         "hotend_temp": 250,
         "bed_temp": 90,
+        "max_volumetric_speed": 14.0,
     },
     {
         "name": "ABS-CF",
@@ -326,6 +334,7 @@ DEFAULT_MATERIALS = [
         "color": DEFAULT_COLOR_PALETTE[0],
         "hotend_temp": 255,
         "bed_temp": 95,
+        "max_volumetric_speed": 10.0,
     },
     {
         "name": "ASA",
@@ -335,6 +344,7 @@ DEFAULT_MATERIALS = [
         "color": DEFAULT_COLOR_PALETTE[0],
         "hotend_temp": 260,
         "bed_temp": 100,
+        "max_volumetric_speed": 14.0,
     },
     {
         "name": "ASA-CF",
@@ -344,6 +354,7 @@ DEFAULT_MATERIALS = [
         "color": DEFAULT_COLOR_PALETTE[0],
         "hotend_temp": 265,
         "bed_temp": 105,
+        "max_volumetric_speed": 10.0,
     },
     {
         "name": "TPU",
@@ -353,6 +364,7 @@ DEFAULT_MATERIALS = [
         "color": DEFAULT_COLOR_PALETTE[0],
         "hotend_temp": 225,
         "bed_temp": 50,
+        "max_volumetric_speed": 6.0,
     },
     {
         "name": "PA",
@@ -362,6 +374,7 @@ DEFAULT_MATERIALS = [
         "color": DEFAULT_COLOR_PALETTE[0],
         "hotend_temp": 270,
         "bed_temp": 95,
+        "max_volumetric_speed": 9.0,
     },
     {
         "name": "PA-CF",
@@ -371,6 +384,7 @@ DEFAULT_MATERIALS = [
         "color": DEFAULT_COLOR_PALETTE[0],
         "hotend_temp": 285,
         "bed_temp": 100,
+        "max_volumetric_speed": 8.0,
     },
     {
         "name": "PC",
@@ -380,6 +394,7 @@ DEFAULT_MATERIALS = [
         "color": DEFAULT_COLOR_PALETTE[0],
         "hotend_temp": 290,
         "bed_temp": 105,
+        "max_volumetric_speed": 10.0,
     },
     {
         "name": "PCTG",
@@ -389,6 +404,7 @@ DEFAULT_MATERIALS = [
         "color": DEFAULT_COLOR_PALETTE[0],
         "hotend_temp": 250,
         "bed_temp": 80,
+        "max_volumetric_speed": 12.0,
     },
     {
         "name": "HIPS",
@@ -398,6 +414,7 @@ DEFAULT_MATERIALS = [
         "color": DEFAULT_COLOR_PALETTE[0],
         "hotend_temp": 240,
         "bed_temp": 95,
+        "max_volumetric_speed": 14.0,
     },
     {
         "name": "PP",
@@ -407,6 +424,7 @@ DEFAULT_MATERIALS = [
         "color": DEFAULT_COLOR_PALETTE[0],
         "hotend_temp": 235,
         "bed_temp": 85,
+        "max_volumetric_speed": 10.0,
     },
     {
         "name": "PEI",
@@ -416,6 +434,7 @@ DEFAULT_MATERIALS = [
         "color": DEFAULT_COLOR_PALETTE[0],
         "hotend_temp": 380,
         "bed_temp": 140,
+        "max_volumetric_speed": 5.0,
     },
     {
         "name": "Standard Resin",
@@ -425,6 +444,7 @@ DEFAULT_MATERIALS = [
         "color": DEFAULT_RESIN_COLORS[0],
         "hotend_temp": 0,
         "bed_temp": 0,
+        "max_volumetric_speed": None,
     },
     {
         "name": "Tough Resin",
@@ -434,6 +454,7 @@ DEFAULT_MATERIALS = [
         "color": DEFAULT_RESIN_COLORS[0],
         "hotend_temp": 0,
         "bed_temp": 0,
+        "max_volumetric_speed": None,
     },
     {
         "name": "Flexible Resin",
@@ -443,6 +464,7 @@ DEFAULT_MATERIALS = [
         "color": DEFAULT_RESIN_COLORS[0],
         "hotend_temp": 0,
         "bed_temp": 0,
+        "max_volumetric_speed": None,
     },
     {
         "name": "High Temp Resin",
@@ -452,6 +474,7 @@ DEFAULT_MATERIALS = [
         "color": DEFAULT_RESIN_COLORS[0],
         "hotend_temp": 0,
         "bed_temp": 0,
+        "max_volumetric_speed": None,
     },
     {
         "name": "Engineering Resin",
@@ -461,6 +484,7 @@ DEFAULT_MATERIALS = [
         "color": DEFAULT_RESIN_COLORS[0],
         "hotend_temp": 0,
         "bed_temp": 0,
+        "max_volumetric_speed": None,
     },
     {
         "name": "Castable Resin",
@@ -470,5 +494,6 @@ DEFAULT_MATERIALS = [
         "color": DEFAULT_RESIN_COLORS[0],
         "hotend_temp": 0,
         "bed_temp": 0,
+        "max_volumetric_speed": None,
     },
 ]

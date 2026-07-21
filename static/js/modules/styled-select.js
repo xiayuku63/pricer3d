@@ -14,6 +14,90 @@ const DEFAULT_SELECT_IDS = [
 const _instances = new Map();
 let _globalBound = false;
 
+function _getWrapperFromElement(element) {
+    const direct = element?.closest?.('.styled-select-wrapper');
+    if (direct) return direct;
+    const list = element?.closest?.('.styled-select-list');
+    return list?.__portalOrigin || null;
+}
+
+function _shouldPortalList(wrapper) {
+    return Boolean(wrapper?.closest?.('#quote-default-settings-bar, #batch-edit-bar, #user-center-modal, #options-modal'));
+}
+
+function _resetListPosition(instance) {
+    const { wrapper, list } = instance;
+    list.style.position = '';
+    list.style.left = '';
+    list.style.right = '';
+    list.style.top = '';
+    list.style.bottom = '';
+    list.style.marginTop = '';
+    list.style.minWidth = '';
+    list.style.maxWidth = '';
+    list.style.width = '';
+    list.style.maxHeight = '';
+    if (list.__portalHost === document.body && list.__portalOrigin) {
+        list.__portalOrigin.appendChild(list);
+    }
+    list.__portalHost = null;
+    list.__portalOrigin = null;
+    if (wrapper) {
+        const width = Math.ceil(wrapper.getBoundingClientRect().width || wrapper.offsetWidth || 0);
+        if (width > 0) {
+            list.style.minWidth = `${width}px`;
+        }
+    }
+}
+
+function _positionList(instance) {
+    const { wrapper, trigger, list } = instance;
+    if (!_shouldPortalList(wrapper)) return;
+    const rect = trigger.getBoundingClientRect();
+    if (!rect.width) return;
+    const viewportMaxWidth = Math.max(180, window.innerWidth - 16);
+    const minWidth = Math.max(120, rect.width);
+
+    if (list.parentElement !== document.body) {
+        list.__portalOrigin = list.parentElement;
+        document.body.appendChild(list);
+        list.__portalHost = document.body;
+    }
+
+    list.style.position = 'fixed';
+    list.style.marginTop = '0';
+    list.style.minWidth = `${minWidth}px`;
+    list.style.maxWidth = `${viewportMaxWidth}px`;
+    list.style.right = '';
+    list.style.width = 'max-content';
+    list.style.left = '0px';
+    list.style.top = '0px';
+    list.style.bottom = '';
+    list.style.maxHeight = '320px';
+
+    const listRect = list.getBoundingClientRect();
+    const listWidth = Math.min(Math.max(listRect.width, minWidth), viewportMaxWidth);
+    const listHeight = Math.min(list.scrollHeight || listRect.height || 320, 320);
+    const gap = 4;
+    const left = Math.max(8, Math.min(rect.left, window.innerWidth - listWidth - 8));
+    const spaceBelow = window.innerHeight - rect.bottom - gap;
+    const spaceAbove = rect.top - gap;
+    const placeBelow = spaceBelow >= listHeight || spaceBelow >= spaceAbove;
+    const availableHeight = Math.max(120, Math.min(listHeight, placeBelow ? spaceBelow : spaceAbove));
+
+    list.style.zIndex = '100';
+    list.style.width = `${listWidth}px`;
+    list.style.maxHeight = `${availableHeight}px`;
+    list.style.left = `${left}px`;
+    if (placeBelow) {
+        list.style.top = `${rect.bottom + gap}px`;
+        list.style.bottom = '';
+    } else {
+        list.style.top = '';
+        list.style.bottom = `${window.innerHeight - rect.top + gap}px`;
+    }
+}
+
 function _labelForOption(option) {
     return String(option?.textContent || option?.label || option?.value || '').trim();
 }
@@ -64,6 +148,7 @@ function _syncWrapperWidth(instance) {
 
 function _closeInstance(instance) {
     if (instance.list.classList.contains('hidden')) return;
+    _resetListPosition(instance);
     instance.list.classList.add('hidden');
     instance.trigger.setAttribute('aria-expanded', 'false');
     instance.wrapper.classList.remove('is-open');
@@ -84,7 +169,7 @@ function _ensureGlobalHandlers() {
         const item = event.target.closest('.styled-select-item');
         if (item) {
             event.stopPropagation();
-            const wrapper = item.closest('.styled-select-wrapper');
+            const wrapper = _getWrapperFromElement(item);
             const instance = wrapper ? _instances.get(wrapper.dataset.styledSelectId) : null;
             if (!instance) return;
             const nextValue = item.getAttribute('data-value');
@@ -101,7 +186,7 @@ function _ensureGlobalHandlers() {
         const trigger = event.target.closest('.styled-select-trigger');
         if (trigger) {
             event.stopPropagation();
-            const wrapper = trigger.closest('.styled-select-wrapper');
+            const wrapper = _getWrapperFromElement(trigger);
             const instance = wrapper ? _instances.get(wrapper.dataset.styledSelectId) : null;
             if (!instance || instance.select.disabled) return;
             const willOpen = instance.list.classList.contains('hidden');
@@ -111,6 +196,7 @@ function _ensureGlobalHandlers() {
                 instance.trigger.setAttribute('aria-expanded', 'true');
                 instance.wrapper.classList.add('is-open');
                 _syncInstance(instance);
+                _positionList(instance);
                 const activeItem = instance.list.querySelector('.tw-dropdown-option-active:not([disabled])')
                     || instance.list.querySelector('.styled-select-item:not([disabled])');
                 activeItem?.focus();
@@ -130,7 +216,12 @@ function _ensureGlobalHandlers() {
         _closeAll();
     });
 
-    document.addEventListener('scroll', () => _closeAll(), true);
+    document.addEventListener('scroll', (event) => {
+        if (event.target instanceof Element && event.target.closest('.styled-select-list')) {
+            return;
+        }
+        _closeAll();
+    }, true);
     window.addEventListener('resize', () => _closeAll());
 }
 

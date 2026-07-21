@@ -21,7 +21,8 @@ import { openLoginModal } from '../auth.js';
 import { t, onLangChange } from '../i18n.js';
 import { reQuoteAllSelectedFiles } from '../quote.js';
 import { updateBedSize, setBedLabel } from '../viewer.js';
-import { deleteSlicerPreset } from './slicer.js';
+import { deleteSlicerPreset, getStandardPresetNameForNozzle } from './slicer.js';
+import { filterPresetsForNozzle } from './nozzle-rules.js';
 
 async function _syncBatchPresetControls() {
     const batchPreset = document.getElementById('batch-slicer-preset');
@@ -93,6 +94,8 @@ export { setMsg };
 
 export function renderSlicerPresetsUI() {
     const { slicerPresetsTbody, genPresetSelect, slicerPresetsDownloadBtn, slicerPresetsDeleteBtn } = dom;
+    const frontNozzle = document.getElementById('front-default-nozzle-diameter')?.value || '0.4';
+    const batchNozzle = document.getElementById('batch-nozzle-diameter')?.value || '0.4';
 
     // Populate the slicer config form preset dropdown
     if (genPresetSelect) {
@@ -101,17 +104,22 @@ export function renderSlicerPresetsUI() {
             && items.some(function(p) { return p.id === defaultSlicerPresetId; }))
             ? String(defaultSlicerPresetId) : "";
         genPresetSelect.innerHTML = [
+            '<option value="">' + t('quote.presetNone') + '</option>',
             ...items.map(function(p) { return '<option value="' + p.id + '"' + (String(p.id) === genCurrentVal ? ' selected' : '') + '>' + (p.name || '#' + p.id) + '</option>'; })
         ].join('');
-        if (!genPresetSelect.value && items.length) genPresetSelect.value = String(items[0].id);
+        if (!genCurrentVal) genPresetSelect.value = '';
     }
 
     const frontPreset = document.getElementById('front-default-slicer-preset');
     if (frontPreset) {
-        const items = slicerPresets || [];
+        const items = filterPresetsForNozzle(slicerPresets || [], frontNozzle);
+        const standardFrontPreset = items.find(function(p) {
+            return String(p.name || '').trim() === getStandardPresetNameForNozzle(frontNozzle);
+        });
         var frontCurrentVal = (defaultSlicerPresetId !== null && defaultSlicerPresetId !== undefined
             && items.some(function(p) { return p.id === defaultSlicerPresetId; }))
-            ? String(defaultSlicerPresetId) : "";
+            ? String(defaultSlicerPresetId)
+            : (standardFrontPreset ? String(standardFrontPreset.id) : "");
         frontPreset.innerHTML = [
             '<option value="">' + t('quote.presetNone') + '</option>',
             ...items.map(function(p) { return '<option value="' + p.id + '"' + (String(p.id) === frontCurrentVal ? ' selected' : '') + '>' + (p.name || '#' + p.id) + '</option>'; })
@@ -122,7 +130,7 @@ export function renderSlicerPresetsUI() {
     // Populate the model-page batch preset selector
     const batchPreset = document.getElementById('batch-slicer-preset');
     if (batchPreset) {
-        const items = slicerPresets || [];
+        const items = filterPresetsForNozzle(slicerPresets || [], batchNozzle);
         // Use user's saved default preset; if none, default to first saved preset (combinations)
         var batchCurrentVal;
         if (defaultSlicerPresetId !== null && defaultSlicerPresetId !== undefined

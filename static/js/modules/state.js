@@ -5,6 +5,8 @@ const TOKEN_STORAGE_KEY = "demo_access_token_v1";
 const USER_STORAGE_KEY = "demo_user_v1";
 const SAVED_USERNAME_KEY = "demo_saved_username_v1";
 const SLICER_PRESET_STORAGE_PREFIX = "demo_slicer_preset_id_v1_";
+const FRONT_SETTINGS_STORAGE_PREFIX = "demo_front_settings_v1_";
+const BATCH_SETTINGS_STORAGE_PREFIX = "demo_batch_settings_v1_";
 
 // ── Auth state ──
 export let authToken = '';
@@ -437,6 +439,44 @@ export function saveSlicerPresetSelection() {
             localStorage.removeItem(key);
         }
     } catch (e) {}
+}
+
+function _getScopedStorageKey(prefix) {
+    const uid = currentUser && currentUser.id ? String(currentUser.id) : "guest";
+    return `${prefix}${uid}`;
+}
+
+function _loadJsonStorage(key) {
+    try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function _saveJsonStorage(key, value) {
+    try {
+        localStorage.setItem(key, JSON.stringify(value));
+    } catch (e) {}
+}
+
+export function loadFrontSettingsSnapshot() {
+    return _loadJsonStorage(_getScopedStorageKey(FRONT_SETTINGS_STORAGE_PREFIX));
+}
+
+export function saveFrontSettingsSnapshot(snapshot) {
+    _saveJsonStorage(_getScopedStorageKey(FRONT_SETTINGS_STORAGE_PREFIX), snapshot);
+}
+
+export function loadBatchSettingsSnapshot() {
+    return _loadJsonStorage(_getScopedStorageKey(BATCH_SETTINGS_STORAGE_PREFIX));
+}
+
+export function saveBatchSettingsSnapshot(snapshot) {
+    _saveJsonStorage(_getScopedStorageKey(BATCH_SETTINGS_STORAGE_PREFIX), snapshot);
 }
 
 // ── Material helpers ──

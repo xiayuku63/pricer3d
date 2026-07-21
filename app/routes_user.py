@@ -32,7 +32,6 @@ class MaterialItem(BaseModel):
     density: float = Field(..., gt=0, le=10)
     price_per_kg: float = Field(..., ge=0, le=100000)
     color: ColorItem = Field(default_factory=lambda: ColorItem(name="黑色", hex="#000000"))
-    max_volumetric_speed: Optional[float] = Field(default=None, ge=0, le=1000)
 
 
 class PricingConfig(BaseModel):
@@ -119,7 +118,35 @@ async def update_user_settings(payload: UserSettingsUpdate, request: Request, cu
             )
         seen_material_keys.add(key)
 
-    materials_json = json.dumps([m.model_dump() for m in payload.materials])
+    with get_db_session() as db:
+        existing_user = db.query(User.materials).filter(User.id == current_user["id"]).first()
+
+    existing_materials = normalize_materials(json.loads(existing_user.materials) if existing_user and existing_user.materials else [])
+    existing_by_key = {}
+    for material in existing_materials:
+        if not isinstance(material, dict):
+            continue
+        raw_color = material.get("color") or {}
+        color_key = str(raw_color.get("hex") or raw_color.get("name") or "").strip().lower()
+        key = (
+            str(material.get("brand") or "Generic").strip().lower(),
+            str(material.get("name") or "").strip().lower(),
+            color_key,
+        )
+        existing_by_key[key] = material
+
+    merged_materials = []
+    for item in payload.materials:
+        item_data = item.model_dump()
+        color_key = str(item.color.hex or item.color.name or "").strip().lower()
+        key = ((item.brand or "Generic").strip().lower(), item.name.strip().lower(), color_key)
+        existing = existing_by_key.get(key) or {}
+        for field in ("hotend_temp", "bed_temp", "max_volumetric_speed", "max_print_speed"):
+            if existing.get(field) is not None:
+                item_data[field] = existing.get(field)
+        merged_materials.append(item_data)
+
+    materials_json = json.dumps(merged_materials)
     pricing_json = None
     if payload.pricing_config is not None:
         unit_ok, unit_err, _ = validate_formula_expression(payload.pricing_config.unit_cost_formula)

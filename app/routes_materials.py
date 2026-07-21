@@ -75,6 +75,7 @@ class MaterialResponse(BaseModel):
     bed_temp_min: Optional[int] = None
     bed_temp_max: Optional[int] = None
     print_speed_max: Optional[float] = None
+    max_volumetric_speed: Optional[float] = None
     description: Optional[str] = None
     active: bool
     created_at: str
@@ -93,6 +94,7 @@ class MaterialCreate(BaseModel):
     bed_temp_min: Optional[int] = None
     bed_temp_max: Optional[int] = None
     print_speed_max: Optional[float] = None
+    max_volumetric_speed: Optional[float] = None
     description: Optional[str] = None
 
 
@@ -106,6 +108,7 @@ class MaterialUpdate(BaseModel):
     bed_temp_min: Optional[int] = None
     bed_temp_max: Optional[int] = None
     print_speed_max: Optional[float] = None
+    max_volumetric_speed: Optional[float] = None
     description: Optional[str] = None
     active: Optional[bool] = None
 
@@ -267,6 +270,7 @@ async def list_materials(
                 bed_temp_min=m.bed_temp_min,
                 bed_temp_max=m.bed_temp_max,
                 print_speed_max=m.print_speed_max,
+                max_volumetric_speed=m.max_volumetric_speed,
                 description=m.description,
                 active=bool(m.active),
                 created_at=m.created_at,
@@ -307,6 +311,7 @@ async def get_material(material_id: int):
             bed_temp_min=m.bed_temp_min,
             bed_temp_max=m.bed_temp_max,
             print_speed_max=m.print_speed_max,
+            max_volumetric_speed=m.max_volumetric_speed,
             description=m.description,
             active=bool(m.active),
             created_at=m.created_at,
@@ -349,6 +354,7 @@ async def create_material(data: MaterialCreate, user: dict = Depends(get_current
             bed_temp_min=data.bed_temp_min,
             bed_temp_max=data.bed_temp_max,
             print_speed_max=data.print_speed_max,
+            max_volumetric_speed=data.max_volumetric_speed,
             description=data.description,
             created_at=now,
             updated_at=now,
@@ -371,6 +377,7 @@ async def create_material(data: MaterialCreate, user: dict = Depends(get_current
             bed_temp_min=material.bed_temp_min,
             bed_temp_max=material.bed_temp_max,
             print_speed_max=material.print_speed_max,
+            max_volumetric_speed=material.max_volumetric_speed,
             description=material.description,
             active=bool(material.active),
             created_at=material.created_at,
@@ -425,6 +432,7 @@ async def update_material(material_id: int, data: MaterialUpdate, user: dict = D
             bed_temp_min=m.bed_temp_min,
             bed_temp_max=m.bed_temp_max,
             print_speed_max=m.print_speed_max,
+            max_volumetric_speed=m.max_volumetric_speed,
             description=m.description,
             active=bool(m.active),
             created_at=m.created_at,

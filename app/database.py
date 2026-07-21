@@ -70,6 +70,7 @@ def init_db() -> None:
         _safe_add_column(conn, "quote_history", "slicer_fallback", "INTEGER")
         _safe_add_column(conn, "quote_history", "slicer_error", "TEXT")
         _safe_add_column(conn, "quote_history", "slicer_estimated_time_s", "REAL")
+        _safe_add_column(conn, "materials", "max_volumetric_speed", "REAL")
         conn.commit()
 
     # Step 2b: Collapse the legacy per-material color palettes into one color
@@ -77,7 +78,9 @@ def init_db() -> None:
     # users.colors palette so it cannot be loaded back into the UI.
     raw_conn = engine.raw_connection()
     try:
+        _safe_add_column_sqlite(raw_conn, "materials", "max_volumetric_speed", "REAL")
         _migrate_legacy_material_colors(raw_conn)
+        _backfill_material_catalog_specs(raw_conn)
     finally:
         raw_conn.close()
 
@@ -126,6 +129,15 @@ def _safe_add_column(conn, table: str, column: str, col_type: str) -> None:
             _log.debug("Column %s.%s already exists, skip", table, column)
         else:
             _log.warning("ALTER TABLE %s ADD COLUMN %s %s failed: %s", table, column, col_type, e)
+
+
+def _safe_add_column_sqlite(conn: sqlite3.Connection, table: str, column: str, col_type: str) -> None:
+    """SQLite-native ALTER TABLE fallback for columns that must exist on local DBs."""
+    existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+    if column in existing:
+        return
+    conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
+    conn.commit()
 
 
 def _migrate_legacy_material_colors(conn: sqlite3.Connection | None = None) -> None:
@@ -225,6 +237,35 @@ def _dedupe_materials(materials: list[dict]) -> list[dict]:
         seen.add(key)
         result.append(material)
     return result
+
+
+def _backfill_material_catalog_specs(conn: sqlite3.Connection) -> None:
+    """Backfill canonical material catalog slicing fields from default seeds."""
+    defaults_by_name = {
+        str(m.get("name") or "").strip(): m
+        for m in DEFAULT_MATERIALS
+        if isinstance(m, dict) and m.get("name")
+    }
+    rows = conn.execute(
+        "SELECT id, name, density, hotend_temp_min, hotend_temp_max, bed_temp_min, bed_temp_max, max_volumetric_speed "
+        "FROM materials"
+    ).fetchall()
+    for row in rows:
+        default = defaults_by_name.get(str(row[1] or "").strip())
+        if not default:
+            continue
+        density = row[2] if row[2] is not None else default.get("density")
+        hotend = row[3] if row[3] is not None else default.get("hotend_temp")
+        hotend_max = row[4] if row[4] is not None else default.get("hotend_temp")
+        bed = row[5] if row[5] is not None else default.get("bed_temp")
+        bed_max = row[6] if row[6] is not None else default.get("bed_temp")
+        max_vol = row[7] if row[7] is not None else default.get("max_volumetric_speed")
+        conn.execute(
+            "UPDATE materials SET density = ?, hotend_temp_min = ?, hotend_temp_max = ?, bed_temp_min = ?, "
+            "bed_temp_max = ?, max_volumetric_speed = ? WHERE id = ?",
+            (density, hotend, hotend_max, bed, bed_max, max_vol, row[0]),
+        )
+    conn.commit()
 
 
 def get_app_defaults() -> dict:

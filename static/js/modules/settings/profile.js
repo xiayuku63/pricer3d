@@ -78,6 +78,7 @@ export async function saveUserSettings(options = {}) {
     const {
         saveBtn = dom.frontDefaultSaveBtn,
         messageEl = dom.frontDefaultMsg,
+        source = 'front',
     } = options;
     if (!authToken) return;
     
@@ -172,39 +173,46 @@ export async function saveUserSettings(options = {}) {
         setDefaultPrinterId(printerId || null);
         setDefaultNozzle(savedNozzle || null);
         setDefaultSlicerPresetId(effectivePresetId || null);
-        // Keep the active quote options aligned with the defaults just saved.
-        // Existing result rows may still carry their previous per-file values;
-        // reQuoteAllSelectedFiles uses this active value as the fallback.
-        quoteOptions.printer_model = printerId || '';
-        quoteOptions.slicer_preset_id = effectivePresetId || null;
-        saveSlicerPresetSelection();
         setDefaultMaterial(newDefaultMaterial);
         setDefaultColor(newDefaultColor);
         setDefaultBrand(newDefaultBrand);
-        // Sync quoteOptions so batch toolbar updates immediately
-        quoteOptions.brand = newDefaultBrand || '';
-        // 确保材料在当前品牌下有效
-        const validMaterials = getMaterialsByBrand(quoteOptions.brand);
-        if (newDefaultMaterial && validMaterials.some(m => m.name === newDefaultMaterial)) {
-            quoteOptions.material = newDefaultMaterial;
-        } else if (validMaterials.length) {
-            quoteOptions.material = validMaterials[0].name;
+
+        if (source === 'user-center') {
+            // User-center save is also the explicit "apply current workspace settings" action.
+            quoteOptions.printer_model = printerId || '';
+            quoteOptions.slicer_preset_id = effectivePresetId || null;
+            saveSlicerPresetSelection();
+            quoteOptions.brand = newDefaultBrand || '';
+            const validMaterials = getMaterialsByBrand(quoteOptions.brand);
+            if (newDefaultMaterial && validMaterials.some(m => m.name === newDefaultMaterial)) {
+                quoteOptions.material = newDefaultMaterial;
+            } else if (validMaterials.length) {
+                quoteOptions.material = validMaterials[0].name;
+            }
+            quoteOptions.color = newDefaultColor || quoteOptions.color;
         }
-        quoteOptions.color = newDefaultColor || quoteOptions.color;
+
         await fetchPrinterModels();
         await fetchSlicerPresets();
         const refreshedNozzle = document.getElementById('front-default-nozzle-diameter');
         if (refreshedNozzle && savedNozzle) refreshedNozzle.value = savedNozzle;
         updateDropdowns();
         if (refreshedNozzle && savedNozzle) refreshedNozzle.value = savedNozzle;
-        normalizeResultsWithCurrentOptions();
-        renderResultsTable();
-        recalcSummaryFromCurrentResults();
+
+        if (source === 'user-center') {
+            normalizeResultsWithCurrentOptions();
+            renderResultsTable();
+            recalcSummaryFromCurrentResults();
+        }
+
         setTimeout(() => {
             _restoreButtonState(saveBtn, originalBtnText);
             if (messageEl) messageEl.classList.add('hidden');
         }, 1200);
-        await reQuoteAllSelectedFiles(t('settings.recalcAfterSave'));
+
+        if (source === 'user-center') {
+            await reQuoteAllSelectedFiles(t('settings.recalcAfterSave'));
+        }
     } catch (e) {
         // Restore button state on error
         _restoreButtonState(saveBtn, originalBtnText);

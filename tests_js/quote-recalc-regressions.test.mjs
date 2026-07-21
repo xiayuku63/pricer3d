@@ -13,15 +13,26 @@ const orientationStateUrl = new URL('../static/js/modules/orientation-state.js',
 const { getAffectedFilenamesForGlobalSlicerChange, slicerParamsEqual } = await import(quoteConfigUrl);
 const { normalizeOrientation, getResultOrientation, withResultOrientation } = await import(orientationStateUrl);
 
-test('settings save syncs the active slicer preset before re-quoting', async () => {
+test('user-center save syncs the active slicer preset before re-quoting', async () => {
     const source = await readFile(profileUrl, 'utf8');
-    const saveIndex = source.indexOf('setDefaultSlicerPresetId(effectivePresetId || null);');
+    const saveIndex = source.indexOf("if (source === 'user-center') {");
     const requoteIndex = source.indexOf('await reQuoteAllSelectedFiles', saveIndex);
 
     assert.notEqual(saveIndex, -1);
     assert.notEqual(requoteIndex, -1);
     assert.ok(source.indexOf('quoteOptions.slicer_preset_id = effectivePresetId || null;', saveIndex) < requoteIndex);
     assert.ok(source.indexOf('saveSlicerPresetSelection();', saveIndex) < requoteIndex);
+});
+
+test('front default save does not overwrite the active batch quote options', async () => {
+    const [profileSource, eventsSource] = await Promise.all([
+        readFile(profileUrl, 'utf8'),
+        readFile(appEventsUrl, 'utf8'),
+    ]);
+
+    assert.match(eventsSource, /bind\(dom\.frontDefaultSaveBtn, 'click', \(\) => saveUserSettings\(\{ source: 'front' \}\)\);/);
+    assert.match(profileSource, /if \(source === 'user-center'\) \{/);
+    assert.doesNotMatch(profileSource, /quoteOptions\.printer_model = printerId \|\| '';[\s\S]*?source = 'front'/);
 });
 
 test('user-center save has one event owner to avoid concurrent re-quotes', async () => {
@@ -31,7 +42,7 @@ test('user-center save has one event owner to avoid concurrent re-quotes', async
     ]);
 
     assert.doesNotMatch(main, /_bind\(dom\.userCenterSaveBtn, 'click', saveUserSettings\)/);
-    assert.equal((appEvents.match(/bind\(dom\.userCenterSaveBtn, 'click', saveUserSettings\)/g) || []).length, 1);
+    assert.equal((appEvents.match(/bind\(dom\.userCenterSaveBtn, 'click', \(\) => saveUserSettings\(\{/g) || []).length, 1);
 });
 
 test('re-quote treats a superseded fetch as cancellation, not a failed quote', async () => {

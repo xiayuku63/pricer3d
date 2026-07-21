@@ -159,6 +159,7 @@ def calculate_cost(
     _speed_params: Optional[dict] = None,  # pre-resolved speed params
     _printer_profile_path: Optional[str] = None,  # pre-resolved profile path
     _nozzle_diameter: Optional[float] = None,
+    selected_material_spec: Optional[dict] = None,
 ):
     """Calculate cost for a single model from geometry + material + config.
 
@@ -166,7 +167,13 @@ def calculate_cost(
     is passed in as parameters — no ``from app.*`` imports are used.
     """
     materials = normalize_materials(user_materials)
-    spec = next((m for m in materials if m["name"] == material), None) or DEFAULT_MATERIALS[0]
+    spec = None
+    if isinstance(selected_material_spec, dict) and selected_material_spec.get("name"):
+        normalized_selected = normalize_materials([selected_material_spec])
+        if normalized_selected:
+            spec = normalized_selected[0]
+    if spec is None:
+        spec = next((m for m in materials if m["name"] == material), None) or DEFAULT_MATERIALS[0]
     cfg = merge_pricing_config(pricing_config)
 
     model_weight_g = calculate_weight(volume_mm3, material_density=spec["density"])
@@ -476,6 +483,7 @@ async def process_single_file(
     printer_bed_resolver: Optional[dict] = None,
     speed_params_override: Optional[dict] = None,
     printer_profile_path: Optional[str] = None,
+    selected_material_spec: Optional[dict] = None,
 ):
     """Process a single uploaded file: save, calculate geometry, compute cost.
 
@@ -651,6 +659,7 @@ async def process_single_file(
                 _speed_params=_speed_params,
                 _printer_profile_path=_printer_profile,
                 _nozzle_diameter=_nozzle_diameter,
+                selected_material_spec=selected_material_spec,
             )
         )
 
@@ -737,6 +746,7 @@ def process_single_file_sync(
     orient_x: Optional[float] = None,
     orient_y: Optional[float] = None,
     orient_z: Optional[float] = None,
+    selected_material_spec: Optional[dict] = None,
 ):
     """Synchronous wrapper for process_single_file — used in thread pool."""
     import asyncio
@@ -760,6 +770,7 @@ def process_single_file_sync(
             orient_x,
             orient_y,
             orient_z,
+            selected_material_spec=selected_material_spec,
         )
     )
 

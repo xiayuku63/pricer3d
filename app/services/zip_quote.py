@@ -18,8 +18,6 @@ from openpyxl.utils import get_column_letter
 from app.audit import write_audit_event
 from app.config import (
     DEFAULT_COLORS,
-    DEFAULT_MATERIALS,
-    DEFAULT_PRICING_CONFIG,
     FREE_TOTAL_MODEL_LIMIT,
     MAX_FILES_PER_REQUEST,
     MAX_ZIP_SIZE_BYTES,
@@ -28,13 +26,19 @@ from app.config import (
 from app.db import get_db_session
 from app.deps import is_member_user
 from app.models_orm import QuoteHistory, User
-from app.slicer_presets import get_slicer_preset_by_id
 from app.zip_parser import (
     _collect_all_warnings,
     _match_checklist_to_models,
     _parse_excel_checklist,
 )
-from app.services.quote import _extract_preset_core_params, save_quote_history
+from app.services.quote import (
+    _load_user_quote_settings,
+    _resolve_effective_printer_model,
+    _resolve_effective_slicer_params,
+    _resolve_effective_slicer_preset,
+    save_quote_history,
+)
+from app.material_resolver import merge_user_material_with_catalog
 from calculator.cost import process_single_file
 
 logger = logging.getLogger(__name__)
@@ -66,6 +70,35 @@ _COLOR_NAME_TO_HEX.update(_ENGLISH_COLOR_MAP)
 
 _preview_sessions = {}
 _PREVIEW_SESSION_TTL = 600
+
+
+def _match_selected_material(user_materials: list, material_name: str, brand: str = "", color: str = "") -> Optional[dict]:
+    material_name = str(material_name or "").strip()
+    brand = str(brand or "").strip()
+    color = str(color or "").strip().lower()
+    if not material_name:
+        return None
+
+    candidates = [
+        m
+        for m in user_materials
+        if isinstance(m, dict)
+        and str(m.get("name") or "").strip() == material_name
+        and (not brand or str(m.get("brand") or "Generic").strip() == brand)
+    ]
+    if not candidates:
+        return merge_user_material_with_catalog(None, material_name, brand, color)
+    if color:
+        for candidate in candidates:
+            raw_color = candidate.get("color")
+            values = []
+            if isinstance(raw_color, dict):
+                values.extend([raw_color.get("hex"), raw_color.get("name")])
+            elif raw_color:
+                values.append(raw_color)
+            if any(str(v or "").strip().lower() == color for v in values):
+                return merge_user_material_with_catalog(candidate, material_name, brand, color)
+    return merge_user_material_with_catalog(candidates[0], material_name, brand, color)
 
 
 def _resolve_color_hex(color_str: str, fallback: str = "") -> str:
@@ -203,21 +236,6 @@ def _lookup_printer(printer_name, nozzle_str):
                 return resolved.get("_compound_id") or pid
             return pid
     return None
-
-
-def _resolve_zip_slicer_params(
-    layer_height: float,
-    wall_count: int,
-    infill: int,
-    slicer_preset: Optional[dict],
-) -> tuple[float, int, int]:
-    """Resolve ZIP defaults with the same preset precedence as normal quotes."""
-    preset_params = _extract_preset_core_params(slicer_preset)
-    return (
-        preset_params.get("layer_height", float(layer_height or 0.2)),
-        preset_params.get("perimeters", int(wall_count or 3)),
-        preset_params.get("infill", int(infill or 20)),
-    )
 
 
 def _zip_preview_model_path(result: dict, model: dict) -> Optional[str]:
@@ -384,13 +402,13 @@ def _resolve_zip_defaults(current_user: dict, file: Optional[UploadFile], sessio
                 "match_mode": "none",
             }
 
-    with get_db_session() as db:
-        u = db.query(User).filter(User.id == current_user["id"]).first()
-        user_materials = json.loads(u.materials) if u and u.materials else DEFAULT_MATERIALS
-        pricing_config = json.loads(u.pricing_config) if u and u.pricing_config else DEFAULT_PRICING_CONFIG
-        default_printer_id = u.default_printer_id if u else None
-        default_nozzle = u.default_nozzle if u else None
-        default_slicer_preset_id = u.default_slicer_preset_id if u else None
+    (
+        user_materials,
+        pricing_config,
+        default_printer_id,
+        default_nozzle,
+        default_slicer_preset_id,
+    ) = _load_user_quote_settings(int(current_user["id"]))
 
     return (
         stl_files,
@@ -420,7 +438,6 @@ async def build_zip_quote_response(
     current_user: dict,
 ):
     """Generate ZIP quote streaming response."""
-    from app.printers import resolve_printer
     from app.utils import _user_base_dir
     from sqlalchemy import func as sqlfunc
 
@@ -475,21 +492,13 @@ async def build_zip_quote_response(
         else:
             match_msg = "未包含 Excel 清单，使用默认参数"
 
-    # Resolve printer for stl_only files: request param > DB default
-    _default_compound_id = None
-    _default_preset = None
-    if printer_model:
-        _resolved = resolve_printer(printer_model)
-        if _resolved:
-            _default_compound_id = _resolved.get("_compound_id") or printer_model
-    elif default_printer_id:
-        nz = float(default_nozzle) if default_nozzle else None
-        resolved = resolve_printer(default_printer_id, nz)
-        if resolved:
-            _default_compound_id = resolved.get("_compound_id") or default_printer_id
-    _effective_preset_id = slicer_preset_id if slicer_preset_id is not None else default_slicer_preset_id
-    if _effective_preset_id:
-        _default_preset = get_slicer_preset_by_id(int(current_user["id"]), _effective_preset_id)
+    # Resolve defaults with the exact same precedence as direct uploads.
+    _default_compound_id = _resolve_effective_printer_model(printer_model, default_printer_id, default_nozzle)
+    _, _default_preset = _resolve_effective_slicer_preset(
+        int(current_user["id"]),
+        slicer_preset_id,
+        default_slicer_preset_id,
+    )
 
     # Keep ZIP uploads on the same parameter contract as normal uploads. A
     # preset's core values win over stale form fallbacks, while checklist
@@ -498,7 +507,7 @@ async def build_zip_quote_response(
         effective_layer_height,
         effective_wall_count,
         effective_infill,
-    ) = _resolve_zip_slicer_params(layer_height, wall_count, infill, _default_preset)
+    ) = _resolve_effective_slicer_params(layer_height, wall_count, infill, _default_preset)
 
     _files_to_process = []
     for m in match_result["matched"]:
@@ -550,6 +559,8 @@ async def build_zip_quote_response(
                     cl_color_raw = cl.get("color", "").strip()
                     cl_color = _resolve_color_hex(cl_color_raw, _resolve_color_hex(color))
                     cl_material = cl.get("material_type", "").strip() or material
+                    cl_brand = cl.get("material_brand", "").strip()
+                    cl_material_spec = _match_selected_material(user_materials, cl_material, cl_brand, cl_color_raw or cl_color)
 
                     cl_printer = str(cl.get("printer_model", "")).strip()
                     cl_nozzle = str(cl.get("nozzle", "")).strip()
@@ -592,6 +603,7 @@ async def build_zip_quote_response(
                         perimeters=_wc,
                         current_user=current_user,
                         auto_orient=False,
+                        selected_material_spec=cl_material_spec,
                     )
                     result["_checklist_params"] = True
                     result["_checklist_source"] = {
@@ -633,6 +645,7 @@ async def build_zip_quote_response(
                         perimeters=effective_wall_count,
                         current_user=current_user,
                         auto_orient=False,
+                        selected_material_spec=_match_selected_material(user_materials, material, "", color),
                     )
                     result["_checklist_params"] = False
                     result["checklist_file_path"] = _zip_preview_model_path(result, stl)
