@@ -3,6 +3,7 @@
 
 const TOKEN_STORAGE_KEY = "demo_access_token_v1";
 const USER_STORAGE_KEY = "demo_user_v1";
+const AUTH_SESSION_STORAGE_KEY = "demo_auth_session_v2";
 const SAVED_USERNAME_KEY = "demo_saved_username_v1";
 const SLICER_PRESET_STORAGE_PREFIX = "demo_slicer_preset_id_v1_";
 const FRONT_SETTINGS_STORAGE_PREFIX = "demo_front_settings_v1_";
@@ -392,25 +393,54 @@ export function getRenderColorHex(colorKey) {
 }
 
 // ── Session persistence ──
+function _parseStoredAuthSession(raw) {
+    if (!raw) return null;
+    try {
+        const session = JSON.parse(raw);
+        if (!session?.token || !session?.user?.username) return null;
+        return session;
+    } catch (e) {
+        return null;
+    }
+}
+
+function _readStoredAuthSession(storage) {
+    try {
+        return _parseStoredAuthSession(storage?.getItem(AUTH_SESSION_STORAGE_KEY));
+    } catch (e) {
+        return null;
+    }
+}
+
+function _writeStoredAuthSession(storage, session) {
+    try {
+        storage?.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify(session));
+    } catch (e) {}
+}
+
+function _removeStoredAuthSession(storage) {
+    try {
+        storage?.removeItem(AUTH_SESSION_STORAGE_KEY);
+    } catch (e) {}
+}
+
 export function loadUserSession() {
     try {
-        authToken = localStorage.getItem(TOKEN_STORAGE_KEY) || "";
-        const rawUser = localStorage.getItem(USER_STORAGE_KEY);
-        if (!rawUser) { currentUser = null; return; }
-        const parsedUser = JSON.parse(rawUser);
-        if (parsedUser && parsedUser.username) currentUser = parsedUser;
+        const tabSession = _readStoredAuthSession(globalThis.sessionStorage);
+        const session = tabSession;
+        authToken = session?.token || "";
+        currentUser = session?.user || null;
     } catch (e) { currentUser = null; authToken = ""; }
 }
 
 export function saveUserSession() {
     if (!currentUser || !authToken) return;
-    localStorage.setItem(TOKEN_STORAGE_KEY, authToken);
-    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(currentUser));
+    const session = { token: authToken, user: currentUser };
+    _writeStoredAuthSession(globalThis.sessionStorage, session);
 }
 
 export function clearUserSession() {
-    localStorage.removeItem(TOKEN_STORAGE_KEY);
-    localStorage.removeItem(USER_STORAGE_KEY);
+    _removeStoredAuthSession(globalThis.sessionStorage);
 }
 
 export function saveLastUsername(identifier) {
@@ -536,6 +566,9 @@ export function isColorInAllowedColors(color, allowedColors) {
 
 export function pickAllowedColor(allowedColors, preferredColor, defaultColor) {
     if (allowedColors && allowedColors.length && isColorInAllowedColors(preferredColor, allowedColors)) {
+        if (typeof preferredColor === 'string' && !/^#[0-9a-fA-F]{6}$/.test(preferredColor.trim())) {
+            return preferredColor;
+        }
         const obj = colorToObj(preferredColor);
         if (obj && obj.hex) return obj.hex;
         return String(preferredColor);

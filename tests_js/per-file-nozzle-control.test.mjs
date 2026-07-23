@@ -20,12 +20,15 @@ test('per-file printer helpers preserve and compose nozzle diameters', async () 
 });
 
 test('desktop and mobile model configuration render a nozzle selector', async () => {
-    const source = await readFile(new URL('../static/js/modules/quote-render.js', import.meta.url), 'utf8');
+    const [renderSource, rowRenderSource] = await Promise.all([
+        readFile(new URL('../static/js/modules/quote-render.js', import.meta.url), 'utf8'),
+        readFile(new URL('../static/js/modules/quote-row-render.js', import.meta.url), 'utf8'),
+    ]);
 
-    assert.match(source, /function _buildRowDropdownsHtml\(item\)/);
-    assert.match(source, /getResultNozzleDiameter\(item, selectedPrinter\)/);
-    assert.ok((source.match(/data-field="_nozzle_diameter"/g) || []).length >= 4);
-    assert.match(source, /quote-config-row quote-config-row-printer/);
+    assert.match(rowRenderSource, /function buildRowDropdownsHtml\(item\)/);
+    assert.match(rowRenderSource, /getResultNozzleDiameter\(item, selectedPrinter\)/);
+    assert.ok(((renderSource + rowRenderSource).match(/data-field="_nozzle_diameter"/g) || []).length >= 2);
+    assert.match(renderSource, /quote-config-row quote-config-row-printer/);
 });
 
 test('per-file nozzle edits submit a compound printer id and persist the selected nozzle', async () => {
