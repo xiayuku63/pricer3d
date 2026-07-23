@@ -43,6 +43,8 @@ import {
 import { MATERIAL_INFO } from './quote-data.js';
 import { updateBedSize, setBedLabel } from './viewer.js';
 import { getResultOrientation, withResultOrientation } from './orientation-state.js';
+import { filterPresetsForNozzle, getStandardPresetNameForNozzle } from './presets/nozzle-rules.js';
+import { exportCSV, exportExcel } from './quote-export.js';
 
 // ── Re-export all public symbols for backward compatibility ──
 export {
@@ -67,6 +69,8 @@ export {
     snapshotBatchDirty,
     maybeSnapshotBatchDirty,
     markBatchDirty,
+    exportCSV,
+    exportExcel,
 };
 
 let dom = {};
@@ -94,6 +98,29 @@ function _syncPerFileNozzleSelect(container, printerId, preferredNozzle) {
     ).join('');
     nozzleSelect.value = String(selected);
     return Number(selected);
+}
+
+function _syncPerFilePresetSelect(container, nozzleValue, preferredPresetId) {
+    const presetSelect = container?.querySelector('[data-field="_slicer_preset_id"]');
+    if (!presetSelect) return null;
+    const presets = filterPresetsForNozzle(slicerPresets || [], nozzleValue);
+    const currentId = preferredPresetId ?? presetSelect.value;
+    const hasCurrentPreset = currentId !== null
+        && currentId !== undefined
+        && String(currentId) !== '';
+    const selectedId = presets.some((preset) => String(preset.id) === String(currentId || ''))
+        ? currentId
+        : (hasCurrentPreset
+            ? (presets.find((preset) => String(preset.name || '').trim() === getStandardPresetNameForNozzle(nozzleValue))?.id || '')
+            : '');
+    presetSelect.innerHTML = [
+        '<option value="">' + t('quote.presetNone') + '</option>',
+        ...presets.map((preset) =>
+            `<option value="${preset.id}" ${String(preset.id) === String(selectedId || '') ? 'selected' : ''}>${preset.name || '#' + preset.id}</option>`
+        ),
+    ].join('');
+    presetSelect.value = String(selectedId || '');
+    return selectedId ? Number(selectedId) : null;
 }
 
 // ── Initialize table sort & pagination event listeners ──
@@ -554,6 +581,9 @@ export function handleCardEditChange(event) {
             getResultNozzleDiameter(existing, getCachedPrinterModels().find((item) => item.id === target.value)),
         );
     }
+    if (target.getAttribute('data-field') === '_printer_model' || target.getAttribute('data-field') === '_nozzle_diameter') {
+        _syncPerFilePresetSelect(card, card.querySelector('[data-field="_nozzle_diameter"]')?.value);
+    }
     if (_rowEditTimers.has(filename)) { clearTimeout(_rowEditTimers.get(filename)); }
     // Abort any in-flight request for this file
     const oldCtrl = _rowEditAbortControllers.get(filename);
@@ -639,125 +669,7 @@ async function _handleCardEdit(card, filename, abortSignal) {
     }
 }
 
-// ── 导出功能 ──
-function _cleanPrinter(name) {
-    return (name || '').replace(/_\d{2}$/, '')
-        .replace(/_/g, ' ')
-        .replace(/\b\w+/g, w => {
-            if (/^[A-Za-z]{1,2}\d+[A-Za-z]*$/.test(w)) return w.toUpperCase();
-            return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
-        });
-}
-
-export function exportCSV() {
-    if (!currentResults.length) return;
-    const headers = ['文件名', '材料品牌', '打印机', '材料', '颜色', '数量', '层高(mm)', '填充率(%)', '体积(cm³)', '重量(g)', '打印时间(h)', '单价(CNY)', '总价(CNY)', '状态'];
-    const rows = currentResults.map(item => {
-        const brand = (MATERIAL_OPTIONS.find(m => m.name === item.material) || {}).brand || '';
-        const printer = _cleanPrinter(item._printer_model || '');
-        const bd = item.cost_breakdown || {};
-        const gcode = bd.gcode_summary || {};
-        const cp = gcode.core_params || {};
-        return [
-            item.filename, brand, printer, item.material || '', item.color || '',
-            item.quantity || 1, cp.layer_height || '', cp.fill_density || '',
-            item.volume_cm3 || '', item.weight_g || '', item.estimated_time_h || '',
-            item.unit_cost_cny || '', item.cost_cny || '',
-            item.status === 'success' ? '成功' : (item.error || '失败'),
-        ];
-    });
-    const csvContent = [headers, ...rows].map(row =>
-        row.map(cell => '"' + String(cell).replace(/"/g, '""') + '"').join(',')
-    ).join('\n');
-
-    const BOM = '\uFEFF';
-    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `报价结果_${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-}
-
-export function exportExcel() {
-    if (!currentResults.length) return;
-    const headers = ['文件名', '材料品牌', '打印机', '材料', '颜色', '数量', '层高(mm)', '填充率(%)', '体积(cm³)', '重量(g)', '打印时间(h)', '单价(CNY)', '总价(CNY)', '状态'];
-    const rows = currentResults.map(item => {
-        const brand = (MATERIAL_OPTIONS.find(m => m.name === item.material) || {}).brand || '';
-        const printer = _cleanPrinter(item._printer_model || '');
-        const bd = item.cost_breakdown || {};
-        const gcode = bd.gcode_summary || {};
-        const cp = gcode.core_params || {};
-        return [
-            item.filename, brand, printer, item.material || '', item.color || '',
-            item.quantity || 1, cp.layer_height || '', cp.fill_density || '',
-            item.volume_cm3 || '', item.weight_g || '', item.estimated_time_h || '',
-            item.unit_cost_cny || '', item.cost_cny || '',
-            item.status === 'success' ? '成功' : (item.error || '失败'),
-        ];
-    });
-
-    const colorColIdx = 4;
-    let styles = {};
-    let styleCounter = 0;
-    rows.forEach(row => {
-        const hex = String(row[colorColIdx] || '').trim();
-        if (hex && /^#?[0-9a-fA-F]{6}$/.test(hex)) {
-            const clean = hex.startsWith('#') ? hex : '#' + hex;
-            if (!styles[clean]) {
-                const sid = 'color' + (++styleCounter);
-                styles[clean] = sid;
-            }
-        }
-    });
-
-    let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
-    xml += '<?mso-application progid="Excel.Sheet"?>\n';
-    xml += '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"\n';
-    xml += ' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">\n';
-
-    xml += '<Styles>\n';
-    xml += '<Style ss:ID="header"><Font ss:Bold="1" ss:Size="11" ss:Color="#ffffff"/><Interior ss:Color="#1e293b" ss:Pattern="Solid"/></Style>\n';
-    Object.entries(styles).forEach(([hex, sid]) => {
-        const c = hex.replace('#', '').toUpperCase();
-        xml += `<Style ss:ID="${sid}"><Interior ss:Color="#${c}" ss:Pattern="Solid"/><Font ss:Size="9"/></Style>\n`;
-    });
-    xml += '</Styles>\n';
-
-    xml += '<Worksheet ss:Name="报价结果"><Table>\n';
-    xml += '<Row>';
-    headers.forEach(h => { xml += `<Cell ss:StyleID="header"><Data ss:Type="String">${h}</Data></Cell>`; });
-    xml += '</Row>\n';
-    rows.forEach(row => {
-        xml += '<Row>';
-        row.forEach((cell, ci) => {
-            const type = (typeof cell === 'number' || (typeof cell === 'string' && /^[\d.]+$/.test(cell) && cell !== '')) ? 'Number' : 'String';
-            if (ci === colorColIdx) {
-                const hex = String(cell || '').trim();
-                const clean = hex.startsWith('#') ? hex : (hex ? '#' + hex : '');
-                const sid = styles[clean];
-                if (sid) {
-                    xml += `<Cell ss:StyleID="${sid}"><Data ss:Type="String">${escapeHtml(String(cell))}</Data></Cell>`;
-                } else {
-                    xml += `<Cell><Data ss:Type="${type}">${escapeHtml(String(cell))}</Data></Cell>`;
-                }
-            } else {
-                xml += `<Cell><Data ss:Type="${type}">${escapeHtml(String(cell))}</Data></Cell>`;
-            }
-        });
-        xml += '</Row>\n';
-    });
-    xml += '</Table></Worksheet></Workbook>';
-
-    const blob = new Blob([xml], { type: 'application/vnd.ms-excel;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `报价结果_${new Date().toISOString().slice(0, 10)}.xls`;
-    a.click();
-    URL.revokeObjectURL(url);
-}
+// ── 导出功能已拆分到 quote-export.js ──
 
 // ── Row editing ──
 const _rowEditTimers = new Map();
@@ -846,12 +758,16 @@ async function _handleRowEdit(event, abortSignal) {
         const printer = printerModels.find(function(p) { return p.id === pmBase; });
         const existing = currentResults.find((item) => item?.filename === filename);
         _syncPerFileNozzleSelect(row, pmBase, getResultNozzleDiameter(existing, printer));
+        _syncPerFilePresetSelect(row, row.querySelector('[data-field="_nozzle_diameter"]')?.value);
         if (printer && printer.bed_width && printer.bed_depth) {
             setBedLabel(printer.bed_width, printer.bed_depth, printer.bed_height);
             updateBedSize(printer.bed_width, printer.bed_depth);
         }
     }
     const nozzle = Number.parseFloat(nozzleSel?.value) || 0.4;
+    if (target.getAttribute('data-field') === '_nozzle_diameter') {
+        _syncPerFilePresetSelect(row, nozzle);
+    }
     const pm = buildPrinterCompoundId(pmBase, nozzle);
     const sp = spSel ? (spSel.value ? Number(spSel.value) : null) : null;
     if (errorContainer) errorContainer.classList.add('hidden');
