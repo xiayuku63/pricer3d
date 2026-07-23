@@ -46,6 +46,9 @@
     gap: 4px;
     align-items: center;
 }
+#batch-results-body tr[data-row-file] .quote-config-row-printer {
+    grid-template-columns: minmax(0, 1.2fr) minmax(64px, 0.65fr) minmax(0, 1fr);
+}
 #batch-results-body tr[data-row-file] .quote-config-row-color {
     grid-template-columns: minmax(0, 88px);
     justify-content: start;

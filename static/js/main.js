@@ -227,13 +227,17 @@ document.addEventListener('DOMContentLoaded', () => {
     _bind(dom.slicerPresetGenerateBtn, 'click', generateSlicerPreset);
 
     // ── Slicer preset form: select preset → load params ──
-    function _syncSlicerPresetSelectors(value) {
+    function _syncSlicerPresetSelectors(value, options = {}) {
+        const {
+            syncGen = true,
+            syncBatch = false,
+            syncFront = false,
+        } = options;
         const normalized = value ? String(value) : '';
-        const selectors = [
-            dom.genPresetSelect,
-            document.getElementById('batch-slicer-preset'),
-            document.getElementById('front-default-slicer-preset'),
-        ];
+        const selectors = [];
+        if (syncGen) selectors.push(dom.genPresetSelect);
+        if (syncBatch) selectors.push(document.getElementById('batch-slicer-preset'));
+        if (syncFront) selectors.push(document.getElementById('front-default-slicer-preset'));
         selectors.forEach((sel) => {
             if (sel) sel.value = normalized;
         });
@@ -241,6 +245,9 @@ document.addEventListener('DOMContentLoaded', () => {
             printer_model: document.getElementById('front-default-printer-model')?.value || '',
             nozzle_diameter: document.getElementById('front-default-nozzle-diameter')?.value || '',
             slicer_preset_id: document.getElementById('front-default-slicer-preset')?.value || '',
+            brand: document.getElementById('front-default-brand')?.value || '',
+            material: document.getElementById('front-default-material')?.value || '',
+            color: document.getElementById('front-default-color-dropdown')?.getAttribute('data-selected-color') || '',
         });
         saveBatchSettingsSnapshot({
             printer_model: document.getElementById('batch-printer-model')?.value || '',
@@ -253,19 +260,25 @@ document.addEventListener('DOMContentLoaded', () => {
         const {
             loadForm = false,
             markBatch = false,
+            syncGen = true,
+            syncBatch = false,
+            syncFront = false,
+            updateQuotePreset = true,
         } = options;
         const normalized = value ? String(value) : '';
         const layerEl = document.getElementById('gen-layer-height');
         const wallEl = document.getElementById('gen-wall-count');
         const infillEl = document.getElementById('gen-infill');
 
-        _syncSlicerPresetSelectors(normalized);
+        _syncSlicerPresetSelectors(normalized, { syncGen, syncBatch, syncFront });
 
         if (!normalized) {
             if (dom.genPresetSaveBtn) dom.genPresetSaveBtn.disabled = true;
-            quoteOptions.slicer_preset_id = null;
-            saveSlicerPresetSelection();
-            setDefaultSlicerPresetId(null);
+            if (updateQuotePreset) {
+                quoteOptions.slicer_preset_id = null;
+                saveSlicerPresetSelection();
+                setDefaultSlicerPresetId(null);
+            }
             if (markBatch) markBatchDirty('_slicer_preset_id');
             return;
         }
@@ -274,9 +287,11 @@ document.addEventListener('DOMContentLoaded', () => {
             await loadPresetIntoForm(normalized);
         }
         if (dom.genPresetSaveBtn) dom.genPresetSaveBtn.disabled = false;
-        quoteOptions.slicer_preset_id = Number(normalized);
-        saveSlicerPresetSelection();
-        setDefaultSlicerPresetId(Number(normalized));
+        if (updateQuotePreset) {
+            quoteOptions.slicer_preset_id = Number(normalized);
+            saveSlicerPresetSelection();
+            setDefaultSlicerPresetId(Number(normalized));
+        }
         if (markBatch) markBatchDirty('_slicer_preset_id');
 
         try {
@@ -295,13 +310,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (dom.genPresetSelect) {
         dom.genPresetSelect.addEventListener('change', async () => {
-            await _applySlicerPresetSelection(dom.genPresetSelect.value, { loadForm: true });
+            await _applySlicerPresetSelection(dom.genPresetSelect.value, {
+                loadForm: true,
+                syncGen: true,
+                syncBatch: true,
+                syncFront: false,
+                updateQuotePreset: true,
+            });
         });
     }
 
     if (dom.frontDefaultSlicerPreset) {
         dom.frontDefaultSlicerPreset.addEventListener('change', async () => {
-            await _applySlicerPresetSelection(dom.frontDefaultSlicerPreset.value);
+            await _applySlicerPresetSelection(dom.frontDefaultSlicerPreset.value, {
+                syncGen: false,
+                syncBatch: false,
+                syncFront: true,
+                updateQuotePreset: false,
+            });
         });
     }
 
@@ -409,7 +435,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // Batch preset change → show params summary + update quoteOptions + mark dirty
     if (batchSlicerPreset) {
         batchSlicerPreset.addEventListener('change', async () => {
-            await _applySlicerPresetSelection(batchSlicerPreset.value, { markBatch: true });
+            await _applySlicerPresetSelection(batchSlicerPreset.value, {
+                markBatch: true,
+                syncGen: true,
+                syncBatch: true,
+                syncFront: false,
+                updateQuotePreset: true,
+            });
         });
     }
 

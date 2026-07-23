@@ -324,6 +324,24 @@ export function colorToObj(c) {
     if (typeof c === 'string') {
         const t = c.trim();
         if (/^#[0-9a-fA-F]{6}$/.test(t)) return { name: t, hex: t };
+        const knownColor = {
+            '白色': '#ffffff', '白': '#ffffff', 'white': '#ffffff',
+            '黑色': '#000000', '黑': '#000000', 'black': '#000000',
+            '灰色': '#808080', '灰': '#808080', 'gray': '#808080', 'grey': '#808080',
+            '红色': '#dc2626', '红': '#dc2626', 'red': '#dc2626',
+            '蓝色': '#2563eb', '蓝': '#2563eb', 'blue': '#2563eb',
+            '绿色': '#16a34a', '绿': '#16a34a', 'green': '#16a34a',
+            '黄色': '#ca8a04', '黄': '#ca8a04', 'yellow': '#ca8a04',
+            '橙色': '#ea580c', '橙': '#ea580c', 'orange': '#ea580c',
+            '紫色': '#9333ea', '紫': '#9333ea', 'purple': '#9333ea',
+            '粉色': '#db2777', '粉': '#db2777', 'pink': '#db2777',
+        }[t.toLowerCase()];
+        if (knownColor) return { name: t, hex: knownColor };
+        const materialColor = MATERIAL_OPTIONS
+            .map((material) => material?.color)
+            .filter((color) => color && typeof color === 'object' && color.hex)
+            .find((color) => String(color.name || '').trim().toLowerCase() === t.toLowerCase());
+        if (materialColor?.hex) return materialColor;
         if (t) return { name: t, hex: '' };
     }
     return null;
@@ -586,6 +604,33 @@ export function setAuthToken(v) { authToken = v; }
 export function setCurrentResults(v) { currentResults = v; }
 export function setSlicerPresets(v) { slicerPresets = v; }
 export function setPendingQuoteFiles(v) { pendingQuoteFiles = v; }
+
+export function getPrinterBaseId(printerRef) {
+    return String(printerRef || '').replace(/_\d{2}$/, '');
+}
+
+export function getPrinterNozzleFromRef(printerRef) {
+    const match = String(printerRef || '').match(/_(\d{2})$/);
+    return match ? Number.parseInt(match[1], 10) / 10 : null;
+}
+
+export function buildPrinterCompoundId(printerId, nozzle) {
+    const parsed = Number.parseFloat(nozzle);
+    if (!printerId || !Number.isFinite(parsed)) return String(printerId || '');
+    return `${getPrinterBaseId(printerId)}_${String(Math.round(parsed * 10)).padStart(2, '0').slice(-2)}`;
+}
+
+export function getResultNozzleDiameter(item, printer) {
+    const direct = Number.parseFloat(item?._nozzle_diameter);
+    if (Number.isFinite(direct)) return direct;
+    const compound = getPrinterNozzleFromRef(item?._printer_model);
+    if (Number.isFinite(compound)) return compound;
+    const core = item?.cost_breakdown?.gcode_summary?.core_params || {};
+    const sliced = Number.parseFloat(core.nozzle_diameter);
+    if (Number.isFinite(sliced)) return sliced;
+    const fallback = Number.parseFloat(printer?.nozzle);
+    return Number.isFinite(fallback) ? fallback : 0.4;
+}
 
 // ── Active printer compound ID (model + nozzle → e.g. "bambu_a1_04") ──
 export function getActivePrinterCompoundId() {

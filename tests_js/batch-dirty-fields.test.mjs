@@ -14,6 +14,12 @@ test('batch dirty tracking keeps printer, nozzle, and preset independent', async
     assert.match(source, /case '_printer_model': \{ const el = document\.getElementById\('batch-printer-model'\); return el \? el\.value : ''; \}/);
     assert.match(source, /case '_nozzle_diameter': \{ const el = document\.getElementById\('batch-nozzle-diameter'\); return el \? el\.value : ''; \}/);
     assert.match(source, /case '_slicer_preset_id': \{ const el = document\.getElementById\('batch-slicer-preset'\); return el \? el\.value : ''; \}/);
+    assert.match(source, /if \(dirtyFields\.has\('_printer_model'\)\) \{/);
+    assert.match(source, /else if \(dirtyFields\.has\('_nozzle_diameter'\)\) \{/);
+    assert.match(source, /if \(dirtyFields\.has\('_slicer_preset_id'\)\) \{/);
+    assert.match(source, /const selectedPresetId = slicerPreset\.value \? Number\(slicerPreset\.value\) : null;/);
+    assert.match(source, /updated\._printer_model = buildPrinterCompoundId\(originalPrinterId, nozzle\);/);
+    assert.doesNotMatch(source, /updated\._printer_model = getActivePrinterCompoundId\(\);\s*updated\._slicer_preset_id = quoteOptions\.slicer_preset_id;/);
 });
 
 test('batch controls bind dirty markers to their own field ids', async () => {

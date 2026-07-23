@@ -225,9 +225,9 @@ def resolve_printer(printer_id: str, nozzle: float | None = None) -> dict | None
     for pm in PRINTER_MODELS:
         for n in pm["nozzles"]:
             nid = _nozzle_suffix(n)
-            if printer_id == f"{pm['id']}_{nid}":
-                return {**pm, "_nozzle": n, "_compound_id": printer_id}
-            if printer_id == pm["id"]:
+            if printer_id in (f"{pm['id']}_{nid}", f"{pm['name']}_{nid}"):
+                return {**pm, "_nozzle": n, "_compound_id": f"{pm['id']}_{nid}"}
+            if printer_id in (pm["id"], pm["name"]):
                 nz = nozzle if nozzle is not None else pm["nozzle"]
                 if nz in pm["nozzles"]:
                     nid = _nozzle_suffix(nz)

@@ -11,6 +11,6 @@ test('front default settings bar uses compact desktop widths for each control', 
     assert.match(css, /#front-default-printer-model\s*\{\s*width:\s*155px;/);
     assert.match(css, /#front-default-nozzle-diameter\s*\{\s*width:\s*72px;/);
     assert.match(css, /#front-default-slicer-preset\s*\{\s*width:\s*160px;/);
-    assert.match(css, /#front-default-color-dropdown\s*\{\s*width:\s*120px;/);
+    assert.match(css, /#front-default-color-dropdown\s*\{\s*width:\s*58px;/);
     assert.match(css, /#front-default-brand\s*\{\s*width:\s*120px;/);
 });

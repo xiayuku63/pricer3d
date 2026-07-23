@@ -377,6 +377,10 @@ def generate_slice_config(
     # Otherwise every nozzle selection would still slice as the profile nozzle.
     if max_print_speed is not None:
         ps["max_print_speed"] = str(max_print_speed)
+    if nozzle_diameter is not None:
+        # The flat writer emits print settings after machine settings. Keep
+        # both sections aligned so a stale print-level 0.4 cannot win.
+        ps["nozzle_diameter"] = str(nozzle_diameter)
     if max_volumetric_speed is not None:
         # Material flow limit belongs to the filament section in PrusaSlicer.
         # Keep the print-level value aligned too because older profiles use it.

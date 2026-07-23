@@ -9,7 +9,7 @@ import { t } from './i18n.js';
 // ── Constants ──
 const ALLOWED_EXTENSIONS = ['.stl', '.stp', '.step', '.obj', '.3mf', '.zip'];
 const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
-const MAX_ZIP_SIZE = 1024 * 1024 * 1024; // 1GB
+const MAX_ZIP_SIZE = 500 * 1024 * 1024; // 500MB
 const EXT_ICONS = {
     stl: 'STL', stp: 'STP', step: 'STEP', obj: 'OBJ', '3mf': '3MF', zip: 'ZIP',
 };
@@ -135,8 +135,8 @@ export function validateFiles(files, existingMap, maxFiles) {
         }
         const isZip = ext === '.zip';
         const sizeLimit = isZip ? MAX_ZIP_SIZE : MAX_FILE_SIZE;
-        if (file.size >= sizeLimit) {
-            invalidFiles.push({ file, reason: `文件过大（${formatFileSize(file.size)}），${isZip ? 'ZIP 文件' : '单文件'}需小于 ${formatFileSize(sizeLimit)}` });
+        if (file.size > sizeLimit) {
+            invalidFiles.push({ file, reason: `文件过大（${formatFileSize(file.size)}），${isZip ? 'ZIP 文件' : '单文件'}不能超过 ${formatFileSize(sizeLimit)}` });
             continue;
         }
         if (file.size === 0) {

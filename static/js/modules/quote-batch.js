@@ -1,8 +1,10 @@
 // -- Batch edit operations --
 import {
     quoteOptions, currentResults, setCurrentResults,
-    MATERIAL_OPTIONS, renderColorDropdown, getActivePrinterCompoundId,
+    MATERIAL_OPTIONS, renderColorDropdown,
     getUsedBrandOptions, getMaterialsByBrand, getColorsForMaterial, pickAllowedColor,
+    buildPrinterCompoundId, getPrinterBaseId, getResultNozzleDiameter, getCachedPrinterModels,
+    loadBatchSettingsSnapshot, saveBatchSettingsSnapshot,
 } from './state.js';
 import { renderResultsTable, recalcSummaryFromCurrentResults, refreshOptionsSummary } from './quote-render.js';
 import { reQuoteAllSelectedFiles } from './quote-api.js';
@@ -105,12 +107,24 @@ export function maybeSnapshotBatchDirty() {
     return true;
 }
 
+function _saveBatchSnapshot() {
+    saveBatchSettingsSnapshot({
+        printer_model: document.getElementById('batch-printer-model')?.value || '',
+        nozzle_diameter: document.getElementById('batch-nozzle-diameter')?.value || '',
+        slicer_preset_id: document.getElementById('batch-slicer-preset')?.value || '',
+        brand: document.getElementById('batch-brand')?.value || '',
+        material: document.getElementById('batch-material')?.value || '',
+        color: document.getElementById('batch-color-dropdown')?.getAttribute('data-selected-color') || '',
+    });
+}
+
 // ── Brand dropdown ──
 export function refreshBatchBrandDropdown() {
     const sel = document.getElementById('batch-brand');
     if (!sel) return;
     const brands = getUsedBrandOptions();
-    const prev = sel.value || quoteOptions.brand || '';
+    const snapshot = loadBatchSettingsSnapshot() || {};
+    const prev = snapshot.brand || sel.value || quoteOptions.brand || '';
     sel.innerHTML = brands.map(b => `<option value="${b}">${b}</option>`).join('');
     // 恢复选中：优先用上次值，其次 quoteOptions.brand
     if (prev && brands.includes(prev)) {
@@ -129,9 +143,12 @@ export function refreshBatchMaterialDropdown() {
     const sel = document.getElementById('batch-material');
     if (!sel) return;
     const materials = getMaterialsByBrand(brand);
+    const snapshot = loadBatchSettingsSnapshot() || {};
     sel.innerHTML = materials.map(m => `<option value="${m.name}">${m.name}</option>`).join('');
     // 恢复选中的材料（如果在当前品牌下存在）
-    if (materials.find(m => m.name === quoteOptions.material)) {
+    if (materials.find(m => m.name === snapshot.material)) {
+        sel.value = snapshot.material;
+    } else if (materials.find(m => m.name === quoteOptions.material)) {
         sel.value = quoteOptions.material;
     } else if (materials.length > 0) {
         sel.value = materials[0].name;
@@ -147,14 +164,16 @@ export function refreshBatchColorDropdown() {
     const brandSelect = document.getElementById('batch-brand');
     const brand = brandSelect ? brandSelect.value : quoteOptions.brand;
     const colorInput = container.querySelector('.row-color-value');
+    const snapshot = loadBatchSettingsSnapshot() || {};
     const allowedColors = getColorsForMaterial(material, brand);
     const currentColor = pickAllowedColor(
         allowedColors,
-        colorInput ? colorInput.value : quoteOptions.color,
+        snapshot.color || (colorInput ? colorInput.value : quoteOptions.color),
         quoteOptions.color,
     );
     const rendered = renderColorDropdown(material, currentColor, true, brand);
     container.innerHTML = rendered.html;
+    _saveBatchSnapshot();
 }
 
 export async function batchApplyToAll() {
@@ -188,11 +207,9 @@ export async function batchApplyToAll() {
     const quantity = Number.parseInt(quantityInput.value, 10);
     const brand = brandSelect ? brandSelect.value : '';
 
-    if (dirtyFields.has('_printer_model') || dirtyFields.has('_nozzle_diameter') || dirtyFields.has('_slicer_preset_id')) {
-        if (!printerModel || !printerModel.value) {
-            if (errorMsg) { errorMsg.textContent = '请先选择打印机型号或安装预设'; errorContainer.classList.remove('hidden'); }
-            return;
-        }
+    if ((dirtyFields.has('_printer_model') || dirtyFields.has('_nozzle_diameter')) && (!printerModel || !printerModel.value)) {
+        if (errorMsg) { errorMsg.textContent = '请先选择打印机型号'; errorContainer.classList.remove('hidden'); }
+        return;
     }
 
     if (dirtyFields.has('quantity')) {
@@ -226,10 +243,35 @@ export async function batchApplyToAll() {
         if (dirtyFields.has('quantity')) {
             updated.quantity = quantity;
         }
-        if (dirtyFields.has('_printer_model') || dirtyFields.has('_nozzle_diameter') || dirtyFields.has('_slicer_preset_id')) {
-            updated._printer_model = getActivePrinterCompoundId();
-            updated._slicer_preset_id = quoteOptions.slicer_preset_id;
+        if (dirtyFields.has('_printer_model')) {
+            const selectedPrinterId = printerModel.value;
+            const selectedPrinter = getCachedPrinterModels().find((printer) => printer.id === selectedPrinterId);
+            const supportedNozzles = (selectedPrinter?.nozzles || [0.4])
+                .map((value) => Number.parseFloat(value))
+                .filter((value) => Number.isFinite(value));
+            const originalNozzle = getResultNozzleDiameter(item, getCachedPrinterModels().find(
+                (printer) => printer.id === getPrinterBaseId(item._printer_model),
+            ));
+            const batchNozzle = Number.parseFloat(nozzleDiam?.value);
+            const nozzle = dirtyFields.has('_nozzle_diameter')
+                ? batchNozzle
+                : (supportedNozzles.find((value) => Math.abs(value - originalNozzle) < 0.0001)
+                    ?? (supportedNozzles.find((value) => Math.abs(value - batchNozzle) < 0.0001)
+                        ?? supportedNozzles[0]
+                        ?? 0.4));
+            updated._printer_model = buildPrinterCompoundId(selectedPrinterId, nozzle);
+            updated._nozzle_diameter = nozzle;
             updated._printer_model_explicit = true;
+        } else if (dirtyFields.has('_nozzle_diameter')) {
+            const originalPrinterId = getPrinterBaseId(item._printer_model) || printerModel.value;
+            const nozzle = Number.parseFloat(nozzleDiam?.value);
+            updated._printer_model = buildPrinterCompoundId(originalPrinterId, nozzle);
+            updated._nozzle_diameter = nozzle;
+            updated._printer_model_explicit = true;
+        }
+        if (dirtyFields.has('_slicer_preset_id')) {
+            const selectedPresetId = slicerPreset.value ? Number(slicerPreset.value) : null;
+            updated._slicer_preset_id = selectedPresetId;
             updated._slicer_preset_explicit = true;
         }
 

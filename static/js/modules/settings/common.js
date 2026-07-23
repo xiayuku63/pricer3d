@@ -15,6 +15,7 @@ import {
     defaultMaterial, setDefaultMaterial,
     defaultColor, setDefaultColor,
     defaultBrand, setDefaultBrand,
+    loadFrontSettingsSnapshot,
     getBrandOptions, getMaterialsByBrand, getUsedBrandOptions, MATERIAL_TYPE_PRESETS,
 } from '../state.js';
 import { t } from '../i18n.js';
@@ -112,6 +113,7 @@ export function updateDropdowns() {
         _initColorWheelCanvas(optColor);
         quoteOptions.color = rendered.selected;
     }
+
     refreshOptionsSummary();
     refreshBatchBrandDropdown();
     refreshBatchMaterialDropdown();
@@ -144,9 +146,12 @@ export function refreshDefaultMaterialControls(options = {}) {
     const materialSel = document.getElementById('front-default-material');
     const colorContainer = document.getElementById('front-default-color-dropdown');
     if (!brandSel || !materialSel) return;
+    const frontSnapshot = loadFrontSettingsSnapshot() || {};
 
     const usedBrands = getUsedBrandOptions();
-    const desiredBrand = preserveValues ? (brandSel.value || '') : (defaultBrand || brandSel.value || '');
+    const desiredBrand = preserveValues
+        ? (brandSel.value || '')
+        : (frontSnapshot.brand || defaultBrand || brandSel.value || '');
     brandSel.innerHTML = usedBrands.map((brand) =>
         `<option value="${escapeHtml(brand)}">${escapeHtml(brand)}</option>`
     ).join('');
@@ -156,7 +161,9 @@ export function refreshDefaultMaterialControls(options = {}) {
     brandSel.value = activeBrand;
 
     const materials = getMaterialsByBrand(activeBrand);
-    const desiredMaterial = preserveValues ? (materialSel.value || '') : (defaultMaterial || materialSel.value || '');
+    const desiredMaterial = preserveValues
+        ? (materialSel.value || '')
+        : (frontSnapshot.material || defaultMaterial || materialSel.value || '');
     materialSel.innerHTML = materials.map((material) =>
         `<option value="${escapeHtml(material.name)}">${escapeHtml(material.name)}</option>`
     ).join('');
@@ -167,7 +174,7 @@ export function refreshDefaultMaterialControls(options = {}) {
 
     const desiredColor = preserveValues
         ? (colorContainer?.getAttribute('data-selected-color') || '')
-        : (defaultColor || '');
+        : (frontSnapshot.color || defaultColor || '');
     if (colorContainer && nextMaterial) {
         _renderDefaultColorDropdown(colorContainer, nextMaterial, desiredColor, activeBrand, updateQuoteOptions);
     }

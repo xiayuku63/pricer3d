@@ -84,8 +84,8 @@ def _resolve_color_hex(color_str: str, fallback: str = "") -> str:
     return fallback or s
 
 
-# Max ZIP file size (1GB)
-MAX_ZIP_SIZE_BYTES = 1024 * 1024 * 1024
+# Max ZIP file size (500MB)
+MAX_ZIP_SIZE_BYTES = 500 * 1024 * 1024
 
 # ── Preview session store (in-memory, TTL 10 minutes) ──
 _preview_sessions = {}  # {session_id: {data dict, expires_at}}

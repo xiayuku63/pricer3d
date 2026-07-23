@@ -5,6 +5,7 @@ import {
     MATERIAL_OPTIONS, formatColorLabel, escapeHtml, formatTimeHMS,
     renderColorDropdown, getCachedPrinterModels, slicerPresets,
     getUsedBrandOptions as getBrandOptions, getMaterialsByBrand,
+    getPrinterBaseId, getResultNozzleDiameter,
 } from './state.js';
 import { buildPlaceholderThumbnail } from './preview.js';
 import { t } from './i18n.js';
@@ -656,21 +657,29 @@ function _buildPreviewHtml(item, ext) {
 // Helper: build per-file printer + preset dropdowns HTML
 function _buildRowDropdownsHtml(item) {
     const printerModels = getCachedPrinterModels();
-    const selectedPrinterId = (item._printer_model || '').replace(/_\d{2}$/, '');
+    const selectedPrinterId = getPrinterBaseId(item._printer_model);
+    const selectedPrinter = printerModels.find((printer) => printer.id === selectedPrinterId);
+    const selectedNozzle = getResultNozzleDiameter(item, selectedPrinter);
     const pmOptions = printerModels.map(p =>
         `<option value="${p.id}" ${p.id === selectedPrinterId ? 'selected' : ''}>${p.name}</option>`
+    ).join('');
+    const nozzles = selectedPrinter?.nozzles?.length
+        ? selectedPrinter.nozzles
+        : [selectedPrinter?.nozzle || selectedNozzle || 0.4];
+    const nozzleOptions = nozzles.map((nozzle) =>
+        `<option value="${nozzle}" ${Math.abs(Number(nozzle) - Number(selectedNozzle)) < 0.0001 ? 'selected' : ''}>${nozzle}mm</option>`
     ).join('');
     const presets = slicerPresets || [];
     const presetOptions = ['<option value="">' + t('quote.presetNone') + '</option>',
         ...presets.map(p => `<option value="${p.id}" ${String(p.id) === String(item._slicer_preset_id || '') ? 'selected' : ''}>${p.name || '#' + p.id}</option>`)
     ].join('');
-    return { pmOptions, presetOptions };
+    return { pmOptions, nozzleOptions, presetOptions };
 }
 
 // Helper: build the common first 7 columns (filename, preview, printer, preset, material, color, quantity)
 function _buildCommonRowHtml(item, ext, selectedMaterial, selectedColor, quantityValue) {
     const previewButtonHtml = _buildPreviewHtml(item, ext);
-    const { pmOptions, presetOptions } = _buildRowDropdownsHtml(item);
+    const { pmOptions, nozzleOptions, presetOptions } = _buildRowDropdownsHtml(item);
     const brands = getBrandOptions();
     const currentBrand = item.brand || (MATERIAL_OPTIONS.find(m => m.name === selectedMaterial) || {}).brand || '';
     const effectiveBrand = currentBrand || brands[0] || '';
@@ -680,11 +689,11 @@ function _buildCommonRowHtml(item, ext, selectedMaterial, selectedColor, quantit
     const materialOptionsHtml = filteredMaterials.map((m) => `<option value="${m.name}" ${m.name === selectedMaterial ? 'selected' : ''}>${m.name}</option>`).join('');
     const renderedRowColors = renderColorDropdown(selectedMaterial, selectedColor, true, effectiveBrand);
     return {
-        previewButtonHtml, pmOptions, presetOptions, materialOptionsHtml, brandOptionsHtml,
+        previewButtonHtml, pmOptions, nozzleOptions, presetOptions, materialOptionsHtml, brandOptionsHtml,
         renderedRowColors,
         cols: `<td class="px-2 py-1.5">${escapeHtml(item.filename)}${_buildParamBadge(item)}</td>
                 <td class="px-2 py-1.5">${previewButtonHtml}</td>
-                <td class="px-2 py-1.5"><select data-field="_printer_model" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5 max-w-[110px]">${pmOptions}</select></td>
+                <td class="px-2 py-1.5"><select data-field="_printer_model" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5 max-w-[110px]">${pmOptions}</select><select data-field="_nozzle_diameter" aria-label="喷嘴直径" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5 max-w-[72px]">${nozzleOptions}</select></td>
                 <td class="px-2 py-1.5"><select data-field="_slicer_preset_id" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5 max-w-[100px]">${presetOptions}</select></td>
                 <td class="px-2 py-1.5"><select data-field="_brand" class="row-edit row-brand-select text-[11px] border border-gray-300 rounded px-1 py-0.5 w-full max-w-[110px]">${brandOptionsHtml}</select></td>
                 <td class="px-2 py-1.5"><select data-field="material" class="row-edit text-[11px] border border-gray-300 rounded px-1 py-0.5">${materialOptionsHtml}</select></td>
@@ -911,20 +920,12 @@ export function renderResultsTable() {
             const renderedRowColors = renderColorDropdown(item.material, item.color, true, effectiveBrand);
 
             // Per-file printer + preset dropdowns
-            const printerModels = getCachedPrinterModels();
-            const selectedPrinterId = (item._printer_model || '').replace(/_\d{2}$/, '');
-            const pmOptions = printerModels.map(p =>
-                `<option value="${p.id}" ${p.id === selectedPrinterId ? 'selected' : ''}>${p.name}</option>`
-            ).join('');
-            const presets = slicerPresets || [];
-            const presetOptions = ['<option value="">' + t('quote.presetNone') + '</option>',
-                ...presets.map(p => `<option value="${p.id}" ${String(p.id) === String(item._slicer_preset_id || '') ? 'selected' : ''}>${p.name || '#' + p.id}</option>`)
-            ].join('');
+            const { pmOptions, nozzleOptions, presetOptions } = _buildRowDropdownsHtml(item);
 
             tr.innerHTML = `
                 <td class="px-2 py-1.5"><div>${escapeHtml(item.filename)}${_buildParamBadge(item)}</div><button type="button" data-toggle-detail="${escapeHtml(item.filename)}" class="mt-0.5 text-[10px] text-indigo-500 hover:text-indigo-700 underline flex items-center gap-0.5"><svg class="w-3 h-3 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>详情</button></td>
                 <td class="px-2 py-1.5">${previewButtonHtml}</td>
-                <td class="px-2 py-1.5"><div class="quote-config-grid min-w-[232px]"><div class="quote-config-row"><select data-field="_printer_model" aria-label="打印机" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5">${pmOptions}</select><select data-field="_slicer_preset_id" aria-label="预设" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5">${presetOptions}</select></div><div class="quote-config-row"><select data-field="_brand" aria-label="品牌" class="row-edit row-brand-select text-[11px] border border-gray-300 rounded px-1 py-0.5">${brandOptionsHtml}</select><select data-field="material" aria-label="材料" class="row-edit text-[11px] border border-gray-300 rounded px-1 py-0.5">${materialOptionsHtml}</select></div><div class="quote-config-row quote-config-row-color" data-field="color">${renderedRowColors.html}</div></div></td>
+                <td class="px-2 py-1.5"><div class="quote-config-grid min-w-[320px]"><div class="quote-config-row quote-config-row-printer"><select data-field="_printer_model" aria-label="打印机" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5">${pmOptions}</select><select data-field="_nozzle_diameter" aria-label="喷嘴直径" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5">${nozzleOptions}</select><select data-field="_slicer_preset_id" aria-label="预设" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5">${presetOptions}</select></div><div class="quote-config-row"><select data-field="_brand" aria-label="品牌" class="row-edit row-brand-select text-[11px] border border-gray-300 rounded px-1 py-0.5">${brandOptionsHtml}</select><select data-field="material" aria-label="材料" class="row-edit text-[11px] border border-gray-300 rounded px-1 py-0.5">${materialOptionsHtml}</select></div><div class="quote-config-row quote-config-row-color" data-field="color">${renderedRowColors.html}</div></div></td>
                 <td class="px-2 py-1.5"><input data-field="quantity" type="number" min="1" value="${item.quantity}" class="row-edit w-14 text-[11px] border border-gray-300 rounded px-1 py-0.5" /></td>
                 <td class="px-2 py-1.5">
                     <div class="text-[10px] leading-tight">${recalculating ? '-' : (item.weight_g / Math.max(1, item.quantity)).toFixed(1)}g</div>
@@ -959,19 +960,11 @@ export function renderResultsTable() {
             const renderedRowColors = renderColorDropdown(selectedMaterial, selectedColor, true, effectiveBrand3);
             const quantityValue = item.quantity || quoteOptions.quantity || 1;
             // Per-file printer + preset
-            const printerModels = getCachedPrinterModels();
-            const selectedPrinterId = (item._printer_model || '').replace(/_\d{2}$/, '');
-            const pmOptions = printerModels.map(p =>
-                `<option value="${p.id}" ${p.id === selectedPrinterId ? 'selected' : ''}>${p.name}</option>`
-            ).join('');
-            const presets = slicerPresets || [];
-            const presetOptions = ['<option value="">' + t('quote.presetNone') + '</option>',
-                ...presets.map(p => `<option value="${p.id}" ${String(p.id) === String(item._slicer_preset_id || '') ? 'selected' : ''}>${p.name || '#' + p.id}</option>`)
-            ].join('');
+            const { pmOptions, nozzleOptions, presetOptions } = _buildRowDropdownsHtml(item);
             tr.innerHTML = `
                 <td class="px-2 py-1.5">${escapeHtml(item.filename)}${_buildParamBadge(item)}</td>
                 <td class="px-2 py-1.5">${previewButtonHtml}</td>
-                <td class="px-2 py-1.5"><div class="quote-config-grid min-w-[232px]"><div class="quote-config-row"><select data-field="_printer_model" aria-label="打印机" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5">${pmOptions}</select><select data-field="_slicer_preset_id" aria-label="预设" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5">${presetOptions}</select></div><div class="quote-config-row"><select data-field="_brand" aria-label="品牌" class="row-edit row-brand-select text-[11px] border border-gray-300 rounded px-1 py-0.5">${brandOptionsHtml}</select><select data-field="material" aria-label="材料" class="row-edit text-[11px] border border-gray-300 rounded px-1 py-0.5">${materialOptionsHtml}</select></div><div class="quote-config-row quote-config-row-color" data-field="color">${renderedRowColors.html}</div></div></td>
+                <td class="px-2 py-1.5"><div class="quote-config-grid min-w-[320px]"><div class="quote-config-row quote-config-row-printer"><select data-field="_printer_model" aria-label="打印机" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5">${pmOptions}</select><select data-field="_nozzle_diameter" aria-label="喷嘴直径" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5">${nozzleOptions}</select><select data-field="_slicer_preset_id" aria-label="预设" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5">${presetOptions}</select></div><div class="quote-config-row"><select data-field="_brand" aria-label="品牌" class="row-edit row-brand-select text-[11px] border border-gray-300 rounded px-1 py-0.5">${brandOptionsHtml}</select><select data-field="material" aria-label="材料" class="row-edit text-[11px] border border-gray-300 rounded px-1 py-0.5">${materialOptionsHtml}</select></div><div class="quote-config-row quote-config-row-color" data-field="color">${renderedRowColors.html}</div></div></td>
                 <td class="px-2 py-1.5"><input data-field="quantity" type="number" min="1" value="${quantityValue}" class="row-edit w-14 text-[11px] border border-gray-300 rounded px-1 py-0.5" /></td>
                 <td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td>
                 <td data-role="status-cell" class="px-2 py-1.5 whitespace-nowrap">
@@ -1087,15 +1080,7 @@ function renderResultsCards() {
             ? `<button type="button" data-preview-file="${item.filename}" data-preview-ext="${ext}" class="block rounded border border-gray-200 overflow-hidden hover:border-indigo-300 transition-colors w-full"><img src="${thumbnail}" alt="预览" class="w-full h-28 object-cover bg-white" /></button>`
             : `<button type="button" data-preview-file="${item.filename}" data-preview-ext="${ext}" class="w-full text-[12px] text-indigo-600 hover:text-indigo-700 border border-indigo-200 hover:border-indigo-300 rounded px-3 py-2">预览模型</button>`;
 
-        const printerModels = getCachedPrinterModels();
-        const selectedPrinterId = (item._printer_model || '').replace(/_\d{2}$/, '');
-        const pmOptions = printerModels.map(p =>
-            `<option value="${p.id}" ${p.id === selectedPrinterId ? 'selected' : ''}>${p.name}</option>`
-        ).join('');
-        const presets = slicerPresets || [];
-        const presetOptions = ['<option value="">' + t('quote.presetNone') + '</option>',
-            ...presets.map(p => `<option value="${p.id}" ${String(p.id) === String(item._slicer_preset_id || '') ? 'selected' : ''}>${p.name || '#' + p.id}</option>`)
-        ].join('');
+        const { pmOptions, nozzleOptions, presetOptions } = _buildRowDropdownsHtml(item);
         const mobileBrands = getBrandOptions();
         const mobileCurrentBrand = item.brand || (MATERIAL_OPTIONS.find(m => m.name === (item.material || quoteOptions.material)) || {}).brand || '';
         const mobileEffectiveBrand = mobileCurrentBrand || mobileBrands[0] || '';
@@ -1130,6 +1115,10 @@ function renderResultsCards() {
                     <div>
                         <label class="text-[10px] text-gray-400 block">${t('quote.printerModel')}</label>
                         <select data-field="_printer_model" class="card-edit w-full text-[10px] border border-gray-300 rounded px-1.5 py-1 bg-white">${pmOptions}</select>
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-gray-400 block">${t('quote.nozzleDiameter')}</label>
+                        <select data-field="_nozzle_diameter" class="card-edit w-full text-[10px] border border-gray-300 rounded px-1.5 py-1 bg-white">${nozzleOptions}</select>
                     </div>
                     <div>
                         <label class="text-[10px] text-gray-400 block">${t('quote.preset')}</label>

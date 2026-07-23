@@ -1,4 +1,16 @@
+import { loadFrontSettingsSnapshot, saveFrontSettingsSnapshot } from './state.js';
+
 export function initColorDropdownUI({ quoteOptions, currentResults, selectedFilesMap, thumbnailMap, dom, ensureThumbnailForFile, recolorCurrentMesh, updatePreviewColor, getCurrentPreviewFilename, refreshOptionsSummary }) {
+    function saveFrontMaterialSnapshot() {
+        const previous = loadFrontSettingsSnapshot() || {};
+        saveFrontSettingsSnapshot({
+            ...previous,
+            brand: document.getElementById('front-default-brand')?.value || '',
+            material: document.getElementById('front-default-material')?.value || '',
+            color: document.getElementById('front-default-color-dropdown')?.getAttribute('data-selected-color') || '',
+        });
+    }
+
     function getSwatchBorderColor(hex) {
         return 'rgba(0,0,0,0.72)';
     }
@@ -181,6 +193,7 @@ export function initColorDropdownUI({ quoteOptions, currentResults, selectedFile
                 const defaultColorContainer = wrapper.closest('#uc-default-color-dropdown, #front-default-color-dropdown');
                 defaultColorContainer.setAttribute('data-selected-color', hex);
                 quoteOptions.color = hex;
+                if (wrapper.closest('#front-default-color-dropdown')) saveFrontMaterialSnapshot();
                 return;
             }
 

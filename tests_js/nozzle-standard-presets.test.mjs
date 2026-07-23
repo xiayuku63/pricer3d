@@ -48,13 +48,14 @@ test('changing the nozzle synchronizes its standard preset', async () => {
 
 test('all slicer preset selectors share one synchronization path', async () => {
     const mainSource = await readFile(new URL('../static/js/main.js', import.meta.url), 'utf8');
-    assert.match(mainSource, /function _syncSlicerPresetSelectors\(value\)/);
+    assert.match(mainSource, /function _syncSlicerPresetSelectors\(value, options = \{\}\)/);
     assert.match(mainSource, /document\.getElementById\('batch-slicer-preset'\)/);
     assert.match(mainSource, /document\.getElementById\('front-default-slicer-preset'\)/);
     assert.match(mainSource, /saveFrontSettingsSnapshot\(/);
     assert.match(mainSource, /saveBatchSettingsSnapshot\(/);
     assert.match(mainSource, /dom\.frontDefaultSlicerPreset\.addEventListener\('change', async \(\) => \{/);
-    assert.match(mainSource, /await _applySlicerPresetSelection\(dom\.frontDefaultSlicerPreset\.value\);/);
+    assert.match(mainSource, /await _applySlicerPresetSelection\(dom\.frontDefaultSlicerPreset\.value, \{/);
+    assert.match(mainSource, /updateQuotePreset: false/);
 });
 
 test('front and batch toolbar snapshots persist across reloads', async () => {

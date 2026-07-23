@@ -14,6 +14,7 @@ import {
     selectedFilesMap, getActivePrinterCompoundId,
     setCachedPrinterModels,
     defaultPrinterId, defaultNozzle, defaultSlicerPresetId,
+    loadFrontSettingsSnapshot,
     getHiddenPrinters, setHiddenPrinters, HIDDEN_PRINTERS_KEY,
     getEnabledPrinters, setEnabledPrinters, ENABLED_PRINTERS_KEY,
 } from '../state.js';
@@ -113,13 +114,21 @@ export function renderSlicerPresetsUI() {
     const frontPreset = document.getElementById('front-default-slicer-preset');
     if (frontPreset) {
         const items = filterPresetsForNozzle(slicerPresets || [], frontNozzle);
+        const frontSnapshot = loadFrontSettingsSnapshot() || {};
         const standardFrontPreset = items.find(function(p) {
             return String(p.name || '').trim() === getStandardPresetNameForNozzle(frontNozzle);
         });
-        var frontCurrentVal = (defaultSlicerPresetId !== null && defaultSlicerPresetId !== undefined
-            && items.some(function(p) { return p.id === defaultSlicerPresetId; }))
-            ? String(defaultSlicerPresetId)
-            : (standardFrontPreset ? String(standardFrontPreset.id) : "");
+        // Keep the front default selector stable when the batch selector is
+        // refreshed. The saved front snapshot represents the user's visible
+        // default setting and must not be replaced by the batch/server state.
+        const frontCandidates = [
+            frontSnapshot.slicer_preset_id,
+            frontPreset.value,
+            defaultSlicerPresetId,
+            standardFrontPreset ? standardFrontPreset.id : '',
+        ];
+        var frontCurrentVal = frontCandidates.map(function(value) { return String(value || ''); })
+            .find(function(value) { return value && items.some(function(p) { return String(p.id) === value; }); }) || "";
         frontPreset.innerHTML = [
             '<option value="">' + t('quote.presetNone') + '</option>',
             ...items.map(function(p) { return '<option value="' + p.id + '"' + (String(p.id) === frontCurrentVal ? ' selected' : '') + '>' + (p.name || '#' + p.id) + '</option>'; })
@@ -131,11 +140,13 @@ export function renderSlicerPresetsUI() {
     const batchPreset = document.getElementById('batch-slicer-preset');
     if (batchPreset) {
         const items = filterPresetsForNozzle(slicerPresets || [], batchNozzle);
-        // Use user's saved default preset; if none, default to first saved preset (combinations)
+        // Import-time slicing should follow the authenticated default preset.
         var batchCurrentVal;
         if (defaultSlicerPresetId !== null && defaultSlicerPresetId !== undefined
             && items.some(function(p) { return p.id === defaultSlicerPresetId; })) {
             batchCurrentVal = String(defaultSlicerPresetId);
+        } else if (batchPreset.value && items.some(function(p) { return String(p.id) === String(batchPreset.value); })) {
+            batchCurrentVal = String(batchPreset.value);
         } else if (items.length > 0) {
             batchCurrentVal = String(items[0].id);
         } else {

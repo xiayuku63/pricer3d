@@ -2,6 +2,7 @@ import {
     currentUser, authToken, currentResults,
     MATERIAL_OPTIONS,
     hexToRgb, drawColorWheel, getMonochromeShades,
+    loadFrontSettingsSnapshot, saveFrontSettingsSnapshot,
 } from './state.js';
 import { getResultOrientation, withResultOrientation } from './orientation-state.js';
 
@@ -14,6 +15,16 @@ export function initSettingsAreaEvents({
     preview,
     i18n,
 }) {
+    const saveFrontMaterialSnapshot = () => {
+        const previous = loadFrontSettingsSnapshot() || {};
+        saveFrontSettingsSnapshot({
+            ...previous,
+            brand: document.getElementById('front-default-brand')?.value || '',
+            material: document.getElementById('front-default-material')?.value || '',
+            color: document.getElementById('front-default-color-dropdown')?.getAttribute('data-selected-color') || '',
+        });
+    };
+
     const ADD_MATERIAL_COLOR_CHOICES = [
         { name: '黑色', hex: '#000000' },
         { name: '白色', hex: '#ffffff' },
@@ -106,6 +117,7 @@ export function initSettingsAreaEvents({
     if (frontDefaultBrandSel) {
         frontDefaultBrandSel.addEventListener('change', () => {
             refreshDefaultMaterialControls({ preserveValues: true, updateQuoteOptions: false });
+            saveFrontMaterialSnapshot();
         });
     }
 
@@ -113,6 +125,7 @@ export function initSettingsAreaEvents({
     if (frontDefaultMaterialSel) {
         frontDefaultMaterialSel.addEventListener('change', () => {
             refreshDefaultMaterialControls({ preserveValues: true, updateQuoteOptions: false });
+            saveFrontMaterialSnapshot();
         });
     }
 

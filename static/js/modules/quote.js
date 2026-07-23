@@ -16,6 +16,7 @@ import {
     getActivePrinterCompoundId,
     getCachedPrinterModels, slicerPresets,
     getUsedBrandOptions as getBrandOptions, getMaterialsByBrand,
+    buildPrinterCompoundId, getResultNozzleDiameter,
 } from './state.js';
 import { buildPlaceholderThumbnail, ensureThumbnailForFile, buildThumbnails } from './preview.js';
 import { loadQuoteHistory } from './history.js';
@@ -77,6 +78,22 @@ export function initQuote(d) {
     // Initialize DOM refs in split modules
     // (quote-api.js uses _dom for error display in _quoteSelectedFilesInternal)
     // Note: setApiDom and setBatchDom are called separately from quote-api.js and quote-batch.js
+}
+
+function _syncPerFileNozzleSelect(container, printerId, preferredNozzle) {
+    const nozzleSelect = container?.querySelector('[data-field="_nozzle_diameter"]');
+    if (!nozzleSelect) return Number.parseFloat(preferredNozzle) || 0.4;
+    const printer = getCachedPrinterModels().find((item) => item.id === printerId);
+    const nozzles = printer?.nozzles?.length ? printer.nozzles : [printer?.nozzle || 0.4];
+    const preferred = Number.parseFloat(preferredNozzle);
+    const selected = nozzles.find((nozzle) => Number.isFinite(preferred) && Math.abs(Number(nozzle) - preferred) < 0.0001)
+        ?? printer?.nozzle
+        ?? nozzles[0];
+    nozzleSelect.innerHTML = nozzles.map((nozzle) =>
+        `<option value="${nozzle}" ${Math.abs(Number(nozzle) - Number(selected)) < 0.0001 ? 'selected' : ''}>${nozzle}mm</option>`
+    ).join('');
+    nozzleSelect.value = String(selected);
+    return Number(selected);
 }
 
 // ── Initialize table sort & pagination event listeners ──
@@ -529,6 +546,14 @@ export function handleCardEditChange(event) {
     const card = target.closest('[data-card-file]');
     if (!card) return;
     const filename = card.getAttribute('data-card-file');
+    if (target.getAttribute('data-field') === '_printer_model') {
+        const existing = currentResults.find((item) => item?.filename === filename);
+        _syncPerFileNozzleSelect(
+            card,
+            target.value,
+            getResultNozzleDiameter(existing, getCachedPrinterModels().find((item) => item.id === target.value)),
+        );
+    }
     if (_rowEditTimers.has(filename)) { clearTimeout(_rowEditTimers.get(filename)); }
     // Abort any in-flight request for this file
     const oldCtrl = _rowEditAbortControllers.get(filename);
@@ -558,8 +583,11 @@ async function _handleCardEdit(card, filename, abortSignal) {
         return;
     }
     const pmSel = card.querySelector('[data-field="_printer_model"]');
+    const nozzleSel = card.querySelector('[data-field="_nozzle_diameter"]');
     const spSel = card.querySelector('[data-field="_slicer_preset_id"]');
-    const pm = pmSel ? pmSel.value : '';
+    const pmBase = pmSel ? pmSel.value : '';
+    const nozzle = Number.parseFloat(nozzleSel?.value) || 0.4;
+    const pm = buildPrinterCompoundId(pmBase, nozzle);
     const sp = spSel ? (spSel.value ? Number(spSel.value) : null) : null;
     if (errorContainer) errorContainer.classList.add('hidden');
 
@@ -593,6 +621,7 @@ async function _handleCardEdit(card, filename, abortSignal) {
                 ...(orientation ? withResultOrientation(updated, orientation) : updated),
                 color: currentColor,
                 _printer_model: pm || prevItem?._printer_model,
+                _nozzle_diameter: nozzle,
                 _printer_model_explicit: prevItem?._printer_model_explicit || printerChanged,
                 _slicer_preset_explicit: prevItem?._slicer_preset_explicit || presetChanged,
             };
@@ -808,17 +837,22 @@ async function _handleRowEdit(event, abortSignal) {
         return;
     }
     const pmSel = row.querySelector('[data-field="_printer_model"]');
+    const nozzleSel = row.querySelector('[data-field="_nozzle_diameter"]');
     const spSel = row.querySelector('[data-field="_slicer_preset_id"]');
-    const pm = pmSel ? pmSel.value : '';
+    const pmBase = pmSel ? pmSel.value : '';
     // ── 当打印机型号变更时，更新 3D 预览底板 ──
     if (target.getAttribute('data-field') === '_printer_model') {
         const printerModels = getCachedPrinterModels();
-        const printer = printerModels.find(function(p) { return p.id === pm; });
+        const printer = printerModels.find(function(p) { return p.id === pmBase; });
+        const existing = currentResults.find((item) => item?.filename === filename);
+        _syncPerFileNozzleSelect(row, pmBase, getResultNozzleDiameter(existing, printer));
         if (printer && printer.bed_width && printer.bed_depth) {
             setBedLabel(printer.bed_width, printer.bed_depth, printer.bed_height);
             updateBedSize(printer.bed_width, printer.bed_depth);
         }
     }
+    const nozzle = Number.parseFloat(nozzleSel?.value) || 0.4;
+    const pm = buildPrinterCompoundId(pmBase, nozzle);
     const sp = spSel ? (spSel.value ? Number(spSel.value) : null) : null;
     if (errorContainer) errorContainer.classList.add('hidden');
     row.querySelector('[data-role="status-cell"]').innerHTML = '<span class="inline-block w-2 h-2 rounded-full mr-1 align-middle bg-amber-500"></span>' + t('quote.recalculating');
@@ -854,6 +888,7 @@ async function _handleRowEdit(event, abortSignal) {
                 ...(orientation ? withResultOrientation(updated, orientation) : updated),
                 color: dropdownColor,
                 _printer_model: pm || prevItem._printer_model,
+                _nozzle_diameter: nozzle,
                 _printer_model_explicit: prevItem?._printer_model_explicit || printerChanged,
                 _slicer_preset_explicit: prevItem?._slicer_preset_explicit || presetChanged,
             };

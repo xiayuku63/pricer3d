@@ -629,6 +629,7 @@ async def process_single_file(
                     "color": color,
                     "material": material,
                     "_printer_model": pricing_config.get("printer_model"),
+                    "_nozzle_diameter": _nozzle_diameter,
                     "_saved_path": model_saved_path,
                 }
 
@@ -713,6 +714,7 @@ async def process_single_file(
             "infill": actual_infill,
             "_slicer_preset_id": slicer_preset.get("id") if slicer_preset else None,
             "_printer_model": pricing_config.get("printer_model") if pricing_config else None,
+            "_nozzle_diameter": _nozzle_diameter,
             "_saved_path": model_saved_path,
             "cost_breakdown": breakdown,
             "effective_weight_g": round(effective_weight_g * quantity, 2),
