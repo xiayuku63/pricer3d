@@ -4,6 +4,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { getRenderColorHex } from '../state.js';
 import { scene, camera, stlLoader, previewContainer, previewPlaceholder, requestRender } from './scene.js';
 import { fitCameraToMesh } from './camera.js';
+import { createPreviewMaterial } from './render-style.js';
 
 // ── Shared mutable state (owned here, imported by scene.js and camera.js) ──
 export let currentMesh, currentMeshCenterOffset = null;
@@ -23,6 +24,22 @@ let _lastRenderedOrientation = null;
 let _renderRequestId = 0;
 
 const FACES_COLORS = [0x22c55e, 0x3b82f6, 0xa855f7, 0xeab308, 0xf97316, 0xec4899];
+
+function _addPreviewOutline(parent, geometry) {
+    if (!geometry) return;
+    const outline = new THREE.LineSegments(
+        new THREE.EdgesGeometry(geometry, 25),
+        new THREE.LineBasicMaterial({
+            color: 0x64748b,
+            transparent: true,
+            opacity: 0.5,
+            depthTest: true,
+        }),
+    );
+    outline.name = 'preview-outline';
+    outline.renderOrder = 2;
+    parent.add(outline);
+}
 
 // ── Color helpers ──
 
@@ -61,13 +78,11 @@ export function recolorCurrentMesh(colorKey) {
     if (!currentMesh) return false;
     const colorNum = _colorNumFromKey(colorKey);
     currentMesh.traverse(function(c) {
-        if (c.isMesh) {
-            c.material = new THREE.MeshStandardMaterial({
-                color: colorNum,
-                metalness: 0.0,
-                roughness: 0.6,
-            });
-        }
+            if (c.isMesh) {
+                c.castShadow = true;
+                c.receiveShadow = true;
+                c.material = createPreviewMaterial(colorNum);
+            }
     });
     _lastRenderedColorKey = colorKey;
     requestRender();
@@ -79,17 +94,10 @@ export function recolorCurrentMesh(colorKey) {
 export function clearCurrentMesh() {
     if (!currentMesh) return;
     scene.remove(currentMesh);
-    if (currentMesh.type === 'Group') {
-        currentMesh.traverse(c => {
-            if (c.isMesh) {
-                if (c.geometry) c.geometry.dispose();
-                if (c.material) c.material.dispose();
-            }
-        });
-    } else {
-        if (currentMesh.geometry) currentMesh.geometry.dispose();
-        if (currentMesh.material) currentMesh.material.dispose();
-    }
+    currentMesh.traverse(c => {
+        if (c.geometry) c.geometry.dispose();
+        if (c.material) c.material.dispose();
+    });
     currentMesh = null;
 }
 
@@ -113,11 +121,8 @@ async function renderViaGLB(file, orientation = null, colorKey = null) {
             if (c.isMesh) {
                 c.castShadow = true;
                 c.receiveShadow = true;
-                c.material = new THREE.MeshStandardMaterial({
-                    color: _glbColorNum,
-                    metalness: 0.0,
-                    roughness: 0.6,
-                });
+                c.material = createPreviewMaterial(_glbColorNum);
+                _addPreviewOutline(c, c.geometry);
             }
         });
         // 自适应缩放 + 居中
@@ -223,12 +228,11 @@ export function renderSTL(file, colorKey = 'Blue', orientation = null) {
             geometry.computeBoundingBox();
             geometry.translate(0, 0, -geometry.boundingBox.min.z);
             clearCurrentMesh();
-            const material = new THREE.MeshStandardMaterial({
-                color: _colorNumFromKey(colorKey),
-                metalness: 0.0,
-                roughness: 0.6,
-            });
+            const material = createPreviewMaterial(_colorNumFromKey(colorKey));
             currentMesh = new THREE.Mesh(geometry, material);
+            currentMesh.castShadow = true;
+            currentMesh.receiveShadow = true;
+            _addPreviewOutline(currentMesh, geometry);
             currentMesh.rotation.set(0, 0, 0);
             // 模型在打印平面居中
             const bc = window._BED_CENTER || 128;

@@ -11,7 +11,7 @@ import { t } from '../i18n.js';
 import { reQuoteAllSelectedFiles, getSlicerConfigSnapshot, getAffectedFilenamesForSlicerConfigChange, getAffectedFilenamesForSlicerPresetChange } from '../quote.js';
 import { dom, _printerModels, _selectedPresetId, setMsg, renderSlicerPresetsUI } from './ui.js';
 import { fetchPrinterModels } from './printers.js';
-import { LAYER_HEIGHT_BY_NOZZLE, getNozzleSettings } from './nozzle-rules.js';
+import { LAYER_HEIGHT_BY_NOZZLE, getNozzleSettings, getStandardPresetNameForNozzle as getStandardPresetNameFromRules } from './nozzle-rules.js';
 
 async function _fetchPresetParams(presetId) {
     if (!presetId) return null;
@@ -351,8 +351,7 @@ function _setStandardSlicerForm(settings) {
 }
 
 export function getStandardPresetNameForNozzle(nozzleValue) {
-    const { settings } = _nozzleSettings(nozzleValue);
-    return `${settings.defaultVal.toFixed(2)}-${STANDARD_WALL_COUNT}-${STANDARD_INFILL}%`;
+    return getStandardPresetNameFromRules(nozzleValue);
 }
 
 function _selectPresetAndSyncForm(preset) {

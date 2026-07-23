@@ -22,7 +22,7 @@ function _getWrapperFromElement(element) {
 }
 
 function _shouldPortalList(wrapper) {
-    return Boolean(wrapper?.closest?.('#quote-default-settings-bar, #batch-edit-bar, #user-center-modal, #options-modal'));
+    return Boolean(wrapper?.closest?.('#quote-default-settings-bar, #batch-edit-bar, #batch-results-body, #batch-results-cards, #user-center-modal, #options-modal'));
 }
 
 function _resetListPosition(instance) {
@@ -230,7 +230,10 @@ function _enhanceSelect(select) {
 
     const measuredWidth = Math.ceil(select.getBoundingClientRect().width || select.offsetWidth || 0);
     const wrapper = document.createElement('div');
-    wrapper.className = 'styled-select-wrapper';
+    wrapper.className = 'styled-select-wrapper styled-select-host';
+    if (select.closest('#batch-results-body, #batch-results-cards')) {
+        wrapper.classList.add('styled-select-row');
+    }
     wrapper.dataset.styledSelectId = select.id || String(Math.random()).slice(2);
     select.dataset.styledSelectEnhanced = '1';
     select.setAttribute('aria-hidden', 'true');
@@ -269,6 +272,12 @@ function _enhanceSelect(select) {
     _buildItems(instance);
     _syncWrapperWidth(instance);
     return instance;
+}
+
+export function enhanceStyledSelectsIn(root, selector = 'select.row-edit, select.card-edit') {
+    const container = root || document;
+    _ensureGlobalHandlers();
+    container.querySelectorAll(selector).forEach((select) => _enhanceSelect(select));
 }
 
 export function initStyledSelectDropdowns(selectIds = DEFAULT_SELECT_IDS) {

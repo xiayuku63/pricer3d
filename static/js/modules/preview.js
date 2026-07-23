@@ -17,6 +17,7 @@ import {
 import { clearClusters } from './layface.js';
 import { t } from './i18n.js';
 import { getResultOrientation, hasNonZeroOrientation } from './orientation-state.js';
+import { addPreviewLighting, configurePreviewRenderer, createPreviewMaterial } from './viewer/render-style.js';
 
 let dom = {};
 
@@ -50,6 +51,7 @@ export async function buildStlThumbnail(file, colorKey = "Blue", orientation = n
 
     const width = 220, height = 140;
     const thumbRenderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    configurePreviewRenderer(thumbRenderer);
     thumbRenderer.setSize(width, height);
     thumbRenderer.setPixelRatio(1);
 
@@ -67,11 +69,9 @@ export async function buildStlThumbnail(file, colorKey = "Blue", orientation = n
         colorHex = (hexInfo !== null && hexInfo !== undefined) ? hexInfo : 0x3b82f6;
     }
 
-    const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
-        color: colorHex,
-        metalness: 0.0,
-        roughness: 0.6,
-    }));
+    const mesh = new THREE.Mesh(geometry, createPreviewMaterial(colorHex));
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
     // 若指定朝向，先旋转几何体再渲染缩略图
     if (orientation) {
         mesh.rotation.x = THREE.MathUtils.degToRad(orientation.x || 0);
@@ -84,10 +84,7 @@ export async function buildStlThumbnail(file, colorKey = "Blue", orientation = n
     }
     applyAxonometricRotation(mesh);
     scene.add(mesh);
-    scene.add(new THREE.AmbientLight(0xffffff, 1.0));
-    const light = new THREE.DirectionalLight(0xffffff, 0.35);
-    light.position.set(2, 3, 1);
-    scene.add(light);
+    addPreviewLighting(scene);
 
     const box = new THREE.Box3().setFromObject(mesh);
     const size = box.getSize(new THREE.Vector3());
@@ -116,6 +113,7 @@ export async function buildNonStlThumbnail(file, colorKey) {
     const url = URL.createObjectURL(glbBlob);
 
     const thumbRenderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    configurePreviewRenderer(thumbRenderer);
     thumbRenderer.setSize(220, 140);
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xffffff);
@@ -137,19 +135,16 @@ export async function buildNonStlThumbnail(file, colorKey) {
 
     const model = gltf.scene;
     model.traverse(c => {
-        if (c.isMesh) c.material = new THREE.MeshStandardMaterial({
-            color: colorHex,
-            metalness: 0.0,
-            roughness: 0.6,
-        });
+        if (c.isMesh) {
+            c.castShadow = true;
+            c.receiveShadow = true;
+            c.material = createPreviewMaterial(colorHex);
+        }
     });
     model.rotation.x = THREE.MathUtils.degToRad(-30);
     model.rotation.y = THREE.MathUtils.degToRad(-45);
     scene.add(model);
-    scene.add(new THREE.AmbientLight(0xffffff, 1.0));
-    const light = new THREE.DirectionalLight(0xffffff, 0.35);
-    light.position.set(2, 3, 1);
-    scene.add(light);
+    addPreviewLighting(scene);
 
     const box = new THREE.Box3().setFromObject(model);
     const size = box.getSize(new THREE.Vector3());

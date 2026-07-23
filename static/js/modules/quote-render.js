@@ -3,12 +3,16 @@ import { MATERIAL_INFO } from './quote-data.js';
 import {
     quoteOptions, currentResults, thumbnailMap,
     MATERIAL_OPTIONS, formatColorLabel, escapeHtml, formatTimeHMS,
-    renderColorDropdown, getCachedPrinterModels, slicerPresets,
-    getUsedBrandOptions as getBrandOptions, getMaterialsByBrand,
-    getPrinterBaseId, getResultNozzleDiameter,
+    renderColorDropdown,
+    getUsedBrandOptions as getBrandOptions,
 } from './state.js';
 import { buildPlaceholderThumbnail } from './preview.js';
 import { t } from './i18n.js';
+import { enhanceStyledSelectsIn } from './styled-select.js';
+import {
+    buildRowDropdownsHtml as _buildRowDropdownsHtml,
+    buildParamBadge as _buildParamBadge,
+} from './quote-row-render.js';
 
 let _dom = {};
 export function setRenderDom(d) { _dom = d; }
@@ -645,127 +649,6 @@ export function refreshOptionsSummary() {
 
 // ── Results table ──
 
-// Helper: build preview button HTML for a result row
-function _buildPreviewHtml(item, ext) {
-    const thumbnail = thumbnailMap.get(item.filename) || buildPlaceholderThumbnail(ext);
-    const isRealThumbnail = thumbnail && thumbnail.startsWith('data:image/png');
-    return isRealThumbnail
-        ? `<button type="button" data-preview-file="${item.filename}" data-preview-ext="${ext}" class="block rounded border border-gray-200 overflow-hidden hover:border-indigo-300 transition-colors"><img src="${thumbnail}" alt="静态图" class="w-32 h-20 object-cover bg-white" /></button>`
-        : `<button type="button" data-preview-file="${item.filename}" data-preview-ext="${ext}" class="text-[12px] text-indigo-600 hover:text-indigo-700 border border-indigo-200 hover:border-indigo-300 rounded px-2 py-0.5">预览</button>`;
-}
-
-// Helper: build per-file printer + preset dropdowns HTML
-function _buildRowDropdownsHtml(item) {
-    const printerModels = getCachedPrinterModels();
-    const selectedPrinterId = getPrinterBaseId(item._printer_model);
-    const selectedPrinter = printerModels.find((printer) => printer.id === selectedPrinterId);
-    const selectedNozzle = getResultNozzleDiameter(item, selectedPrinter);
-    const pmOptions = printerModels.map(p =>
-        `<option value="${p.id}" ${p.id === selectedPrinterId ? 'selected' : ''}>${p.name}</option>`
-    ).join('');
-    const nozzles = selectedPrinter?.nozzles?.length
-        ? selectedPrinter.nozzles
-        : [selectedPrinter?.nozzle || selectedNozzle || 0.4];
-    const nozzleOptions = nozzles.map((nozzle) =>
-        `<option value="${nozzle}" ${Math.abs(Number(nozzle) - Number(selectedNozzle)) < 0.0001 ? 'selected' : ''}>${nozzle}mm</option>`
-    ).join('');
-    const presets = slicerPresets || [];
-    const presetOptions = ['<option value="">' + t('quote.presetNone') + '</option>',
-        ...presets.map(p => `<option value="${p.id}" ${String(p.id) === String(item._slicer_preset_id || '') ? 'selected' : ''}>${p.name || '#' + p.id}</option>`)
-    ].join('');
-    return { pmOptions, nozzleOptions, presetOptions };
-}
-
-// Helper: build the common first 7 columns (filename, preview, printer, preset, material, color, quantity)
-function _buildCommonRowHtml(item, ext, selectedMaterial, selectedColor, quantityValue) {
-    const previewButtonHtml = _buildPreviewHtml(item, ext);
-    const { pmOptions, nozzleOptions, presetOptions } = _buildRowDropdownsHtml(item);
-    const brands = getBrandOptions();
-    const currentBrand = item.brand || (MATERIAL_OPTIONS.find(m => m.name === selectedMaterial) || {}).brand || '';
-    const effectiveBrand = currentBrand || brands[0] || '';
-    const brandOptionsHtml = brands.map(b => `<option value="${b}" ${b === effectiveBrand ? 'selected' : ''}>${b}</option>`).join('');
-    // 按品牌过滤材料
-    const filteredMaterials = effectiveBrand ? MATERIAL_OPTIONS.filter(m => (m.brand || 'Generic') === effectiveBrand) : MATERIAL_OPTIONS;
-    const materialOptionsHtml = filteredMaterials.map((m) => `<option value="${m.name}" ${m.name === selectedMaterial ? 'selected' : ''}>${m.name}</option>`).join('');
-    const renderedRowColors = renderColorDropdown(selectedMaterial, selectedColor, true, effectiveBrand);
-    return {
-        previewButtonHtml, pmOptions, nozzleOptions, presetOptions, materialOptionsHtml, brandOptionsHtml,
-        renderedRowColors,
-        cols: `<td class="px-2 py-1.5">${escapeHtml(item.filename)}${_buildParamBadge(item)}</td>
-                <td class="px-2 py-1.5">${previewButtonHtml}</td>
-                <td class="px-2 py-1.5"><select data-field="_printer_model" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5 max-w-[110px]">${pmOptions}</select><select data-field="_nozzle_diameter" aria-label="喷嘴直径" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5 max-w-[72px]">${nozzleOptions}</select></td>
-                <td class="px-2 py-1.5"><select data-field="_slicer_preset_id" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5 max-w-[100px]">${presetOptions}</select></td>
-                <td class="px-2 py-1.5"><select data-field="_brand" class="row-edit row-brand-select text-[11px] border border-gray-300 rounded px-1 py-0.5 w-full max-w-[110px]">${brandOptionsHtml}</select></td>
-                <td class="px-2 py-1.5"><select data-field="material" class="row-edit text-[11px] border border-gray-300 rounded px-1 py-0.5">${materialOptionsHtml}</select></td>
-                <td class="px-2 py-1.5" data-field="color">${renderedRowColors.html}</td>
-                <td class="px-2 py-1.5"><input data-field="quantity" type="number" min="1" value="${quantityValue}" class="row-edit w-14 text-[11px] border border-gray-300 rounded px-1 py-0.5" /></td>`,
-    };
-}
-
-// Helper: build checklist badge HTML (full checklist with print params)
-function _buildChecklistHtml(item) {
-    if (!item._checklist_params || !item._checklist_source) return '';
-    const src = item._checklist_source;
-    const tip = t('quote.usedChecklist') + '：'
-        + (src.printer_model ? t('quote.printerModel') + ':' + src.printer_model + ' ' : '')
-        + (src.nozzle ? t('quote.nozzleDiameter') + ':' + src.nozzle + 'mm | ' : '')
-        + '层高:' + src.layer_height + 'mm 墙层数:' + src.wall_count + ' 填充:' + src.infill + '%';
-    return ` <span class="inline-block whitespace-nowrap text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1 cursor-help" title="${tip}">\u{1F4CB}${t('quote.badgeChecklist')}</span>`;
-}
-
-// Helper: build BOM data badge HTML (checklist with basic data only, no print params)
-function _buildBomDataBadgeHtml(item) {
-    const src = item._checklist_source || {};
-    const parts = [];
-    if (src.material_type) parts.push(t('quote.materialType') + ':' + src.material_type);
-    if (src.material_brand) parts.push(t('quote.materialBrand') + ':' + src.material_brand);
-    if (src.material) parts.push(t('quote.material') + ':' + src.material);
-    if (src.color) parts.push(t('quote.color') + ':' + src.color);
-    if (src.quantity) parts.push(t('quote.quantity') + ':' + src.quantity);
-    const tip = t('quote.usedBomData') + (parts.length ? '：' + parts.join(' | ') : '');
-    return ` <span class="inline-block whitespace-nowrap text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1 cursor-help" title="${tip}">📋${t('quote.badgeBomData')}</span>`;
-}
-
-// Helper: build default params badge HTML
-function _buildDefaultBadgeHtml() {
-    return ` <span class="inline-block whitespace-nowrap text-[10px] text-gray-500 bg-gray-100 border border-gray-200 rounded px-1 cursor-help" title="${t('quote.usedDefault')}">\u{1F4CB}${t('quote.badgeDefault')}</span>`;
-}
-
-// Helper: build checklist/default/BOM badge based on item data
-function _buildParamBadge(item) {
-    let badge = '';
-    if (item._checklist_params) {
-        const src = item._checklist_source || {};
-        // Check if any printing params were actually specified in checklist
-        const hasPrintParams = src.layer_height || src.wall_count || src.infill || src.printer_model || src.nozzle;
-        if (hasPrintParams) {
-            // Full checklist with print params
-            badge = _buildChecklistHtml(item);
-        } else {
-            // BOM data only (material, color, quantity) - no print params
-            badge = _buildBomDataBadgeHtml(item);
-        }
-    } else {
-        // No checklist - default
-        badge = _buildDefaultBadgeHtml();
-    }
-    badge += _buildWarningsBadgeHtml(item);
-    return badge;
-}
-
-// Helper: build warning badge for items with ZIP import validation warnings
-function _buildWarningsBadgeHtml(item) {
-    if (!item._warnings || !item._warnings.length) return '';
-    const count = item._warnings.length;
-    const tipLines = item._warnings.map(w => {
-        const base = t('quote.paramWarning', { param: w.param, value: w.value, default: w.default_used });
-        return w.reason ? `${base} (${w.reason})` : base;
-    });
-    const tip = tipLines.join('\n');
-    return ` <span class="text-[10px] text-amber-700 bg-amber-50 border border-amber-300 rounded px-1 cursor-help" title="${escapeHtml(tip)}">\u26A0\uFE0F${t('quote.warningsSummary', { count })}</span>`;
-}
-
-
 // Helper: build slicing params summary HTML (compact inline)
 
 // ── Table sort & pagination state ──
@@ -925,7 +808,7 @@ export function renderResultsTable() {
             tr.innerHTML = `
                 <td class="px-2 py-1.5"><div>${escapeHtml(item.filename)}${_buildParamBadge(item)}</div><button type="button" data-toggle-detail="${escapeHtml(item.filename)}" class="mt-0.5 text-[10px] text-indigo-500 hover:text-indigo-700 underline flex items-center gap-0.5"><svg class="w-3 h-3 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>详情</button></td>
                 <td class="px-2 py-1.5">${previewButtonHtml}</td>
-                <td class="px-2 py-1.5"><div class="quote-config-grid min-w-[320px]"><div class="quote-config-row quote-config-row-printer"><select data-field="_printer_model" aria-label="打印机" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5">${pmOptions}</select><select data-field="_nozzle_diameter" aria-label="喷嘴直径" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5">${nozzleOptions}</select><select data-field="_slicer_preset_id" aria-label="预设" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5">${presetOptions}</select></div><div class="quote-config-row"><select data-field="_brand" aria-label="品牌" class="row-edit row-brand-select text-[11px] border border-gray-300 rounded px-1 py-0.5">${brandOptionsHtml}</select><select data-field="material" aria-label="材料" class="row-edit text-[11px] border border-gray-300 rounded px-1 py-0.5">${materialOptionsHtml}</select></div><div class="quote-config-row quote-config-row-color" data-field="color">${renderedRowColors.html}</div></div></td>
+                <td class="px-2 py-1.5"><div class="quote-config-grid min-w-[320px]"><div class="quote-config-row quote-config-row-printer"><select data-field="_printer_model" aria-label="打印机" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5">${pmOptions}</select><select data-field="_nozzle_diameter" aria-label="喷嘴直径" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5">${nozzleOptions}</select><select data-field="_slicer_preset_id" aria-label="预设" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5">${presetOptions}</select></div><div class="quote-config-row quote-config-row-material"><select data-field="_brand" aria-label="品牌" class="row-edit row-brand-select text-[11px] border border-gray-300 rounded px-1 py-0.5">${brandOptionsHtml}</select><select data-field="material" aria-label="材料" class="row-edit text-[11px] border border-gray-300 rounded px-1 py-0.5">${materialOptionsHtml}</select><div class="quote-config-row-color" data-field="color">${renderedRowColors.html}</div></div></div></td>
                 <td class="px-2 py-1.5"><input data-field="quantity" type="number" min="1" value="${item.quantity}" class="row-edit w-14 text-[11px] border border-gray-300 rounded px-1 py-0.5" /></td>
                 <td class="px-2 py-1.5">
                     <div class="text-[10px] leading-tight">${recalculating ? '-' : (item.weight_g / Math.max(1, item.quantity)).toFixed(1)}g</div>
@@ -964,7 +847,7 @@ export function renderResultsTable() {
             tr.innerHTML = `
                 <td class="px-2 py-1.5">${escapeHtml(item.filename)}${_buildParamBadge(item)}</td>
                 <td class="px-2 py-1.5">${previewButtonHtml}</td>
-                <td class="px-2 py-1.5"><div class="quote-config-grid min-w-[320px]"><div class="quote-config-row quote-config-row-printer"><select data-field="_printer_model" aria-label="打印机" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5">${pmOptions}</select><select data-field="_nozzle_diameter" aria-label="喷嘴直径" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5">${nozzleOptions}</select><select data-field="_slicer_preset_id" aria-label="预设" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5">${presetOptions}</select></div><div class="quote-config-row"><select data-field="_brand" aria-label="品牌" class="row-edit row-brand-select text-[11px] border border-gray-300 rounded px-1 py-0.5">${brandOptionsHtml}</select><select data-field="material" aria-label="材料" class="row-edit text-[11px] border border-gray-300 rounded px-1 py-0.5">${materialOptionsHtml}</select></div><div class="quote-config-row quote-config-row-color" data-field="color">${renderedRowColors.html}</div></div></td>
+                <td class="px-2 py-1.5"><div class="quote-config-grid min-w-[320px]"><div class="quote-config-row quote-config-row-printer"><select data-field="_printer_model" aria-label="打印机" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5">${pmOptions}</select><select data-field="_nozzle_diameter" aria-label="喷嘴直径" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5">${nozzleOptions}</select><select data-field="_slicer_preset_id" aria-label="预设" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5">${presetOptions}</select></div><div class="quote-config-row quote-config-row-material"><select data-field="_brand" aria-label="品牌" class="row-edit row-brand-select text-[11px] border border-gray-300 rounded px-1 py-0.5">${brandOptionsHtml}</select><select data-field="material" aria-label="材料" class="row-edit text-[11px] border border-gray-300 rounded px-1 py-0.5">${materialOptionsHtml}</select><div class="quote-config-row-color" data-field="color">${renderedRowColors.html}</div></div></div></td>
                 <td class="px-2 py-1.5"><input data-field="quantity" type="number" min="1" value="${quantityValue}" class="row-edit w-14 text-[11px] border border-gray-300 rounded px-1 py-0.5" /></td>
                 <td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td>
                 <td data-role="status-cell" class="px-2 py-1.5 whitespace-nowrap">
@@ -1059,6 +942,8 @@ export function renderResultsTable() {
 
     // ── 同步渲染移动端卡片视图 ──
     renderResultsCards();
+    enhanceStyledSelectsIn(document.getElementById('batch-results-body'));
+    enhanceStyledSelectsIn(document.getElementById('batch-results-cards'));
 }
 
 // ── 移动端卡片布局渲染 ──

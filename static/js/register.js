@@ -3,6 +3,7 @@
 
 const TOKEN_STORAGE_KEY = "demo_access_token_v1";
 const USER_STORAGE_KEY = "demo_user_v1";
+const AUTH_SESSION_STORAGE_KEY = "demo_auth_session_v2";
 
 // ── DOM Elements ──
 const usernameEl = document.getElementById('reg-username');
@@ -803,8 +804,10 @@ submitBtn.addEventListener('click', async () => {
         if (!res.ok) throw new Error(data.message || data.detail || '注册失败');
 
         // Success!
-        localStorage.setItem(TOKEN_STORAGE_KEY, data.access_token || "");
-        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data.user || {}));
+        const accessToken = data.access_token || "";
+        const user = data.user || {};
+        const authSession = JSON.stringify({ token: accessToken, user });
+        sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, authSession);
 
         // Show success state
         step3Panel.innerHTML = `

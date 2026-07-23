@@ -60,7 +60,8 @@ function createLifecycleHarness() {
 
 async function loadAppLifecycle() {
     const source = await readFile(new URL('../static/js/modules/app-shell.js', import.meta.url), 'utf8');
-    return import(`data:text/javascript,${encodeURIComponent(source)}`);
+    const standaloneSource = source.replace(/^import .*;\r?\n/gm, '');
+    return import(`data:text/javascript,${encodeURIComponent(standaloneSource)}`);
 }
 
 async function withLifecycle(callback) {
