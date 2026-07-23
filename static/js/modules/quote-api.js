@@ -5,6 +5,7 @@ import {
     MATERIAL_OPTIONS, authFetch,
     getColorsForMaterial, pickAllowedColor,
     getActivePrinterCompoundId,
+    loadFrontSettingsSnapshot,
 
 } from './state.js';
 import { renderResultsTable, recalcSummaryFromCurrentResults } from './quote-render.js';
@@ -14,6 +15,7 @@ import { t } from './i18n.js';
 import { uploadWithProgress, showProgress, showProgressSuccess, showProgressError, hideProgress, showToast } from './upload.js';
 import { getAffectedFilenamesForGlobalSlicerChange, getAffectedFilenamesForPresetChange } from './quote-config.js';
 import { getResultOrientation, withResultOrientation } from './orientation-state.js';
+import { resolveUploadDefaults } from './upload-defaults.js';
 
 let _dom = {};
 export function setApiDom(d) { _dom = d; }
@@ -46,6 +48,20 @@ function _getActiveSlicerPresetId() {
     if (batch && batch.value) return Number(batch.value);
     return (quoteOptions.slicer_preset_id !== null && quoteOptions.slicer_preset_id !== undefined)
         ? quoteOptions.slicer_preset_id : null;
+}
+
+function _getUploadDefaults() {
+    return resolveUploadDefaults({
+        root: document,
+        snapshot: loadFrontSettingsSnapshot() || {},
+        fallback: {
+            printer_model: _getActivePrinterModel(),
+            slicer_preset_id: quoteOptions.slicer_preset_id,
+            brand: quoteOptions.brand,
+            material: quoteOptions.material,
+            color: quoteOptions.color,
+        },
+    });
 }
 
 function _getActiveSlicerParams() {
@@ -147,13 +163,15 @@ async function _quoteSelectedFilesInternal(selectedFiles, useProgress) {
 
     const formData = new FormData();
     selectedFiles.forEach((file) => formData.append("files", file));
-    const printerModel = _getActivePrinterModel();
-    if (printerModel) formData.append("printer_model", printerModel);
-    formData.append("material", quoteOptions.material);
-    if (quoteOptions.brand) formData.append("brand", quoteOptions.brand);
-    formData.append("color", quoteOptions.color);
+    // Upload-time row initialization should inherit the front default settings
+    // bar so newly uploaded models start from the saved defaults.
+    const uploadDefaults = _getUploadDefaults();
+    if (uploadDefaults.printer_model) formData.append("printer_model", uploadDefaults.printer_model);
+    formData.append("material", uploadDefaults.material);
+    if (uploadDefaults.brand) formData.append("brand", uploadDefaults.brand);
+    formData.append("color", uploadDefaults.color);
     formData.append("quantity", String(quoteOptions.quantity));
-    const presetId = _getActiveSlicerPresetId();
+    const presetId = uploadDefaults.slicer_preset_id;
     if (presetId !== null && presetId !== undefined) {
         formData.append("slicer_preset_id", String(presetId));
     }
@@ -227,6 +245,7 @@ export function mergeResultsByFilename(incomingResults) {
                 : (existing.color || item.color),
             brand: item.brand !== undefined ? item.brand : existing.brand,
             _printer_model: item._printer_model !== undefined ? item._printer_model : existing._printer_model,
+            _nozzle_diameter: item._nozzle_diameter !== undefined ? item._nozzle_diameter : existing._nozzle_diameter,
             _slicer_preset_id: item._slicer_preset_id !== undefined ? item._slicer_preset_id : existing._slicer_preset_id,
             _printer_model_explicit: existing._printer_model_explicit ?? item._printer_model_explicit ?? false,
             _slicer_preset_explicit: existing._slicer_preset_explicit ?? item._slicer_preset_explicit ?? false,

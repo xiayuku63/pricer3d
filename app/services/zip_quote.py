@@ -1,9 +1,11 @@
 """ZIP quote business services."""
 
+import asyncio
 import io
 import json
 import logging
 import os
+import re
 import time
 import uuid
 import zipfile
@@ -18,6 +20,7 @@ from openpyxl.utils import get_column_letter
 from app.audit import write_audit_event
 from app.config import (
     DEFAULT_COLORS,
+    DEFAULT_MATERIALS,
     FREE_TOTAL_MODEL_LIMIT,
     MAX_FILES_PER_REQUEST,
     MAX_ZIP_SIZE_BYTES,
@@ -33,13 +36,13 @@ from app.zip_parser import (
 )
 from app.services.quote import (
     _load_user_quote_settings,
+    _process_single_file_sync,
     _resolve_effective_printer_model,
     _resolve_effective_slicer_params,
     _resolve_effective_slicer_preset,
     save_quote_history,
 )
 from app.material_resolver import merge_user_material_with_catalog
-from calculator.cost import process_single_file
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +73,7 @@ _COLOR_NAME_TO_HEX.update(_ENGLISH_COLOR_MAP)
 
 _preview_sessions = {}
 _PREVIEW_SESSION_TTL = 600
+_UPLOAD_READ_CHUNK_BYTES = 1024 * 1024
 
 
 def _match_selected_material(user_materials: list, material_name: str, brand: str = "", color: str = "") -> Optional[dict]:
@@ -117,6 +121,114 @@ def _resolve_color_hex(color_str: str, fallback: str = "") -> str:
     return fallback or s
 
 
+def _color_tokens(value) -> set[str]:
+    if isinstance(value, dict):
+        values = (value.get("name"), value.get("hex"))
+    else:
+        values = (value,)
+    return {str(item or "").strip().lower() for item in values if str(item or "").strip()}
+
+
+def _build_missing_checklist_materials(user_materials: list, checklist: Optional[list]) -> list:
+    """Build Generic material-color records required by explicit checklist colors."""
+    if not checklist:
+        return []
+
+    materials = [item for item in user_materials if isinstance(item, dict)]
+    created = []
+    for item in checklist:
+        color_name = str(item.get("color") or "").strip()
+        if not color_name:
+            continue
+        material_name = str(item.get("material_type") or "").strip() or "PLA"
+        resolved_color = _resolve_color_hex(color_name)
+        color_hex = resolved_color if re.fullmatch(r"#[0-9a-fA-F]{6}", resolved_color or "") else ""
+        wanted_tokens = _color_tokens({"name": color_name, "hex": color_hex})
+
+        exists = any(
+            str(material.get("brand") or "Generic").strip().lower() == "generic"
+            and str(material.get("name") or "").strip().lower() == material_name.lower()
+            and bool(_color_tokens(material.get("color")) & wanted_tokens)
+            for material in [*materials, *created]
+        )
+        if exists:
+            continue
+
+        base = next(
+            (
+                material
+                for material in materials
+                if str(material.get("brand") or "Generic").strip().lower() == "generic"
+                and str(material.get("name") or "").strip().lower() == material_name.lower()
+            ),
+            None,
+        )
+        if base is None:
+            base = next(
+                (
+                    material
+                    for material in materials
+                    if str(material.get("name") or "").strip().lower() == material_name.lower()
+                ),
+                None,
+            )
+        if base is None:
+            base = next(
+                (
+                    material
+                    for material in DEFAULT_MATERIALS
+                    if str(material.get("name") or "").strip().lower() == material_name.lower()
+                ),
+                None,
+            )
+        if base is None:
+            base = next(
+                (material for material in DEFAULT_MATERIALS if str(material.get("name") or "").upper() == "PLA"),
+                {},
+            )
+
+        new_material = {
+            key: value
+            for key, value in dict(base).items()
+            if key not in {"name", "brand", "color"}
+        }
+        new_material.update(
+            {
+                "name": material_name,
+                "brand": "Generic",
+                "color": {"name": color_name, "hex": color_hex},
+            }
+        )
+        created.append(new_material)
+    return created
+
+
+def _ensure_checklist_material_colors(user_id: int, user_materials: list, checklist: Optional[list]) -> list:
+    created = _build_missing_checklist_materials(user_materials, checklist)
+    if not created:
+        return []
+
+    user_materials.extend(created)
+    with get_db_session() as db:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="用户不存在")
+        user.materials = json.dumps(user_materials, ensure_ascii=False)
+    logger.info(
+        "ZIP material library updated: user_id=%s created=%s",
+        user_id,
+        [
+            {
+                "brand": material.get("brand"),
+                "name": material.get("name"),
+                "color": material.get("color"),
+            }
+            for material in created
+        ],
+    )
+    return created
+
+
 def _store_preview_session(data: dict) -> str:
     """Store parsed ZIP data in memory and return a session_id."""
     session_id = uuid.uuid4().hex
@@ -150,6 +262,55 @@ def _consume_preview_session(session_id: str) -> Optional[dict]:
     return data
 
 
+async def _read_upload_limited(file: UploadFile) -> bytes:
+    """Read an upload without allocating beyond the configured ZIP limit."""
+    chunks = []
+    total = 0
+    while True:
+        chunk = await file.read(_UPLOAD_READ_CHUNK_BYTES)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > MAX_ZIP_SIZE_BYTES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"ZIP 文件不能超过 {MAX_ZIP_SIZE_BYTES // (1024 * 1024)}MB",
+            )
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
+def _read_upload_file_limited(file: UploadFile) -> bytes:
+    """Read the underlying spooled file for the synchronous fallback path."""
+    if not getattr(file, "file", None):
+        raise HTTPException(status_code=400, detail="ZIP 文件无法读取")
+    try:
+        file.file.seek(0)
+        content = file.file.read(MAX_ZIP_SIZE_BYTES + 1)
+        file.file.seek(0)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"ZIP 文件无法读取：{e}") from e
+    if len(content) > MAX_ZIP_SIZE_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"ZIP 文件不能超过 {MAX_ZIP_SIZE_BYTES // (1024 * 1024)}MB",
+        )
+    return content
+
+
+def _validate_free_zip_capacity(existing_count: int, incoming_count: int) -> None:
+    if existing_count + incoming_count <= FREE_TOTAL_MODEL_LIMIT:
+        return
+    remaining = max(0, FREE_TOTAL_MODEL_LIMIT - existing_count)
+    raise HTTPException(
+        status_code=400,
+        detail=(
+            f"免费用户最多累计 {FREE_TOTAL_MODEL_LIMIT} 个模型，"
+            f"当前还可上传 {remaining} 个，本次 ZIP 包含 {incoming_count} 个"
+        ),
+    )
+
+
 def _parse_zip_contents(file_bytes: bytes) -> dict:
     """Parse ZIP bytes and return {excel_bytes, stl_files, checklist, match_result}."""
     try:
@@ -157,27 +318,59 @@ def _parse_zip_contents(file_bytes: bytes) -> dict:
     except zipfile.BadZipFile:
         raise HTTPException(status_code=400, detail="无效的 ZIP 文件，请检查文件完整性")
 
+    entries = [entry for entry in zf.infolist() if not entry.is_dir()]
+    expanded_size = sum(entry.file_size for entry in entries)
+    if expanded_size > MAX_ZIP_SIZE_BYTES:
+        zf.close()
+        raise HTTPException(
+            status_code=400,
+            detail=f"ZIP 解压后总大小不能超过 {MAX_ZIP_SIZE_BYTES // (1024 * 1024)}MB",
+        )
+    for entry in entries:
+        if entry.flag_bits & 0x1:
+            zf.close()
+            raise HTTPException(status_code=400, detail="ZIP 中不能包含加密文件")
+        if entry.file_size > MAX_ZIP_SIZE_BYTES:
+            zf.close()
+            raise HTTPException(
+                status_code=400,
+                detail=f"ZIP 中单个文件解压后不能超过 {MAX_ZIP_SIZE_BYTES // (1024 * 1024)}MB",
+            )
+        if entry.file_size and entry.compress_size == 0:
+            zf.close()
+            raise HTTPException(status_code=400, detail="ZIP 中包含异常压缩条目")
     excel_bytes = None
+    excel_filename = None
     stl_files = []
+    model_keys = set()
 
-    for entry in zf.infolist():
-        if entry.is_dir():
-            continue
+    for entry in entries:
         bn = os.path.basename(entry.filename)
-        if bn.startswith(".") or bn.startswith("__MACOSX") or bn.startswith("~$"):
+        path_parts = entry.filename.replace("\\", "/").split("/")
+        if bn.startswith(".") or "__MACOSX" in path_parts or bn.startswith("~$"):
             continue
 
         entry_bytes = zf.read(entry)
         lower = bn.lower()
 
         if lower.endswith((".xlsx", ".xls")):
-            if excel_bytes is None:
-                excel_bytes = entry_bytes
-                logger.info(f"ZIP: found Excel checklist: {bn}")
+            if excel_bytes is not None:
+                zf.close()
+                raise HTTPException(status_code=400, detail="ZIP 中只能包含一个 Excel 清单")
+            excel_bytes = entry_bytes
+            excel_filename = bn
+            logger.info("ZIP: found Excel checklist: %s", bn)
         else:
             ext = os.path.splitext(lower)[1]
             if ext in SUPPORTED_EXTENSIONS:
                 stem = os.path.splitext(bn)[0].lower()
+                if stem in model_keys:
+                    zf.close()
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"ZIP 中存在重名模型：{bn}。模型文件名（不含扩展名）必须唯一",
+                    )
+                model_keys.add(stem)
                 stl_files.append(
                     {
                         "filename": bn,
@@ -195,7 +388,10 @@ def _parse_zip_contents(file_bytes: bytes) -> dict:
     if len(stl_files) > MAX_FILES_PER_REQUEST:
         raise HTTPException(status_code=400, detail=f"ZIP 中模型文件数量不能超过 {MAX_FILES_PER_REQUEST} 个")
 
-    checklist = _parse_excel_checklist(excel_bytes) if excel_bytes else None
+    try:
+        checklist = _parse_excel_checklist(excel_bytes, excel_filename) if excel_bytes else None
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
     if checklist:
         match_result = _match_checklist_to_models(checklist, stl_files)
@@ -209,13 +405,26 @@ def _parse_zip_contents(file_bytes: bytes) -> dict:
 
     return {
         "excel_bytes": excel_bytes,
+        "excel_filename": excel_filename,
         "stl_files": stl_files,
         "checklist": checklist,
         "match_result": match_result,
     }
 
 
-def _lookup_printer(printer_name, nozzle_str):
+def _resolved_nozzle(printer_id: Optional[str]) -> Optional[float]:
+    """Return the nozzle encoded by a compound printer id."""
+    if not printer_id:
+        return None
+    from app.printers import resolve_printer
+
+    resolved = resolve_printer(str(printer_id))
+    if not resolved or resolved.get("_nozzle") is None:
+        return None
+    return float(resolved["_nozzle"])
+
+
+def _lookup_printer(printer_name, nozzle_str, fallback_nozzle=None):
     """Return compound_id (e.g. bambu_a1_04) or None if not found."""
     from app.printers import PRINTER_MODELS, resolve_printer
 
@@ -225,7 +434,7 @@ def _lookup_printer(printer_name, nozzle_str):
     for pm in PRINTER_MODELS:
         if pm.get("name", "").lower() == name_lower:
             pid = pm["id"]
-            nz = None
+            nz = fallback_nozzle
             if nozzle_str and str(nozzle_str).strip():
                 try:
                     nz = float(str(nozzle_str).strip())
@@ -236,6 +445,34 @@ def _lookup_printer(printer_name, nozzle_str):
                 return resolved.get("_compound_id") or pid
             return pid
     return None
+
+
+def _resolve_checklist_printer(
+    default_compound_id: Optional[str],
+    printer_name: str = "",
+    nozzle_str: str = "",
+) -> Optional[str]:
+    """Apply only checklist printer fields that are explicitly populated."""
+    from app.printers import resolve_printer
+
+    printer_name = str(printer_name or "").strip()
+    nozzle_str = str(nozzle_str or "").strip()
+    default_nozzle = _resolved_nozzle(default_compound_id)
+
+    if printer_name:
+        return _lookup_printer(printer_name, nozzle_str, default_nozzle) or default_compound_id
+    if not nozzle_str or not default_compound_id:
+        return default_compound_id
+
+    try:
+        requested_nozzle = float(nozzle_str)
+    except (TypeError, ValueError):
+        return default_compound_id
+    default_printer = resolve_printer(default_compound_id)
+    if not default_printer:
+        return default_compound_id
+    resolved = resolve_printer(default_printer["id"], requested_nozzle)
+    return (resolved.get("_compound_id") if resolved else None) or default_compound_id
 
 
 def _zip_preview_model_path(result: dict, model: dict) -> Optional[str]:
@@ -249,9 +486,7 @@ async def build_zip_preview_response(file: UploadFile):
     if not fname.endswith(".zip"):
         raise HTTPException(status_code=400, detail="请上传 .zip 压缩文件")
 
-    content = await file.read()
-    if len(content) >= MAX_ZIP_SIZE_BYTES:
-        raise HTTPException(status_code=400, detail=f"ZIP 文件必须小于 {MAX_ZIP_SIZE_BYTES // (1024 * 1024)}MB")
+    content = await _read_upload_limited(file)
 
     parsed = _parse_zip_contents(content)
     match_result = parsed["match_result"]
@@ -328,79 +563,11 @@ def _resolve_zip_defaults(current_user: dict, file: Optional[UploadFile], sessio
         if not fname.endswith(".zip"):
             raise HTTPException(status_code=400, detail="请上传 .zip 压缩文件")
 
-        content = b""
-        if hasattr(file, "file") and file.file is not None:
-            try:
-                content = file.file.read()
-            except Exception:
-                content = b""
-            if hasattr(file.file, "seek"):
-                try:
-                    file.file.seek(0)
-                except Exception:
-                    pass
-        if not content:
-            try:
-                maybe = file.read()
-                if hasattr(maybe, "__await__"):
-                    raise HTTPException(status_code=500, detail="ZIP ????????????????")
-                content = maybe or b""
-            except HTTPException:
-                raise
-            except Exception as e:
-                raise HTTPException(status_code=400, detail=f"ZIP ??????: {e}")
-
-        if len(content) >= MAX_ZIP_SIZE_BYTES:
-            raise HTTPException(status_code=400, detail=f"ZIP 文件必须小于 {MAX_ZIP_SIZE_BYTES // (1024 * 1024)}MB")
-
-        try:
-            zf = zipfile.ZipFile(io.BytesIO(content))
-        except zipfile.BadZipFile:
-            raise HTTPException(status_code=400, detail="无效的 ZIP 文件，请检查文件完整性")
-
-        excel_bytes = None
-        stl_files = []
-
-        for entry in zf.infolist():
-            if entry.is_dir():
-                continue
-            bn = os.path.basename(entry.filename)
-            if bn.startswith(".") or bn.startswith("__MACOSX") or bn.startswith("~$"):
-                continue
-            entry_bytes = zf.read(entry)
-            lower = bn.lower()
-            if lower.endswith((".xlsx", ".xls")):
-                if excel_bytes is None:
-                    excel_bytes = entry_bytes
-            else:
-                ext = os.path.splitext(lower)[1]
-                if ext in SUPPORTED_EXTENSIONS:
-                    stem = os.path.splitext(bn)[0].lower()
-                    stl_files.append(
-                        {
-                            "filename": bn,
-                            "name_stem": stem,
-                            "file_bytes": entry_bytes,
-                            "ext": ext,
-                        }
-                    )
-        zf.close()
-
-        if not stl_files:
-            raise HTTPException(status_code=400, detail="ZIP 中未找到支持的模型文件")
-        if len(stl_files) > MAX_FILES_PER_REQUEST:
-            raise HTTPException(status_code=400, detail=f"ZIP 中模型文件数量不能超过 {MAX_FILES_PER_REQUEST} 个")
-
-        checklist = _parse_excel_checklist(excel_bytes) if excel_bytes else None
-        if checklist:
-            match_result = _match_checklist_to_models(checklist, stl_files)
-        else:
-            match_result = {
-                "matched": [],
-                "checklist_only": [],
-                "stl_only": stl_files,
-                "match_mode": "none",
-            }
+        content = _read_upload_file_limited(file)
+        parsed = _parse_zip_contents(content)
+        stl_files = parsed["stl_files"]
+        checklist = parsed["checklist"]
+        match_result = parsed["match_result"]
 
     (
         user_materials,
@@ -441,23 +608,6 @@ async def build_zip_quote_response(
     from app.utils import _user_base_dir
     from sqlalchemy import func as sqlfunc
 
-    # 免费用户限制
-    if not is_member_user(current_user):
-        with get_db_session() as db:
-            existing_count = (
-                db.query(sqlfunc.count(QuoteHistory.id))
-                .filter(
-                    QuoteHistory.user_id == current_user["id"],
-                    QuoteHistory.status == "success",
-                )
-                .scalar()
-                or 0
-            )
-        if existing_count >= FREE_TOTAL_MODEL_LIMIT:
-            raise HTTPException(
-                status_code=400, detail=f"免费用户最多累计 {FREE_TOTAL_MODEL_LIMIT} 个模型，升级会员无限制"
-            )
-
     (
         stl_files,
         checklist,
@@ -469,6 +619,26 @@ async def build_zip_quote_response(
         default_nozzle,
         default_slicer_preset_id,
     ) = _resolve_zip_defaults(current_user, file, session_id)
+    user_materials = [dict(material) for material in user_materials if isinstance(material, dict)]
+
+    if not is_member_user(current_user):
+        with get_db_session() as db:
+            existing_count = (
+                db.query(sqlfunc.count(QuoteHistory.id))
+                .filter(
+                    QuoteHistory.user_id == current_user["id"],
+                    QuoteHistory.status == "success",
+                )
+                .scalar()
+                or 0
+            )
+        _validate_free_zip_capacity(existing_count, len(stl_files))
+
+    created_materials = _ensure_checklist_material_colors(
+        int(current_user["id"]),
+        user_materials,
+        checklist,
+    )
 
     # Pre-save all model files to disk so thumbnails work even if slicing fails
     _user_folder = f"user_{current_user['id']}_{current_user['username']}"
@@ -564,11 +734,9 @@ async def build_zip_quote_response(
 
                     cl_printer = str(cl.get("printer_model", "")).strip()
                     cl_nozzle = str(cl.get("nozzle", "")).strip()
-                    has_printer = bool(cl_printer)
-                    if has_printer:
-                        compound_id = _lookup_printer(cl_printer, cl_nozzle)
-                    else:
-                        compound_id = _default_compound_id
+                    has_printer_override = bool(cl_printer)
+                    has_nozzle_override = bool(cl_nozzle)
+                    compound_id = _resolve_checklist_printer(_default_compound_id, cl_printer, cl_nozzle)
 
                     file_pricing = dict(pricing_config)
                     if compound_id:
@@ -590,7 +758,8 @@ async def build_zip_quote_response(
                         file=io.BytesIO(stl["file_bytes"]),
                     )
 
-                    result = await process_single_file(
+                    result = await asyncio.to_thread(
+                        _process_single_file_sync,
                         fake_file,
                         material=cl_material,
                         layer_height=_lh,
@@ -606,15 +775,22 @@ async def build_zip_quote_response(
                         selected_material_spec=cl_material_spec,
                     )
                     result["_checklist_params"] = True
+                    result["brand"] = (
+                        str(cl_material_spec.get("brand") or cl_brand or "Generic")
+                        if cl_material_spec
+                        else (cl_brand or "Generic")
+                    )
+                    result["_printer_model_explicit"] = has_printer_override or has_nozzle_override
+                    result["_slicer_preset_explicit"] = has_print_params
                     result["_checklist_source"] = {
                         "layer_height": _lh if has_print_params else "",
                         "wall_count": _wc if has_print_params else "",
                         "infill": _inf if has_print_params else "",
-                        "printer_model": (compound_id or cl_printer or "") if has_printer else "",
-                        "nozzle": cl_nozzle if has_printer else "",
+                        "printer_model": cl_printer,
+                        "nozzle": cl_nozzle,
                         "material_type": cl.get("material_type", ""),
                         "material_brand": cl.get("material_brand", ""),
-                        "color": cl_color_raw or cl_color,
+                        "color": cl_color_raw,
                         "quantity": cl_qty,
                     }
                     result["checklist_file_path"] = _zip_preview_model_path(result, stl)
@@ -632,7 +808,8 @@ async def build_zip_quote_response(
                     if _default_compound_id:
                         file_pricing["printer_model"] = _default_compound_id
 
-                    result = await process_single_file(
+                    result = await asyncio.to_thread(
+                        _process_single_file_sync,
                         fake_file,
                         material=material,
                         layer_height=effective_layer_height,
@@ -695,6 +872,7 @@ async def build_zip_quote_response(
             "summary_total_weight_g": round(sum(r.get("weight_g", 0) for r in success_items), 2),
             "summary_total_time_h": round(sum(r.get("estimated_time_h", 0) for r in success_items), 2),
             "results": results,
+            "created_materials": created_materials,
             "match_status": {
                 "mode": match_result["match_mode"],
                 "message": match_msg,
@@ -839,7 +1017,7 @@ def download_zip_template(request: Request):
 
     examples = [
         ["model1.stl", brand_examples[0], "PLA", "白色", 1, "Bambu Lab A1", 0.4, 0.2, 3, 20],
-        ["model2.stl", "", "", "", "", "", 0.16, 4, 15],
+        ["model2.stl", "", "", "", "", "", "", 0.16, 4, 15],
         [
             "model3.stl",
             brand_examples[2] if len(brand_examples) > 2 else "Generic",

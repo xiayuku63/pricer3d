@@ -23,17 +23,17 @@ import { renderSlicerPresetsUI, fetchSlicerPresets, fetchPrinterModels } from '.
 import { refreshOptionsSummary, normalizeResultsWithCurrentOptions, renderResultsTable, recalcSummaryFromCurrentResults, reQuoteAllSelectedFiles } from '../quote.js';
 import { updateDropdowns, dom } from './common.js';
 import { syncPricingFromInputs, validateCurrentFormulas } from './pricing.js';
+import { getEffectiveSelectValue } from '../upload-defaults.js';
 
 function _collectDefaultSettings() {
     const printerSel = document.getElementById('front-default-printer-model');
     const nozzleSel = document.getElementById('front-default-nozzle-diameter');
-    const presetSel = document.getElementById('front-default-slicer-preset');
     const brandSel = document.getElementById('front-default-brand');
     const materialSel = document.getElementById('front-default-material');
     const colorContainer = document.getElementById('front-default-color-dropdown');
     const printerId = (printerSel && printerSel.value) ? printerSel.value : defaultPrinterId;
     const nozzle = String((nozzleSel && nozzleSel.value) || defaultNozzle || '').trim();
-    const presetRawValue = presetSel ? String(presetSel.value || '').trim() : '';
+    const presetRawValue = getEffectiveSelectValue(document, 'front-default-slicer-preset').value;
     const presetId = presetRawValue ? Number(presetRawValue) : null;
     const effectivePresetId = presetId || null;
     const newDefaultBrand = (brandSel && brandSel.value) ? brandSel.value : null;
@@ -150,6 +150,12 @@ export async function saveUserSettings(options = {}) {
         if (savedNozzle !== nozzle) {
             throw new Error(`喷嘴直径保存失败：服务端返回 ${savedNozzle || '空值'}，期望 ${nozzle || '空值'}`);
         }
+        const savedPresetId = savedSettings.default_slicer_preset_id == null
+            ? null
+            : Number(savedSettings.default_slicer_preset_id);
+        if (savedPresetId !== effectivePresetId) {
+            throw new Error(`切片预设保存失败：服务端返回 ${savedPresetId ?? '空值'}，期望 ${effectivePresetId ?? '空值'}`);
+        }
         // Show success feedback on button
         _showButtonSavedState(saveBtn);
         if (messageEl) { messageEl.classList.remove('hidden'); }
@@ -177,33 +183,12 @@ export async function saveUserSettings(options = {}) {
         setDefaultColor(newDefaultColor);
         setDefaultBrand(newDefaultBrand);
 
-        if (source === 'user-center') {
-            // User-center save is also the explicit "apply current workspace settings" action.
-            quoteOptions.printer_model = printerId || '';
-            quoteOptions.slicer_preset_id = effectivePresetId || null;
-            saveSlicerPresetSelection();
-            quoteOptions.brand = newDefaultBrand || '';
-            const validMaterials = getMaterialsByBrand(quoteOptions.brand);
-            if (newDefaultMaterial && validMaterials.some(m => m.name === newDefaultMaterial)) {
-                quoteOptions.material = newDefaultMaterial;
-            } else if (validMaterials.length) {
-                quoteOptions.material = validMaterials[0].name;
-            }
-            quoteOptions.color = newDefaultColor || quoteOptions.color;
-        }
-
         await fetchPrinterModels();
         await fetchSlicerPresets();
         const refreshedNozzle = document.getElementById('front-default-nozzle-diameter');
         if (refreshedNozzle && savedNozzle) refreshedNozzle.value = savedNozzle;
         updateDropdowns();
         if (refreshedNozzle && savedNozzle) refreshedNozzle.value = savedNozzle;
-
-        if (source === 'user-center') {
-            normalizeResultsWithCurrentOptions();
-            renderResultsTable();
-            recalcSummaryFromCurrentResults();
-        }
 
         setTimeout(() => {
             _restoreButtonState(saveBtn, originalBtnText);

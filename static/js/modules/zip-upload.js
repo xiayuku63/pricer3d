@@ -11,6 +11,7 @@ import {
     getActivePrinterCompoundId,
     setPendingQuoteFiles,
     getColorsForMaterial, pickAllowedColor,
+    loadFrontSettingsSnapshot,
 } from './state.js';
 
 import {
@@ -23,6 +24,7 @@ import { buildThumbnails } from './preview.js';
 import { t } from './i18n.js';
 import { mergeResultsByFilename, quoteSelectedFilesWithProgress, renderResultsTable, recalcSummaryFromCurrentResults } from './quote.js';
 import { openLoginModal } from './auth.js';
+import { resolveUploadDefaults } from './upload-defaults.js';
 
 let dom = {};
 let _getMaxFiles = () => 5;
@@ -152,17 +154,27 @@ async function _handleZipUpload(zipFiles, modelFiles, validFiles) {
             zipCancelBtn.onclick = () => { zipAbortController.abort(); };
         }
 
+        const uploadDefaults = resolveUploadDefaults({
+            root: document,
+            snapshot: loadFrontSettingsSnapshot() || {},
+            fallback: {
+                printer_model: getActivePrinterCompoundId(),
+                slicer_preset_id: quoteOptions.slicer_preset_id,
+                brand: quoteOptions.brand,
+                material: quoteOptions.material,
+                color: quoteOptions.color,
+            },
+        });
         const sliceFormData = new FormData();
         sliceFormData.append('session_id', previewData.session_id);
-        sliceFormData.append('material', quoteOptions.material);
-        sliceFormData.append('color', quoteOptions.color);
+        sliceFormData.append('material', uploadDefaults.material);
+        sliceFormData.append('color', uploadDefaults.color);
         sliceFormData.append('quantity', String(quoteOptions.quantity));
 
-        const zipPrinterModel = getActivePrinterCompoundId();
-        if (zipPrinterModel) sliceFormData.append('printer_model', zipPrinterModel);
-        const zipPresetEl = document.getElementById('batch-slicer-preset');
-        const zipPresetId = (zipPresetEl && zipPresetEl.value) ? Number(zipPresetEl.value) : null;
-        if (zipPresetId) sliceFormData.append('slicer_preset_id', String(zipPresetId));
+        if (uploadDefaults.printer_model) sliceFormData.append('printer_model', uploadDefaults.printer_model);
+        if (uploadDefaults.slicer_preset_id !== null) {
+            sliceFormData.append('slicer_preset_id', String(uploadDefaults.slicer_preset_id));
+        }
         const zipLayerEl = document.getElementById('gen-layer-height');
         const zipWallEl = document.getElementById('gen-wall-count');
         const zipInfillEl = document.getElementById('gen-infill');
@@ -223,6 +235,20 @@ async function _handleZipUpload(zipFiles, modelFiles, validFiles) {
 
         if (!zipData) throw new Error('ZIP 处理失败：未收到完成事件');
 
+        (zipData.created_materials || []).forEach((material) => {
+            if (!material || !material.name) return;
+            const color = material.color || {};
+            const colorKey = String(color.hex || color.name || '').trim().toLowerCase();
+            const exists = MATERIAL_OPTIONS.some((existing) => {
+                const existingColor = existing?.color || {};
+                const existingColorKey = String(existingColor.hex || existingColor.name || '').trim().toLowerCase();
+                return String(existing?.brand || 'Generic') === String(material.brand || 'Generic')
+                    && String(existing?.name || '') === String(material.name)
+                    && existingColorKey === colorKey;
+            });
+            if (!exists) MATERIAL_OPTIONS.push(material);
+        });
+
         mergeResultsByFilename(zipData.results || []);
         renderResultsTable();
         recalcSummaryFromCurrentResults();
@@ -250,8 +276,8 @@ async function _handleZipUpload(zipFiles, modelFiles, validFiles) {
             const colorByFilename = {};
             const mergedForColor = (typeof currentResults !== 'undefined') ? currentResults : (zipData.results || []);
             mergedForColor.forEach(r => {
-                if (r && r.filename && r._checklist_source && r._checklist_source.color) {
-                    colorByFilename[r.filename] = r._checklist_source.color;
+                if (r && r.filename && r.color) {
+                    colorByFilename[r.filename] = r.color;
                 }
             });
             await buildThumbnails(zipModelFiles, colorByFilename);

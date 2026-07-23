@@ -29,6 +29,9 @@ function _saveFrontSnapshot() {
         printer_model: document.getElementById('front-default-printer-model')?.value || '',
         nozzle_diameter: document.getElementById('front-default-nozzle-diameter')?.value || '',
         slicer_preset_id: document.getElementById('front-default-slicer-preset')?.value || '',
+        brand: document.getElementById('front-default-brand')?.value || '',
+        material: document.getElementById('front-default-material')?.value || '',
+        color: document.getElementById('front-default-color-dropdown')?.getAttribute('data-selected-color') || '',
     });
 }
 
@@ -138,21 +141,20 @@ export async function fetchPrinterModels() {
             batchSel.appendChild(opt);
         });
         if (visibleModels.length > 0) {
-            // Batch controls drive import-time slicing, so authenticated defaults
-            // must win on page load. Local snapshots are only a fallback.
+            // Batch controls drive import-time slicing. Prefer authenticated
+            // defaults first, then in-session UI value, then older snapshots.
             var preferredId = _pickVisibleModelId(
-                [batchSel.value, defaultPrinterId, batchSnapshot?.printer_model],
+                [defaultPrinterId, batchSel.value, batchSnapshot?.printer_model],
                 visibleModels[0].id,
             );
             batchSel.value = preferredId;
             _populateNozzleDropdown("batch-nozzle-diameter", preferredId);
-            // Keep the current in-session choice when present; otherwise use the
-            // saved default nozzle before falling back to older local snapshots.
+            // Import-time slicing should follow saved defaults after login/save.
             if (defaultNozzle || currentBatchNozzle || batchSnapshot?.nozzle_diameter) {
                 var batchNozzleEl = document.getElementById("batch-nozzle-diameter");
                 if (batchNozzleEl) {
                     const batchModel = visibleModels.find(function(p) { return p.id === preferredId; });
-                    batchNozzleEl.value = String(_preferredNozzle(batchModel, currentBatchNozzle || defaultNozzle || batchSnapshot?.nozzle_diameter));
+                    batchNozzleEl.value = String(_preferredNozzle(batchModel, defaultNozzle || currentBatchNozzle || batchSnapshot?.nozzle_diameter));
                 }
             }
             _syncBatchPrinter();

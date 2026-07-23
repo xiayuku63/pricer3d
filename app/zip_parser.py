@@ -241,22 +241,26 @@ def _collect_all_warnings(checklist: Optional[List[dict]]) -> List[dict]:
     return warnings
 
 
-def _parse_excel_checklist(file_bytes: bytes) -> Optional[List[dict]]:
-    """Parse Excel checklist. Returns list of {filename, material_brand, material_type, printer_model, nozzle, layer_height, wall_count, infill}
-    or None if no checklist found / parse error."""
+def _parse_excel_checklist(file_bytes: bytes, filename: str = "checklist.xlsx") -> Optional[List[dict]]:
+    """Parse an XLSX checklist, returning None only when it has no item rows."""
+    if str(filename).lower().endswith(".xls"):
+        raise ValueError("暂不支持旧版 .xls 清单，请另存为 .xlsx 后重新上传")
+
     try:
         wb = load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
     except Exception as e:
-        logger.warning(f"Failed to open Excel workbook: {e}")
-        return None
+        logger.warning("Failed to open Excel workbook %s: %s", filename, e)
+        raise ValueError("Excel 清单无法读取，请确认文件是有效的 .xlsx 文件") from e
 
     ws = wb.active
     if not ws:
-        return None
+        wb.close()
+        raise ValueError("Excel 清单中没有可读取的工作表")
 
     rows = list(ws.iter_rows(min_row=1, max_row=min(ws.max_row or 1000, 1000), values_only=True))
     if len(rows) < 2:
-        return None
+        wb.close()
+        raise ValueError("Excel 清单中没有数据行")
 
     # Find the header row — scan rows until we find one with a 'filename'-mapped column
     header_row_idx = None
@@ -271,11 +275,17 @@ def _parse_excel_checklist(file_bytes: bytes) -> Optional[List[dict]]:
 
     if header_row_idx is None:
         logger.warning("Excel has no 'filename' column — not a valid checklist")
-        return None
+        wb.close()
+        raise ValueError("Excel 清单缺少 filename（文件名）列")
 
     items = []
-    all_warnings = []
+    seen_stems = set()
     for row in rows[header_row_idx + 1 :]:
+        row_headers = [str(c).strip().lower() if c is not None else "" for c in row]
+        row_header_map = _match_headers(row_headers)
+        if "filename" in row_header_map and len(row_header_map) >= 2:
+            continue
+
         item = {}
         for key, col_idx in col_map.items():
             val = row[col_idx] if col_idx < len(row) else None
@@ -287,6 +297,8 @@ def _parse_excel_checklist(file_bytes: bytes) -> Optional[List[dict]]:
         # Skip rows with no filename
         if not item.get("filename"):
             continue
+        if str(item["filename"]).strip().startswith(("提示：", "提示:", "Note:", "NOTE:")):
+            continue
 
         # Normalize filename — strip extension and any subfolder path
         fn = item["filename"]
@@ -296,6 +308,10 @@ def _parse_excel_checklist(file_bytes: bytes) -> Optional[List[dict]]:
         if dot_pos > 0:
             fn = fn[:dot_pos]
         item["filename_stem"] = fn.lower()
+        if item["filename_stem"] in seen_stems:
+            wb.close()
+            raise ValueError(f"Excel 清单中存在重复文件名：{item['filename']}")
+        seen_stems.add(item["filename_stem"])
 
         # Parse numeric fields with validation
         for num_key in ("layer_height", "wall_count", "infill"):
@@ -326,7 +342,6 @@ def _parse_excel_checklist(file_bytes: bytes) -> Optional[List[dict]]:
         item_warnings = _validate_checklist_item(item, item.get("filename_stem", ""))
         if item_warnings:
             item["_warnings"] = item_warnings
-            all_warnings.extend(item_warnings)
 
         items.append(item)
 

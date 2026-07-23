@@ -1,6 +1,7 @@
 import os
 
 from parser.prusa_slicer import generate_slice_config
+from app.printers import resolve_printer
 from app.services.quote import _extract_preset_core_params, _resolve_effective_slicer_params
 
 
@@ -42,6 +43,34 @@ def test_effective_printer_and_material_settings_override_profile():
         assert "filament_max_volumetric_speed = 18" in text
         assert "machine_max_acceleration_extruding = 7000" in text
         assert "machine_max_jerk_x = 8" in text
+    finally:
+        os.unlink(path)
+
+
+def test_display_name_compound_printer_writes_requested_nozzle():
+    printer = resolve_printer("Bambu Lab A1_08")
+    assert printer["_compound_id"] == "bambu_a1_08"
+
+    path = generate_slice_config(
+        printer_profile_path="profiles/prusa/printers/bambu_a1.ini",
+        nozzle_diameter=printer["_nozzle"],
+    )
+    try:
+        text = open(path, encoding="utf-8").read()
+        assert "nozzle_diameter = 0.8" in text
+    finally:
+        os.unlink(path)
+
+
+def test_nozzle_override_survives_flattening_without_printer_profile():
+    path = generate_slice_config(
+        printer_profile_path=None,
+        nozzle_diameter=0.8,
+    )
+    try:
+        text = open(path, encoding="utf-8").read()
+        nozzle_lines = [line for line in text.splitlines() if line.startswith("nozzle_diameter =")]
+        assert nozzle_lines == ["nozzle_diameter = 0.8"]
     finally:
         os.unlink(path)
 

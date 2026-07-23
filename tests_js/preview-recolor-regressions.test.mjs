@@ -29,6 +29,22 @@ test('preview color updates re-render the active file and invalidate stale STL r
     assert.match(mesh, /if \(requestId !== _renderRequestId\) return/);
 });
 
+test('opening a file preview applies that result printer bed instead of the batch printer bed', async () => {
+    const source = await readFile(previewUrl, 'utf8');
+    const previewIndex = source.indexOf('export function previewByFilename');
+    const rowIndex = source.indexOf('const rowData = currentResults.find', previewIndex);
+    const bedIndex = source.indexOf('setBedLabel(printer.bed_width, printer.bed_depth, printer.bed_height)', rowIndex);
+    const openIndex = source.indexOf('openPreviewModal(onFaceClickCb)', previewIndex);
+
+    assert.notEqual(rowIndex, -1);
+    assert.notEqual(bedIndex, -1);
+    assert.notEqual(openIndex, -1);
+    assert.ok(rowIndex < bedIndex);
+    assert.ok(bedIndex < openIndex);
+    assert.match(source.slice(rowIndex, openIndex), /rowData\?\._printer_model/);
+    assert.match(source.slice(rowIndex, openIndex), /updateBedSize\(printer\.bed_width, printer\.bed_depth\)/);
+});
+
 test('saving orientation merges the fresh quote result and then attaches orientation state', async () => {
     const source = await readFile(orientationUrl, 'utf8');
     const saveIndex = source.indexOf('export async function saveOrientationAndRequote');

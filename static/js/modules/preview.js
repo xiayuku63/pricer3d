@@ -5,13 +5,14 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import {
     selectedFilesMap, thumbnailMap, currentResults,
     currentPreviewFilename, setCurrentPreviewFilename, quoteOptions,
-    colorToObj, getRenderColorHex, formatColorLabel,
+    colorToObj, getRenderColorHex, formatColorLabel, getCachedPrinterModels,
 } from './state.js';
 import {
     initViewer, renderSTL, buildPlaceholderThumbnail, updateViewerSize,
     camera, renderer, controls, clearCurrentMesh, currentMesh,
     lookAtView, applyOrientationRotation, resetOrientation,
     setupFaceClickHandler, highlightFaces, resetHighlight, fitCameraToMesh,
+    setBedLabel, updateBedSize,
 } from './viewer.js';
 import { clearClusters } from './layface.js';
 import { t } from './i18n.js';
@@ -256,6 +257,16 @@ export function closePreviewModal() {
 export function previewByFilename(filename, ext) {
     const { previewPlaceholder } = dom;
     setCurrentPreviewFilename(filename);
+    const rowData = currentResults.find((i) => i && i.filename === filename);
+    const printerRef = String(rowData?._printer_model || quoteOptions.printer_model || '');
+    const printerId = printerRef.replace(/_\d{2}$/, '');
+    const printer = getCachedPrinterModels().find(
+        (item) => item && (item.id === printerId || item.name === printerId),
+    );
+    if (printer?.bed_width && printer?.bed_depth) {
+        setBedLabel(printer.bed_width, printer.bed_depth, printer.bed_height);
+        updateBedSize(printer.bed_width, printer.bed_depth);
+    }
     const onFaceClickCb = window._onFaceClicked || null;
     openPreviewModal(onFaceClickCb);
     const file = selectedFilesMap.get(filename);
@@ -265,7 +276,6 @@ export function previewByFilename(filename, ext) {
         return;
     }
     if (previewPlaceholder) { previewPlaceholder.textContent = t('preview.loadingFile', { filename: filename, size: (file.size/1024).toFixed(0) }); previewPlaceholder.classList.remove('hidden'); }
-    const rowData = currentResults.find((i) => i && i.filename === filename);
     var perFileOrient = getResultOrientation(rowData);
     // 如果没有 per-file 方向（API 不返回），使用最后一次用户设置的 quoteOptions.orientation
     if (!perFileOrient && hasNonZeroOrientation(quoteOptions.orientation)) {
