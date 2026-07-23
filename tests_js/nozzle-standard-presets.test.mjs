@@ -83,6 +83,17 @@ test('model page preset dropdowns filter standard presets by the active nozzle',
     assert.match(rulesSource, /settings\.valid\.some/);
 });
 
+test('per-file model configuration keeps nozzle and preset selections compatible', async () => {
+    const rowRenderSource = await readFile(new URL('../static/js/modules/quote-row-render.js', import.meta.url), 'utf8');
+    const quoteSource = await readFile(new URL('../static/js/modules/quote.js', import.meta.url), 'utf8');
+    assert.match(rowRenderSource, /filterPresetsForNozzle\(slicerPresets \|\| \[\], selectedNozzle\)/);
+    assert.match(quoteSource, /function _syncPerFilePresetSelect\(container, nozzleValue, preferredPresetId\)/);
+    assert.match(quoteSource, /filterPresetsForNozzle\(slicerPresets \|\| \[\], nozzleValue\)/);
+    assert.match(quoteSource, /target\.getAttribute\('data-field'\) === '_nozzle_diameter'/);
+    assert.match(quoteSource, /_syncPerFilePresetSelect\(row, nozzle\)/);
+    assert.match(quoteSource, /_syncPerFilePresetSelect\(card/);
+});
+
 test('settings save snapshots and restores the selected nozzle around async refreshes', async () => {
     const source = await readFile(profileUrl, 'utf8');
     assert.match(source, /const nozzleSel = document\.getElementById\('front-default-nozzle-diameter'\);/);

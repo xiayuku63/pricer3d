@@ -39,4 +39,9 @@ export function filterPresetsForNozzle(presets, nozzleValue) {
     return (Array.isArray(presets) ? presets : []).filter((preset) => isPresetCompatibleWithNozzle(preset, nozzleValue));
 }
 
+export function getStandardPresetNameForNozzle(nozzleValue) {
+    const { settings } = getNozzleSettings(nozzleValue);
+    return `${settings.defaultVal.toFixed(2)}-2-15%`;
+}
+
 export { LAYER_HEIGHT_BY_NOZZLE };

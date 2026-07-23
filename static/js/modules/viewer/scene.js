@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 import { currentMesh, faceClickCallback, highlightGroup, highlightMode } from './mesh.js';
+import { addPreviewLighting, configurePreviewRenderer } from './render-style.js';
 
 // ── Shared state (created by initViewer, read by other modules) ──
 export let scene, camera, renderer, controls, stlLoader;
@@ -83,6 +84,7 @@ function _createBed(width, depth) {
         side: THREE.DoubleSide,
     });
     _bedPlane = new THREE.Mesh(bedGeo, bedMat);
+    _bedPlane.receiveShadow = true;
     _bedPlane.position.set(w / 2, d / 2, 0);
     scene.add(_bedPlane);
 
@@ -173,7 +175,9 @@ export function initViewer(previewContainerEl, previewPlaceholderEl) {
     previewPlaceholder = previewPlaceholderEl;
 
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xffffff);
+    // Keep the thumbnail background white, but give the interactive preview
+    // enough contrast to show white models and recessed edges.
+    scene.background = new THREE.Color(0xf1f5f9);
 
     camera = new THREE.PerspectiveCamera(45, previewContainer.clientWidth / previewContainer.clientHeight, 0.1, 10000);
     camera.position.set(0, 0, 120);
@@ -182,6 +186,7 @@ export function initViewer(previewContainerEl, previewPlaceholderEl) {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     _isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
     renderer = new THREE.WebGLRenderer({ antialias: !_isMobile, powerPreference: 'high-performance' });
+    configurePreviewRenderer(renderer);
     renderer.setPixelRatio(dpr);
     renderer.setSize(previewContainer.clientWidth, previewContainer.clientHeight);
     previewContainer.appendChild(renderer.domElement);
@@ -244,11 +249,7 @@ export function initViewer(previewContainerEl, previewPlaceholderEl) {
 
     raycaster = new THREE.Raycaster();
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
-    scene.add(ambientLight);
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.35);
-    dirLight.position.set(2, 3, 1);
-    scene.add(dirLight);
+    addPreviewLighting(scene);
 
     // 打印底板（网格 + 平面 + 坐标轴）。默认 256×256；如有 pending size 则使用之。
     var _initBedW = _pendingBedSize ? _pendingBedSize.width : 256;

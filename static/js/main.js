@@ -264,6 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
             syncBatch = false,
             syncFront = false,
             updateQuotePreset = true,
+            recalculate = false,
         } = options;
         const normalized = value ? String(value) : '';
         const layerEl = document.getElementById('gen-layer-height');
@@ -280,6 +281,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 setDefaultSlicerPresetId(null);
             }
             if (markBatch) markBatchDirty('_slicer_preset_id');
+            if (recalculate) await reQuoteAllSelectedFiles(t('quote.recalculate'));
             return;
         }
 
@@ -306,6 +308,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         } catch (e) { /* ignore */ }
+        if (recalculate) await reQuoteAllSelectedFiles(t('quote.recalculate'));
     }
 
     if (dom.genPresetSelect) {
@@ -441,6 +444,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 syncBatch: true,
                 syncFront: false,
                 updateQuotePreset: true,
+                recalculate: true,
             });
         });
     }

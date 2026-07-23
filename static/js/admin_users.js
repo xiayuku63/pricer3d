@@ -1,11 +1,22 @@
 const TOKEN_STORAGE_KEY = 'demo_access_token_v1';
+const AUTH_SESSION_STORAGE_KEY = 'demo_auth_session_v2';
 const PAGE_SIZE = 20;
 const $ = (id) => document.getElementById(id);
 const usersTbody = $('users-tbody');
 const auditTbody = $('audit-tbody');
 const metricsTbody = $('metrics-tbody');
 const msg = $('msg');
-let authToken = localStorage.getItem(TOKEN_STORAGE_KEY) || '';
+function loadAuthToken() {
+    for (const storage of [sessionStorage, localStorage]) {
+        try {
+            const session = JSON.parse(storage.getItem(AUTH_SESSION_STORAGE_KEY) || 'null');
+            if (session?.token) return session.token;
+        } catch (e) {}
+    }
+    return localStorage.getItem(TOKEN_STORAGE_KEY) || '';
+}
+
+let authToken = loadAuthToken();
 let isAdmin = false;
 let usersPage = 1;
 let usersTotal = 0;
