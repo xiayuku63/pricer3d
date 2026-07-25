@@ -14,10 +14,17 @@ import shlex
 import shutil
 import subprocess
 import tempfile
+import threading
+from contextlib import nullcontext
 from functools import lru_cache
 from typing import Optional
 
 logger = logging.getLogger(__name__)
+
+# FUSE-free AppImage extraction is not safe when several processes launch the
+# same image concurrently. Serialize AppImage launches to prevent extraction
+# races while leaving native binaries and WSL commands unconstrained.
+_APPIMAGE_EXECUTION_LOCK = threading.Lock()
 
 
 @lru_cache(maxsize=1)
@@ -127,7 +134,8 @@ def prusa_executable_diagnostics() -> dict:
         diag["path"] = exe
         try:
             cmd = _executable_command(exe)
-            out = subprocess.check_output(cmd + ["--help"], stderr=subprocess.STDOUT, timeout=10, shell=False)
+            with prusa_execution_lock(exe):
+                out = subprocess.check_output(cmd + ["--help"], stderr=subprocess.STDOUT, timeout=10, shell=False)
             lines = out.decode("utf-8", errors="replace").split("\n")
             for line in lines:
                 line = line.strip()
@@ -198,6 +206,17 @@ def translate_path_for_executable(path: str, exe: str) -> str:
     if len(absolute) >= 2 and absolute[1] == ":":
         return f"/mnt/{absolute[0].lower()}{absolute[2:]}"
     return absolute
+
+
+def _uses_appimage(exe: str) -> bool:
+    """Whether the resolved executable is an AppImage launched directly."""
+    command = _executable_command(exe)
+    return len(command) >= 2 and command[1] == "--appimage-extract-and-run"
+
+
+def prusa_execution_lock(exe: str):
+    """Return the shared lock required for concurrent AppImage launches."""
+    return _APPIMAGE_EXECUTION_LOCK if _uses_appimage(exe) else nullcontext()
 
 
 # ── G-code parsing ──
@@ -679,7 +698,8 @@ def run_prusa_slice(
     try:
         # WSL stderr may contain UTF-16LE proxy warnings mixed with
         # UTF-8 program output → read as bytes, decode robustly
-        proc = subprocess.run(cmd, capture_output=True, text=False, timeout=_SLICE_TIMEOUT)
+        with prusa_execution_lock(exe):
+            proc = subprocess.run(cmd, capture_output=True, text=False, timeout=_SLICE_TIMEOUT)
 
         def _safe_decode(data: bytes) -> str:
             if not data:
