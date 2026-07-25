@@ -24,6 +24,7 @@ import trimesh
 from parser.prusa_slicer import (
     _executable_command,
     prusa_executable,
+    prusa_execution_lock,
     translate_path_for_executable,
 )
 
@@ -360,13 +361,14 @@ def _normalize_step(path: str, output_dir: str) -> str:
         translate_path_for_executable(path, executable),
     ]
     try:
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            text=False,
-            timeout=120,
-            check=False,
-        )
+        with prusa_execution_lock(executable):
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=False,
+                timeout=120,
+                check=False,
+            )
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise ModelNormalizationError(
             "STEP 文件转换超时或转换器无法启动",
