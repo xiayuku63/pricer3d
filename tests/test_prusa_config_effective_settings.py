@@ -139,3 +139,17 @@ def test_generate_slice_config_accepts_string_preset_content():
         assert "fill_density = 15%" in text
     finally:
         os.unlink(path)
+
+
+def test_first_layer_height_is_capped_at_the_active_nozzle_diameter():
+    path = generate_slice_config(
+        layer_height=0.20,
+        infill_percent=15,
+        perimeters=2,
+        nozzle_diameter=0.20,
+    )
+    try:
+        text = open(path, encoding="utf-8").read()
+        assert "first_layer_height = 0.2" in text
+    finally:
+        os.unlink(path)
