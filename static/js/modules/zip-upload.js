@@ -7,7 +7,7 @@ import {
     quoteOptions, selectedFilesMap, thumbnailMap,
     currentResults, setCurrentResults,
     MATERIAL_OPTIONS,
-    authFetch, escapeHtml,
+    authFetch, escapeHtml, colorToObj,
     getActivePrinterCompoundId,
     setPendingQuoteFiles,
     getColorsForMaterial, pickAllowedColor,
@@ -86,6 +86,195 @@ function _hideError() {
     if (dom.errorContainer) dom.errorContainer.classList.add('hidden');
 }
 
+const ZIP_NEW_COLOR_VALUE = '__zip_new_color__';
+
+function _colorHex(value) {
+    const hex = String(colorToObj(value)?.hex || '').trim();
+    return /^#[0-9a-fA-F]{6}$/.test(hex) ? hex.toLowerCase() : '';
+}
+
+function _zipColorPalette() {
+    const palette = [];
+    const seen = new Set();
+    // The selectable palette comes only from colors already stored in the
+    // user's material library. Do not add a second hard-coded color catalog.
+    for (const material of MATERIAL_OPTIONS) {
+        const color = colorToObj(material?.color);
+        if (!color) continue;
+        const hex = _colorHex(color);
+        const name = String(color.name || hex || '').trim();
+        const key = (hex || name).toLowerCase();
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        palette.push({ name: name || hex, hex: hex || '#808080' });
+    }
+    return palette;
+}
+
+function _zipChecklistColors(previewData) {
+    // The preview endpoint includes every color from the checklist, not just
+    // rows that happened to match a model. All checklist colors must be
+    // explicitly mapped before slicing starts.
+    if (Array.isArray(previewData?.checklist_colors)) {
+        return previewData.checklist_colors
+            .map((item) => ({
+                source: String(item?.source || '').trim(),
+                count: Number(item?.count || 0),
+            }))
+            .filter((item) => item.source);
+    }
+
+    const colors = new Map();
+    for (const matched of previewData?.matched || []) {
+        const raw = String(matched?.checklist?.color || '').trim();
+        if (!raw) continue;
+        const key = raw.toLowerCase();
+        const entry = colors.get(key) || { source: raw, count: 0 };
+        entry.count += 1;
+        colors.set(key, entry);
+    }
+    return [...colors.values()];
+}
+
+function _renderZipColorMapping(previewData) {
+    const section = document.getElementById('zip-preview-color-mapping');
+    const body = document.getElementById('zip-preview-color-mapping-body');
+    if (!section || !body) return;
+
+    const sourceColors = _zipChecklistColors(previewData);
+    if (!sourceColors.length) {
+        section.classList.add('hidden');
+        body.innerHTML = '';
+        return;
+    }
+
+    const palette = _zipColorPalette();
+    // Keep a copy outside the DOM as a fallback for native select/color-picker
+    // interactions that can replace or blur the row before confirmation.
+    previewData._colorMapping = {};
+    body.innerHTML = sourceColors.map(({ source, count }) => {
+        const sourceHex = _colorHex(source);
+        const customHex = sourceHex || '#000000';
+        const options = palette.map((color) =>
+            `<option value="${escapeHtml(color.hex)}" data-color-name="${escapeHtml(color.name)}"></option>`
+        ).join('');
+        const customOption = `<option value="${ZIP_NEW_COLOR_VALUE}"></option>`;
+        const swatches = palette.map((color) =>
+            `<button type="button" class="zip-color-option flex items-center justify-center w-8 h-8 rounded-md" data-color-value="${escapeHtml(color.hex)}" title="\u989c\u8272\u9009\u9879" aria-label="\u989c\u8272\u9009\u9879">
+                <span class="w-5 h-5 rounded-sm border" style="background:${escapeHtml(color.hex)};border-color:var(--color-border-input);"></span>
+            </button>`
+        ).join('');
+        const sourceStyle = sourceHex ? `background:${sourceHex};` : 'background:var(--color-neutral-300);';
+        return `<div class="zip-color-mapping-row rounded-lg px-3 py-2" data-source-color="${escapeHtml(source)}">
+            <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+                <div class="flex items-center gap-2 min-w-0 sm:w-44 flex-shrink-0">
+                    <span class="w-5 h-5 rounded-sm border flex-shrink-0" style="${sourceStyle}border-color:var(--color-border-input);" title="${escapeHtml(source)}" aria-label="${escapeHtml(source)}"></span>
+                    <span class="text-xs tw-text-strong truncate max-w-24" title="${escapeHtml(source)}">${escapeHtml(source)}</span>
+                    <span class="text-[10px] tw-text-muted flex-shrink-0">\u00D7${count}</span>
+                </div>
+                <div class="flex items-center gap-2 flex-1 min-w-0">
+                    <span class="text-[11px] tw-text-muted whitespace-nowrap">\u624B\u52A8\u9009\u62E9</span>
+                    <div class="zip-color-picker relative flex-1 min-w-0">
+                        <select class="zip-color-target hidden">
+                            <option value="" selected disabled></option>${options}${customOption}
+                        </select>
+                        <button type="button" class="zip-color-target-trigger tw-input w-full flex items-center justify-between px-2 py-1.5" aria-label="\u9009\u62E9\u76EE\u6807\u989C\u8272" aria-expanded="false">
+                            <span class="zip-color-target-swatch w-5 h-5 rounded-sm border flex-shrink-0" style="background:var(--color-neutral-200);border-color:var(--color-border-input);"></span>
+                            <svg class="w-4 h-4 tw-text-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </button>
+                        <div class="zip-color-options hidden absolute right-0 top-full mt-1 z-30 p-2 rounded-lg shadow-lg grid grid-cols-5 gap-1" style="background:var(--color-surface);border:1px solid var(--color-border-strong);min-width:12rem;">
+                            ${swatches}
+                            <button type="button" class="zip-color-option zip-color-new-option col-span-5 flex items-center justify-center h-8 rounded-md text-xs tw-text-muted" data-color-value="${ZIP_NEW_COLOR_VALUE}">\uFF0B\u65B0\u589E\u989C\u8272</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="zip-color-custom hidden flex items-center gap-2 mt-2 sm:pl-44">
+                <span class="text-[11px] tw-text-muted whitespace-nowrap">\u65B0\u589E\u989C\u8272</span>
+                <input type="color" class="zip-color-custom-hex w-8 h-8 p-0 border rounded cursor-pointer flex-shrink-0" value="${customHex}" aria-label="\u65B0\u589E\u989C\u8272">
+                <input type="text" class="zip-color-custom-name tw-input text-xs px-2 py-1.5 flex-1 min-w-0" placeholder="\u989C\u8272\u540D\u79F0\uFF08\u53EF\u9009\uFF09" maxlength="40">
+            </div>
+        </div>`;
+    }).join('');
+    section.classList.remove('hidden');
+
+    body.querySelectorAll('.zip-color-mapping-row').forEach((row) => {
+        const select = row.querySelector('.zip-color-target');
+        const trigger = row.querySelector('.zip-color-target-trigger');
+        const optionsPanel = row.querySelector('.zip-color-options');
+        const custom = row.querySelector('.zip-color-custom');
+        const swatch = row.querySelector('.zip-color-target-swatch');
+        const customHex = row.querySelector('.zip-color-custom-hex');
+        const customName = row.querySelector('.zip-color-custom-name');
+        if (!select || !trigger || !optionsPanel) return;
+
+        const sync = () => {
+            const isCustom = select.value === ZIP_NEW_COLOR_VALUE;
+            custom?.classList.toggle('hidden', !isCustom);
+            const hex = isCustom ? customHex?.value : select.value;
+            if (swatch) swatch.style.background = /^#[0-9a-fA-F]{6}$/.test(hex || '')
+                ? hex
+                : 'var(--color-neutral-200)';
+            if (!row || !hex || !/^#[0-9a-fA-F]{6}$/.test(hex)) {
+                if (row) delete previewData._colorMapping[row.getAttribute('data-source-color') || ''];
+                return;
+            }
+            const selected = select.selectedOptions?.[0];
+            const name = isCustom
+                ? (customName?.value.trim() || hex)
+                : (selected?.dataset?.colorName || hex);
+            previewData._colorMapping[row.getAttribute('data-source-color') || ''] = {
+                name,
+                hex: hex.toLowerCase(),
+            };
+            row.classList.remove('ring-2', 'ring-red-400');
+        };
+
+        trigger.addEventListener('click', (event) => {
+            event.stopPropagation();
+            body.querySelectorAll('.zip-color-options').forEach((panel) => {
+                if (panel !== optionsPanel) panel.classList.add('hidden');
+            });
+            const isHidden = optionsPanel.classList.toggle('hidden');
+            trigger.setAttribute('aria-expanded', String(!isHidden));
+        });
+        optionsPanel.querySelectorAll('.zip-color-option').forEach((option) => {
+            option.addEventListener('click', (event) => {
+                event.stopPropagation();
+                select.value = option.getAttribute('data-color-value') || '';
+                optionsPanel.classList.add('hidden');
+                trigger.setAttribute('aria-expanded', 'false');
+                select.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+        });
+        select.addEventListener('change', sync);
+        customHex?.addEventListener('input', sync);
+        customHex?.addEventListener('change', sync);
+        customName?.addEventListener('input', sync);
+        sync();
+    });
+}
+
+function _collectZipColorMapping(previewData) {
+    const body = document.getElementById('zip-preview-color-mapping-body');
+    const mapping = { ...(previewData?._colorMapping || {}) };
+    if (!body) return mapping;
+    body.querySelectorAll('.zip-color-mapping-row').forEach((row) => {
+        const source = row.getAttribute('data-source-color') || '';
+        const select = row.querySelector('.zip-color-target');
+        if (!source || !select) return;
+        const isCustom = select.value === ZIP_NEW_COLOR_VALUE;
+        const customHex = row.querySelector('.zip-color-custom-hex')?.value || '';
+        const customName = row.querySelector('.zip-color-custom-name')?.value.trim() || '';
+        const hex = isCustom ? customHex : select.value;
+        if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return;
+        const selected = select.selectedOptions?.[0];
+        const name = isCustom ? (customName || hex) : (selected?.dataset?.colorName || hex);
+        mapping[source] = { name, hex: hex.toLowerCase() };
+    });
+    return mapping;
+}
+
 /**
  * Process ZIP file upload with SSE streaming progress.
  * Two-step flow: preview first, then confirm to slice.
@@ -132,8 +321,8 @@ async function _handleZipUpload(zipFiles, modelFiles, validFiles) {
         updateProgress(100, '清单与模型解析完成');
 
         // ── Step 2: Show preview modal and wait for user confirmation ──
-        const confirmed = await _showZipPreviewModal(previewData);
-        if (!confirmed) {
+        const previewChoice = await _showZipPreviewModal(previewData);
+        if (!previewChoice?.confirmed) {
             hideProgress();
             dom.fileNameDisplay.textContent = t('zipPreview.cancelled') || '已取消 ZIP 切片';
             dom.fileNameDisplay.classList.remove('text-indigo-600', 'font-medium');
@@ -170,6 +359,10 @@ async function _handleZipUpload(zipFiles, modelFiles, validFiles) {
         sliceFormData.append('material', uploadDefaults.material);
         sliceFormData.append('color', uploadDefaults.color);
         sliceFormData.append('quantity', String(quoteOptions.quantity));
+        const colorMapping = previewChoice.colorMapping || {};
+        if (Object.keys(colorMapping).length > 0) {
+            sliceFormData.append('color_mapping', JSON.stringify(colorMapping));
+        }
 
         if (uploadDefaults.printer_model) sliceFormData.append('printer_model', uploadDefaults.printer_model);
         if (uploadDefaults.slicer_preset_id !== null) {
@@ -321,7 +514,7 @@ async function _handleZipUpload(zipFiles, modelFiles, validFiles) {
 
 /**
  * Show the ZIP preview modal with match results.
- * Returns a Promise that resolves to true (confirmed) or false (cancelled).
+ * Returns a Promise with the confirmation state and grouped color mapping.
  */
 function _showZipPreviewModal(previewData) {
     return new Promise((resolve) => {
@@ -331,16 +524,17 @@ function _showZipPreviewModal(previewData) {
         const cancelBtn = document.getElementById('zip-preview-cancel-btn');
         const confirmBtn = document.getElementById('zip-preview-confirm-btn');
         const backdrop = document.getElementById('zip-preview-backdrop');
+        const colorMappingBody = document.getElementById('zip-preview-color-mapping-body');
 
         if (!modal || !panel) {
             // Fallback: if modal not found, auto-confirm
-            resolve(true);
+            resolve({ confirmed: true, colorMapping: {} });
             return;
         }
 
         // Guard all required interactive elements
         if (!closeBtn || !cancelBtn || !confirmBtn || !backdrop) {
-            resolve(true);
+            resolve({ confirmed: true, colorMapping: {} });
             return;
         }
 
@@ -358,6 +552,7 @@ function _showZipPreviewModal(previewData) {
             summaryParts.push(`<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-medium">${ms.model_only} ${t('zipPreview.modelOnly') || '无清单'}</span>`);
         }
         summaryEl.innerHTML = summaryParts.join('');
+        _renderZipColorMapping(previewData);
 
         // Populate matched table
         const matchedSection = document.getElementById('zip-preview-matched');
@@ -436,7 +631,19 @@ function _showZipPreviewModal(previewData) {
             if (target.closest('#zip-preview-close-btn') || target.closest('#zip-preview-cancel-btn')) {
                 close(false);
             } else if (target.closest('#zip-preview-confirm-btn')) {
-                close(true);
+                const colorMapping = _collectZipColorMapping(previewData);
+                const missing = _zipChecklistColors(previewData)
+                    .filter(({ source }) => !colorMapping[String(source).trim()]);
+                if (missing.length > 0) {
+                    colorMappingBody?.querySelectorAll('.zip-color-mapping-row').forEach((row) => {
+                        const source = row.getAttribute('data-source-color') || '';
+                        row.classList.toggle('ring-2', missing.some((item) => item.source === source));
+                        row.classList.toggle('ring-red-400', missing.some((item) => item.source === source));
+                    });
+                    showToast(`\u8BF7\u4E3A\u6E05\u5355\u4E2D\u7684\u6BCF\u79CD\u989C\u8272\u624B\u52A8\u9009\u62E9\u76EE\u6807\u989C\u8272\uFF08\u8FD8\u7F3A\u5C11\uFF1A${missing.map((item) => item.source).join('\u3001')}\uFF09`, 'warning');
+                    return;
+                }
+                close({ confirmed: true, colorMapping });
             } else if (target.id === 'zip-preview-backdrop' || target.id === 'zip-preview-modal') {
                 close(false);
             }

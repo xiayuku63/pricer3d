@@ -1,5 +1,24 @@
 import { loadFrontSettingsSnapshot, saveFrontSettingsSnapshot } from './state.js';
 
+// The page shell uses backdrop-filter, which creates a containing block for fixed
+// descendants. Portal these modals to body so their fixed positioning is relative
+// to the viewport rather than the scrollable quote card.
+export function portalModalToBody(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal && modal.parentElement !== document.body) {
+        document.body.appendChild(modal);
+    }
+    return modal;
+}
+
+export function portalUserCenterModal() {
+    return portalModalToBody('user-center-modal');
+}
+
+export function portalPreviewModal() {
+    return portalModalToBody('preview-modal');
+}
+
 export function initColorDropdownUI({ quoteOptions, currentResults, selectedFilesMap, thumbnailMap, dom, ensureThumbnailForFile, recolorCurrentMesh, updatePreviewColor, getCurrentPreviewFilename, refreshOptionsSummary }) {
     function saveFrontMaterialSnapshot() {
         const previous = loadFrontSettingsSnapshot() || {};

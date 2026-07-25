@@ -10,7 +10,9 @@ from fastapi import HTTPException
 from starlette.requests import Request
 
 import app.services.zip_quote as zip_quote_service
+import app.services.zip_quote_runner as zip_quote_runner
 from app.services.zip_quote import (
+    _apply_checklist_color_mapping,
     _build_missing_checklist_materials,
     _ensure_checklist_material_colors,
     _parse_zip_contents,
@@ -121,6 +123,50 @@ def test_display_name_compound_printer_keeps_requested_nozzle():
     assert _resolve_effective_printer_model("Bambu Lab A1_08", None, None) == "bambu_a1_08"
 
 
+
+def test_checklist_color_mapping_groups_source_color_and_preserves_original():
+    checklist = [
+        {"filename_stem": "black-part", "color": "黑色", "material_type": "PLA"},
+        {"filename_stem": "yellow-part", "color": "黄色", "material_type": "PLA"},
+    ]
+
+    mapped = _apply_checklist_color_mapping(
+        checklist,
+        json.dumps({
+            '黑色': {"name": "深黑", "hex": "#101010"},
+            '黄色': {"name": "柠檬黄", "hex": "#facc15"},
+        }),
+    )
+    assert mapped[0]["color"] == "深黑"
+    assert mapped[0]["_original_color"] == "黑色"
+    assert mapped[0]["_mapped_color"] == {"name": "深黑", "hex": "#101010"}
+    assert mapped[1]["color"] == "柠檬黄"
+    assert mapped[1]["_original_color"] == "黄色"
+
+
+def test_checklist_color_mapping_requires_every_checklist_color():
+    with pytest.raises(HTTPException) as exc_info:
+        _apply_checklist_color_mapping(
+            [{"color": "黑色"}, {"color": "黄色"}],
+            json.dumps({'黑色': {"name": "深黑", "hex": "#101010"}}),
+        )
+
+    assert exc_info.value.status_code == 400
+    assert "黄色" in str(exc_info.value.detail)
+
+
+def test_mapped_checklist_color_creates_material_with_selected_hex():
+    created = _build_missing_checklist_materials(
+        [{"name": "PLA", "brand": "Generic", "density": 1.24, "price_per_kg": 80}],
+        [{
+            "material_type": "PLA",
+            "color": "深黑",
+            "_mapped_color": {"name": "深黑", "hex": "#101010"},
+        }],
+    )
+
+    assert created[0]["color"] == {"name": "深黑", "hex": "#101010"}
+
 def test_missing_checklist_color_builds_generic_material():
     materials = [
         {
@@ -182,8 +228,8 @@ def test_missing_checklist_material_defaults_to_pla_and_is_persisted(monkeypatch
 
 
 def test_zip_processing_uses_shared_quote_wrapper_for_printer_profile():
-    source = open(zip_quote_service.__file__, encoding="utf-8").read()
+    source = open(zip_quote_runner.__file__, encoding="utf-8").read()
 
     assert "await asyncio.to_thread(" in source
-    assert "_process_single_file_sync," in source
+    assert "process_single_file_sync" in source
     assert "await process_single_file(" not in source
