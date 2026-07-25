@@ -103,3 +103,12 @@ def test_wsl_wrapper_translates_windows_model_paths():
             r"D:\Projects\pricer3d\data\part.step",
             exe,
         ) == "/mnt/d/Projects/pricer3d/data/part.step"
+
+
+def test_appimage_uses_fuse_free_extraction_mode():
+    with patch.object(prusa_slicer.os.path, "isfile", return_value=True):
+        with patch.object(prusa_slicer.os.path, "realpath", return_value="/usr/local/bin/prusa-slicer.AppImage"):
+            assert prusa_slicer._executable_command("/usr/local/bin/prusa-slicer") == [
+                "/usr/local/bin/prusa-slicer",
+                "--appimage-extract-and-run",
+            ]

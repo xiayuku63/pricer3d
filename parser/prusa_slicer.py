@@ -164,6 +164,12 @@ def _executable_command(exe: str) -> list[str]:
     # Keep a real native executable path intact even if its path contains
     # spaces. This is the normal Windows executable case.
     if os.path.isfile(stripped):
+        # The Docker image ships PrusaSlicer as an AppImage. Containers do not
+        # expose FUSE, so invoking it normally exits with code 127. The
+        # built-in extraction mode runs the same AppImage without FUSE and
+        # needs no additional package or converter.
+        if os.path.realpath(stripped).lower().endswith(".appimage"):
+            return [stripped, "--appimage-extract-and-run"]
         return [stripped]
 
     tokens = shlex.split(stripped, posix=False)
