@@ -346,6 +346,24 @@ def _merge_preset_into_sections(
         sections[print_section].update(flat)
 
 
+def _safe_first_layer_height(layer_height: float, nozzle_diameter: Optional[float] = None) -> float:
+    """Return a PrusaSlicer-compatible first-layer height.
+
+    PrusaSlicer rejects a first layer taller than the active nozzle. This is
+    especially important for a 0.2 mm nozzle: the historical 0.35 mm default
+    silently forced the quote pipeline to fall back to formula estimates.
+    """
+    height = max(0.01, float(layer_height))
+    cap = 0.35
+    try:
+        nozzle = float(nozzle_diameter) if nozzle_diameter is not None else 0.0
+        if nozzle > 0:
+            cap = min(cap, nozzle)
+    except (TypeError, ValueError):
+        pass
+    return round(min(height * 1.75, cap), 2)
+
+
 def generate_slice_config(
     layer_height: float = 0.2,
     infill_percent: int = 20,
@@ -446,7 +464,7 @@ def generate_slice_config(
     # preset may provide additional PrusaSlicer settings, but it must not
     # silently replace the layer height, walls, or infill the user selected.
     ps["layer_height"] = str(layer_height)
-    ps["first_layer_height"] = str(round(min(layer_height * 1.75, 0.35), 2))
+    ps["first_layer_height"] = str(_safe_first_layer_height(layer_height, nozzle_diameter))
     ps["fill_density"] = f"{infill_percent}%"
     ps["sparse_infill_density"] = f"{infill_percent}%"
     ps["perimeters"] = str(perimeters)
@@ -808,7 +826,7 @@ def generate_prusa_config(
 
     ps = sections[print_sec]
     ps["layer_height"] = str(layer_height)
-    ps["first_layer_height"] = str(round(min(layer_height * 1.75, 0.35), 2))
+    ps["first_layer_height"] = str(_safe_first_layer_height(layer_height, nozzle_diameter))
     ps["fill_density"] = f"{infill_percent}%"
     ps["sparse_infill_density"] = f"{infill_percent}%"
     ps["perimeters"] = str(perimeters)
