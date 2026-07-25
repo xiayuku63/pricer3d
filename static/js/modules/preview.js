@@ -104,7 +104,7 @@ export async function buildStlThumbnail(file, colorKey = "Blue", orientation = n
     return dataUrl;
 }
 
-export async function buildNonStlThumbnail(file, colorKey) {
+export async function buildNonStlThumbnail(file, colorKey, orientation = null) {
     const formData = new FormData();
     formData.append('file', file);
     const resp = await fetch('/api/preview/glb', { method: 'POST', body: formData });
@@ -141,8 +141,13 @@ export async function buildNonStlThumbnail(file, colorKey) {
             c.material = createPreviewMaterial(colorHex);
         }
     });
-    model.rotation.x = THREE.MathUtils.degToRad(-30);
-    model.rotation.y = THREE.MathUtils.degToRad(-45);
+    if (orientation) {
+        model.rotation.x = THREE.MathUtils.degToRad(orientation.x || 0);
+        model.rotation.y = THREE.MathUtils.degToRad(orientation.y || 0);
+        model.rotation.z = THREE.MathUtils.degToRad(orientation.z || 0);
+    }
+    model.rotateX(THREE.MathUtils.degToRad(-30));
+    model.rotateY(THREE.MathUtils.degToRad(-45));
     scene.add(model);
     addPreviewLighting(scene);
 
@@ -169,7 +174,7 @@ export async function ensureThumbnailForFile(file, colorKey, orientation = null)
     const ext = file.name.includes('.') ? file.name.split('.').pop().toLowerCase() : '';
     try {
         const orient = orientation || { x: 0, y: 0, z: 0 };
-        const thumb = ext === 'stl' ? await buildStlThumbnail(file, colorKey, orientation) : await buildNonStlThumbnail(file, colorKey);
+        const thumb = ext === 'stl' ? await buildStlThumbnail(file, colorKey, orientation) : await buildNonStlThumbnail(file, colorKey, orientation);
         // 同时存两份：带朝向的key + 文件名key（兼容现有读取逻辑）
         thumbnailMap.set(file.name, thumb);
         if (orientation) {

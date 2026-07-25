@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 import os
-import shlex
 import subprocess
 import tempfile
 import uuid
@@ -22,7 +21,11 @@ from typing import Iterable, Optional
 import numpy as np
 import trimesh
 
-from parser.prusa_slicer import prusa_executable
+from parser.prusa_slicer import (
+    _executable_command,
+    prusa_executable,
+    translate_path_for_executable,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -332,9 +335,8 @@ def _normalize_3mf(path: str, output_dir: str) -> str:
 
 
 def _command_prefix(executable: str) -> list[str]:
-    if os.path.isfile(executable):
-        return [executable]
-    return shlex.split(executable)
+    """Split native/WSL executable settings without losing Windows slashes."""
+    return _executable_command(executable)
 
 
 def _normalize_step(path: str, output_dir: str) -> str:
@@ -346,12 +348,22 @@ def _normalize_step(path: str, output_dir: str) -> str:
         )
 
     output_path = os.path.join(output_dir, f"{Path(path).stem}_{uuid.uuid4().hex[:8]}_normalized.stl")
-    command = _command_prefix(executable) + ["--export-stl", "--output", output_path, path]
+    # On Windows the project intentionally uses the existing WSL PrusaSlicer.
+    # PrusaSlicer runs inside Linux, so both the source and destination must be
+    # expressed as /mnt/<drive>/... paths. Passing Windows paths makes the
+    # converter exit successfully without producing a usable STL (or fail with
+    # a misleading "file not found" error).
+    command = _command_prefix(executable) + [
+        "--export-stl",
+        "--output",
+        translate_path_for_executable(output_path, executable),
+        translate_path_for_executable(path, executable),
+    ]
     try:
         result = subprocess.run(
             command,
             capture_output=True,
-            text=True,
+            text=False,
             timeout=120,
             check=False,
         )
@@ -361,8 +373,18 @@ def _normalize_step(path: str, output_dir: str) -> str:
             code="STEP_CONVERSION_FAILED",
         ) from exc
 
+    def _decode_output(data: bytes | str | None) -> str:
+        if not data:
+            return ""
+        if isinstance(data, str):
+            return data.strip()
+        try:
+            return data.decode("utf-8").strip()
+        except UnicodeDecodeError:
+            return data.replace(b"\x00", b"").decode("utf-8", errors="replace").strip()
+
     if result.returncode != 0 or not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
-        detail = (result.stderr or result.stdout or "").strip().replace("\n", " ")[:240]
+        detail = (_decode_output(result.stderr) or _decode_output(result.stdout)).replace("\n", " ")[:240]
         logger.warning("STEP to STL conversion failed: %s", detail)
         try:
             os.unlink(output_path)

@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import asyncio
+import io
 import subprocess
 import zipfile
 from pathlib import Path
 
 import pytest
 import trimesh
+from fastapi import UploadFile
+
+from calculator.cost import process_single_file
 
 from parser.geometry import calculate_geometry
 from parser.model_pipeline import ModelNormalizationError, normalize_model
@@ -110,3 +115,62 @@ def test_step_uses_detected_prusaslicer_and_preserves_source(tmp_path: Path, mon
         assert source.read_text(encoding="ascii") == "ISO-10303-21;"
     finally:
         normalized.cleanup()
+
+
+def test_step_command_preserves_absolute_wsl_wrapper_path(tmp_path: Path, monkeypatch):
+    source = tmp_path / "part.step"
+    source.write_text("ISO-10303-21;", encoding="ascii")
+    captured: list[str] = []
+
+    monkeypatch.setattr(
+        "parser.model_pipeline.prusa_executable",
+        lambda: r"C:\Windows\System32\wsl.exe -- prusa-slicer",
+    )
+    monkeypatch.setattr("parser.model_pipeline.translate_path_for_executable", lambda path, _: path)
+
+    def fake_run(command, **kwargs):
+        captured.extend(command)
+        output_path = Path(command[command.index("--output") + 1])
+        trimesh.creation.box(extents=[10, 10, 10]).export(output_path, file_type="stl")
+        return subprocess.CompletedProcess(command, 0, stdout=b"", stderr=b"")
+
+    monkeypatch.setattr("parser.model_pipeline.subprocess.run", fake_run)
+
+    normalized = normalize_model(str(source))
+    try:
+        assert captured[:3] == [r"C:\Windows\System32\wsl.exe", "--", "prusa-slicer"]
+    finally:
+        normalized.cleanup()
+
+
+def test_failed_step_result_keeps_requested_default_parameters(monkeypatch):
+    file = UploadFile(filename="broken.stp", file=io.BytesIO(b"not a STEP model"))
+    preset = {"id": 42, "name": "0.20-2-15%"}
+
+    def fail_normalization(*args, **kwargs):
+        raise ModelNormalizationError("converter unavailable", code="STEP_CONVERTER_UNAVAILABLE")
+
+    monkeypatch.setattr("calculator.cost.normalize_model", fail_normalization)
+
+    result = asyncio.run(
+        process_single_file(
+            file=file,
+            material="PLA",
+            layer_height=0.2,
+            infill=15,
+            quantity=3,
+            color="#111111",
+            user_materials=[{"name": "PLA", "density": 1.24, "price_per_kg": 80}],
+            pricing_config={"printer_model": "bambu_a1_04"},
+            slicer_preset=preset,
+            perimeters=2,
+        )
+    )
+
+    assert result["status"] == "failed"
+    assert result["error_code"] == "STEP_CONVERTER_UNAVAILABLE"
+    assert result["_printer_model"] == "bambu_a1_04"
+    assert result["_slicer_preset_id"] == 42
+    assert result["layer_height"] == 0.2
+    assert result["wall_count"] == 2
+    assert result["infill"] == 15

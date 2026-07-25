@@ -143,20 +143,55 @@ def prusa_executable_diagnostics() -> dict:
     return diag
 
 
+def _command_basename(value: str) -> str:
+    """Return a platform-independent basename for a command token."""
+    return value.replace("\\", "/").rsplit("/", 1)[-1].lower()
+
+
 def _executable_command(exe: str) -> list[str]:
     """Build argv for a slicer executable or an optional WSL wrapper.
 
     A native executable path is already one argv item, even when it contains
-    spaces (for example ``C:\\Program Files\\...``). Only wrapper commands
-    such as ``wsl.exe -d Ubuntu prusa-slicer`` need shell-style splitting.
+    spaces (for example ``C:\\Program Files\\...``). Wrapper commands can
+    also be returned as an absolute path (``C:\\Windows\\System32\\wsl.exe --
+    prusa-slicer``), so detection must inspect the basename of the first token,
+    not compare the whole token with ``wsl.exe``.
     """
     stripped = exe.strip()
     if not stripped:
         return []
-    first = stripped.split(None, 1)[0].lower()
-    if first in {"wsl", "wsl.exe"}:
-        return shlex.split(stripped, posix=False)
+
+    # Keep a real native executable path intact even if its path contains
+    # spaces. This is the normal Windows executable case.
+    if os.path.isfile(stripped):
+        return [stripped]
+
+    tokens = shlex.split(stripped, posix=False)
+    if tokens and _command_basename(tokens[0]) in {"wsl", "wsl.exe"}:
+        return tokens
     return [stripped]
+
+
+def is_wsl_executable(exe: str) -> bool:
+    """Whether an executable setting resolves to a WSL wrapper command."""
+    command = _executable_command(exe)
+    return bool(command and _command_basename(command[0]) in {"wsl", "wsl.exe"})
+
+
+def translate_path_for_executable(path: str, exe: str) -> str:
+    """Translate a Windows path for a WSL-backed slicer command."""
+    if not is_wsl_executable(exe):
+        return path
+
+    import sys as _sys
+
+    if _sys.platform != "win32":
+        return path
+
+    absolute = os.path.abspath(path).replace("\\", "/")
+    if len(absolute) >= 2 and absolute[1] == ":":
+        return f"/mnt/{absolute[0].lower()}{absolute[2:]}"
+    return absolute
 
 
 # ── G-code parsing ──
@@ -357,9 +392,13 @@ def generate_slice_config(
         and not slicer_preset.get("is_default")
     ):
         raw = slicer_preset["content"]
-        first_byte = raw[:1] if raw else b""
-        if first_byte not in (b"{", b"[") and b"=" in raw:
-            _merge_preset_into_sections(sections, raw)
+        if isinstance(raw, bytes):
+            preset_text = raw.decode("utf-8", errors="replace")
+        else:
+            preset_text = str(raw)
+        stripped_preset = preset_text.lstrip()
+        if not stripped_preset.startswith(("{", "[")) and "=" in preset_text:
+            _merge_preset_into_sections(sections, preset_text)
 
     # ── Apply quote parameter overrides into the print section ──
     print_section = None
@@ -573,7 +612,7 @@ def run_prusa_slice(
 
     # ── Detect WSL passthrough and translate paths ──
     cmd_parts = _executable_command(exe)
-    _is_wsl = cmd_parts and cmd_parts[0] in ("wsl", "wsl.exe")
+    _is_wsl = is_wsl_executable(exe)
 
     def _wsl_path(p: str) -> str:
         """Translate a Windows path to a WSL path (/mnt/c/...)."""
