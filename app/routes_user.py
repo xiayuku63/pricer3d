@@ -121,7 +121,8 @@ async def update_user_settings(payload: UserSettingsUpdate, request: Request, cu
     with get_db_session() as db:
         existing_user = db.query(User.materials).filter(User.id == current_user["id"]).first()
 
-    existing_materials = normalize_materials(json.loads(existing_user.materials) if existing_user and existing_user.materials else [])
+    existing_materials_json = getattr(existing_user, "materials", None) if existing_user else None
+    existing_materials = normalize_materials(json.loads(existing_materials_json) if existing_materials_json else [])
     existing_by_key = {}
     for material in existing_materials:
         if not isinstance(material, dict):

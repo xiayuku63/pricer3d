@@ -267,10 +267,15 @@
         padding: 10px 14px;
     }
 
-    /* Preview modal: full screen on mobile */
+    /* Preview modal: centered within the mobile viewport */
+    #preview-modal > .relative.z-10 {
+        align-items: center;
+    }
     #preview-modal .max-w-5xl {
         max-width: 100%;
+        max-height: calc(100dvh - 16px);
         border-radius: 0;
+        overflow-y: auto;
     }
     #preview-container {
         height: 50vh !important;

@@ -50,6 +50,7 @@ async def zip_quote(
     layer_height: float = Form(0.2),
     wall_count: int = Form(3),
     infill: int = Form(20),
+    color_mapping: Optional[str] = Form(default=None),
     session_id: Optional[str] = Form(default=None),
     current_user=Depends(get_current_user),
 ):
@@ -66,6 +67,7 @@ async def zip_quote(
             layer_height=layer_height,
             wall_count=wall_count,
             infill=infill,
+            color_mapping=color_mapping,
             session_id=session_id,
             current_user=current_user,
         )

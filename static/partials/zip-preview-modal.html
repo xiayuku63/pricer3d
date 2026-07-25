@@ -16,6 +16,18 @@
                                 <!-- Populated by JS -->
                             </div>
 
+                            <!-- 清单颜色批量设置 -->
+                            <div id="zip-preview-color-mapping" class="hidden">
+                                <div class="flex items-center justify-between mb-1.5">
+                                    <h5 class="text-sm font-semibold flex items-center gap-1" style="color: var(--color-primary-text);">
+                                        <span class="inline-block w-2 h-2 rounded-full" style="background-color: var(--color-primary);"></span>
+                                        <span>清单颜色批量设置</span>
+                                    </h5>
+                                    <span class="text-[11px] tw-text-muted">同一种原始颜色会批量应用到对应模型</span>
+                                </div>
+                                <div id="zip-preview-color-mapping-body" class="space-y-2"></div>
+                            </div>
+
                             <!-- 清单中有但无对应模型 (BOM only) -->
                             <div id="zip-preview-bom-only" class="hidden">
                                 <h5 class="text-sm font-semibold mb-1.5 flex items-center gap-1" style="color: var(--color-danger-text);">
