@@ -119,3 +119,23 @@ def test_effective_slicer_params_use_preset_values_and_page_values_as_fallbacks(
     }
     assert _resolve_effective_slicer_params(0.2, 3, 20, preset) == (0.4, 2, 15)
     assert _resolve_effective_slicer_params(0.28, 4, 30, None) == (0.28, 4, 30)
+
+
+def test_generate_slice_config_accepts_string_preset_content():
+    preset = {
+        "name": "0.20-2-15%",
+        "content": "layer_height = 0.20\nperimeters = 2\nfill_density = 15%\n",
+    }
+    path = generate_slice_config(
+        layer_height=0.20,
+        infill_percent=15,
+        perimeters=2,
+        slicer_preset=preset,
+    )
+    try:
+        text = open(path, encoding="utf-8").read()
+        assert "layer_height = 0.2" in text
+        assert "perimeters = 2" in text
+        assert "fill_density = 15%" in text
+    finally:
+        os.unlink(path)

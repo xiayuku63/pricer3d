@@ -161,6 +161,7 @@ def calculate_cost(
     _printer_profile_path: Optional[str] = None,  # pre-resolved profile path
     _nozzle_diameter: Optional[float] = None,
     selected_material_spec: Optional[dict] = None,
+    allow_slicer_orientation_fallback: bool = True,
 ):
     """Calculate cost for a single model from geometry + material + config.
 
@@ -288,26 +289,44 @@ def calculate_cost(
             outputs_dir = os.path.dirname(model_path)  # same dir as model
             output_gcode = os.path.join(outputs_dir, f"{base_name}.gcode")
 
-            stats = run_prusa_slice(
-                actual_slice_path,
-                output_gcode,
-                layer_height=layer_height_mm,
-                infill_percent=infill_percent,
-                perimeters=perimeters or 3,
-                material_density=spec["density"],
-                slicer_preset=slicer_preset,
-                enable_supports=True,
-                printer_profile_path=_printer_profile,
-                top_shell_layers=top_shell_layers,
-                bottom_shell_layers=bottom_shell_layers,
-                hotend_temp=spec.get("hotend_temp"),
-                bed_temp=spec.get("bed_temp"),
-                nozzle_diameter=_nozzle_diameter,
-                max_print_speed=(_speed_params or {}).get("max_speed"),
-                max_acceleration=(_speed_params or {}).get("max_acceleration"),
-                jerk_limit=(_speed_params or {}).get("jerk_limit"),
-                max_volumetric_speed=spec.get("max_volumetric_speed"),
-            )
+            slice_kwargs = {
+                "layer_height": layer_height_mm,
+                "infill_percent": infill_percent,
+                "perimeters": perimeters or 3,
+                "material_density": spec["density"],
+                "slicer_preset": slicer_preset,
+                "enable_supports": True,
+                "printer_profile_path": _printer_profile,
+                "top_shell_layers": top_shell_layers,
+                "bottom_shell_layers": bottom_shell_layers,
+                "hotend_temp": spec.get("hotend_temp"),
+                "bed_temp": spec.get("bed_temp"),
+                "nozzle_diameter": _nozzle_diameter,
+                "max_print_speed": (_speed_params or {}).get("max_speed"),
+                "max_acceleration": (_speed_params or {}).get("max_acceleration"),
+                "jerk_limit": (_speed_params or {}).get("jerk_limit"),
+                "max_volumetric_speed": spec.get("max_volumetric_speed"),
+            }
+            try:
+                stats = run_prusa_slice(actual_slice_path, output_gcode, **slice_kwargs)
+            except RuntimeError as exc:
+                fallback = None
+                if allow_slicer_orientation_fallback and _is_first_layer_extrusion_error(exc):
+                    fallback = _retry_slice_with_axis_orientations(
+                        actual_slice_path,
+                        output_gcode,
+                        slice_kwargs,
+                    )
+                if fallback is None:
+                    raise
+                stats, fallback_euler = fallback
+                orientation_info = {
+                    **orientation_info,
+                    "euler_angles_deg": fallback_euler,
+                    "slicer_orientation_fallback": True,
+                    "slicer_orientation_reason": "first_layer_no_extrusion",
+                }
+                logger.info("PrusaSlicer first-layer recovery succeeded with rotation=%s", fallback_euler)
             if stats.get("time_s", 0) > 0:
                 correction = float(cfg.get("prusa_time_correction") or 1.0)
                 slicer_time_s = max(1, int(stats["time_s"] * correction))
@@ -446,6 +465,76 @@ def calculate_cost(
         breakdown,
     )
 
+def _is_first_layer_extrusion_error(error: Exception) -> bool:
+    """Identify PrusaSlicer's recoverable no-extrusion-on-first-layer error."""
+    return "no extrusions in the first layer" in str(error).lower()
+
+
+def _retry_slice_with_axis_orientations(
+    model_path: str,
+    output_gcode_path: str,
+    slice_kwargs: dict,
+) -> Optional[tuple[dict, dict[str, float]]]:
+    """Retry a slicer failure after placing the mesh on a printable axis face.
+
+    CAD imports may be valid meshes but rest on an edge or a zero-area face.
+    PrusaSlicer then reports that the first layer has no extrusions. Retry a
+    few axis-aligned orientations only for that precise failure; this leaves
+    normal models and user-selected orientations untouched.
+    """
+    try:
+        import trimesh
+
+        mesh = trimesh.load(model_path, force="mesh")
+        if isinstance(mesh, trimesh.Scene):
+            mesh = trimesh.util.concatenate(tuple(mesh.geometry.values()))
+        if not isinstance(mesh, trimesh.Trimesh) or len(mesh.vertices) == 0:
+            return None
+
+        candidates: list[tuple[float, dict[str, float], object]] = []
+        for euler in (
+            {"x": 0.0, "y": 90.0, "z": 0.0},
+            {"x": 0.0, "y": -90.0, "z": 0.0},
+            {"x": 90.0, "y": 0.0, "z": 0.0},
+            {"x": -90.0, "y": 0.0, "z": 0.0},
+        ):
+            rotated = mesh.copy()
+            matrix = trimesh.transformations.euler_matrix(
+                np.deg2rad(euler["x"]),
+                np.deg2rad(euler["y"]),
+                np.deg2rad(euler["z"]),
+                axes="sxyz",
+            )
+            rotated.apply_transform(matrix)
+            rotated.apply_translation([0.0, 0.0, -float(rotated.bounds[0, 2])])
+            # Prefer shorter printable orientations when multiple candidates
+            # work: this is a sensible default and keeps retries inexpensive.
+            candidates.append((float(rotated.extents[2]), euler, rotated))
+
+        for _, euler, rotated in sorted(candidates, key=lambda item: item[0]):
+            fd, candidate_path = tempfile.mkstemp(
+                suffix=".stl",
+                prefix="p3d_slice_recovery_",
+                dir=os.path.dirname(model_path) or None,
+            )
+            os.close(fd)
+            try:
+                rotated.export(candidate_path, file_type="stl")
+                stats = run_prusa_slice(candidate_path, output_gcode_path, **slice_kwargs)
+                return stats, euler
+            except RuntimeError as exc:
+                if not _is_first_layer_extrusion_error(exc):
+                    logger.info("PrusaSlicer recovery candidate failed: %s", exc)
+            finally:
+                try:
+                    os.unlink(candidate_path)
+                except OSError:
+                    pass
+    except Exception as exc:
+        logger.warning("PrusaSlicer first-layer orientation recovery unavailable: %s", exc)
+    return None
+
+
 
 # ═══════════════════════════════════════════════════════════════════
 # File-processing orchestration
@@ -509,6 +598,16 @@ async def process_single_file(
         }
 
     file_content = await file.read()
+    result_context = {
+        "quantity": quantity,
+        "color": color,
+        "material": material,
+        "layer_height": layer_height,
+        "infill": infill,
+        "wall_count": perimeters or 3,
+        "_slicer_preset_id": slicer_preset.get("id") if slicer_preset else None,
+        "_printer_model": pricing_config.get("printer_model") if pricing_config else None,
+    }
     if len(file_content) >= max_file_size:
         return {
             "filename": filename,
@@ -627,10 +726,7 @@ async def process_single_file(
                     "unit_time_h": 0,
                     "cost_cny": 0,
                     "unit_cost_cny": 0,
-                    "quantity": quantity,
-                    "color": color,
-                    "material": material,
-                    "_printer_model": pricing_config.get("printer_model"),
+                    **result_context,
                     "_nozzle_diameter": _nozzle_diameter,
                     "_saved_path": model_saved_path,
                     "_normalized_path": normalized_path,
@@ -666,6 +762,9 @@ async def process_single_file(
                 _printer_profile_path=_printer_profile,
                 _nozzle_diameter=_nozzle_diameter,
                 selected_material_spec=selected_material_spec,
+                allow_slicer_orientation_fallback=(
+                    not auto_orient and not any(v is not None for v in [orient_x, orient_y, orient_z])
+                ),
             )
         )
 
@@ -738,6 +837,7 @@ async def process_single_file(
             "status": "failed",
             "error_code": e.code,
             "error": msg or "???????",
+            **result_context,
             "source_format": ext.lstrip("."),
         }
     except Exception as e:
@@ -748,6 +848,7 @@ async def process_single_file(
             "filename": filename,
             "status": "failed",
             "error": msg or "????",
+            **result_context,
             "source_format": ext.lstrip("."),
         }
 

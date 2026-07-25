@@ -1,5 +1,6 @@
-from unittest.mock import patch
+import sys
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from parser import prusa_slicer
 
@@ -85,3 +86,20 @@ def test_slice_command_does_not_use_unsupported_headless_option(tmp_path):
     assert "--headless" not in command
     assert result["time_s"] == 62
     assert result["filament_g"] == 1.5
+
+
+def test_absolute_windows_wsl_wrapper_is_split_into_argv_items():
+    assert prusa_slicer._executable_command(r"C:\Windows\System32\wsl.exe -- prusa-slicer") == [
+        r"C:\Windows\System32\wsl.exe",
+        "--",
+        "prusa-slicer",
+    ]
+
+
+def test_wsl_wrapper_translates_windows_model_paths():
+    exe = r"C:\Windows\System32\wsl.exe -- prusa-slicer"
+    with patch.object(sys, "platform", "win32"):
+        assert prusa_slicer.translate_path_for_executable(
+            r"D:\Projects\pricer3d\data\part.step",
+            exe,
+        ) == "/mnt/d/Projects/pricer3d/data/part.step"
