@@ -95,7 +95,7 @@ import { initOnboarding, checkAndStart as checkOnboarding, startGuide } from './
 import { initZipUpload, handleFileSelection } from './modules/zip-upload.js';
 import { initLiveClock } from './modules/live-clock.js';
 import { collectAppDomRefs } from './modules/app-dom.js';
-import { initColorDropdownUI, initMobileNavigation, initAppLifecycle } from './modules/app-shell.js';
+import { initColorDropdownUI, initMobileNavigation, initAppLifecycle, portalUserCenterModal, portalPreviewModal } from './modules/app-shell.js';
 import { initSettingsAreaEvents, initResultsAreaEvents } from './modules/app-events.js';
 
 // ═══════════════════════════════════════════════
@@ -107,6 +107,9 @@ document.addEventListener('DOMContentLoaded', () => {
     initStyledSelectDropdowns();
     // Init i18n (language switcher)
     initI18n();
+    // Keep the user-center fixed layer relative to the viewport, not the page card.
+    portalUserCenterModal();
+    portalPreviewModal();
     // Init live clock
     initLiveClock();
     const _getMaxFiles = () => (currentUser && currentUser.is_member) ? Infinity : 5;
