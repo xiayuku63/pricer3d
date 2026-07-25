@@ -36,3 +36,10 @@ temp_script.py
 fix_dropdown.py
 nul
 tmp_material_*.gcode
+
+# Local-only manual test artifacts
+.local-tests/
+
+# SQLite runtime journal files
+*.db-shm
+*.db-wal

@@ -12,7 +12,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 def test_reversed_winding_cube_keeps_all_outer_contact_planes():
     """Convex-hull filtering must not depend on STL triangle winding."""
-    mesh = trimesh.load(PROJECT_ROOT / "static" / "test_cube.stl", force="mesh")
+    mesh = trimesh.load(PROJECT_ROOT / "tests" / "fixtures" / "test_cube.stl", force="mesh")
 
     clusters = cluster_coplanar_faces(mesh, include_upward_faces=True)
 

@@ -19,3 +19,8 @@ push.ps1
 SECURITY_P0_CHECKLIST.md
 .ecosystem/
 .env
+
+# Test suites and local-only probes are not part of production images
+tests/
+tests_js/
+.local-tests/
