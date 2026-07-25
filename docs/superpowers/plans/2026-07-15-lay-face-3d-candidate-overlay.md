@@ -137,11 +137,11 @@ Expected: PASS with no failed tests.
 ### Task 4: Verify The Existing Preview In A Browser
 
 **Files:**
-- Verify only: `static/test_placeface.html`
+- Verify only: `.local-tests/test_placeface.html`
 
 - [ ] **Step 1: Load a model and enter candidate mode**
 
-Run the app locally, open the existing preview with `static/test_cube.stl`, and activate lay-on-face. Confirm cyan labeled overlays are visibly attached to model faces while OrbitControls rotates the mesh.
+Run the app locally, open the existing preview with `tests/fixtures/test_cube.stl`, and activate lay-on-face. Confirm cyan labeled overlays are visibly attached to model faces while OrbitControls rotates the mesh.
 
 - [ ] **Step 2: Confirm placement cleanup**
 

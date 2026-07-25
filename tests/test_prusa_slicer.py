@@ -77,7 +77,7 @@ def test_slice_command_does_not_use_unsupported_headless_option(tmp_path):
     with patch.object(prusa_slicer, "prusa_executable", return_value="/usr/bin/prusa-slicer"):
         with patch.object(prusa_slicer.subprocess, "run", side_effect=fake_run) as run:
             result = prusa_slicer.run_prusa_slice(
-                "static/test_cube.stl",
+                "tests/fixtures/test_cube.stl",
                 str(output_path),
             )
 
