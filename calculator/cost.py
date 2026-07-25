@@ -38,6 +38,7 @@ from calculator.pricing import (
     normalize_materials,
 )
 from parser.prusa_slicer import run_prusa_slice
+from parser.model_pipeline import ModelNormalizationError, normalize_model
 
 logger = logging.getLogger(__name__)
 
@@ -251,16 +252,10 @@ def calculate_cost(
             logger.info(f"PrusaSlicer enabled, slicing: {model_path}")
             prusaslicer_used = True
 
-            # Convert 3MF to STL for PrusaSlicer
+            # The caller normalizes complex formats before entering the pricing
+            # engine. Keep slicing on the same mesh used for geometry and
+            # orientation so preview, quote, and slice never diverge.
             actual_slice_path = model_path
-            _tmp_3mf_stl = None
-            if model_path.lower().endswith(".3mf"):
-                from parser.geometry import _extract_geometry_from_3mf
-
-                _tmp_3mf_stl = _extract_geometry_from_3mf(model_path)
-                if _tmp_3mf_stl:
-                    actual_slice_path = _tmp_3mf_stl
-                    logger.info(f"3MF converted to STL for slicing: {_tmp_3mf_stl}")
 
             # Use pre-resolved printer profile path if available
             _printer_profile = _printer_profile_path
@@ -340,11 +335,6 @@ def calculate_cost(
             slicer_time_s = None
             slicer_filament_g_per_part = None
             slicer_error_msg = str(e)
-            if _tmp_3mf_stl and os.path.exists(_tmp_3mf_stl):
-                try:
-                    os.unlink(_tmp_3mf_stl)
-                except OSError:
-                    pass
 
     # ── Adjust estimates with slicer results ──
     if slicer_filament_g_per_part is not None and slicer_filament_g_per_part > 0:
@@ -552,9 +542,18 @@ async def process_single_file(
         with open(model_saved_path, "wb") as f:
             f.write(bytes(file_content))
 
-        # ── Apply manual orientation ──
+        # Normalize once and use the same triangulated mesh for geometry,
+        # orientation, preview metadata, and slicing. The uploaded source is
+        # intentionally preserved unchanged.
+        normalized_model = normalize_model(
+            model_saved_path,
+            output_dir=os.path.join(os.path.dirname(model_saved_path), "normalized"),
+        )
+        normalized_path = normalized_model.mesh_path
+
+        # ?? Apply manual orientation to the normalized mesh ??
         if any(v is not None for v in [orient_x, orient_y, orient_z]):
-            _apply_manual_orientation(model_saved_path, orient_x, orient_y, orient_z)
+            _apply_manual_orientation(normalized_path, orient_x, orient_y, orient_z)
             auto_orient = False  # don't double-orient
 
         # Resolve the effective nozzle from the compound printer id, e.g.
@@ -570,13 +569,16 @@ async def process_single_file(
             pass
 
         # ── Geometry ──
-        volume, surface_area, dimensions = calculate_geometry(model_saved_path)
+        volume, surface_area, dimensions = calculate_geometry(normalized_path)
         if volume == 0:
             return {
                 "filename": filename,
                 "status": "failed",
                 "error": "无法读取或计算模型体积，可能文件已损坏",
                 "_saved_path": model_saved_path,
+                "_normalized_path": normalized_path,
+                "source_format": ext.lstrip("."),
+                "normalized_format": "stl",
             }
 
         # ── Printer dimension check ──
@@ -631,6 +633,9 @@ async def process_single_file(
                     "_printer_model": pricing_config.get("printer_model"),
                     "_nozzle_diameter": _nozzle_diameter,
                     "_saved_path": model_saved_path,
+                    "_normalized_path": normalized_path,
+                    "source_format": ext.lstrip("."),
+                    "normalized_format": "stl",
                 }
 
         # Inject speed params into pricing_config (for PrusaSlicer)
@@ -650,7 +655,7 @@ async def process_single_file(
                 user_materials,
                 pricing_config,
                 quantity,
-                model_path=model_saved_path,
+                model_path=normalized_path,
                 slicer_preset=slicer_preset,
                 perimeters=perimeters,
                 current_user=current_user,
@@ -716,11 +721,25 @@ async def process_single_file(
             "_printer_model": pricing_config.get("printer_model") if pricing_config else None,
             "_nozzle_diameter": _nozzle_diameter,
             "_saved_path": model_saved_path,
+            "_normalized_path": normalized_path,
+            "source_format": ext.lstrip("."),
+            "normalized_format": "stl",
             "cost_breakdown": breakdown,
             "effective_weight_g": round(effective_weight_g * quantity, 2),
             "_printer_speed_params": _speed_params if _speed_params else None,
         }
 
+    except ModelNormalizationError as e:
+        msg = str(e or "").strip()
+        if len(msg) > 240:
+            msg = msg[:240]
+        return {
+            "filename": filename,
+            "status": "failed",
+            "error_code": e.code,
+            "error": msg or "???????",
+            "source_format": ext.lstrip("."),
+        }
     except Exception as e:
         msg = str(e or "").strip()
         if len(msg) > 200:
@@ -728,7 +747,8 @@ async def process_single_file(
         return {
             "filename": filename,
             "status": "failed",
-            "error": msg or "处理失败",
+            "error": msg or "????",
+            "source_format": ext.lstrip("."),
         }
 
 
