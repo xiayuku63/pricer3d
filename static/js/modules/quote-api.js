@@ -76,6 +76,17 @@ function _getActiveSlicerParams() {
     };
 }
 
+async function _syncThumbnailsWithQuoteResults(files, results) {
+    const filesByName = new Map((files || []).map((file) => [file.name, file]));
+    for (const result of results || []) {
+        const file = filesByName.get(result?.filename);
+        if (!file || !result?.color) continue;
+        // The upload preview is generated before the API response arrives. Rebuild
+        // it from the server-selected color so it cannot retain a stale global default.
+        await ensureThumbnailForFile(file, result.color, getResultOrientation(result));
+    }
+}
+
 export function getSlicerConfigSnapshot() {
     return {
         printerModel: _getActivePrinterModel(),
@@ -193,7 +204,9 @@ async function _quoteSelectedFilesInternal(selectedFiles, useProgress) {
             const result = await uploadWithProgress('/api/quote', formData, authToken);
             if (!result.ok) throw new Error(result.error || t('quote.requestFailed'));
             const data = result.data;
-            mergeResultsByFilename(data.results || []);
+            const results = data.results || [];
+            mergeResultsByFilename(results);
+            await _syncThumbnailsWithQuoteResults(selectedFiles, results);
             renderResultsTable();
             recalcSummaryFromCurrentResults();
             showProgressSuccess(`报价完成，共处理 ${(data.results || []).length} 个文件`);
@@ -209,7 +222,9 @@ async function _quoteSelectedFilesInternal(selectedFiles, useProgress) {
         const response = await authFetch('/api/quote', { method: 'POST', body: formData });
         const data = await response.json();
         if (!response.ok) throw new Error(data.detail || data.error || t('quote.requestFailed'));
-        mergeResultsByFilename(data.results || []);
+        const results = data.results || [];
+        mergeResultsByFilename(results);
+        await _syncThumbnailsWithQuoteResults(selectedFiles, results);
         renderResultsTable();
         recalcSummaryFromCurrentResults();
         setTimeout(() => loadQuoteHistory(authToken), 500);
