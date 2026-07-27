@@ -89,48 +89,34 @@ __all__ = [
 
 
 def _load_mesh(model_path: str) -> trimesh.Trimesh:
-    """Load and validate a 3D model file (STL/3MF/STEP).
+    """Load a supported model through the shared normalization pipeline.
 
-    STEP files are auto-converted to STL via PrusaSlicer before loading.
+    Orientation operations need the same triangulated STL representation as
+    preview, geometry calculation, and slicing.  In particular, trimesh does
+    not provide a reliable STEP loader and direct 3MF loading can preserve a
+    scene instead of the assembled build geometry.  Normalizing here keeps
+    smart placement and the manual lay-on-face flow consistent for STL, 3MF,
+    and STEP files.
     """
-    _tmp = None
-    ext = os.path.splitext(model_path)[1].lower()
-    if ext in (".stp", ".step"):
-        import tempfile as _tempfile
-        import subprocess as _subprocess
+    from parser.model_pipeline import ModelNormalizationError, normalize_model
 
-        fd, _tmp = _tempfile.mkstemp(suffix=".stl", prefix="p3d_orient_step_")
-        os.close(fd)
-        result = _subprocess.run(
-            ["prusa-slicer", "--export-stl", "--output", _tmp, model_path],
-            capture_output=True,
-            text=True,
-            timeout=120,
-        )
-        if result.returncode != 0 or not os.path.exists(_tmp):
-            if _tmp and os.path.exists(_tmp):
-                os.unlink(_tmp)
-            raise ValueError(f"STEP 文件转换失败: {os.path.basename(model_path)}")
-        load_path = _tmp
-    else:
-        load_path = model_path
-
+    normalized = None
     try:
-        mesh = trimesh.load(load_path, force="mesh")
+        normalized = normalize_model(model_path)
+        mesh = trimesh.load(normalized.mesh_path, force="mesh")
         if isinstance(mesh, trimesh.Scene):
             meshes = mesh.dump()
             mesh = trimesh.util.concatenate(meshes)
         if not isinstance(mesh, trimesh.Trimesh) or mesh.vertices.shape[0] == 0:
-            raise ValueError("无法加载模型: {}".format(model_path))
+            raise ValueError("model could not be loaded: {}".format(model_path))
         if not hasattr(mesh, "face_normals") or mesh.face_normals is None or len(mesh.face_normals) == 0:
             mesh = trimesh.Trimesh(vertices=mesh.vertices, faces=mesh.faces, process=True, validate=True)
         return mesh
+    except ModelNormalizationError:
+        raise
     finally:
-        if _tmp and os.path.exists(_tmp):
-            try:
-                os.unlink(_tmp)
-            except OSError:
-                pass
+        if normalized is not None:
+            normalized.cleanup()
 
 
 def analyze_orientation(
@@ -190,30 +176,12 @@ def apply_orientation_to_mesh(
     Returns:
         Path to the rotated STL file.
     """
-    _tmp = None
-    ext = os.path.splitext(model_path)[1].lower()
-    if ext in (".stp", ".step"):
-        import tempfile as _tempfile
-        import subprocess as _subprocess
+    from parser.model_pipeline import normalize_model
 
-        fd, _tmp = _tempfile.mkstemp(suffix=".stl", prefix="p3d_orient_apply_")
-        os.close(fd)
-        result = _subprocess.run(
-            ["prusa-slicer", "--export-stl", "--output", _tmp, model_path],
-            capture_output=True,
-            text=True,
-            timeout=120,
-        )
-        if result.returncode != 0 or not os.path.exists(_tmp):
-            if _tmp and os.path.exists(_tmp):
-                os.unlink(_tmp)
-            raise ValueError(f"STEP 文件转换失败: {os.path.basename(model_path)}")
-        load_path = _tmp
-    else:
-        load_path = model_path
-
+    normalized = normalize_model(model_path)
     try:
-        mesh = trimesh.load(load_path, force="mesh")
+        mesh = trimesh.load(normalized.mesh_path, force="mesh")
+
         if isinstance(mesh, trimesh.Scene):
             meshes = mesh.dump()
             mesh = trimesh.util.concatenate(meshes)
@@ -255,11 +223,7 @@ def apply_orientation_to_mesh(
         )
         return out_path
     finally:
-        if _tmp and os.path.exists(_tmp):
-            try:
-                os.unlink(_tmp)
-            except OSError:
-                pass
+        normalized.cleanup()
 
 
 def get_best_face_for_slicing(

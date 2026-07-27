@@ -3,13 +3,17 @@ import * as THREE from 'three';
 import { camera, controls, scene } from './scene.js';
 
 export function fitCameraToMesh(meshObject) {
-    const box = new THREE.Box3().setFromObject(meshObject);
+    const box = new THREE.Box3().setFromObject(meshObject, true);
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z);
     const fov = camera.fov * (Math.PI / 180);
     let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
     cameraZ *= 1.6;
+    // fitCameraToMesh always moves to a top view along -Z. Side-view buttons
+    // set camera.up to +Z, which becomes parallel to the view direction and
+    // makes the bed appear vertical. Restore a stable top-view up vector first.
+    camera.up.set(0, 1, 0);
     camera.position.set(center.x, center.y, center.z + cameraZ);
     camera.near = Math.max(maxDim / 100, 0.1);
     camera.far = Math.max(maxDim * 20, 1000);
@@ -26,7 +30,7 @@ export function fitCameraToMesh(meshObject) {
 export function lookAtView(view, meshObject) {
     if (!meshObject || !camera || !controls) return;
     meshObject.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(meshObject);
+    const box = new THREE.Box3().setFromObject(meshObject, true);
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z, 1);

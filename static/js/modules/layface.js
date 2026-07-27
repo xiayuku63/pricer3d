@@ -362,17 +362,24 @@ function _getFaceWorldMinZ(mesh, faceVertices) {
     if (!mesh || !Array.isArray(faceVertices) || faceVertices.length < 3) return null;
 
     const co = currentMeshCenterOffset || new THREE.Vector3(0, 0, 0);
-    let sinkZ = 0;
+    const localBedOffset = new THREE.Vector3(0, 0, 0);
     if (mesh.geometry) {
         mesh.geometry.computeBoundingBox();
-        sinkZ = mesh.geometry.boundingBox.getCenter(new THREE.Vector3()).z;
+        mesh.geometry.boundingBox.getCenter(localBedOffset);
     }
-
+    // Backend clusters use normalized STL source coordinates. The viewer first
+    // subtracts currentMeshCenterOffset with geometry.center(), then translates
+    // the local geometry upward so its initial bottom is Z=0. Reapply both
+    // transforms before matrixWorld so face-side selection uses the real plane.
     let minZ = Infinity;
     const point = new THREE.Vector3();
     for (const vertex of faceVertices) {
         if (!Array.isArray(vertex) || vertex.length < 3) continue;
-        point.set(vertex[0] - co.x, vertex[1] - co.y, vertex[2] - co.z + sinkZ);
+        point.set(
+            vertex[0] - co.x + localBedOffset.x,
+            vertex[1] - co.y + localBedOffset.y,
+            vertex[2] - co.z + localBedOffset.z,
+        );
         point.applyMatrix4(mesh.matrixWorld);
         if (Number.isFinite(point.z)) minZ = Math.min(minZ, point.z);
     }
@@ -395,7 +402,7 @@ export function placeFaceOnBed(mesh, normal, upAxis = 'Z', faceVertices = null) 
         const candidateQuat = new THREE.Quaternion().setFromUnitVectors(direction, up);
         mesh.quaternion.copy(candidateQuat);
         mesh.updateMatrixWorld(true);
-        const modelBox = new THREE.Box3().setFromObject(mesh);
+        const modelBox = new THREE.Box3().setFromObject(mesh, true);
         const faceMinZ = _getFaceWorldMinZ(mesh, faceVertices);
         const gap = faceMinZ === null ? 0 : Math.max(0, faceMinZ - modelBox.min.z);
         if (gap < bestGap) {
@@ -405,21 +412,16 @@ export function placeFaceOnBed(mesh, normal, upAxis = 'Z', faceVertices = null) 
     }
     mesh.quaternion.copy(bestQuat || new THREE.Quaternion());
 
-    // Pin the chosen face itself to Z=0. Falling back to the overall bounding
-    // box keeps placement safe when face vertices are unavailable.
+    // Use face vertices only to choose the normal direction. The rendered object's
+    // world bounds are the source of truth for final bed contact, so malformed
+    // or stale face coordinates can never leave the visible model floating.
     mesh.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(mesh);
-    const faceMinZ = _getFaceWorldMinZ(mesh, faceVertices);
-    mesh.position.z -= faceMinZ === null ? box.min.z : faceMinZ;
-
-    // A malformed/non-planar face must never leave any model geometry below bed.
-    mesh.updateMatrixWorld(true);
-    const settledBox = new THREE.Box3().setFromObject(mesh);
-    if (settledBox.min.z < -0.001) mesh.position.z -= settledBox.min.z;
+    const box = new THREE.Box3().setFromObject(mesh, true);
+    mesh.position.z -= box.min.z;
 
     // X/Y 居中到热床中心（与 orientation-ui.js centerModel() 逻辑一致）
     mesh.updateMatrixWorld(true);
-    const box2 = new THREE.Box3().setFromObject(mesh);
+    const box2 = new THREE.Box3().setFromObject(mesh, true);
     const center = box2.getCenter(new THREE.Vector3());
     const bc = window._BED_CENTER || 128;
     mesh.position.x += (bc - center.x);

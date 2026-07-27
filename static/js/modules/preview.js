@@ -12,16 +12,77 @@ import {
     camera, renderer, controls, clearCurrentMesh, currentMesh,
     lookAtView, applyOrientationRotation, resetOrientation,
     setupFaceClickHandler, highlightFaces, resetHighlight, fitCameraToMesh,
-    setBedLabel, updateBedSize,
+    setBedLabel, updateBedSize, getCurrentMeshEntities, setCurrentMeshEntityColor,
 } from './viewer.js';
 import { clearClusters } from './layface.js';
 import { t } from './i18n.js';
 import { getResultOrientation, hasNonZeroOrientation } from './orientation-state.js';
 import { addPreviewLighting, configurePreviewRenderer, createPreviewMaterial } from './viewer/render-style.js';
+import { getPreview3mf, getPreviewGlb } from './preview-cache.js';
 
 let dom = {};
+let entityColorEventsBound = false;
+let previewRenderToken = 0;
 
-export function initPreview(d) { dom = d; }
+function hideEntityColorControls() {
+    const section = document.getElementById('entity-colors-section');
+    const list = document.getElementById('entity-colors-list');
+    if (section) section.classList.add('hidden');
+    if (list) list.replaceChildren();
+}
+
+export function renderEntityColorControls() {
+    const section = document.getElementById('entity-colors-section');
+    const list = document.getElementById('entity-colors-list');
+    if (!section || !list) return;
+    const entities = getCurrentMeshEntities();
+    list.replaceChildren();
+    if (entities.length === 0) {
+        section.classList.add('hidden');
+        return;
+    }
+    for (const entity of entities) {
+        const row = document.createElement('label');
+        row.className = 'flex items-center gap-2 rounded-lg border px-2 py-1.5 text-xs';
+        row.style.borderColor = 'var(--color-border)';
+        const colorInput = document.createElement('input');
+        colorInput.type = 'color';
+        colorInput.value = entity.color || '#9CA3AF';
+        colorInput.setAttribute('data-entity-color', entity.id);
+        colorInput.className = 'h-7 w-9 cursor-pointer rounded border-0 bg-transparent p-0';
+        const name = document.createElement('span');
+        name.className = 'min-w-0 flex-1 truncate tw-text';
+        name.title = entity.name;
+        name.textContent = entity.name;
+        const hex = document.createElement('span');
+        hex.className = 'font-mono text-[10px] tw-text-muted';
+        hex.setAttribute('data-entity-color-value', entity.id);
+        hex.textContent = colorInput.value.toUpperCase();
+        row.append(colorInput, name, hex);
+        list.appendChild(row);
+    }
+    section.classList.remove('hidden');
+}
+
+function bindEntityColorControls() {
+    if (entityColorEventsBound) return;
+    const list = document.getElementById('entity-colors-list');
+    if (!list) return;
+    list.addEventListener('input', (event) => {
+        const input = event.target.closest('[data-entity-color]');
+        if (!input) return;
+        const entityId = input.getAttribute('data-entity-color');
+        if (!setCurrentMeshEntityColor(entityId, input.value)) return;
+        const value = list.querySelector('[data-entity-color-value="' + CSS.escape(entityId) + '"]');
+        if (value) value.textContent = input.value.toUpperCase();
+    });
+    entityColorEventsBound = true;
+}
+
+export function initPreview(d) {
+    dom = d;
+    bindEntityColorControls();
+}
 
 // Re-export buildPlaceholderThumbnail from viewer
 export { buildPlaceholderThumbnail } from './viewer.js';
@@ -105,11 +166,9 @@ export async function buildStlThumbnail(file, colorKey = "Blue", orientation = n
 }
 
 export async function buildNonStlThumbnail(file, colorKey, orientation = null) {
-    const formData = new FormData();
-    formData.append('file', file);
-    const resp = await fetch('/api/preview/glb', { method: 'POST', body: formData });
-    if (!resp.ok) throw new Error('GLB failed');
-    const glbBlob = await resp.blob();
+    const ext = file.name.includes('.') ? file.name.split('.').pop().toLowerCase() : '';
+    const is3mf = ext === '3mf';
+    const glbBlob = await (is3mf ? getPreview3mf(file) : getPreviewGlb(file));
     const url = URL.createObjectURL(glbBlob);
 
     const thumbRenderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
@@ -138,7 +197,12 @@ export async function buildNonStlThumbnail(file, colorKey, orientation = null) {
         if (c.isMesh) {
             c.castShadow = true;
             c.receiveShadow = true;
-            c.material = createPreviewMaterial(colorHex);
+            if (!is3mf) {
+                c.material = createPreviewMaterial(colorHex);
+            } else {
+                const sourceColor = c.userData.source_color || c.material?.color?.getHexString?.();
+                c.material = createPreviewMaterial(sourceColor ? (String(sourceColor).startsWith('#') ? sourceColor : '#' + sourceColor) : colorHex);
+            }
         }
     });
     if (orientation) {
@@ -236,6 +300,7 @@ export function openPreviewModal(onFaceClickCb) {
 }
 
 export function closePreviewModal() {
+    previewRenderToken += 1;
     const { previewModal, viewCube, layFaceBtn } = dom;
     setupFaceClickHandler(null);
     import('./orientation-ui.js').then(m => m.cleanupLayFaceMode()).catch(() => {
@@ -251,12 +316,14 @@ export function closePreviewModal() {
         layFaceBtn.setAttribute('aria-pressed', 'false');
     }
     if (previewModal) previewModal.classList.add('hidden');
+    hideEntityColorControls();
     if (viewCube) viewCube.classList.add('hidden');
 }
 
 export function previewByFilename(filename, ext) {
     const { previewPlaceholder } = dom;
     setCurrentPreviewFilename(filename);
+    const renderToken = ++previewRenderToken;
     const rowData = currentResults.find((i) => i && i.filename === filename);
     const printerRef = String(rowData?._printer_model || quoteOptions.printer_model || '');
     const printerId = printerRef.replace(/_\d{2}$/, '');
@@ -289,7 +356,12 @@ export function previewByFilename(filename, ext) {
     // Normalize to hex string if possible (handles bare-color-name / object inputs)
     var _previewColorObj = colorToObj(colorForPreview);
     if (_previewColorObj && _previewColorObj.hex) colorForPreview = _previewColorObj.hex;
-    renderSTL(file, colorForPreview, perFileOrient);
+    hideEntityColorControls();
+    Promise.resolve(renderSTL(file, colorForPreview, perFileOrient)).then((ok) => {
+        if (renderToken !== previewRenderToken || currentPreviewFilename !== filename) return;
+        if (ok) renderEntityColorControls();
+        else hideEntityColorControls();
+    });
 }
 
 export function updatePreviewColor(filename, color) {
@@ -297,7 +369,13 @@ export function updatePreviewColor(filename, color) {
     const file = selectedFilesMap.get(filename);
     if (!file) return false;
     const obj = colorToObj(color);
-    renderSTL(file, obj?.hex || color || '#ffffff', getResultOrientation(currentResults.find((item) => item && item.filename === filename)));
+    const renderToken = ++previewRenderToken;
+    Promise.resolve(renderSTL(file, obj?.hex || color || '#ffffff',
+        getResultOrientation(currentResults.find((item) => item && item.filename === filename)),
+    )).then((ok) => {
+        if (renderToken !== previewRenderToken || currentPreviewFilename !== filename) return;
+        if (ok) renderEntityColorControls();
+    });
     return true;
 }
 
