@@ -455,7 +455,7 @@ export async function saveOrientationAndRequote() {
     try {
         const { quoteSingleFileWithOptions, mergeResultsByFilename } = await import('./quote-api.js');
         const { renderResultsTable, recalcSummaryFromCurrentResults } = await import('./quote-render.js');
-        const { ensureThumbnailForFile, closePreviewModal } = await import('./preview.js');
+        const { ensureThumbnailForFile, closePreviewModal, getCurrentPreviewEntityColors } = await import('./preview.js');
 
         const ctx = getCurrentPreviewQuoteContext();
         await ensureThumbnailForFile(file, ctx.color, orient);
@@ -469,6 +469,7 @@ export async function saveOrientationAndRequote() {
             orient_x: orient.x,
             orient_y: orient.y,
             orient_z: orient.z,
+            entity_colors: getCurrentPreviewEntityColors(),
         });
 
         // The quote response is authoritative for time/cost. Attach the

@@ -228,6 +228,7 @@ def parse_prusa_gcode_stats(gcode_path: str) -> dict:
         "filament_mm": 0.0,
         "filament_cm3": 0.0,
         "filament_g": 0.0,
+        "filament_g_by_extruder": [],
         "time_s": 0,
         "time_str": "",
     }
@@ -248,6 +249,13 @@ def parse_prusa_gcode_stats(gcode_path: str) -> dict:
         result["filament_cm3"] = float(m.group(1))
     if m := re.search(r"; total filament used \[g\] = ([\d.]+)", content):
         result["filament_g"] = float(m.group(1))
+    if m := re.search(r"; filament used \[g\] = ([^\r\n]+)", content):
+        try:
+            values = [float(part.strip()) for part in m.group(1).split(",") if part.strip()]
+        except ValueError:
+            values = []
+        if len(values) > 1:
+            result["filament_g_by_extruder"] = values
 
     # Parse time: "estimated printing time (normal mode) = Xh Ym Zs" or "Xm Ys"
     if m := re.search(r"; estimated printing time \(normal mode\) = (\d+)h (\d+)m (\d+)s", content):
@@ -405,6 +413,7 @@ def generate_slice_config(
     max_acceleration: Optional[float] = None,
     jerk_limit: Optional[float] = None,
     max_volumetric_speed: Optional[float] = None,
+    multicolor_slots: Optional[list[dict]] = None,
 ) -> str:
     """
     Generate a combined PrusaSlicer INI config file for a quote request.
@@ -550,6 +559,24 @@ def generate_slice_config(
                 sections[sec_name]["first_layer_bed_temperature"] = str(bed_temp)
             break
 
+    # Multi-color / single-nozzle multi-material settings.
+    # Object-level tool assignments are stored in the generated Prusa 3MF.
+    if multicolor_slots and len(multicolor_slots) > 1:
+        colors = [str(slot.get("color") or "#9CA3AF") for slot in multicolor_slots]
+        densities = [str(float(slot.get("density") or material_density)) for slot in multicolor_slots]
+        for sec_name in sections:
+            if sec_name.startswith("filament:"):
+                section = sections[sec_name]
+                section["filament_colour"] = ",".join(colors)
+                section["extruder_colour"] = ",".join(colors)
+                section["filament_density"] = ",".join(densities)
+                section["single_extruder_multi_material"] = "1"
+                section["wipe_tower"] = "1"
+                section.setdefault("wipe_tower_x", "180")
+                section.setdefault("wipe_tower_y", "0")
+                section.setdefault("toolchange_gcode", "T[next_extruder]")
+                break
+
     # ── Write temp config FLAT (no section headers, deduplicated) ──
     # CRITICAL: PrusaSlicer 2.7.x CLI --load ONLY accepts flat key=value.
     # Any [section] header causes the ENTIRE file to be ignored.
@@ -606,6 +633,7 @@ def run_prusa_slice(
     max_acceleration: Optional[float] = None,
     jerk_limit: Optional[float] = None,
     max_volumetric_speed: Optional[float] = None,
+    multicolor_slots: Optional[list[dict]] = None,
 ) -> dict:
     """
     Run PrusaSlicer headless. Merges system/user/quote config into temp INI.
@@ -644,6 +672,7 @@ def run_prusa_slice(
         max_acceleration=max_acceleration,
         jerk_limit=jerk_limit,
         max_volumetric_speed=max_volumetric_speed,
+        multicolor_slots=multicolor_slots,
     )
 
     preset_label = "系统默认"

@@ -9,7 +9,7 @@ import pytest
 from fastapi import UploadFile
 
 from app import routes_preview
-from parser.model_pipeline import load_3mf_entities, normalize_model
+from parser.model_pipeline import build_prusaslicer_multicolor_3mf, load_3mf_entities, normalize_model
 
 
 CORE_NS = "http://schemas.microsoft.com/3dmanufacturing/core/2015/02"
@@ -161,3 +161,33 @@ def test_load_3mf_entities_splits_triangle_material_colors(tmp_path):
     assert len(entities) == 2
     assert [entity.color for entity in entities] == ["#FF0000", "#0000FF"]
     assert [len(entity.faces) for entity in entities] == [1, 1]
+
+
+def test_multicolor_prusa_project_preserves_entities_colors_and_extruder_slots(tmp_path):
+    source = tmp_path / "multi.3mf"
+    output = tmp_path / "multicolor-project.3mf"
+    _write_multi_entity_3mf(source)
+
+    result = build_prusaslicer_multicolor_3mf(
+        str(source),
+        str(output),
+        entity_colors={
+            "3D/Objects/parts.model:1:1": {"color": "#CC0000"},
+            "3D/Objects/parts.model:2:1": {"color": "#0000CC"},
+        },
+        euler_angles_deg={"x": 0, "y": 0, "z": 90},
+    )
+
+    assert output.exists()
+    assert result["entity_count"] == 2
+    assert result["colors"] == ["#CC0000", "#0000CC"]
+    assert [item["extruder"] for item in result["slots"]] == [1, 2]
+    with zipfile.ZipFile(output) as archive:
+        config = archive.read("Metadata/Slic3r_PE_model.config").decode("utf-8")
+        model = archive.read("3D/3dmodel.model").decode("utf-8")
+    assert 'key="extruder" value="1"' in config
+    assert 'key="extruder" value="2"' in config
+    assert model.count('<object id=') == 2
+    # The first tetrahedron was at x=5..15 / y=7..17.  A 90-degree Z rotation
+    # changes the plane; this proves the project carries manual placement too.
+    assert 'vertex x="-7" y="5" z="9"' in model

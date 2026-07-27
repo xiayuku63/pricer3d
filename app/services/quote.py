@@ -179,6 +179,7 @@ async def build_quote_payload(
     orient_x: Optional[float],
     orient_y: Optional[float],
     orient_z: Optional[float],
+    entity_colors_json: Optional[str],
     current_user: dict,
 ):
     """Validate inputs, process files, apply membership discount and persist history.
@@ -206,6 +207,16 @@ async def build_quote_payload(
                 detail={"status_code": status_code},
             )
             return payload
+
+    entity_colors: dict[str, object] = {}
+    if entity_colors_json:
+        try:
+            parsed_colors = json.loads(entity_colors_json)
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(status_code=400, detail="多色实体配置格式不正确") from exc
+        if not isinstance(parsed_colors, dict) or len(parsed_colors) > 100:
+            raise HTTPException(status_code=400, detail="多色实体配置格式不正确")
+        entity_colors = parsed_colors
 
     if not files:
         raise HTTPException(status_code=400, detail="请至少上传一个模型文件")
@@ -315,6 +326,7 @@ async def build_quote_payload(
                     orient_y,
                     orient_z,
                     selected_material,
+                    entity_colors,
                 )
                 if isinstance(result, dict) and effective_brand:
                     result["brand"] = effective_brand
@@ -405,6 +417,7 @@ def _process_single_file_sync(
     orient_y: Optional[float] = None,
     orient_z: Optional[float] = None,
     selected_material_spec: Optional[dict] = None,
+    entity_colors: Optional[dict[str, object]] = None,
 ):
     """Synchronous wrapper for process_single_file — runs in thread pool.
 
@@ -466,6 +479,7 @@ def _process_single_file_sync(
             orient_y,
             orient_z,
             selected_material_spec=selected_material_spec,
+            entity_colors=entity_colors,
             printer_bed_resolver=printer_bed_resolver,
             speed_params_override=speed_params_override,
             printer_profile_path=printer_profile_path,

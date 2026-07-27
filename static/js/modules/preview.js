@@ -106,6 +106,24 @@ function createEntityColorChoice(color, entityId, selectedColor) {
     return choice;
 }
 
+export function getCurrentPreviewEntityColors() {
+    const assignments = {};
+    for (const entity of getCurrentMeshEntities()) {
+        const color = normalizeEntityColor(entity.color, '');
+        if (entity.id && color) assignments[entity.id] = { color };
+    }
+    return assignments;
+}
+
+function applySavedEntityColors(assignments) {
+    if (!assignments || typeof assignments !== 'object') return;
+    for (const entity of getCurrentMeshEntities()) {
+        const requested = assignments[entity.id];
+        const color = normalizeEntityColor(typeof requested === 'object' ? requested?.color : requested, '');
+        if (color) setCurrentMeshEntityColor(entity.id, color);
+    }
+}
+
 export function renderEntityColorControls() {
     const section = document.getElementById('entity-colors-section');
     const list = document.getElementById('entity-colors-list');
@@ -505,8 +523,10 @@ export function previewByFilename(filename, ext) {
     hideEntityColorControls();
     Promise.resolve(renderSTL(file, colorForPreview, perFileOrient)).then((ok) => {
         if (renderToken !== previewRenderToken || currentPreviewFilename !== filename) return;
-        if (ok) renderEntityColorControls();
-        else hideEntityColorControls();
+        if (ok) {
+            applySavedEntityColors(rowData?._entity_colors);
+            renderEntityColorControls();
+        } else hideEntityColorControls();
     });
 }
 
