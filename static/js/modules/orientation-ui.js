@@ -1,7 +1,7 @@
 // ── Orientation UI: layface, orientation controls, training ──
 import * as THREE from 'three';
 import {
-    currentMesh, controls, requestRender, renderer, camera,
+    currentMesh, controls, requestRender, renderer, camera, waitForMeshReady,
 } from './viewer.js';
 import {
     renderClusters, clearClusters, setClusterHover, intersectClusters,
@@ -153,14 +153,14 @@ export function syncOrientationFromMesh() {
 export function centerModel() {
     if (!currentMesh) return;
     currentMesh.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(currentMesh);
+    const box = new THREE.Box3().setFromObject(currentMesh, true);
     const center = box.getCenter(new THREE.Vector3());
     const bc = window._BED_CENTER || 128;
     currentMesh.position.x += (bc - center.x);
     currentMesh.position.y += (bc - center.y);
     currentMesh.position.z -= box.min.z;
     currentMesh.updateMatrixWorld(true);
-    const newBox = new THREE.Box3().setFromObject(currentMesh);
+    const newBox = new THREE.Box3().setFromObject(currentMesh, true);
     const newCenter = newBox.getCenter(new THREE.Vector3());
     controls.target.copy(newCenter);
     controls.update();
@@ -184,11 +184,30 @@ export async function toggleLayFace() {
     if (!file) return;
 
     if (layFaceState === 'loading') return;
+    if (!currentMesh) {
+        layFaceState = 'loading';
+        bindLayFaceEscape();
+        setLayFaceButtonLabel(t('orientation.analyzing'), { disabled: true });
+        setLayFaceHint(true, t('orientation.analyzing'));
+        const ready = await waitForMeshReady();
+        if (!ready || !currentMesh) {
+            cleanupLayFaceMode();
+            setLayFaceButtonLabel(t('orientation.requestFailed'));
+            setTimeout(() => setLayFaceButtonLabel(t('orientation.autoOrient')), 2000);
+            return;
+        }
+        layFaceState = 'idle';
+        setLayFaceHint(false);
+        setLayFaceButtonLabel(t('orientation.autoOrient'));
+    }
     if (layFaceState === 'active') {
         cleanupLayFaceMode();
         return;
     }
 
+    // Re-entering manual placement must preserve the current orientation. The
+    // face placement operation already replaces the mesh quaternion directly;
+    // resetting here makes the second invocation jump back to the initial pose.
     clearClusters();
     layFaceState = 'loading';
     bindLayFaceEscape();
@@ -364,7 +383,7 @@ export async function learnedAutoOrient() {
         applyOrientationRotation(data.euler_angles_deg);
         // 再次确保贴到 Z=0 并适配相机
         currentMesh.updateMatrixWorld(true);
-        const box = new THREE.Box3().setFromObject(currentMesh);
+        const box = new THREE.Box3().setFromObject(currentMesh, true);
         if (box.min.z > 0.1) {
             currentMesh.position.z -= box.min.z;
         }

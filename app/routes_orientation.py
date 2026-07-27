@@ -16,7 +16,7 @@ import numpy as np
 
 from .config import MAX_FILE_SIZE_BYTES, SUPPORTED_EXTENSIONS
 from .deps import get_current_user
-from calculator.orientation import analyze_orientation, get_stable_faces, cluster_coplanar_faces
+from calculator.orientation import analyze_orientation, get_stable_faces, cluster_coplanar_faces, _load_mesh
 
 logger = logging.getLogger(__name__)
 
@@ -138,13 +138,8 @@ async def list_coplanar_clusters(
         with open(tmp_path, "wb") as f:
             f.write(content)
 
-        import trimesh
-
-        mesh = trimesh.load(tmp_path, force="mesh")
-        if isinstance(mesh, trimesh.Scene):
-            meshes = mesh.dump()
-            mesh = trimesh.util.concatenate(meshes)
-        if not isinstance(mesh, trimesh.Trimesh) or mesh.vertices.shape[0] == 0:
+        mesh = _load_mesh(tmp_path)
+        if mesh.vertices.shape[0] == 0:
             return {"filename": filename, "clusters": []}
 
         clusters = cluster_coplanar_faces(mesh, include_upward_faces=True)
@@ -188,13 +183,8 @@ async def train_sample(
         with open(tmp_path, "wb") as f:
             f.write(content)
 
-        import trimesh
-
-        mesh = trimesh.load(tmp_path, force="mesh")
-        if isinstance(mesh, trimesh.Scene):
-            meshes = mesh.dump()
-            mesh = trimesh.util.concatenate(meshes)
-        if not isinstance(mesh, trimesh.Trimesh) or mesh.vertices.shape[0] == 0:
+        mesh = _load_mesh(tmp_path)
+        if mesh.vertices.shape[0] == 0:
             return {"status": "ok", "message": "已标记 (无面级数据)"}
 
         # ── 新版: 面级特征提取 ──

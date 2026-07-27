@@ -7,10 +7,15 @@ creates a temporary STL representation for OBJ/3MF/STEP when necessary.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import os
+import posixpath
 import subprocess
+import shutil
 import tempfile
+import threading
 import uuid
 import zipfile
 import xml.etree.ElementTree as ET
@@ -33,6 +38,37 @@ logger = logging.getLogger(__name__)
 SUPPORTED_MODEL_EXTENSIONS = {".stl", ".stp", ".step", ".obj", ".3mf"}
 _STEP_EXTENSIONS = {".stp", ".step"}
 _3MF_MESH_EXTENSIONS = {".stl", ".obj", ".ply", ".off"}
+
+# STEP conversion is the dominant cost of non-STL preview.  Preview, quote,
+# orientation, and slicing can all request the same uploaded bytes, so keep a
+# process-local normalized STL cache keyed by source content.  The cache lives
+# under the system temp directory and is intentionally not returned as a
+# temporary artifact owned by one request.
+_MODEL_CACHE_ROOT = Path(tempfile.gettempdir()) / f"pricer3d_model_cache_{os.getpid()}"
+_MODEL_CACHE_GUARD = threading.Lock()
+_MODEL_CACHE_LOCKS: dict[str, threading.Lock] = {}
+
+
+def _model_cache_lock(key: str) -> threading.Lock:
+    with _MODEL_CACHE_GUARD:
+        return _MODEL_CACHE_LOCKS.setdefault(key, threading.Lock())
+
+
+def _source_digest(path: str) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _cached_mesh_path(path: str, extension: str) -> tuple[str, str]:
+    source_key = _source_digest(path)
+    converter_key = prusa_executable() if extension in _STEP_EXTENSIONS else "native-3mf"
+    cache_key = hashlib.sha256(
+        f"{extension}\0{converter_key}\0{source_key}".encode("utf-8")
+    ).hexdigest()
+    return cache_key, str(_MODEL_CACHE_ROOT / f"{cache_key}.stl")
 
 
 class ModelNormalizationError(RuntimeError):
@@ -249,6 +285,276 @@ def _parse_3mf_model(xml_data: bytes) -> tuple[list[np.ndarray], list[np.ndarray
     return vertices_out, faces_out
 
 
+
+@dataclass
+class ThreeMFEntity:
+    entity_id: str
+    name: str
+    vertices: np.ndarray
+    faces: np.ndarray
+    color: Optional[str] = None
+    source_object_id: str = ""
+
+
+def _attribute_by_local_name(element: ET.Element, name: str) -> Optional[str]:
+    for key, value in element.attrib.items():
+        if _local_name(key) == name:
+            return value
+    return None
+
+
+def _normalize_3mf_color(raw: Optional[str]) -> Optional[str]:
+    if not raw:
+        return None
+    value = raw.strip().upper()
+    if not value.startswith("#"):
+        value = f"#{value}"
+    if len(value) == 9:
+        value = value[:7]
+    if len(value) != 7:
+        return None
+    try:
+        int(value[1:], 16)
+    except ValueError:
+        return None
+    return value
+
+
+def _parse_3mf_property_colors(resources: Optional[ET.Element]) -> dict[tuple[str, int], str]:
+    colors: dict[tuple[str, int], str] = {}
+    if resources is None:
+        return colors
+    for group in list(resources):
+        group_name = _local_name(group.tag)
+        if group_name not in {"basematerials", "colorgroup"}:
+            continue
+        resource_id = group.attrib.get("id")
+        if not resource_id:
+            continue
+        for index, item in enumerate(list(group)):
+            raw_color = item.attrib.get("displaycolor") or item.attrib.get("color")
+            color = _normalize_3mf_color(raw_color)
+            if color:
+                colors[(resource_id, index)] = color
+    return colors
+
+
+def _metadata_value(element: ET.Element, key: str) -> Optional[str]:
+    for child in _children(element, "metadata"):
+        if child.attrib.get("key") == key:
+            return child.attrib.get("value")
+    return None
+
+
+def _parse_bambu_3mf_parts(archive: zipfile.ZipFile) -> dict[str, dict[str, object]]:
+    filament_colors: list[Optional[str]] = []
+    if "Metadata/project_settings.config" in archive.namelist():
+        try:
+            settings = json.loads(archive.read("Metadata/project_settings.config").decode("utf-8-sig"))
+            filament_colors = [
+                _normalize_3mf_color(str(raw))
+                for raw in settings.get("filament_colour", [])
+            ]
+        except (UnicodeDecodeError, json.JSONDecodeError, TypeError):
+            filament_colors = []
+
+    parts: dict[str, dict[str, object]] = {}
+    if "Metadata/model_settings.config" not in archive.namelist():
+        return parts
+    try:
+        root = ET.fromstring(archive.read("Metadata/model_settings.config"))
+    except ET.ParseError:
+        return parts
+
+    for object_element in _children(root, "object"):
+        object_extruder = _metadata_value(object_element, "extruder")
+        for part in _children(object_element, "part"):
+            part_id = part.attrib.get("id")
+            if not part_id:
+                continue
+            name = _metadata_value(part, "name")
+            raw_extruder = _metadata_value(part, "extruder") or object_extruder
+            try:
+                extruder = int(raw_extruder) if raw_extruder else None
+            except ValueError:
+                extruder = None
+            color = None
+            if extruder is not None and 1 <= extruder <= len(filament_colors):
+                color = filament_colors[extruder - 1]
+            parts[part_id] = {"name": name, "extruder": extruder, "color": color}
+    return parts
+
+
+def _normalized_package_path(raw: str, current_document: str) -> str:
+    path = raw.replace("\\", "/")
+    if path.startswith("/"):
+        return posixpath.normpath(path.lstrip("/"))
+    return posixpath.normpath(posixpath.join(posixpath.dirname(current_document), path))
+
+
+def load_3mf_entities(path: str) -> list[ThreeMFEntity]:
+    """Load build instances as separate transformed meshes with display colors."""
+    try:
+        with zipfile.ZipFile(path, "r") as archive:
+            if archive.testzip() is not None:
+                raise ModelNormalizationError("3MF archive is corrupt", code="3MF_ZIP_INVALID")
+            document_names = [
+                name.replace("\\", "/").lstrip("/")
+                for name in archive.namelist()
+                if name.lower().endswith(".model") and name.replace("\\", "/").startswith("3D/")
+            ]
+            if not document_names:
+                raise ModelNormalizationError("3MF contains no model document", code="3MF_OBJECTS_MISSING")
+
+            documents: dict[str, dict[str, object]] = {}
+            for document_name in document_names:
+                try:
+                    root = ET.fromstring(archive.read(document_name))
+                except ET.ParseError as exc:
+                    raise ModelNormalizationError("3MF model XML is invalid", code="3MF_XML_INVALID") from exc
+                resources = _first_child(root, "resources")
+                objects: dict[str, ET.Element] = {}
+                if resources is not None:
+                    for object_element in _children(resources, "object"):
+                        object_id = object_element.attrib.get("id")
+                        if object_id:
+                            objects[object_id] = object_element
+                unit = (root.attrib.get("unit") or "millimeter").lower()
+                documents[document_name] = {
+                    "root": root,
+                    "objects": objects,
+                    "unit_scale": _UNIT_TO_MM.get(unit, 1.0),
+                    "colors": _parse_3mf_property_colors(resources),
+                }
+
+            root_document = "3D/3dmodel.model" if "3D/3dmodel.model" in documents else document_names[0]
+            bambu_parts = _parse_bambu_3mf_parts(archive)
+            entities: list[ThreeMFEntity] = []
+            instance_counts: dict[tuple[str, str], int] = {}
+
+            def resolve_object(
+                document_name: str,
+                object_id: str,
+                transform: np.ndarray,
+                stack: tuple[tuple[str, str], ...] = (),
+            ) -> None:
+                key = (document_name, object_id)
+                if key in stack:
+                    raise ModelNormalizationError("3MF component cycle", code="3MF_COMPONENT_CYCLE")
+                document = documents.get(document_name)
+                if document is None:
+                    return
+                object_element = document["objects"].get(object_id)
+                if object_element is None:
+                    return
+
+                arrays = _mesh_arrays_from_object(object_element, float(document["unit_scale"]))
+                if arrays is not None:
+                    vertices, faces = arrays
+                    instance_key = (document_name, object_id)
+                    instance_index = instance_counts.get(instance_key, 0) + 1
+                    instance_counts[instance_key] = instance_index
+                    part_metadata = bambu_parts.get(object_id, {})
+                    entity_name = str(
+                        part_metadata.get("name")
+                        or object_element.attrib.get("name")
+                        or f"Entity {len(entities) + 1}"
+                    )
+
+                    object_color = part_metadata.get("color")
+                    if not object_color:
+                        pid = object_element.attrib.get("pid")
+                        raw_index = object_element.attrib.get("pindex")
+                        if pid and raw_index is not None:
+                            try:
+                                object_color = document["colors"].get((pid, int(raw_index)))
+                            except ValueError:
+                                object_color = None
+
+                    mesh_element = _first_child(object_element, "mesh")
+                    triangles_element = _first_child(mesh_element, "triangles") if mesh_element is not None else None
+                    triangle_colors: list[Optional[str]] = []
+                    if triangles_element is not None:
+                        for triangle in _children(triangles_element, "triangle"):
+                            triangle_color = object_color
+                            pid = triangle.attrib.get("pid")
+                            raw_index = triangle.attrib.get("p1")
+                            if pid and raw_index is not None:
+                                try:
+                                    triangle_color = document["colors"].get((pid, int(raw_index))) or triangle_color
+                                except ValueError:
+                                    pass
+                            triangle_colors.append(str(triangle_color) if triangle_color else None)
+
+                    distinct_colors = list(dict.fromkeys(triangle_colors))
+                    if len(distinct_colors) <= 1:
+                        groups = [(None, np.arange(len(faces), dtype=np.int64))]
+                    else:
+                        groups = [
+                            (color, np.asarray([index for index, item in enumerate(triangle_colors) if item == color], dtype=np.int64))
+                            for color in distinct_colors
+                        ]
+
+                    for group_index, (group_color, group_face_indices) in enumerate(groups):
+                        if len(group_face_indices) == 0:
+                            continue
+                        group_faces = faces[group_face_indices]
+                        used_vertices = np.unique(group_faces.reshape(-1))
+                        remap = {int(old): index for index, old in enumerate(used_vertices)}
+                        local_faces = np.asarray(
+                            [[remap[int(vertex)] for vertex in face] for face in group_faces],
+                            dtype=np.int64,
+                        )
+                        color = group_color or object_color
+                        suffix = f":part{group_index + 1}" if len(groups) > 1 else ""
+                        entities.append(
+                            ThreeMFEntity(
+                                entity_id=f"{document_name}:{object_id}:{instance_index}{suffix}",
+                                name=entity_name + (f" ({color})" if len(groups) > 1 and color else ""),
+                                vertices=_apply_transform(vertices[used_vertices], transform),
+                                faces=local_faces,
+                                color=str(color) if color else None,
+                                source_object_id=object_id,
+                            )
+                        )
+
+                components = _first_child(object_element, "components")
+                if components is None:
+                    return
+                for component in _children(components, "component"):
+                    component_id = component.attrib.get("objectid")
+                    if not component_id:
+                        continue
+                    raw_path = _attribute_by_local_name(component, "path")
+                    target_document = (
+                        _normalized_package_path(raw_path, document_name)
+                        if raw_path else document_name
+                    )
+                    child_transform = transform @ _parse_3mf_transform(component.attrib.get("transform"))
+                    resolve_object(target_document, component_id, child_transform, stack + (key,))
+
+            root_info = documents[root_document]
+            build = _first_child(root_info["root"], "build")
+            build_items = _children(build, "item") if build is not None else []
+            if build_items:
+                for item in build_items:
+                    object_id = item.attrib.get("objectid")
+                    if object_id:
+                        resolve_object(
+                            root_document,
+                            object_id,
+                            _parse_3mf_transform(item.attrib.get("transform")),
+                        )
+            else:
+                for object_id in root_info["objects"]:
+                    resolve_object(root_document, object_id, np.eye(4, dtype=np.float64))
+
+            if not entities:
+                raise ModelNormalizationError("3MF contains no mesh entities", code="3MF_MESH_MISSING")
+            return entities
+    except zipfile.BadZipFile as exc:
+        raise ModelNormalizationError("3MF is not a valid ZIP archive", code="3MF_ZIP_INVALID") from exc
+
 def _export_mesh_to_stl(vertices: Iterable[np.ndarray], faces: Iterable[np.ndarray], output_path: str) -> str:
     vertex_parts = list(vertices)
     face_parts = list(faces)
@@ -285,10 +591,18 @@ def _normalize_3mf(path: str, output_dir: str) -> str:
 
             vertices: list[np.ndarray] = []
             faces: list[np.ndarray] = []
-            for name in object_names:
-                parsed_vertices, parsed_faces = _parse_3mf_model(archive.read(name))
-                vertices.extend(parsed_vertices)
-                faces.extend(parsed_faces)
+            try:
+                native_entities = load_3mf_entities(path)
+            except ModelNormalizationError as exc:
+                if exc.code not in {"3MF_MESH_MISSING", "3MF_OBJECTS_MISSING"}:
+                    raise
+                native_entities = []
+            if native_entities:
+                vertex_offset = 0
+                for entity in native_entities:
+                    vertices.append(entity.vertices)
+                    faces.append(entity.faces + vertex_offset)
+                    vertex_offset += len(entity.vertices)
 
             if not vertices:
                 # Compatibility fallback for 3MF packages embedding another
@@ -428,13 +742,27 @@ def normalize_model(path: str, *, output_dir: Optional[str] = None) -> Normalize
             mesh.export(output_path, file_type="stl")
             mesh_path = output_path
             temporary_paths.append(output_path)
-        elif extension == ".3mf":
-            mesh_path = _normalize_3mf(source_path, temp_dir)
-            if mesh_path != source_path:
-                temporary_paths.append(mesh_path)
+        elif extension in _STEP_EXTENSIONS or extension == ".3mf":
+            cache_key, cached_path = _cached_mesh_path(source_path, extension)
+            cache_lock = _model_cache_lock(cache_key)
+            with cache_lock:
+                if not os.path.isfile(cached_path) or os.path.getsize(cached_path) == 0:
+                    os.makedirs(_MODEL_CACHE_ROOT, exist_ok=True)
+                    cache_work_dir = tempfile.mkdtemp(prefix=f".{cache_key}_", dir=_MODEL_CACHE_ROOT)
+                    try:
+                        if extension == ".3mf":
+                            generated_path = _normalize_3mf(source_path, cache_work_dir)
+                        else:
+                            generated_path = _normalize_step(source_path, cache_work_dir)
+                        os.replace(generated_path, cached_path)
+                    finally:
+                        shutil.rmtree(cache_work_dir, ignore_errors=True)
+                mesh_path = cached_path
         else:
-            mesh_path = _normalize_step(source_path, temp_dir)
-            temporary_paths.append(mesh_path)
+            raise ModelNormalizationError(
+                f"Unsupported model format: {extension}",
+                code="MODEL_FORMAT_UNSUPPORTED",
+            )
         return NormalizedModel(
             source_path=source_path,
             mesh_path=mesh_path,

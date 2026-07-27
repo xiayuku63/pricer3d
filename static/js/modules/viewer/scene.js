@@ -140,7 +140,7 @@ export function updateBedSize(width, depth) {
     if (currentMesh) {
         currentMesh.updateMatrixWorld(true);
         const bc = window._BED_CENTER || 128;
-        const box = new THREE.Box3().setFromObject(currentMesh);
+        const box = new THREE.Box3().setFromObject(currentMesh, true);
         const center = box.getCenter(new THREE.Vector3());
         currentMesh.position.x += (bc - center.x);
         currentMesh.position.y += (bc - center.y);

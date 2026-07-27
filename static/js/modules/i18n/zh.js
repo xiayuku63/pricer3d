@@ -470,6 +470,7 @@ export default {
   'preview.loading': '加载中 {name} ({pct}%)',
   'preview.loadingFile': '加载中 {filename} ({size}KB)...',
   'preview.title': '3D 预览',
+  'preview.entityColors': '3MF \u5B9E\u4F53\u989C\u8272',
 
   // ── Orientation / 朝向 ──
   'orientation.autoOrient': '手动摆放',

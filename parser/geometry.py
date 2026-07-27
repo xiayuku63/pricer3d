@@ -27,7 +27,9 @@ def calculate_geometry(model_path: str):
         if not isinstance(mesh, trimesh.Trimesh) or len(mesh.vertices) == 0:
             return 0, 0, {"x": 0, "y": 0, "z": 0}
 
-        volume = float(mesh.volume)
+        # Triangle winding can be globally reversed in valid 3MF/STL meshes.
+        # Signed volume changes sign, but physical material volume does not.
+        volume = abs(float(mesh.volume))
         surface_area = float(mesh.area)
         extents = mesh.extents
         dimensions = {

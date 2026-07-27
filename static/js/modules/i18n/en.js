@@ -475,6 +475,7 @@ export default {
   'preview.loading': 'Loading {name} ({pct}%)',
   'preview.loadingFile': 'Loading {filename} ({size}KB)...',
   'preview.title': '3D Preview',
+  'preview.entityColors': '3MF Entity Colors',
 
   // ── Orientation ──
   'orientation.autoOrient': 'Manual Place',
