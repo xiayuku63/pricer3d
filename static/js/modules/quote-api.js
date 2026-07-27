@@ -141,6 +141,9 @@ export async function quoteSingleFileWithOptions(file, options, signal) {
     if (orientX != null) formData.append('orient_x', String(orientX));
     if (orientY != null) formData.append('orient_y', String(orientY));
     if (orientZ != null) formData.append('orient_z', String(orientZ));
+    if (options.entity_colors && typeof options.entity_colors === 'object') {
+        formData.append('entity_colors_json', JSON.stringify(options.entity_colors));
+    }
     const fetchOpts = { method: 'POST', body: formData };
     if (signal) fetchOpts.signal = signal;
     const response = await authFetch('/api/quote', fetchOpts);
@@ -261,6 +264,7 @@ export function mergeResultsByFilename(incomingResults) {
             brand: item.brand !== undefined ? item.brand : existing.brand,
             _printer_model: item._printer_model !== undefined ? item._printer_model : existing._printer_model,
             _nozzle_diameter: item._nozzle_diameter !== undefined ? item._nozzle_diameter : existing._nozzle_diameter,
+            _entity_colors: item._entity_colors !== undefined ? item._entity_colors : existing._entity_colors,
             _slicer_preset_id: item._slicer_preset_id !== undefined ? item._slicer_preset_id : existing._slicer_preset_id,
             _printer_model_explicit: existing._printer_model_explicit ?? item._printer_model_explicit ?? false,
             _slicer_preset_explicit: existing._slicer_preset_explicit ?? item._slicer_preset_explicit ?? false,

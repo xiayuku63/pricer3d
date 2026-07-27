@@ -38,6 +38,7 @@ async def get_quote(
     orient_x: Optional[float] = Form(default=None),
     orient_y: Optional[float] = Form(default=None),
     orient_z: Optional[float] = Form(default=None),
+    entity_colors_json: Optional[str] = Form(default=None, max_length=20000),
     current_user=Depends(get_current_user),
 ):
     logger.warning("ROUTE_DEBUG auto_orient=%s type=%s", auto_orient, type(auto_orient).__name__)
@@ -59,6 +60,7 @@ async def get_quote(
             orient_x=orient_x,
             orient_y=orient_y,
             orient_z=orient_z,
+            entity_colors_json=entity_colors_json,
             current_user=current_user,
         )
     except HTTPException:

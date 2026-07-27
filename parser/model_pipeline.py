@@ -19,6 +19,7 @@ import threading
 import uuid
 import zipfile
 import xml.etree.ElementTree as ET
+from xml.sax.saxutils import escape as xml_escape
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, Optional
@@ -575,6 +576,155 @@ def _export_mesh_to_stl(vertices: Iterable[np.ndarray], faces: Iterable[np.ndarr
     if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
         raise ModelNormalizationError("标准化 STL 生成失败", code="MODEL_EXPORT_FAILED")
     return output_path
+
+
+def normalize_3mf_entity_color(value: object, fallback: str = "#9CA3AF") -> str:
+    """Normalize a UI / 3MF color value to a six-digit hex color."""
+    raw = str(value or "").strip()
+    if raw.startswith("#"):
+        raw = raw[1:]
+    if len(raw) == 6 and all(ch in "0123456789abcdefABCDEF" for ch in raw):
+        return f"#{raw.upper()}"
+    return fallback
+
+
+def _three_mf_rotation_matrix(euler_angles_deg: Optional[dict[str, float]]) -> np.ndarray:
+    """Return the same XYZ Euler transform used by the quote-orientation path."""
+    if not euler_angles_deg:
+        return np.eye(4, dtype=np.float64)
+    angles = [float(euler_angles_deg.get(axis) or 0.0) for axis in ("x", "y", "z")]
+    if not any(angles):
+        return np.eye(4, dtype=np.float64)
+    try:
+        from scipy.spatial.transform import Rotation
+
+        matrix = np.eye(4, dtype=np.float64)
+        matrix[:3, :3] = Rotation.from_euler("xyz", angles, degrees=True).as_matrix()
+        return matrix
+    except Exception as exc:  # pragma: no cover - scipy is a project dependency
+        raise ModelNormalizationError("?????????????", code="3MF_ORIENTATION_FAILED") from exc
+
+
+def build_prusaslicer_multicolor_3mf(
+    source_path: str,
+    output_path: str,
+    *,
+    entity_colors: Optional[dict[str, object]] = None,
+    default_color: str = "#9CA3AF",
+    euler_angles_deg: Optional[dict[str, float]] = None,
+) -> dict[str, object]:
+    """Build a PrusaSlicer project retaining one printable object per 3MF entity.
+
+    PrusaSlicer's project extension stores per-object / per-volume options in
+    ``Metadata/Slic3r_PE_model.config``.  Unlike an STL, this preserves the
+    extruder assignment required for a multi-color toolpath.  The return value
+    contains the resolved slots and is safe to return to the quote UI.
+    """
+    entities = load_3mf_entities(source_path)
+    if len(entities) < 2:
+        raise ModelNormalizationError("3MF ????????????????", code="3MF_MULTICOLOR_NEEDS_ENTITIES")
+
+    raw_assignments = entity_colors if isinstance(entity_colors, dict) else {}
+    fallback = normalize_3mf_entity_color(default_color)
+    transform = _three_mf_rotation_matrix(euler_angles_deg)
+    resolved_entities: list[tuple[ThreeMFEntity, str]] = []
+    palette: list[str] = []
+    for entity in entities:
+        requested = raw_assignments.get(entity.entity_id)
+        if isinstance(requested, dict):
+            requested = requested.get("color")
+        color = normalize_3mf_entity_color(requested or entity.color, fallback)
+        if color not in palette:
+            palette.append(color)
+        resolved_entities.append((entity, color))
+
+    # A stock Prusa MMU profile supports five tools.  PrusaSlicer itself can
+    # handle more, but a higher limit here would generate G-code that standard
+    # MMU / AMS workflows cannot fulfil safely.
+    if len(palette) > 5:
+        raise ModelNormalizationError("???????? 5 ????????????", code="3MF_MULTICOLOR_TOO_MANY_COLORS")
+
+    def package_xml() -> tuple[str, str]:
+        objects: list[str] = []
+        build_items: list[str] = []
+        config_objects: list[str] = []
+        for index, (entity, color) in enumerate(resolved_entities, start=1):
+            vertices = _apply_transform(entity.vertices, transform)
+            vertices_xml = "".join(
+                f'<vertex x="{float(vertex[0]):.9g}" y="{float(vertex[1]):.9g}" z="{float(vertex[2]):.9g}"/>'
+                for vertex in vertices
+            )
+            triangles_xml = "".join(
+                f'<triangle v1="{int(face[0])}" v2="{int(face[1])}" v3="{int(face[2])}"/>'
+                for face in entity.faces
+            )
+            objects.append(
+                f'<object id="{index}" type="model"><mesh><vertices>{vertices_xml}</vertices>'
+                f'<triangles>{triangles_xml}</triangles></mesh></object>'
+            )
+            build_items.append(f'<item objectid="{index}" printable="1"/>')
+            slot = palette.index(color) + 1
+            entity_name = xml_escape(entity.name or f"?? {index}", {'"': '&quot;'})
+            last_face = max(0, len(entity.faces) - 1)
+            config_objects.append(
+                f'<object id="{index}" instances_count="1">'
+                f'<metadata type="object" key="name" value="{entity_name}"/>'
+                f'<metadata type="object" key="extruder" value="{slot}"/>'
+                f'<volume firstid="0" lastid="{last_face}">'
+                f'<metadata type="volume" key="name" value="{entity_name}"/>'
+                '<metadata type="volume" key="volume_type" value="ModelPart"/>'
+                f'<metadata type="volume" key="extruder" value="{slot}"/>'
+                '<mesh edges_fixed="0" degenerate_facets="0" facets_removed="0" '
+                'facets_reversed="0" backwards_edges="0"/>'
+                '</volume></object>'
+            )
+
+        model_xml = (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<model unit="millimeter" xml:lang="en-US" '
+            'xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02" '
+            'xmlns:slic3rpe="http://schemas.slic3r.org/3mf/2017/06">'
+            '<metadata name="slic3rpe:Version3mf">1</metadata>'
+            '<metadata name="Application">Pricer3D</metadata><resources>'
+            f'{"".join(objects)}</resources><build>{"".join(build_items)}</build></model>'
+        )
+        config_xml = (
+            '<?xml version="1.0" encoding="UTF-8"?><config>'
+            f'{"".join(config_objects)}</config>'
+        )
+        return model_xml, config_xml
+
+    model_xml, config_xml = package_xml()
+    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+    content_types = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        '<Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/>'
+        '</Types>'
+    )
+    rels = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Target="/3D/3dmodel.model" Id="rel-1" '
+        'Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/>'
+        '</Relationships>'
+    )
+    with zipfile.ZipFile(output_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("[Content_Types].xml", content_types)
+        archive.writestr("_rels/.rels", rels)
+        archive.writestr("3D/3dmodel.model", model_xml)
+        archive.writestr("Metadata/Slic3r_PE_model.config", config_xml)
+
+    return {
+        "path": output_path,
+        "entity_count": len(resolved_entities),
+        "colors": palette,
+        "slots": [
+            {"entity_id": entity.entity_id, "name": entity.name, "color": color, "extruder": palette.index(color) + 1}
+            for entity, color in resolved_entities
+        ],
+    }
 
 
 def _normalize_3mf(path: str, output_dir: str) -> str:

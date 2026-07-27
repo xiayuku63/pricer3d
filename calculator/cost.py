@@ -38,7 +38,11 @@ from calculator.pricing import (
     normalize_materials,
 )
 from parser.prusa_slicer import run_prusa_slice
-from parser.model_pipeline import ModelNormalizationError, normalize_model
+from parser.model_pipeline import (
+    ModelNormalizationError,
+    build_prusaslicer_multicolor_3mf,
+    normalize_model,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -162,6 +166,8 @@ def calculate_cost(
     _nozzle_diameter: Optional[float] = None,
     selected_material_spec: Optional[dict] = None,
     allow_slicer_orientation_fallback: bool = True,
+    slice_model_path: Optional[str] = None,
+    multicolor_slots: Optional[list[dict]] = None,
 ):
     """Calculate cost for a single model from geometry + material + config.
 
@@ -256,7 +262,7 @@ def calculate_cost(
             # The caller normalizes complex formats before entering the pricing
             # engine. Keep slicing on the same mesh used for geometry and
             # orientation so preview, quote, and slice never diverge.
-            actual_slice_path = model_path
+            actual_slice_path = slice_model_path or model_path
 
             # Use pre-resolved printer profile path if available
             _printer_profile = _printer_profile_path
@@ -306,6 +312,7 @@ def calculate_cost(
                 "max_acceleration": (_speed_params or {}).get("max_acceleration"),
                 "jerk_limit": (_speed_params or {}).get("jerk_limit"),
                 "max_volumetric_speed": spec.get("max_volumetric_speed"),
+                "multicolor_slots": multicolor_slots,
             }
             try:
                 stats = run_prusa_slice(actual_slice_path, output_gcode, **slice_kwargs)
@@ -563,6 +570,7 @@ async def process_single_file(
     speed_params_override: Optional[dict] = None,
     printer_profile_path: Optional[str] = None,
     selected_material_spec: Optional[dict] = None,
+    entity_colors: Optional[dict[str, object]] = None,
 ):
     """Process a single uploaded file: save, calculate geometry, compute cost.
 
@@ -607,6 +615,7 @@ async def process_single_file(
         "wall_count": perimeters or 3,
         "_slicer_preset_id": slicer_preset.get("id") if slicer_preset else None,
         "_printer_model": pricing_config.get("printer_model") if pricing_config else None,
+        "_entity_colors": entity_colors if isinstance(entity_colors, dict) else {},
     }
     if len(file_content) >= max_file_size:
         return {
@@ -649,6 +658,25 @@ async def process_single_file(
             output_dir=os.path.join(os.path.dirname(model_saved_path), "normalized"),
         )
         normalized_path = normalized_model.mesh_path
+        multicolor_project = None
+        multicolor_slots = None
+        manual_orientation = {"x": float(orient_x or 0), "y": float(orient_y or 0), "z": float(orient_z or 0)}
+        if ext == ".3mf":
+            try:
+                project_path = os.path.join(os.path.dirname(model_saved_path), "multicolor-project.3mf")
+                candidate = build_prusaslicer_multicolor_3mf(
+                    model_saved_path,
+                    project_path,
+                    entity_colors=entity_colors,
+                    default_color=color,
+                    euler_angles_deg=manual_orientation,
+                )
+                if len(candidate["colors"]) > 1:
+                    multicolor_project = candidate
+                    density = selected_material_spec.get("density", 1.24) if isinstance(selected_material_spec, dict) else 1.24
+                    multicolor_slots = [{"color": item, "density": density} for item in candidate["colors"]]
+            except ModelNormalizationError as exc:
+                logger.info("3MF multi-color project not used: %s (%s)", exc, exc.code)
 
         # ?? Apply manual orientation to the normalized mesh ??
         if any(v is not None for v in [orient_x, orient_y, orient_z]):
@@ -755,7 +783,9 @@ async def process_single_file(
                 slicer_preset=slicer_preset,
                 perimeters=perimeters,
                 current_user=current_user,
-                auto_orient=auto_orient,
+                # Auto-orientation currently operates on the normalized STL. Do
+                # not let it silently desynchronize a multi-color project.
+                auto_orient=auto_orient and multicolor_project is None,
                 model_dimensions=dimensions,
                 _resolved_printer=_printer_bed,
                 _speed_params=_speed_params,
@@ -763,8 +793,12 @@ async def process_single_file(
                 _nozzle_diameter=_nozzle_diameter,
                 selected_material_spec=selected_material_spec,
                 allow_slicer_orientation_fallback=(
-                    not auto_orient and not any(v is not None for v in [orient_x, orient_y, orient_z])
+                    multicolor_project is None
+                    and not auto_orient
+                    and not any(v is not None for v in [orient_x, orient_y, orient_z])
                 ),
+                slice_model_path=multicolor_project["path"] if multicolor_project else None,
+                multicolor_slots=multicolor_slots,
             )
         )
 
@@ -821,6 +855,8 @@ async def process_single_file(
             "_nozzle_diameter": _nozzle_diameter,
             "_saved_path": model_saved_path,
             "_normalized_path": normalized_path,
+            "_multicolor_project_path": multicolor_project["path"] if multicolor_project else None,
+            "multicolor": multicolor_project["slots"] if multicolor_project else [],
             "source_format": ext.lstrip("."),
             "normalized_format": "stl",
             "cost_breakdown": breakdown,
@@ -870,6 +906,7 @@ def process_single_file_sync(
     orient_y: Optional[float] = None,
     orient_z: Optional[float] = None,
     selected_material_spec: Optional[dict] = None,
+    entity_colors: Optional[dict[str, object]] = None,
 ):
     """Synchronous wrapper for process_single_file — used in thread pool."""
     import asyncio
@@ -894,6 +931,7 @@ def process_single_file_sync(
             orient_y,
             orient_z,
             selected_material_spec=selected_material_spec,
+            entity_colors=entity_colors,
         )
     )
 
