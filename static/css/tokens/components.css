@@ -1083,3 +1083,128 @@ input, textarea, select, [contenteditable="true"], code, pre, .allow-select {
 table.min-w-full.text-\\[11px\\] tbody td {
   color: var(--color-text);
 }
+
+/* ── Multi-entity 3MF color selector ── */
+.entity-color-row {
+  padding: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.54);
+}
+
+.entity-color-select-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 94px;
+  height: 30px;
+  padding: 3px 7px;
+  border: 1px solid var(--color-border-input);
+  border-radius: 9px;
+  background: var(--color-surface-solid);
+  color: var(--color-text);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background-color var(--transition-fast);
+}
+
+.entity-color-select-trigger:hover,
+.entity-color-select-trigger[aria-expanded="true"] {
+  border-color: rgba(0, 122, 255, 0.48);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.10);
+}
+
+.entity-color-selected-swatch {
+  width: 19px;
+  height: 19px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(15, 23, 42, 0.18);
+  border-radius: 6px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+.entity-color-selected-value {
+  min-width: 49px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 9px;
+  color: var(--color-text-secondary);
+}
+
+.entity-color-chevron {
+  margin-top: -3px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--color-text-muted);
+  transition: transform var(--transition-fast);
+}
+
+.entity-color-select-trigger[aria-expanded="true"] .entity-color-chevron {
+  transform: rotate(180deg);
+}
+
+.entity-color-menu {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(28px, 1fr));
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border);
+}
+
+.entity-color-menu.hidden {
+  display: none;
+}
+
+.entity-color-choice {
+  position: relative;
+  width: 100%;
+  min-width: 28px;
+  aspect-ratio: 1;
+  border: 1px solid rgba(15, 23, 42, 0.18);
+  border-radius: 8px;
+  background: var(--entity-choice-color, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+
+.entity-color-choice:hover,
+.entity-color-choice:focus-visible {
+  z-index: 1;
+  transform: translateY(-1px);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.14);
+  outline: none;
+}
+
+.entity-color-choice.is-active {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-surface-solid), 0 0 0 4px rgba(0, 122, 255, 0.78);
+}
+
+.entity-color-choice-check {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 1px rgba(0, 0, 0, 0.9);
+}
+
+.entity-color-add-choice {
+  display: grid;
+  place-items: center;
+  border-style: dashed;
+  background: var(--color-bg-muted);
+  color: var(--color-primary);
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.dark .entity-color-row {
+  background: rgba(15, 23, 42, 0.48);
+}
+
+.dark .entity-color-select-trigger {
+  background: rgba(15, 23, 42, 0.72);
+}

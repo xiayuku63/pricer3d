@@ -22,13 +22,88 @@ import { getPreview3mf, getPreviewGlb } from './preview-cache.js';
 
 let dom = {};
 let entityColorEventsBound = false;
+let pendingEntityColorId = null;
 let previewRenderToken = 0;
+const entityColorPalettesByFile = new Map();
+
+function normalizeEntityColor(value, fallback = '#9CA3AF') {
+    const match = String(value || '').trim().match(/^#?([0-9a-f]{6})$/i);
+    return match ? `#${match[1].toUpperCase()}` : fallback;
+}
+
+function currentEntityPaletteKey() {
+    const file = selectedFilesMap.get(currentPreviewFilename);
+    if (!file) return String(currentPreviewFilename || '__preview__');
+    return [file.name || currentPreviewFilename || '', file.size || 0, file.lastModified || 0].join(':');
+}
+
+function addEntityPaletteColor(color) {
+    const normalized = normalizeEntityColor(color, '');
+    if (!normalized) return '';
+    const key = currentEntityPaletteKey();
+    const palette = entityColorPalettesByFile.get(key) || [];
+    if (!palette.some((item) => item.toLowerCase() === normalized.toLowerCase())) {
+        palette.push(normalized);
+        entityColorPalettesByFile.set(key, palette);
+    }
+    return normalized;
+}
+
+function getEntityColorPalette(entities) {
+    const key = currentEntityPaletteKey();
+    const palette = [...(entityColorPalettesByFile.get(key) || [])];
+    for (const entity of entities) {
+        for (const color of [entity.sourceColor, entity.color]) {
+            const normalized = normalizeEntityColor(color, '');
+            if (normalized && !palette.some((item) => item.toLowerCase() === normalized.toLowerCase())) {
+                palette.push(normalized);
+            }
+        }
+    }
+    if (palette.length === 0) palette.push('#9CA3AF');
+    entityColorPalettesByFile.set(key, palette);
+    return palette;
+}
+
+function closeEntityColorMenus(exceptMenu = null) {
+    const list = document.getElementById('entity-colors-list');
+    if (!list) return;
+    list.querySelectorAll('[data-entity-color-menu]').forEach((menu) => {
+        if (menu === exceptMenu) return;
+        menu.classList.add('hidden');
+        const row = menu.closest('[data-entity-color-row]');
+        const trigger = row?.querySelector('[data-entity-color-trigger]');
+        if (trigger) trigger.setAttribute('aria-expanded', 'false');
+    });
+}
 
 function hideEntityColorControls() {
     const section = document.getElementById('entity-colors-section');
     const list = document.getElementById('entity-colors-list');
+    pendingEntityColorId = null;
     if (section) section.classList.add('hidden');
     if (list) list.replaceChildren();
+}
+
+function createEntityColorChoice(color, entityId, selectedColor) {
+    const choice = document.createElement('button');
+    const isSelected = color.toLowerCase() === selectedColor.toLowerCase();
+    choice.type = 'button';
+    choice.className = `entity-color-choice${isSelected ? ' is-active' : ''}`;
+    choice.setAttribute('data-entity-color-option', entityId);
+    choice.setAttribute('data-color-value', color);
+    choice.setAttribute('role', 'option');
+    choice.setAttribute('aria-label', color);
+    choice.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+    choice.title = color;
+    choice.style.setProperty('--entity-choice-color', color);
+    if (isSelected) {
+        const check = document.createElement('span');
+        check.className = 'entity-color-choice-check';
+        check.textContent = '?';
+        choice.appendChild(check);
+    }
+    return choice;
 }
 
 export function renderEntityColorControls() {
@@ -41,24 +116,60 @@ export function renderEntityColorControls() {
         section.classList.add('hidden');
         return;
     }
+    const palette = getEntityColorPalette(entities);
     for (const entity of entities) {
-        const row = document.createElement('label');
-        row.className = 'flex items-center gap-2 rounded-lg border px-2 py-1.5 text-xs';
-        row.style.borderColor = 'var(--color-border)';
-        const colorInput = document.createElement('input');
-        colorInput.type = 'color';
-        colorInput.value = entity.color || '#9CA3AF';
-        colorInput.setAttribute('data-entity-color', entity.id);
-        colorInput.className = 'h-7 w-9 cursor-pointer rounded border-0 bg-transparent p-0';
+        const selectedColor = normalizeEntityColor(entity.color);
+        const row = document.createElement('div');
+        row.className = 'entity-color-row';
+        row.setAttribute('data-entity-color-row', entity.id);
+
         const name = document.createElement('span');
-        name.className = 'min-w-0 flex-1 truncate tw-text';
+        name.className = 'min-w-0 flex-1 truncate text-xs font-medium tw-text';
         name.title = entity.name;
         name.textContent = entity.name;
+
+        const trigger = document.createElement('button');
+        trigger.type = 'button';
+        trigger.className = 'entity-color-select-trigger';
+        trigger.setAttribute('data-entity-color-trigger', entity.id);
+        trigger.setAttribute('aria-expanded', 'false');
+        trigger.setAttribute('aria-haspopup', 'listbox');
+        trigger.setAttribute('aria-label', `${entity.name}: ${selectedColor}`);
+        trigger.title = selectedColor;
+
+        const swatch = document.createElement('span');
+        swatch.className = 'entity-color-selected-swatch';
+        swatch.style.backgroundColor = selectedColor;
         const hex = document.createElement('span');
-        hex.className = 'font-mono text-[10px] tw-text-muted';
+        hex.className = 'entity-color-selected-value';
         hex.setAttribute('data-entity-color-value', entity.id);
-        hex.textContent = colorInput.value.toUpperCase();
-        row.append(colorInput, name, hex);
+        hex.textContent = selectedColor;
+        const chevron = document.createElement('span');
+        chevron.className = 'entity-color-chevron';
+        chevron.textContent = '\u2304';
+        trigger.append(swatch, hex, chevron);
+
+        const header = document.createElement('div');
+        header.className = 'flex items-center gap-2';
+        header.append(name, trigger);
+
+        const menu = document.createElement('div');
+        menu.className = 'entity-color-menu hidden';
+        menu.setAttribute('data-entity-color-menu', entity.id);
+        menu.setAttribute('role', 'listbox');
+        for (const color of palette) {
+            menu.appendChild(createEntityColorChoice(color, entity.id, selectedColor));
+        }
+        const addColor = document.createElement('button');
+        addColor.type = 'button';
+        addColor.className = 'entity-color-choice entity-color-add-choice';
+        addColor.setAttribute('data-entity-color-add', entity.id);
+        addColor.setAttribute('aria-label', t('preview.addEntityColor'));
+        addColor.title = t('preview.addEntityColor');
+        addColor.textContent = '+';
+        menu.appendChild(addColor);
+
+        row.append(header, menu);
         list.appendChild(row);
     }
     section.classList.remove('hidden');
@@ -67,14 +178,49 @@ export function renderEntityColorControls() {
 function bindEntityColorControls() {
     if (entityColorEventsBound) return;
     const list = document.getElementById('entity-colors-list');
-    if (!list) return;
-    list.addEventListener('input', (event) => {
-        const input = event.target.closest('[data-entity-color]');
-        if (!input) return;
-        const entityId = input.getAttribute('data-entity-color');
-        if (!setCurrentMeshEntityColor(entityId, input.value)) return;
-        const value = list.querySelector('[data-entity-color-value="' + CSS.escape(entityId) + '"]');
-        if (value) value.textContent = input.value.toUpperCase();
+    const addInput = document.getElementById('entity-color-add-input');
+    if (!list || !addInput) return;
+
+    list.addEventListener('click', (event) => {
+        const trigger = event.target.closest('[data-entity-color-trigger]');
+        if (trigger) {
+            const row = trigger.closest('[data-entity-color-row]');
+            const menu = row?.querySelector('[data-entity-color-menu]');
+            if (!menu) return;
+            const willOpen = menu.classList.contains('hidden');
+            closeEntityColorMenus(willOpen ? menu : null);
+            menu.classList.toggle('hidden', !willOpen);
+            trigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+            return;
+        }
+
+        const option = event.target.closest('[data-entity-color-option]');
+        if (option) {
+            const entityId = option.getAttribute('data-entity-color-option');
+            const color = addEntityPaletteColor(option.getAttribute('data-color-value'));
+            if (color && setCurrentMeshEntityColor(entityId, color)) renderEntityColorControls();
+            return;
+        }
+
+        const add = event.target.closest('[data-entity-color-add]');
+        if (add) {
+            pendingEntityColorId = add.getAttribute('data-entity-color-add');
+            const entity = getCurrentMeshEntities().find((item) => item.id === pendingEntityColorId);
+            addInput.value = normalizeEntityColor(entity?.color, '#9CA3AF');
+            addInput.click();
+        }
+    });
+
+    addInput.addEventListener('change', () => {
+        const entityId = pendingEntityColorId;
+        pendingEntityColorId = null;
+        const color = addEntityPaletteColor(addInput.value);
+        if (color && entityId) setCurrentMeshEntityColor(entityId, color);
+        renderEntityColorControls();
+    });
+
+    document.addEventListener('click', (event) => {
+        if (!event.target.closest('#entity-colors-section')) closeEntityColorMenus();
     });
     entityColorEventsBound = true;
 }
