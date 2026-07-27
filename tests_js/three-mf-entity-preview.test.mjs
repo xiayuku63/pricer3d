@@ -28,8 +28,22 @@ test("preview modal renders an entity color editor after a multi-entity 3MF load
 
     assert.match(modal, /id="entity-colors-section"/);
     assert.match(modal, /id="entity-colors-list"/);
+    assert.match(modal, /id="entity-color-add-input" type="color"/);
     assert.match(preview, /renderEntityColorControls/);
     assert.match(preview, /setCurrentMeshEntityColor/);
     assert.match(preview, /is3mf \? getPreview3mf\(file\) : getPreviewGlb\(file\)/);
-    assert.match(preview, /data-entity-color/);
+    assert.match(preview, /data-entity-color-trigger/);
+    assert.match(preview, /data-entity-color-option/);
+    assert.match(preview, /data-entity-color-add/);
+    assert.match(preview, /entityColorPalettesByFile/);
+});
+
+
+test("entity colors use a reusable palette and add-color flow instead of one native input per row", async () => {
+    const preview = await readFile(previewUrl, "utf8");
+
+    assert.match(preview, /function getEntityColorPalette/);
+    assert.match(preview, /function addEntityPaletteColor/);
+    assert.match(preview, /addInput\.addEventListener\('change'/);
+    assert.doesNotMatch(preview, /colorInput\.type = 'color'/);
 });
