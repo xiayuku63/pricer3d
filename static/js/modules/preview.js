@@ -467,7 +467,10 @@ export function closePreviewModal() {
     previewRenderToken += 1;
     const { previewModal, viewCube, layFaceBtn } = dom;
     setupFaceClickHandler(null);
-    import('./orientation-ui.js').then(m => m.cleanupLayFaceMode()).catch(() => {
+    import('./orientation-ui.js').then(m => {
+        m.cleanupLayFaceMode();
+        m.discardCurrentOrientationDraft();
+    }).catch(() => {
         clearClusters();
         window.__onLayFaceClick = null;
     });

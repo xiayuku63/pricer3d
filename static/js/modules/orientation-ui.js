@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import {
     currentMesh, controls, requestRender, renderer, camera, waitForMeshReady,
+    applyOrientationRotation, resetOrientation,
 } from './viewer.js';
 import {
     renderClusters, clearClusters, setClusterHover, intersectClusters,
@@ -13,7 +14,14 @@ import {
 } from './state.js';
 import { t } from './i18n.js';
 import { openLoginModal } from './auth.js';
-import { normalizeOrientation, withResultOrientation } from './orientation-state.js';
+import {
+    commitOrientationDraft,
+    createOrientationDraft,
+    discardOrientationDraft,
+    getResultOrientation,
+    updateOrientationDraft,
+    withResultOrientation,
+} from './orientation-state.js';
 
 let dom = {};
 let hoverRaycaster = new THREE.Raycaster();
@@ -23,6 +31,8 @@ let layFaceHoverBound = false;
 let layFaceState = 'idle';
 let layFaceAbortController = null;
 let layFaceEscapeBound = false;
+let currentOrientationDraft = null;
+let currentOrientationDraftFilename = null;
 
 function setButtonLabelText(button, label) {
     if (!button) return;
@@ -134,8 +144,50 @@ export function cleanupLayFaceMode() {
     setLayFaceButtonLabel(t('orientation.autoOrient'));
 }
 
+function getSavedCurrentOrientation() {
+    const rowData = currentResults.find((item) => item && item.filename === currentPreviewFilename);
+    return getResultOrientation(rowData, quoteOptions.orientation || { x: 0, y: 0, z: 0 });
+}
+
+export function beginCurrentOrientationDraft() {
+    if (!currentPreviewFilename) return null;
+    if (currentOrientationDraft && currentOrientationDraftFilename === currentPreviewFilename) {
+        return currentOrientationDraft.draft;
+    }
+    currentOrientationDraftFilename = currentPreviewFilename;
+    currentOrientationDraft = createOrientationDraft(getSavedCurrentOrientation());
+    return currentOrientationDraft.draft;
+}
+
+export function discardCurrentOrientationDraft() {
+    if (!currentOrientationDraft) return null;
+    const saved = discardOrientationDraft(currentOrientationDraft);
+    const shouldRestore = currentOrientationDraft.dirty
+        && currentOrientationDraftFilename === currentPreviewFilename
+        && currentMesh;
+    currentOrientationDraft = null;
+    currentOrientationDraftFilename = null;
+    if (shouldRestore) applyOrientationRotation(saved);
+    return saved;
+}
+
+function commitCurrentOrientationDraft(orientation) {
+    if (!currentOrientationDraft || currentOrientationDraftFilename !== currentPreviewFilename) {
+        beginCurrentOrientationDraft();
+    }
+    currentOrientationDraft = commitOrientationDraft(currentOrientationDraft, orientation);
+    const committed = currentOrientationDraft.draft;
+    quoteOptions.orientation = committed;
+    const idx = currentResults.findIndex((item) => item && item.filename === currentPreviewFilename);
+    if (idx >= 0) currentResults[idx] = withResultOrientation(currentResults[idx], committed);
+    return committed;
+}
+
 export function syncOrientationFromMesh() {
-    if (!currentMesh) return quoteOptions.orientation || { x: 0, y: 0, z: 0 };
+    if (!currentMesh) {
+        return currentOrientationDraft?.draft || getSavedCurrentOrientation();
+    }
+    beginCurrentOrientationDraft();
     currentMesh.updateMatrixWorld();
     // Lay-on-face applies a quaternion. Reading rotation.x/y/z directly can
     // therefore return the old Euler values even though the model moved.
@@ -144,13 +196,15 @@ export function syncOrientationFromMesh() {
     const ry = THREE.MathUtils.radToDeg(euler.y) || 0;
     const rz = THREE.MathUtils.radToDeg(euler.z) || 0;
     const cleanAngle = value => Math.abs(value) < 1e-8 ? 0 : Number(value.toFixed(4));
-    quoteOptions.orientation = { x: cleanAngle(rx), y: cleanAngle(ry), z: cleanAngle(rz) };
-    const idx = currentResults.findIndex((item) => item && item.filename === currentPreviewFilename);
-    if (idx >= 0) currentResults[idx] = withResultOrientation(currentResults[idx], quoteOptions.orientation);
-    return quoteOptions.orientation;
+    currentOrientationDraft = updateOrientationDraft(currentOrientationDraft, {
+        x: cleanAngle(rx),
+        y: cleanAngle(ry),
+        z: cleanAngle(rz),
+    });
+    return currentOrientationDraft.draft;
 }
 
-// ── Center ──
+// Orientation positioning
 export function centerModel() {
     if (!currentMesh) return;
     currentMesh.updateMatrixWorld(true);
@@ -170,15 +224,12 @@ export function centerModel() {
 // ── Reset ──
 export function resetOrientationHandler() {
     cleanupLayFaceMode();
-    quoteOptions.orientation = { x: 0, y: 0, z: 0 };
-    const idx = currentResults.findIndex((item) => item && item.filename === currentPreviewFilename);
-    if (idx >= 0) currentResults[idx] = withResultOrientation(currentResults[idx], quoteOptions.orientation);
-    // resetOrientation is from viewer.js
-    const viewerModule = import('./viewer.js');
-    viewerModule.then(m => m.resetOrientation());
+    beginCurrentOrientationDraft();
+    currentOrientationDraft = updateOrientationDraft(currentOrientationDraft, { x: 0, y: 0, z: 0 });
+    resetOrientation();
 }
 
-// ── Lay on Face ──
+// Lay on Face
 export async function toggleLayFace() {
     if (!currentPreviewFilename) return;
     const file = selectedFilesMap.get(currentPreviewFilename);
@@ -209,6 +260,8 @@ export async function toggleLayFace() {
     // Re-entering manual placement must preserve the current orientation. The
     // face placement operation already replaces the mesh quaternion directly;
     // resetting here makes the second invocation jump back to the initial pose.
+    beginCurrentOrientationDraft();
+
     clearClusters();
     layFaceState = 'loading';
     bindLayFaceEscape();
@@ -286,7 +339,7 @@ export async function submitTraining() {
     const file = selectedFilesMap.get(currentPreviewFilename);
     if (!file) return;
 
-    const euler = quoteOptions.orientation || { x: 0, y: 0, z: 0 };
+    const euler = syncOrientationFromMesh() || getSavedCurrentOrientation();
     const formData = new FormData();
     formData.append('file', file);
     formData.append('x', String(euler.x || 0));
@@ -328,6 +381,7 @@ export async function submitTraining() {
                 orient_z: orient.z,
             });
             mergeResultsByFilename([{ ...updated, euler_angles_deg: updated.euler_angles_deg || { ...orient } }]);
+            commitCurrentOrientationDraft(orient);
             renderResultsTable();
             recalcSummaryFromCurrentResults();
             if (orientTrainStatus) {
@@ -356,6 +410,7 @@ export async function learnedAutoOrient() {
 
     if (orientLearnedBtn) orientLearnedBtn.disabled = true;
     // 退出手动摆放模式（如果有）
+    beginCurrentOrientationDraft();
     cleanupLayFaceMode();
 
     try {
@@ -393,11 +448,8 @@ export async function learnedAutoOrient() {
         setTimeout(() => fitCameraToMesh(currentMesh), 50);
 
         // 更新 state
-        const { quoteOptions } = await import('./state.js');
-        const previewOrientation = syncOrientationFromMesh();
-        quoteOptions.orientation = normalizeOrientation(previewOrientation || data.euler_angles_deg);
-        const idx = currentResults.findIndex((item) => item && item.filename === currentPreviewFilename);
-        if (idx >= 0) currentResults[idx] = withResultOrientation(currentResults[idx], quoteOptions.orientation);
+        // Keep this orientation as a draft until save/requote succeeds.
+        syncOrientationFromMesh();
 
         if (orientLearnedBtn) {
             const p = data.prusa;
@@ -486,6 +538,7 @@ export async function saveOrientationAndRequote() {
             _printer_model: ctx.printerModel || updated._printer_model,
             _slicer_preset_id: ctx.slicerPresetId !== null ? ctx.slicerPresetId : updated._slicer_preset_id,
         }, orient)]);
+        commitCurrentOrientationDraft(orient);
         renderResultsTable();
         recalcSummaryFromCurrentResults();
 

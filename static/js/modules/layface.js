@@ -325,6 +325,17 @@ export function setClusterHover(index, active) {
  * @param {THREE.Raycaster} raycaster
  * @returns {{ index: number, mesh: THREE.Mesh } | null}
  */
+function _collectOccluderMeshes(occluder) {
+    const meshes = [];
+    if (!occluder) return meshes;
+    occluder.traverse(object => {
+        if (!object.isMesh) return;
+        if (object.userData && object.userData.isClusterOverlay) return;
+        meshes.push(object);
+    });
+    return meshes;
+}
+
 export function intersectClusters(raycaster, occluder = null) {
     if (!clusterMode || clusterOverlays.length === 0) return null;
     const intersects = raycaster.intersectObjects(clusterOverlays, false);
@@ -334,7 +345,8 @@ export function intersectClusters(raycaster, occluder = null) {
         // Ignore it when the model is closer than the overlay so hover/click
         // behavior matches what the user can actually see.
         if (occluder) {
-            const modelHit = raycaster.intersectObject(occluder, false)[0];
+            const occluderMeshes = _collectOccluderMeshes(occluder);
+            const modelHit = raycaster.intersectObjects(occluderMeshes, false)[0];
             if (modelHit && modelHit.distance < hit.distance - 0.01) return null;
         }
         const obj = hit.object;

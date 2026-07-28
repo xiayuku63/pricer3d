@@ -29,3 +29,33 @@ export function withResultOrientation(result, orientation) {
         euler_angles_deg: normalized,
     };
 }
+
+function orientationsEqual(a, b) {
+    const left = normalizeOrientation(a);
+    const right = normalizeOrientation(b);
+    return left.x === right.x && left.y === right.y && left.z === right.z;
+}
+
+export function createOrientationDraft(savedOrientation = null) {
+    const saved = normalizeOrientation(savedOrientation);
+    return { saved, draft: { ...saved }, dirty: false };
+}
+
+export function updateOrientationDraft(state, orientation) {
+    const current = state || createOrientationDraft();
+    const draft = normalizeOrientation(orientation);
+    return {
+        saved: { ...current.saved },
+        draft,
+        dirty: !orientationsEqual(current.saved, draft),
+    };
+}
+
+export function discardOrientationDraft(state) {
+    return normalizeOrientation(state?.saved);
+}
+
+export function commitOrientationDraft(state, orientation = null) {
+    const committed = normalizeOrientation(orientation || state?.draft || state?.saved);
+    return { saved: committed, draft: { ...committed }, dirty: false };
+}
