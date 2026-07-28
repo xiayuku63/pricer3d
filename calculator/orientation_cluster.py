@@ -359,6 +359,11 @@ def cluster_coplanar_faces(
     model_diag = float(np.linalg.norm(vertices.max(axis=0) - vertices.min(axis=0)))
     offset_tol = max(min(model_diag * 0.002, 0.5), 0.05)
     cos_threshold = COPLANAR_COS_THRESHOLD
+    min_cluster_area = (
+        max(model_diag * model_diag * 1e-4, 1e-4)
+        if include_upward_faces
+        else MIN_COPLANAR_AREA_MM2
+    )
 
     order = np.argsort(-areas)
     visited = np.zeros(n_faces, dtype=bool)
@@ -396,10 +401,8 @@ def cluster_coplanar_faces(
                 visited[ni] = True
                 queue.append(ni)
 
-        if len(cluster_faces) < 2:
-            continue
         cluster_area = float(np.sum(areas[cluster_faces]))
-        if cluster_area < MIN_COPLANAR_AREA_MM2:
+        if cluster_area < min_cluster_area:
             continue
 
         cluster_face_indices = faces[cluster_faces]
