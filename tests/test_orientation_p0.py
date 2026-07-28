@@ -8,12 +8,39 @@ from app.routes_orientation import auto_learned_orient
 from calculator.cost import _apply_manual_orientation
 from scipy.spatial.transform import Rotation
 
+from calculator.orientation import get_smart_orientation_for_slicing
 from calculator.orientation_math import (
     rotation_from_bed_normal,
     rotation_from_up_vector,
     rotation_to_euler,
 )
 from calculator.orientation_scoring import evaluate_orientation, fine_tune_orientation
+
+
+def test_shared_smart_orientation_path_always_uses_geometry_v2(monkeypatch):
+    calls = []
+
+    def fake_best_face(model_path, method):
+        calls.append((model_path, method))
+        return {"status": "ok"}
+
+    monkeypatch.setattr("calculator.orientation.get_best_face_for_slicing", fake_best_face)
+
+    result = get_smart_orientation_for_slicing("part.stl")
+
+    assert result == {"status": "ok"}
+    assert calls == [("part.stl", "geometry_v2")]
+
+
+def test_quote_and_preview_use_the_shared_smart_orientation_path():
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    cost_source = (root / "calculator" / "cost.py").read_text(encoding="utf-8")
+    route_source = (root / "app" / "routes_orientation.py").read_text(encoding="utf-8")
+
+    assert "get_smart_orientation_for_slicing(model_path)" in cost_source
+    assert "get_smart_orientation_for_slicing(tmp_path)" in route_source
 
 
 @pytest.mark.parametrize(
@@ -121,7 +148,7 @@ def test_auto_orientation_endpoint_returns_the_scored_rotation_matrix(monkeypatc
             return b"solid part\nendsolid part\n"
 
     def fake_best_face(model_path, method):
-        assert method == "learned"
+        assert method == "geometry_v2"
         return {
             "rotation_matrix": expected_matrix,
             "euler_angles_deg": {"x": 0.0, "y": -90.0, "z": 0.0},

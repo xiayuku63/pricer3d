@@ -86,7 +86,7 @@ class FaceFeatureExtractor:
         # ── 旋转后评分特征 ──
         # 计算"面朝上"的旋转矩阵 (法向的反方向对齐 +Z)
         R = rotation_from_bed_normal(normal)[:3, :3].copy()
-        metrics = _score_orientation_3x3(mesh, R)
+        metrics = _score_orientation_3x3(mesh, R, include_support_islands=False)
 
         z_height = float(metrics.get("z_height", 0.0))
         overhang_ratio = float(metrics.get("overhang_ratio", 0.0))

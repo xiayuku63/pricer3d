@@ -302,6 +302,54 @@ def _is_on_matching_hull_plane(
     return bool(np.min(np.abs(aligned_offsets - candidate_offset)) <= offset_tol)
 
 
+def get_convex_hull_candidate_planes(
+    mesh: trimesh.Trimesh,
+    max_planes: int = 32,
+) -> list[dict]:
+    """Return the largest supporting planes of the convex hull.
+
+    Any flat orientation that can touch an infinite print bed is a supporting
+    plane of the model's convex hull.  Generating automatic-placement candidates
+    from the hull avoids the expensive full-mesh clustering and internal-face
+    ray tests used by the interactive manual-placement workflow.
+    """
+    try:
+        hull = mesh.convex_hull
+        built = _build_hull_coplanar_planes(hull, exact_eps=1e-3)
+        if built is None:
+            return []
+        plane_normals, plane_offsets = built
+        hull_normals = np.asarray(hull.face_normals, dtype=np.float64)
+        hull_areas = np.asarray(hull.area_faces, dtype=np.float64)
+        hull_centers = np.asarray(hull.triangles_center, dtype=np.float64)
+        hull_offsets = np.einsum("ij,ij->i", hull_normals, hull_centers)
+        offset_tol = max(float(np.linalg.norm(hull.extents)) * 1e-6, 1e-5)
+
+        result = []
+        for normal, offset in zip(plane_normals, plane_offsets):
+            dots = hull_normals @ normal
+            mask = (dots >= 0.999) & (np.abs(hull_offsets - offset) <= offset_tol)
+            if not np.any(mask):
+                continue
+            area = float(np.sum(hull_areas[mask]))
+            weights = hull_areas[mask]
+            centroid = np.average(hull_centers[mask], axis=0, weights=weights)
+            result.append(
+                {
+                    "normal": [_clean_value(v) for v in normal],
+                    "area": round(area, 4),
+                    "centroid": [_clean_value(v) for v in centroid],
+                    "face_count": int(np.count_nonzero(mask)),
+                    "source": "convex_hull",
+                }
+            )
+        result.sort(key=lambda item: item["area"], reverse=True)
+        return result[: max(1, int(max_planes))]
+    except Exception as exc:
+        logger.debug("convex hull candidate generation failed: %s", exc)
+        return []
+
+
 def cluster_coplanar_faces(
     mesh: trimesh.Trimesh,
     include_upward_faces: bool = False,
