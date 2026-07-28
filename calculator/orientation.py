@@ -19,6 +19,7 @@ import os
 import re
 import subprocess
 import logging
+import math
 import tempfile
 import uuid
 import numpy as np
@@ -52,6 +53,7 @@ from calculator.orientation_cluster import (
     COPLANAR_COS_THRESHOLD,
     MIN_COPLANAR_AREA_MM2,
     cluster_coplanar_faces,
+    get_convex_hull_candidate_planes,
 )
 
 logger = logging.getLogger(__name__)
@@ -263,12 +265,17 @@ def apply_orientation_to_mesh(
         normalized.cleanup()
 
 
+def get_smart_orientation_for_slicing(model_path: str) -> dict:
+    """Run the canonical smart-placement strategy used by preview and quoting."""
+    return get_best_face_for_slicing(model_path, method="geometry_v2")
+
+
 def get_best_face_for_slicing(
     model_path: str,
     method: str = "coplanar",
     sa_config: Optional[dict] = None,
 ) -> dict:
-    """Auto-select the best print-bed face using coplanar clustering or SA.
+    """Auto-select a print orientation using geometry V2, coplanar, or SA.
 
     Strategy (method="coplanar", default):
     1. Coplanar clustering to find all flat candidate faces
@@ -283,7 +290,8 @@ def get_best_face_for_slicing(
 
     Args:
         model_path: Path to STL/3MF model file
-        method: "coplanar" (default) or "sa" for simulated annealing
+        method: "geometry_v2"/"auto" for the fast automatic strategy,
+                "coplanar" for the legacy strategy, or "sa".
         sa_config: Optional kwargs dict passed to optimize_orientation_sa()
                    (only used when method="sa")
 
@@ -305,8 +313,8 @@ def get_best_face_for_slicing(
 
         return optimize_orientation_sa(model_path, **(sa_config or {}))
 
-    if method == "learned":
-        return _learned_best_face(model_path)
+    if method in {"learned", "geometry_v2", "auto"}:
+        return _geometry_best_face(model_path)
 
     mesh = _load_mesh(model_path)
 
@@ -489,182 +497,171 @@ def slice_with_prusaslicer(model_path: str, timeout: int = 30) -> dict:
         return {"success": False, "error": str(e)[:200]}
 
 
-def _learned_best_face(model_path: str) -> dict:
-    """类 OrcaSlicer 自动摆放：多源候选 + 复合评分 + 稳定性检查。
+def _geometry_best_face(model_path: str) -> dict:
+    """Fully automatic, slicer-free orientation ranking.
 
-    候选来源（三路）:
-      1. coplanar 聚类面 (已有)
-      2. 凸包面 + 大面 (get_stable_faces)
-      3. Fibonacci 球面采样 (有机形状回退)
-
-    评分公式模仿 OrcaSlicer:
-      score = base_area * (1 - overhang_ratio) / max(z_height, 1)
-
-    Args:
-        model_path: 模型文件路径
-
-    Returns:
-        同 get_best_face_for_slicing() 的返回结构
+    The optimizer evaluates exterior planar faces first, then principal axes and
+    a small spherical fallback only when the model has no useful flat contact.
+    Scores combine effective overhang/support demand, bed adhesion, CoG stability,
+    and print height.  No real slicing is performed, keeping response time bounded.
     """
-    import os as _os
-    from calculator.orientation_learner import (
-        OrientationLearner,
-        FaceFeatureExtractor,
-    )
-    from calculator.orientation_scoring import (
-        get_stable_faces,
-        evaluate_orientation,
-    )
+    from calculator.orientation_scoring import evaluate_orientation
 
     mesh = _load_mesh(model_path)
-    best_overall = None
-    best_score = -1e9
+    vertices = np.asarray(mesh.vertices, dtype=np.float64)
+    model_diag = max(float(np.linalg.norm(np.ptp(vertices, axis=0))), 1e-9)
+    model_volume = max(abs(float(mesh.volume)), model_diag**3 * 1e-6, 1.0)
 
-    # ── 数据目录 (LR 模型) ──
-    data_dir = _os.path.join(
-        _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
-        "data",
-    )
-    learner = OrientationLearner(data_dir=data_dir)
-    extractor = FaceFeatureExtractor()
+    candidates_by_rotation: dict[tuple, dict] = {}
 
-    # ── 已使用的 up_vector 去重 ──
-    used_ups = set()  # set of (round(x,2), round(y,2), round(z,2))
+    def _clamp01(value: float) -> float:
+        return max(0.0, min(1.0, float(value)))
 
-    def _up_key(v: np.ndarray) -> tuple:
-        return tuple(np.round(v / max(float(np.linalg.norm(v)), 1e-9), 2))
+    def _score_components(metrics: dict) -> dict:
+        contact_area = max(float(metrics.get("base_contact_area", 0.0)), 0.0)
+        footprint_area = max(float(metrics.get("xy_footprint", 0.0)), 1e-9)
+        contact_ratio = _clamp01(contact_area / footprint_area)
+        adhesion = math.sqrt(contact_ratio)
 
-    # ── 辅助：给候选面评分 ──
-    def _score_candidate(
-        normal: np.ndarray,
-        cluster: dict = None,
-        label: str = "",
-        face_vertices: Optional[Sequence[Sequence[float]]] = None,
-    ) -> None:
-        nonlocal best_overall, best_score
-        normal = np.array(normal, dtype=np.float64)
-        n_normal = float(np.linalg.norm(normal))
-        if n_normal < 1e-8:
-            return
-        up = -normal / n_normal
-        key = _up_key(up)
-        if key in used_ups:
-            return
-        used_ups.add(key)
+        margin = float(metrics.get("stability_margin", -1e9))
+        cog_height = max(float(metrics.get("cog_height", 0.0)), 1e-9)
+        stability_target = max(cog_height * 0.25, model_diag * 0.02, 0.1)
+        stability = 0.0 if margin < 0 else _clamp01(margin / stability_target)
 
-        # 计算旋转 + 评分指标
-        candidate_face_vertices = face_vertices
-        if candidate_face_vertices is None and cluster is not None:
-            candidate_face_vertices = cluster.get("face_vertices") or cluster.get("vertices")
-        R = _rotation_for_bed_candidate(mesh, normal, candidate_face_vertices)
-        metrics = evaluate_orientation(mesh, R)
-        m = metrics["metrics"]
-        z_h = float(m.get("z_height", 1))
-        o_r = float(m.get("overhang_ratio", 1))
-        c_a = float(m.get("base_contact_area", 0))
+        overhang_ratio = max(float(metrics.get("overhang_ratio", 1.0)), 0.0)
+        overhang_quality = 1.0 - _clamp01(overhang_ratio / 0.35)
+        support_volume = max(float(metrics.get("support_volume_estimate", 0.0)), 0.0)
+        support_volume_quality = 1.0 - _clamp01(support_volume / max(model_volume * 0.5, 1.0))
+        support_islands = max(int(metrics.get("support_island_count", 0)), 0)
+        support_island_quality = 1.0 / (1.0 + math.log1p(support_islands) * 0.5)
+        support = (
+            overhang_quality * 0.45
+            + support_volume_quality * 0.40
+            + support_island_quality * 0.15
+        )
 
-        # ── 类 OrcaSlicer 复合评分 ──
-        # 核心: 接触面积^1.5(越大越好) × (1-悬垂)²(越少越好) / z_height(越矮越好)
-        # 接触面积是 FDM 成败的第一要素
-        score = (c_a**1.5) * ((1.0 - o_r) ** 2) / max(z_h, 1.0)
-
-        # ── 最小接触面积过滤 (拒绝接触面积过小的朝向) ──
-        bottom_area = c_a
-        if bottom_area < 200:  # <200mm² 接触面太小，打印必倒
-            return
-        if bottom_area < 500:
-            score *= 0.3  # <500mm² 很小，重罚
-
-        # ── LR 模型加分 (仅 coplanar 面有, 当前样本不足仅微调) ──
-        lr_prob = None
-        if cluster is not None and learner.is_trained():
-            try:
-                feat = extractor.extract(mesh, cluster)
-                feat_batch = feat.reshape(1, -1)
-                prob = float(learner.predict_proba(feat_batch)[0])
-                lr_prob = prob
-                # LR 模型作为微弱 bonus: 最多加 5% (当前仅 20 正样本)
-                score *= 0.95 + 0.05 * prob
-            except Exception:
-                pass
-
-        # ── 稳定性检查 (CoG 在底面凸包内) ──
-        stable = True
-        try:
-            vertices_r = np.asarray(mesh.vertices, dtype=np.float64) @ R[:3, :3].T
-            z_all = vertices_r[:, 2]
-            z_min = float(z_all.min())
-            eps_b = max(0.5, z_h * 0.02)
-            bottom_mask = z_all < z_min + eps_b
-            bottom_xy = vertices_r[bottom_mask, :2]
-            if len(bottom_xy) >= 3:
-                cog = np.asarray(mesh.center_mass, dtype=np.float64) @ R[:3, :3].T
-                cog_xy = cog[:2]
-                from scipy.spatial import ConvexHull, Delaunay
-
-                hull = ConvexHull(bottom_xy)
-                tri = Delaunay(bottom_xy[hull.vertices])
-                stable = tri.find_simplex(cog_xy) >= 0
-                if not stable:
-                    score *= 0.8
-        except Exception:
-            pass
-
-        candidate = {
-            "face": cluster or {"normal": normal.tolist(), "area": 0},
-            "score": round(score, 4),
-            "metrics": m,
-            "euler_angles_deg": metrics["euler_angles_deg"],
-            "learned_prob": lr_prob,
-            "label": label,
-            "stable": stable,
-            "rotation_matrix": R[:3, :3].tolist(),
+        z_height = max(float(metrics.get("z_height", model_diag)), 0.0)
+        height = 1.0 - _clamp01(z_height / model_diag)
+        total = (
+            support * 0.42
+            + adhesion * 0.26
+            + stability * 0.22
+            + height * 0.10
+        )
+        if not bool(metrics.get("stable", False)):
+            total *= 0.35
+        if contact_area <= max(model_diag * model_diag * 1e-8, 1e-5):
+            total *= 0.25
+        return {
+            "support": support,
+            "adhesion": adhesion,
+            "stability": stability,
+            "height": height,
+            "total": total,
         }
 
-        if score > best_score:
-            best_score = score
-            best_overall = candidate
+    def _add_candidate(
+        *,
+        label: str,
+        normal: Optional[np.ndarray] = None,
+        rotation: Optional[np.ndarray] = None,
+        face: Optional[dict] = None,
+        face_vertices: Optional[Sequence[Sequence[float]]] = None,
+    ) -> None:
+        if rotation is None:
+            if normal is None:
+                return
+            normal = np.asarray(normal, dtype=np.float64)
+            if float(np.linalg.norm(normal)) < 1e-8:
+                return
+            rotation = _rotation_for_bed_candidate(mesh, normal, face_vertices)
+        R3 = np.asarray(rotation, dtype=np.float64)[:3, :3]
+        key = tuple(np.round(R3.reshape(-1), 5))
 
-    # ══════════════════════════════════════════════
-    # 候选源 1: coplanar 聚类面
-    # ══════════════════════════════════════════════
+        evaluated = evaluate_orientation(mesh, R3, include_support_islands=False)
+        metrics = evaluated["metrics"]
+        components = _score_components(metrics)
+        candidate_face = face or {
+            "normal": np.asarray(normal if normal is not None else [0, 0, 0], dtype=float).tolist(),
+            "area": 0.0,
+        }
+        candidate = {
+            "face": candidate_face,
+            "score": round(components["total"] * 100.0, 4),
+            "score_components": {k: round(v * 100.0, 2) for k, v in components.items() if k != "total"},
+            "metrics": metrics,
+            "euler_angles_deg": evaluated["euler_angles_deg"],
+            "learned_prob": None,
+            "label": label,
+            "stable": bool(metrics.get("stable", False)),
+            "rotation_matrix": R3.tolist(),
+        }
+        existing = candidates_by_rotation.get(key)
+        if existing is None or candidate["score"] > existing["score"]:
+            candidates_by_rotation[key] = candidate
+        elif existing.get("face", {}).get("area", 0) == 0 and candidate_face.get("area", 0) > 0:
+            existing["face"] = candidate_face
+            existing["label"] = label
+
+    # Preserve the uploaded orientation as a valid baseline.
+    _add_candidate(label="source", rotation=np.eye(3), face={"normal": [0, 0, -1], "area": 0.0})
+
+    # Automatic placement only needs supporting planes of the convex hull.
+    # This is substantially faster than the full interactive coplanar workflow.
+    hull_planes = get_convex_hull_candidate_planes(mesh, max_planes=32)
+    for index, plane in enumerate(hull_planes):
+        normal = np.asarray(plane.get("normal", [0, 0, 1]), dtype=np.float64)
+        _add_candidate(label=f"hull_{index}", normal=normal, face=plane)
+
+    # Principal inertia axes provide six meaningful fallback directions for
+    # rounded or organic models at negligible cost.
     try:
-        clusters = cluster_coplanar_faces(mesh)
-        for i, cluster in enumerate(clusters):
-            normal = np.array(cluster.get("normal", [0, 0, 1]), dtype=np.float64)
-            _score_candidate(normal, cluster=cluster, label=f"共面_{i}")
-    except Exception as e:
-        logger.warning("coplanar 聚类失败: %s", e)
+        axes = np.asarray(mesh.principal_inertia_vectors, dtype=np.float64)
+        for axis_index, axis in enumerate(axes):
+            for sign in (-1.0, 1.0):
+                normal = axis * sign
+                _add_candidate(label=f"principal_{axis_index}_{'pos' if sign > 0 else 'neg'}", normal=normal)
+    except Exception as exc:
+        logger.debug("principal-axis candidates unavailable: %s", exc)
 
-    # ══════════════════════════════════════════════
-    # 候选源 2: 凸包面 + 大面 (get_stable_faces)
-    # ══════════════════════════════════════════════
-    try:
-        stable_result = get_stable_faces(model_path)
-        for face in stable_result.get("faces", []):
-            normal = np.array(face.get("normal", [0, 0, 1]), dtype=np.float64)
-            _score_candidate(normal, label=face.get("label", "稳定面"))
-    except Exception as e:
-        logger.warning("get_stable_faces 失败: %s", e)
+    candidates = list(candidates_by_rotation.values())
+    useful_contact = max(
+        (
+            float(item["metrics"].get("base_contact_area", 0.0))
+            / max(float(item["metrics"].get("xy_footprint", 0.0)), 1e-9)
+            for item in candidates
+        ),
+        default=0.0,
+    )
 
-    # ══════════════════════════════════════════════
-    # 候选源 3: Fibonacci 球面采样 (稠密覆盖)
-    # ══════════════════════════════════════════════
-    try:
-        from calculator.orientation_math import fibonacci_sphere_sampling
+    # Dense sampling is only needed when no useful plane/axis contact exists.
+    if len(candidates) < 6 or useful_contact < 0.01:
+        for index, normal in enumerate(fibonacci_sphere_sampling(32)):
+            _add_candidate(label=f"sample_{index}", normal=normal)
+        candidates = list(candidates_by_rotation.values())
 
-        samples = fibonacci_sphere_sampling(128)
-        for i in range(samples.shape[0]):
-            normal = samples[i].copy()
-            _score_candidate(normal, label=f"采样_{i}")
-            if len(used_ups) >= 200:  # 上限
-                break
-    except Exception as e:
-        logger.warning("Fibonacci 采样失败: %s", e)
+    candidates.sort(key=lambda item: item["score"], reverse=True)
 
-    # ── 无候选回退 ──
-    if best_overall is None:
-        logger.warning("所有候选源均无结果，返回原始朝向")
+    # Support-component counting is the most expensive per-candidate metric.
+    # Recompute it only for a coarse shortlist, then perform the final ranking.
+    total_candidate_count = len(candidates)
+    shortlist_size = min(12, total_candidate_count)
+    finalists = candidates[:shortlist_size]
+    for candidate in finalists:
+        R3 = np.asarray(candidate["rotation_matrix"], dtype=np.float64)
+        evaluated = evaluate_orientation(mesh, R3, include_support_islands=True)
+        candidate["metrics"] = evaluated["metrics"]
+        candidate["euler_angles_deg"] = evaluated["euler_angles_deg"]
+        components = _score_components(candidate["metrics"])
+        candidate["score"] = round(components["total"] * 100.0, 4)
+        candidate["score_components"] = {
+            key: round(value * 100.0, 2)
+            for key, value in components.items()
+            if key != "total"
+        }
+    finalists.sort(key=lambda item: item["score"], reverse=True)
+    candidates = finalists
+    if not candidates:
         return {
             "oriented_path": model_path,
             "original_path": model_path,
@@ -673,75 +670,49 @@ def _learned_best_face(model_path: str) -> dict:
             "score": 0,
             "face": None,
             "all_candidates": [],
-            "method_used": "learned",
+            "method_used": "geometry_v2",
             "fallback": True,
         }
 
-    logger.info(
-        "智能摆放: 候选 %d 个, 最佳得分=%.2f (label=%s, 稳定=%s, lr=%s)",
-        len(used_ups),
-        best_score,
-        best_overall.get("label"),
-        best_overall.get("stable"),
-        best_overall.get("learned_prob"),
-    )
-
-    # ══════════════════════════════════════════════
-    # PrusaSlicer 精确验证: 对前 3 候选做真实切片
-    # ══════════════════════════════════════════════
-    # 收集所有候选，取前 3
-    # (由于 _score_candidate 直接更新 best_overall，我们重新收集)
-    # 用 fast_score 收集到的最近 50 个 = used_ups 数量
-    # 简化: 只对 best_overall 做切片验证（1次切片 ~0.5-2秒）
-    prusa_info = {}
-    try:
-        R_tmp = np.eye(4)
-        R_tmp[:3, :3] = np.asarray(best_overall["rotation_matrix"], dtype=np.float64)
-        # 微调前的旋转
-        tune_tmp = fine_tune_orientation(mesh, R_tmp[:3, :3])
-        R_final = tune_tmp["R"]
-        # 导出临时 STL
-        tmp_rotated = os.path.join(tempfile.gettempdir(), f"p3d_orient_{uuid.uuid4().hex[:8]}.stl")
-        mesh_rotated = mesh.copy()
-        mesh_rotated.vertices = np.asarray(mesh.vertices) @ R_final.T
-        mesh_rotated.export(tmp_rotated)
-        # PrusaSlicer 切片
-        slice_result = slice_with_prusaslicer(tmp_rotated, timeout=30)
-        if slice_result["success"]:
-            prusa_info = slice_result
-            logger.info(
-                "PrusaSlicer 验证: filament=%.1fmm, time=%ds",
-                slice_result["filament_mm"],
-                slice_result["print_time_s"],
-            )
-        # 清理
-        try:
-            os.unlink(tmp_rotated)
-        except OSError:
-            pass
-    except Exception as e:
-        logger.warning("PrusaSlicer 验证失败: %s", e)
-
-    # ── 应用最佳旋转 + 导出（跳过 Z 轴微调，无实际意义） ──
-    R_opt = np.asarray(best_overall["rotation_matrix"], dtype=np.float64)
-    euler = rotation_to_euler(R_opt)
-
+    best = candidates[0]
+    R_opt = np.asarray(best["rotation_matrix"], dtype=np.float64)
     oriented_path = apply_orientation_to_mesh(model_path, R_opt)
 
-    result = {
+    def _compact_face(face: dict) -> dict:
+        return {
+            key: face[key]
+            for key in ("normal", "area", "face_count", "centroid", "bbox_size", "stability")
+            if key in face
+        }
+
+    top_candidates = []
+    for item in candidates[:TOP_N_RESULTS]:
+        public_item = dict(item)
+        public_item["face"] = _compact_face(item.get("face") or {})
+        top_candidates.append(public_item)
+    best_face = _compact_face(best.get("face") or {})
+    logger.info(
+        "geometry_v2 orientation: candidates=%d best=%.2f label=%s support=%.1f adhesion=%.1f stability=%.1f",
+        len(candidates),
+        best["score"],
+        best["label"],
+        best["score_components"]["support"],
+        best["score_components"]["adhesion"],
+        best["score_components"]["stability"],
+    )
+    return {
         "oriented_path": oriented_path,
         "original_path": model_path,
         "rotation_matrix": [[round(float(R_opt[i, j]), 6) for j in range(3)] for i in range(3)],
-        "euler_angles_deg": euler,
-        "score": best_overall["score"],
-        "face": best_overall["face"],
-        "tune_report": "方向已最优（Z轴归零）",
-        "all_candidates": [],
-        "method_used": "learned",
+        "euler_angles_deg": rotation_to_euler(R_opt),
+        "score": best["score"],
+        "face": best_face,
+        "tune_report": "Geometry-only optimization across support, adhesion, stability, and height",
+        "all_candidates": top_candidates,
+        "method_used": "geometry_v2",
         "fallback": False,
-        "n_candidates": len(used_ups),
-        "best_label": best_overall.get("label", ""),
+        "n_candidates": total_candidate_count,
+        "best_label": best["label"],
+        "score_components": best["score_components"],
+        "metrics": best["metrics"],
     }
-    if prusa_info.get("success"):
-        result["prusa"] = prusa_info
-    return result

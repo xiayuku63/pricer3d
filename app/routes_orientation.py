@@ -421,10 +421,9 @@ async def auto_learned_orient(
     file: UploadFile = File(...),
     current_user=Depends(get_current_user),
 ):
-    """使用自学习模型自动摆放：接收文件，返回最优朝向。
+    """Run fast geometry-only smart placement and return the best orientation.
 
     POST /api/orientation/auto-learned
-    → {euler_angles_deg: {x,y,z}, score, method_used, face_normal, fallback}
     """
     filename = file.filename or "unnamed"
     _, ext = os.path.splitext(filename.lower())
@@ -445,9 +444,9 @@ async def auto_learned_orient(
         with open(tmp_path, "wb") as f:
             f.write(content)
 
-        from calculator.orientation import get_best_face_for_slicing
+        from calculator.orientation import get_smart_orientation_for_slicing
 
-        result = get_best_face_for_slicing(tmp_path, method="learned")
+        result = get_smart_orientation_for_slicing(tmp_path)
         euler = result.get("euler_angles_deg", {"x": 0, "y": 0, "z": 0})
         face = result.get("face") or {}
         normal = face.get("normal") if isinstance(face, dict) else None
@@ -457,11 +456,14 @@ async def auto_learned_orient(
             "euler_angles_deg": euler,
             "rotation_matrix": result.get("rotation_matrix"),
             "score": result.get("score"),
-            "method_used": result.get("method_used", "learned"),
+            "method_used": result.get("method_used", "geometry_v2"),
             "fallback": result.get("fallback", False),
             "face_normal": normal,
             "n_candidates": result.get("n_candidates"),
             "best_label": result.get("best_label"),
+            "metrics": result.get("metrics"),
+            "score_components": result.get("score_components"),
+            "all_candidates": result.get("all_candidates", []),
             "prusa": result.get("prusa"),
         }
     except Exception as e:

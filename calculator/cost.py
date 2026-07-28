@@ -205,15 +205,9 @@ def calculate_cost(
     _oriented_tmp_path: Optional[str] = None
     if auto_orient and model_path and os.path.exists(model_path):
         try:
-            from calculator.orientation import get_best_face_for_slicing
+            from calculator.orientation import get_smart_orientation_for_slicing
 
-            _learned_model = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                "data",
-                "orientation_model.pkl",
-            )
-            _orient_method = "learned" if os.path.exists(_learned_model) else "coplanar"
-            orient_result = get_best_face_for_slicing(model_path, method=_orient_method)
+            orient_result = get_smart_orientation_for_slicing(model_path)
             oriented_path = orient_result.get("oriented_path")
             if oriented_path and oriented_path != model_path:
                 _oriented_tmp_path = oriented_path

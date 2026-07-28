@@ -1,33 +1,45 @@
-"""Orientation scoring, evaluation, and stable-face discovery.
+"""Fast geometric scoring and stable-face discovery for print orientation."""
 
-Evaluates how good a candidate print orientation is by computing
-overhang ratio, support volume, print time, and bed adhesion.
-"""
-
-import math
 import logging
+import math
+
 import numpy as np
 import trimesh
 
 from calculator.orientation_math import (
-    rotation_to_euler,
-    rotation_from_up_vector,
-    rotation_from_bed_normal,
     fibonacci_sphere_sampling,
+    rotation_from_bed_normal,
+    rotation_from_up_vector,
+    rotation_to_euler,
 )
 
 logger = logging.getLogger(__name__)
 
-# ── 可调参数 ──
 OVERHANG_ANGLE_DEG = 45.0
 NUM_FIBONACCI_SAMPLES = 64
 NUM_LARGE_FACE_SAMPLES = 8
 TOP_N_RESULTS = 5
-SUPPORT_WEIGHT = 0.50
-TIME_WEIGHT = 0.30
+SUPPORT_WEIGHT = 0.45
+TIME_WEIGHT = 0.10
 ADHESION_WEIGHT = 0.20
+STABILITY_WEIGHT = 0.25
 FINE_TUNE_Z_RANGE = (-30, 30)
 FINE_TUNE_STEP = 1.0
+
+
+def _bed_plane_tolerance(rotated_vertices: np.ndarray) -> float:
+    bounds = np.ptp(rotated_vertices, axis=0)
+    model_diag = float(np.linalg.norm(bounds))
+    return max(1e-5, min(0.01, model_diag * 1e-6))
+
+
+def _bed_contact_mask(rotated_vertices: np.ndarray, faces: np.ndarray) -> np.ndarray:
+    if rotated_vertices.size == 0 or len(faces) == 0:
+        return np.zeros(len(faces), dtype=bool)
+    z_min = float(rotated_vertices[:, 2].min())
+    plane_tol = _bed_plane_tolerance(rotated_vertices)
+    triangle_z = rotated_vertices[faces, 2]
+    return np.max(np.abs(triangle_z - z_min), axis=1) <= plane_tol
 
 
 def _bed_contact_area(
@@ -35,68 +47,123 @@ def _bed_contact_area(
     faces: np.ndarray,
     face_areas: np.ndarray,
 ) -> float:
-    """Return the geometric triangle area that actually lies on the bed plane.
-
-    Convex-hull footprint is useful for stability, but it is not adhesion area:
-    gaps, holes, and disconnected feet must not be filled in.  A triangle counts
-    only when all of its vertices lie on the global minimum-Z plane.
-    """
-    if rotated_vertices.size == 0 or len(faces) == 0:
-        return 0.0
-
-    z_min = float(rotated_vertices[:, 2].min())
-    bounds = np.ptp(rotated_vertices, axis=0)
-    model_diag = float(np.linalg.norm(bounds))
-    plane_tol = max(1e-5, min(0.01, model_diag * 1e-6))
-
-    triangle_z = rotated_vertices[faces, 2]
-    on_bed = np.max(np.abs(triangle_z - z_min), axis=1) <= plane_tol
-    return float(np.sum(face_areas[on_bed]))
+    """Return actual triangle area on the minimum-Z bed plane."""
+    mask = _bed_contact_mask(rotated_vertices, faces)
+    return float(np.sum(face_areas[mask]))
 
 
-def _score_orientation_3x3(mesh: trimesh.Trimesh, R: np.ndarray) -> dict:
-    """Quick-scoring of a 3x3 rotation on the mesh (no full reconstruction)."""
+def _count_face_components(mesh: trimesh.Trimesh, mask: np.ndarray) -> int:
+    active = np.flatnonzero(mask)
+    if len(active) == 0:
+        return 0
+    parent = np.arange(len(mask), dtype=np.int64)
+
+    def find(x: int) -> int:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = int(parent[x])
+        return x
+
+    def union(a: int, b: int) -> None:
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[rb] = ra
+
+    for a, b in np.asarray(mesh.face_adjacency, dtype=np.int64):
+        if mask[a] and mask[b]:
+            union(int(a), int(b))
+    return len({find(int(i)) for i in active})
+
+
+
+
+def _score_orientation_3x3(
+    mesh: trimesh.Trimesh,
+    R: np.ndarray,
+    include_support_islands: bool = True,
+) -> dict:
+    """Compute fast, slicer-free geometric metrics for one rotation."""
+    R = np.asarray(R, dtype=np.float64)[:3, :3]
     vertices = np.asarray(mesh.vertices, dtype=np.float64)
+    faces = np.asarray(mesh.faces, dtype=np.int64)
     rotated_verts = vertices @ R.T
     rotated_normals = np.asarray(mesh.face_normals, dtype=np.float64) @ R.T
     face_areas = np.asarray(mesh.area_faces, dtype=np.float64)
     total_area = float(np.sum(face_areas))
-    if total_area < 1e-9:
-        return {"overhang_ratio": 1.0, "contact_area": 0.0, "z_height": 0.0, "support_volume": 0.0}
+    if total_area < 1e-9 or rotated_verts.size == 0:
+        return {
+            "overhang_ratio": 1.0,
+            "effective_overhang_area": 0.0,
+            "contact_area": 0.0,
+            "z_height": 0.0,
+            "support_volume": 0.0,
+            "support_island_count": 0,
+            "stability_margin": -1e9,
+            "stable": False,
+        }
 
     z_all = rotated_verts[:, 2]
     z_min = float(z_all.min())
     z_max = float(z_all.max())
     z_height = z_max - z_min
+    contact_mask = _bed_contact_mask(rotated_verts, faces)
+    contact_area = float(np.sum(face_areas[contact_mask]))
 
     dot_z = rotated_normals[:, 2]
     threshold_cos = math.cos(math.radians(OVERHANG_ANGLE_DEG))
-    overhang_mask = (dot_z < 0.0) & (-dot_z > threshold_cos)
-    overhang_area = float(np.sum(face_areas[overhang_mask]))
+    angle_overhang = (dot_z < 0.0) & (-dot_z > threshold_cos)
+    effective_overhang = angle_overhang & ~contact_mask
+    overhang_area = float(np.sum(face_areas[effective_overhang]))
     overhang_ratio = overhang_area / total_area
 
-    contact_area = _bed_contact_area(
-        rotated_verts,
-        np.asarray(mesh.faces),
-        face_areas,
-    )
-
     support_volume = 0.0
-    if overhang_area > 1e-9:
-        try:
-            tri_centers = mesh.triangles_center[overhang_mask]
-            tri_centers_rot = tri_centers @ R.T
-            heights = tri_centers_rot[:, 2] - z_min
-            support_volume = float(np.sum(face_areas[overhang_mask] * np.maximum(heights, 0.0))) * 0.3
-        except Exception:
-            support_volume = overhang_area * z_height * 0.3
+    if np.any(effective_overhang):
+        centers = np.asarray(mesh.triangles_center, dtype=np.float64) @ R.T
+        heights = np.maximum(centers[effective_overhang, 2] - z_min, 0.0)
+        support_volume = float(np.sum(face_areas[effective_overhang] * heights)) * 0.3
+    support_islands = _count_face_components(mesh, effective_overhang) if include_support_islands else 0
+
+    footprint_size = np.ptp(rotated_verts[:, :2], axis=0)
+    footprint_area = float(footprint_size[0] * footprint_size[1])
+
+    stability_margin = -1e9
+    stable = False
+    support_polygon_area = 0.0
+    cog = np.asarray(mesh.center_mass, dtype=np.float64)
+    if not np.all(np.isfinite(cog)):
+        cog = np.asarray(mesh.centroid, dtype=np.float64)
+    cog_r = cog @ R.T
+    cog_height = float(cog_r[2] - z_min)
+    try:
+        contact_indices = np.unique(faces[contact_mask].reshape(-1))
+        contact_xy = rotated_verts[contact_indices, :2]
+        if len(contact_xy) >= 3:
+            from scipy.spatial import ConvexHull
+
+            hull = ConvexHull(contact_xy)
+            support_polygon_area = float(hull.volume)
+            equations = np.asarray(hull.equations, dtype=np.float64)
+            distances = -(equations[:, :2] @ cog_r[:2] + equations[:, 2])
+            distances /= np.maximum(np.linalg.norm(equations[:, :2], axis=1), 1e-12)
+            stability_margin = float(np.min(distances))
+            stable = stability_margin >= -_bed_plane_tolerance(rotated_verts)
+    except Exception:
+        pass
 
     return {
         "overhang_ratio": round(overhang_ratio, 6),
+        "effective_overhang_area": round(overhang_area, 2),
+        "overhang_area": round(overhang_area, 2),
         "contact_area": round(contact_area, 2),
         "z_height": round(z_height, 2),
         "support_volume": round(support_volume, 2),
-        "overhang_area": round(overhang_area, 2),
+        "support_island_count": int(support_islands),
+        "stability_margin": round(stability_margin, 4),
+        "stable": bool(stable),
+        "support_polygon_area": round(support_polygon_area, 2),
+        "cog_height": round(cog_height, 2),
+        "xy_footprint": round(footprint_area, 2),
+        "total_area": round(total_area, 2),
     }
 
 
@@ -106,90 +173,69 @@ def fine_tune_orientation(
     z_range: tuple = FINE_TUNE_Z_RANGE,
     step: float = FINE_TUNE_STEP,
 ) -> dict:
-    """Keep the aligned face orientation without arbitrary Z-axis rotation.
-
-    Overhang ratio, bed contact, and model height are invariant under rotation
-    around the build Z axis.  The previous sweep therefore always selected the
-    first sampled angle (-30 degrees) even though no metric improved.
-    ``z_range`` and ``step`` remain accepted for API compatibility.
-    """
+    """Keep the aligned face orientation without arbitrary Z rotation."""
     del z_range, step
     metrics = _score_orientation_3x3(mesh, R_base)
     return {
         "R": np.asarray(R_base, dtype=np.float64).copy(),
         "angle": 0.0,
         "metrics": metrics,
-        "report": "保持面朝向，未添加无效的Z轴旋转",
+        "report": "Kept the aligned face without an arbitrary Z-axis rotation",
     }
 
 
-def evaluate_orientation(mesh: trimesh.Trimesh, rotation: np.ndarray) -> dict:
-    """Full evaluation of a candidate orientation: score + detailed metrics."""
-    rotated_points = mesh.vertices @ rotation[:3, :3].T + rotation[:3, 3]
-    rotated_faces = mesh.faces
-    rotated = trimesh.Trimesh(
-        vertices=rotated_points,
-        faces=rotated_faces,
-        process=False,
-        validate=False,
-    )
-    rotated.remove_unreferenced_vertices()
+def evaluate_orientation(
+    mesh: trimesh.Trimesh,
+    rotation: np.ndarray,
+    include_support_islands: bool = True,
+) -> dict:
+    """Evaluate one orientation using fast geometric metrics only."""
+    R3 = np.asarray(rotation, dtype=np.float64)[:3, :3]
+    raw = _score_orientation_3x3(mesh, R3, include_support_islands=include_support_islands)
+    volume = max(abs(float(mesh.volume)), 1.0)
+    footprint = max(float(raw.get("xy_footprint", 0.0)), 1e-9)
+    contact_area = float(raw.get("contact_area", 0.0))
+    support_volume = float(raw.get("support_volume", 0.0))
+    overhang_ratio = float(raw.get("overhang_ratio", 1.0))
+    stability_margin = float(raw.get("stability_margin", -1e9))
+    cog_height = max(float(raw.get("cog_height", 0.0)), 1e-9)
 
-    min_z = float(rotated.bounds[0, 2])
-    if abs(min_z) > 1e-6:
-        translate = np.eye(4)
-        translate[2, 3] = -min_z
-        rotated.apply_transform(translate)
-
-    face_normals = rotated.face_normals
-    face_areas = rotated.area_faces
-    total_area = float(np.sum(face_areas))
-    bounds = rotated.bounds
-    z_height = float(bounds[1, 2] - bounds[0, 2])
-
-    dot_z = face_normals[:, 2]
-    threshold_cos = math.cos(math.radians(OVERHANG_ANGLE_DEG))
-    overhang_mask = (dot_z < 0) & (-dot_z > threshold_cos)
-    overhang_area = float(np.sum(face_areas[overhang_mask]))
-    overhang_ratio = overhang_area / max(total_area, 1e-9)
-
-    support_volume = 0.0
-    if np.any(overhang_mask):
-        centroids = rotated.triangles_center[overhang_mask]
-        heights = centroids[:, 2]
-        support_volume = float(np.sum(face_areas[overhang_mask] * np.maximum(heights, 0.0))) * 0.3
-
-    xy_area = float(np.sum(face_areas * np.abs(dot_z)))
-
-    contact_area = _bed_contact_area(
-        np.asarray(rotated.vertices, dtype=np.float64),
-        np.asarray(rotated.faces),
-        np.asarray(face_areas, dtype=np.float64),
+    support_penalty = min(1.0, 0.55 * min(overhang_ratio / 0.35, 1.0) + 0.45 * min(support_volume / volume, 1.0))
+    support_score = 100.0 * (1.0 - support_penalty)
+    adhesion_score = min(100.0, contact_area / footprint * 100.0)
+    stability_score = 0.0 if stability_margin < 0 else min(100.0, stability_margin / max(cog_height * 0.5, 1e-9) * 100.0)
+    extents = np.ptp(np.asarray(mesh.vertices) @ R3.T, axis=0)
+    z_ratio = float(raw.get("z_height", 0.0)) / max(float(np.max(extents)), 1e-9)
+    time_score = max(0.0, 100.0 * (1.0 - z_ratio))
+    overall = (
+        support_score * SUPPORT_WEIGHT
+        + stability_score * STABILITY_WEIGHT
+        + adhesion_score * ADHESION_WEIGHT
+        + time_score * TIME_WEIGHT
     )
 
-    support_score = max(0.0, (1.0 - overhang_ratio) * 100.0)
-    avg_dim = float((bounds[1] - bounds[0]).mean())
-    z_ratio = z_height / max(avg_dim, 1e-9)
-    time_score = max(0.0, 100.0 * (1.0 - max(0.0, z_ratio - 0.3) / 1.7))
-    max_contact = total_area * 0.5
-    adhesion_score = min(100.0, contact_area / max(max_contact, 1e-9) * 100.0)
-
-    overall = support_score * SUPPORT_WEIGHT + time_score * TIME_WEIGHT + adhesion_score * ADHESION_WEIGHT
-
+    metrics = {
+        "overhang_area": raw["overhang_area"],
+        "effective_overhang_area": raw["effective_overhang_area"],
+        "overhang_ratio": raw["overhang_ratio"],
+        "support_volume_estimate": raw["support_volume"],
+        "support_island_count": raw["support_island_count"],
+        "z_height": raw["z_height"],
+        "base_contact_area": raw["contact_area"],
+        "xy_footprint": raw["xy_footprint"],
+        "support_polygon_area": raw["support_polygon_area"],
+        "stability_margin": raw["stability_margin"],
+        "stable": raw["stable"],
+        "cog_height": raw["cog_height"],
+        "support_score": round(support_score, 2),
+        "stability_score": round(stability_score, 2),
+        "time_score": round(time_score, 2),
+        "adhesion_score": round(adhesion_score, 2),
+    }
     return {
         "score": round(overall, 2),
-        "metrics": {
-            "overhang_area": round(overhang_area, 2),
-            "overhang_ratio": round(overhang_ratio, 4),
-            "support_volume_estimate": round(support_volume, 2),
-            "z_height": round(z_height, 2),
-            "base_contact_area": round(contact_area, 2),
-            "xy_footprint": round(xy_area, 2),
-            "support_score": round(support_score, 2),
-            "time_score": round(time_score, 2),
-            "adhesion_score": round(adhesion_score, 2),
-        },
-        "rotation_matrix": rotation.tolist(),
+        "metrics": metrics,
+        "rotation_matrix": np.asarray(rotation).tolist(),
         "euler_angles_deg": rotation_to_euler(rotation),
     }
 
