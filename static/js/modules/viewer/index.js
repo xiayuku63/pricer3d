@@ -35,6 +35,7 @@ export {
     waitForMeshReady,
     renderSTL,
     applyOrientationRotation,
+    applyOrientationMatrix,
     resetOrientation,
     resetMeshPlacementForLayFace,
     setupFaceClickHandler,

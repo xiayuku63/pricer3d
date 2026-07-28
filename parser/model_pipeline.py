@@ -599,7 +599,7 @@ def _three_mf_rotation_matrix(euler_angles_deg: Optional[dict[str, float]]) -> n
         from scipy.spatial.transform import Rotation
 
         matrix = np.eye(4, dtype=np.float64)
-        matrix[:3, :3] = Rotation.from_euler("xyz", angles, degrees=True).as_matrix()
+        matrix[:3, :3] = Rotation.from_euler("XYZ", angles, degrees=True).as_matrix()
         return matrix
     except Exception as exc:  # pragma: no cover - scipy is a project dependency
         raise ModelNormalizationError("?????????????", code="3MF_ORIENTATION_FAILED") from exc

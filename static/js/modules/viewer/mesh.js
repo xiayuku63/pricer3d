@@ -383,17 +383,10 @@ export function renderSTL(file, colorKey = 'Blue', orientation = null) {
 
 // Orientation
 
-export function applyOrientationRotation(data) {
-    if (!currentMesh) return;
-    var euler = data.euler || data;
-    currentMesh.rotation.x = THREE.MathUtils.degToRad(euler.x || 0);
-    currentMesh.rotation.y = THREE.MathUtils.degToRad(euler.y || 0);
-    currentMesh.rotation.z = THREE.MathUtils.degToRad(euler.z || 0);
-    // Compute world-space bounding box, lift bottom to Z=0, and re-centre X/Y
+function _settleOrientationOnBed() {
     currentMesh.updateMatrixWorld(true);
     var box = new THREE.Box3().setFromObject(currentMesh, true);
     currentMesh.position.z -= box.min.z;
-    // Rotation shifts the bounding-box centre, so re-centre X/Y on the bed
     currentMesh.updateMatrixWorld(true);
     box.setFromObject(currentMesh, true);
     var centre = box.getCenter(new THREE.Vector3());
@@ -401,6 +394,32 @@ export function applyOrientationRotation(data) {
     currentMesh.position.x += (bc - centre.x);
     currentMesh.position.y += (bc - centre.y);
     requestRender();
+}
+
+export function applyOrientationRotation(data) {
+    if (!currentMesh) return;
+    var euler = data.euler || data;
+    currentMesh.rotation.x = THREE.MathUtils.degToRad(euler.x || 0);
+    currentMesh.rotation.y = THREE.MathUtils.degToRad(euler.y || 0);
+    currentMesh.rotation.z = THREE.MathUtils.degToRad(euler.z || 0);
+    _settleOrientationOnBed();
+}
+
+export function applyOrientationMatrix(rows) {
+    if (!currentMesh || !Array.isArray(rows) || rows.length !== 3) return false;
+    if (!rows.every(row => Array.isArray(row) && row.length === 3)) return false;
+    const values = rows.flat().map(Number);
+    if (!values.every(Number.isFinite)) return false;
+
+    const matrix = new THREE.Matrix4().set(
+        values[0], values[1], values[2], 0,
+        values[3], values[4], values[5], 0,
+        values[6], values[7], values[8], 0,
+        0, 0, 0, 1,
+    );
+    currentMesh.quaternion.setFromRotationMatrix(matrix);
+    _settleOrientationOnBed();
+    return true;
 }
 
 export function resetOrientation() {
