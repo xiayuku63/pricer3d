@@ -955,7 +955,7 @@ def _apply_manual_orientation(path: str, orient_x, orient_y, orient_z):
             rz = np.deg2rad(orient_z or 0)
             from scipy.spatial.transform import Rotation as _R
 
-            r = _R.from_euler("xyz", [rx, ry, rz])
+            r = _R.from_euler("XYZ", [rx, ry, rz])
             Rmat = np.eye(4)
             Rmat[:3, :3] = r.as_matrix()
             mobj.apply_transform(Rmat)

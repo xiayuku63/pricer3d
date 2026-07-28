@@ -143,7 +143,8 @@ export function syncOrientationFromMesh() {
     const rx = THREE.MathUtils.radToDeg(euler.x) || 0;
     const ry = THREE.MathUtils.radToDeg(euler.y) || 0;
     const rz = THREE.MathUtils.radToDeg(euler.z) || 0;
-    quoteOptions.orientation = { x: Math.round(rx), y: Math.round(ry), z: Math.round(rz) };
+    const cleanAngle = value => Math.abs(value) < 1e-8 ? 0 : Number(value.toFixed(4));
+    quoteOptions.orientation = { x: cleanAngle(rx), y: cleanAngle(ry), z: cleanAngle(rz) };
     const idx = currentResults.findIndex((item) => item && item.filename === currentPreviewFilename);
     if (idx >= 0) currentResults[idx] = withResultOrientation(currentResults[idx], quoteOptions.orientation);
     return quoteOptions.orientation;
@@ -375,12 +376,13 @@ export async function learnedAutoOrient() {
         if (!resp.ok) throw new Error(data.detail || '智能摆放请求失败');
 
         // 应用旋转到模型
-        const { applyOrientationRotation, fitCameraToMesh } = await import('./viewer.js');
+        const { applyOrientationMatrix, applyOrientationRotation, fitCameraToMesh } = await import('./viewer.js');
         // 先重置位置，避免累计偏移
         if (currentMesh.position.z !== 0) {
             currentMesh.position.z = 0;
         }
-        applyOrientationRotation(data.euler_angles_deg);
+        const matrixApplied = applyOrientationMatrix(data.rotation_matrix);
+        if (!matrixApplied) applyOrientationRotation(data.euler_angles_deg);
         // 再次确保贴到 Z=0 并适配相机
         currentMesh.updateMatrixWorld(true);
         const box = new THREE.Box3().setFromObject(currentMesh, true);
@@ -392,7 +394,8 @@ export async function learnedAutoOrient() {
 
         // 更新 state
         const { quoteOptions } = await import('./state.js');
-        quoteOptions.orientation = normalizeOrientation(data.euler_angles_deg);
+        const previewOrientation = syncOrientationFromMesh();
+        quoteOptions.orientation = normalizeOrientation(previewOrientation || data.euler_angles_deg);
         const idx = currentResults.findIndex((item) => item && item.filename === currentPreviewFilename);
         if (idx >= 0) currentResults[idx] = withResultOrientation(currentResults[idx], quoteOptions.orientation);
 

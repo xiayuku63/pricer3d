@@ -36,7 +36,7 @@ from typing import Optional
 from calculator.orientation_scoring import (
     _score_orientation_3x3,
 )
-from calculator.orientation_math import rotation_from_up_vector
+from calculator.orientation_math import rotation_from_bed_normal
 
 logger = logging.getLogger(__name__)
 
@@ -85,16 +85,7 @@ class FaceFeatureExtractor:
 
         # ── 旋转后评分特征 ──
         # 计算"面朝上"的旋转矩阵 (法向的反方向对齐 +Z)
-        up = -normal
-        up_norm = float(np.linalg.norm(up))
-        if up_norm < 1e-8:
-            up = np.array([0.0, 0.0, 1.0])
-        else:
-            up = up / up_norm
-        if up[2] < 0:
-            up = -up
-
-        R = rotation_from_up_vector(up)[:3, :3].copy()
+        R = rotation_from_bed_normal(normal)[:3, :3].copy()
         metrics = _score_orientation_3x3(mesh, R)
 
         z_height = float(metrics.get("z_height", 0.0))

@@ -31,6 +31,7 @@ from calculator.orientation_math import (
     align_face_to_z,
     rotation_to_euler,
     rotation_from_up_vector,
+    rotation_from_bed_normal,
 )
 from calculator.orientation_scoring import (
     OVERHANG_ANGLE_DEG,
@@ -69,6 +70,7 @@ __all__ = [
     "align_face_to_z",
     "rotation_to_euler",
     "rotation_from_up_vector",
+    "rotation_from_bed_normal",
     # Scoring
     "evaluate_orientation",
     "fine_tune_orientation",
@@ -119,6 +121,41 @@ def _load_mesh(model_path: str) -> trimesh.Trimesh:
             normalized.cleanup()
 
 
+def _rotation_for_bed_candidate(
+    mesh: trimesh.Trimesh,
+    normal: np.ndarray,
+    face_vertices: Optional[Sequence[Sequence[float]]] = None,
+) -> np.ndarray:
+    """Choose the normal sign that puts the selected geometric face on the bed.
+
+    STL winding is not reliable.  When candidate face points are available,
+    evaluate both normal directions and retain the rotation for which the whole
+    selected face is closest to the model's global minimum Z plane.
+    """
+    normal = np.asarray(normal, dtype=np.float64)
+    if float(np.linalg.norm(normal)) < 1e-8:
+        return np.eye(4)
+
+    primary = rotation_from_bed_normal(normal)
+    if face_vertices is None:
+        return primary
+
+    points = np.asarray(face_vertices, dtype=np.float64)
+    if points.ndim != 2 or points.shape[0] < 3 or points.shape[1] < 3:
+        return primary
+    points = points[:, :3]
+    mesh_vertices = np.asarray(mesh.vertices, dtype=np.float64)
+
+    def face_gap(rotation: np.ndarray) -> float:
+        R3 = rotation[:3, :3]
+        model_min_z = float((mesh_vertices @ R3.T)[:, 2].min())
+        face_z = (points @ R3.T)[:, 2]
+        return float(np.max(np.abs(face_z - model_min_z)))
+
+    opposite = rotation_from_bed_normal(-normal)
+    return min((primary, opposite), key=face_gap)
+
+
 def analyze_orientation(
     model_path: str,
     face_normal: Optional[Sequence[float]] = None,
@@ -140,7 +177,7 @@ def analyze_orientation(
     else:
         face_normal = np.asarray(face_normal, dtype=np.float64)
 
-    R_align = align_face_to_z(face_normal)
+    R_align = rotation_from_bed_normal(face_normal)[:3, :3]
 
     tune = fine_tune_orientation(mesh, R_align)
     R_opt = tune["R"]
@@ -280,15 +317,9 @@ def get_best_face_for_slicing(
     candidates = []
     for cluster in coplanar_clusters:
         normal = np.array(cluster["normal"], dtype=np.float64)
-        up = -normal
-        up_norm = float(np.linalg.norm(up))
-        if up_norm < 1e-8:
+        if float(np.linalg.norm(normal)) < 1e-8:
             continue
-        up = up / up_norm
-        if up[2] < 0:
-            up = -up
-
-        R = rotation_from_up_vector(up)
+        R = _rotation_for_bed_candidate(mesh, normal, cluster.get("face_vertices"))
         eval_result = evaluate_orientation(mesh, R)
         candidates.append(
             {
@@ -296,6 +327,7 @@ def get_best_face_for_slicing(
                 "score": eval_result["score"],
                 "metrics": eval_result["metrics"],
                 "euler_angles_deg": eval_result["euler_angles_deg"],
+                "rotation_matrix": R[:3, :3].tolist(),
             }
         )
 
@@ -306,16 +338,19 @@ def get_best_face_for_slicing(
             contact = float(f.get("metrics", {}).get("contact_area", 0))
             overhang = float(f.get("metrics", {}).get("overhang_ratio", 0))
             score = contact * (1.0 - overhang) * 0.5
+            fallback_normal = np.asarray(f.get("normal", [0, 0, 0]), dtype=np.float64)
+            fallback_rotation = _rotation_for_bed_candidate(mesh, fallback_normal, f.get("vertices"))
             candidates.append(
                 {
-                    "face": {"normal": f.get("normal", [0, 0, 0]), "area": f.get("area", 0)},
+                    "face": {"normal": fallback_normal.tolist(), "area": f.get("area", 0)},
                     "score": round(score, 2),
                     "metrics": {
                         "contact_area": contact,
                         "overhang_ratio": overhang,
                         "z_height": f.get("metrics", {}).get("z_height", 0),
                     },
-                    "euler_angles_deg": {"x": 0, "y": 0, "z": 0},
+                    "euler_angles_deg": rotation_to_euler(fallback_rotation),
+                    "rotation_matrix": fallback_rotation[:3, :3].tolist(),
                 }
             )
 
@@ -334,19 +369,9 @@ def get_best_face_for_slicing(
         }
 
     best = candidates[0]
-    best_normal = np.array(best["face"]["normal"], dtype=np.float64)
 
     # Step 5: compute rotation + fine-tune + export
-    up = -best_normal
-    up_norm = float(np.linalg.norm(up))
-    if up_norm < 1e-8:
-        up = np.array([0.0, 0.0, 1.0])
-    else:
-        up = up / up_norm
-        if up[2] < 0:
-            up = -up
-
-    R = rotation_from_up_vector(up)
+    R = np.asarray(best.get("rotation_matrix"), dtype=np.float64)
     tune = fine_tune_orientation(mesh, R[:3, :3])
     R_opt = tune["R"]
     euler = rotation_to_euler(R_opt)
@@ -510,22 +535,28 @@ def _learned_best_face(model_path: str) -> dict:
         return tuple(np.round(v / max(float(np.linalg.norm(v)), 1e-9), 2))
 
     # ── 辅助：给候选面评分 ──
-    def _score_candidate(normal: np.ndarray, cluster: dict = None, label: str = "") -> None:
+    def _score_candidate(
+        normal: np.ndarray,
+        cluster: dict = None,
+        label: str = "",
+        face_vertices: Optional[Sequence[Sequence[float]]] = None,
+    ) -> None:
         nonlocal best_overall, best_score
-        up = -np.array(normal, dtype=np.float64)
-        n_up = float(np.linalg.norm(up))
-        if n_up < 1e-8:
+        normal = np.array(normal, dtype=np.float64)
+        n_normal = float(np.linalg.norm(normal))
+        if n_normal < 1e-8:
             return
-        up = up / n_up
-        if up[2] < 0:
-            up = -up
+        up = -normal / n_normal
         key = _up_key(up)
         if key in used_ups:
             return
         used_ups.add(key)
 
         # 计算旋转 + 评分指标
-        R = rotation_from_up_vector(up)
+        candidate_face_vertices = face_vertices
+        if candidate_face_vertices is None and cluster is not None:
+            candidate_face_vertices = cluster.get("face_vertices") or cluster.get("vertices")
+        R = _rotation_for_bed_candidate(mesh, normal, candidate_face_vertices)
         metrics = evaluate_orientation(mesh, R)
         m = metrics["metrics"]
         z_h = float(m.get("z_height", 1))
@@ -587,6 +618,7 @@ def _learned_best_face(model_path: str) -> dict:
             "learned_prob": lr_prob,
             "label": label,
             "stable": stable,
+            "rotation_matrix": R[:3, :3].tolist(),
         }
 
         if score > best_score:
@@ -662,15 +694,9 @@ def _learned_best_face(model_path: str) -> dict:
     # 用 fast_score 收集到的最近 50 个 = used_ups 数量
     # 简化: 只对 best_overall 做切片验证（1次切片 ~0.5-2秒）
     prusa_info = {}
-    prusa_normal = np.array(best_overall["face"]["normal"], dtype=np.float64)
     try:
-        up_tmp = -prusa_normal
-        n_tmp = float(np.linalg.norm(up_tmp))
-        if n_tmp > 1e-8:
-            up_tmp = up_tmp / n_tmp
-            if up_tmp[2] < 0:
-                up_tmp = -up_tmp
-        R_tmp = rotation_from_up_vector(up_tmp)
+        R_tmp = np.eye(4)
+        R_tmp[:3, :3] = np.asarray(best_overall["rotation_matrix"], dtype=np.float64)
         # 微调前的旋转
         tune_tmp = fine_tune_orientation(mesh, R_tmp[:3, :3])
         R_final = tune_tmp["R"]
@@ -697,18 +723,7 @@ def _learned_best_face(model_path: str) -> dict:
         logger.warning("PrusaSlicer 验证失败: %s", e)
 
     # ── 应用最佳旋转 + 导出（跳过 Z 轴微调，无实际意义） ──
-    best_normal = np.array(best_overall["face"]["normal"], dtype=np.float64)
-    up = -best_normal
-    n_up = float(np.linalg.norm(up))
-    if n_up < 1e-8:
-        up = np.array([0.0, 0.0, 1.0])
-    else:
-        up = up / n_up
-        if up[2] < 0:
-            up = -up
-
-    R = rotation_from_up_vector(up)
-    R_opt = R[:3, :3]
+    R_opt = np.asarray(best_overall["rotation_matrix"], dtype=np.float64)
     euler = rotation_to_euler(R_opt)
 
     oriented_path = apply_orientation_to_mesh(model_path, R_opt)

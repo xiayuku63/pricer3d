@@ -455,6 +455,7 @@ async def auto_learned_orient(
         return {
             "status": "ok",
             "euler_angles_deg": euler,
+            "rotation_matrix": result.get("rotation_matrix"),
             "score": result.get("score"),
             "method_used": result.get("method_used", "learned"),
             "fallback": result.get("fallback", False),

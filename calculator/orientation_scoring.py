@@ -10,9 +10,9 @@ import numpy as np
 import trimesh
 
 from calculator.orientation_math import (
-    rodrigues_rotation,
     rotation_to_euler,
     rotation_from_up_vector,
+    rotation_from_bed_normal,
     fibonacci_sphere_sampling,
 )
 
@@ -28,6 +28,30 @@ TIME_WEIGHT = 0.30
 ADHESION_WEIGHT = 0.20
 FINE_TUNE_Z_RANGE = (-30, 30)
 FINE_TUNE_STEP = 1.0
+
+
+def _bed_contact_area(
+    rotated_vertices: np.ndarray,
+    faces: np.ndarray,
+    face_areas: np.ndarray,
+) -> float:
+    """Return the geometric triangle area that actually lies on the bed plane.
+
+    Convex-hull footprint is useful for stability, but it is not adhesion area:
+    gaps, holes, and disconnected feet must not be filled in.  A triangle counts
+    only when all of its vertices lie on the global minimum-Z plane.
+    """
+    if rotated_vertices.size == 0 or len(faces) == 0:
+        return 0.0
+
+    z_min = float(rotated_vertices[:, 2].min())
+    bounds = np.ptp(rotated_vertices, axis=0)
+    model_diag = float(np.linalg.norm(bounds))
+    plane_tol = max(1e-5, min(0.01, model_diag * 1e-6))
+
+    triangle_z = rotated_vertices[faces, 2]
+    on_bed = np.max(np.abs(triangle_z - z_min), axis=1) <= plane_tol
+    return float(np.sum(face_areas[on_bed]))
 
 
 def _score_orientation_3x3(mesh: trimesh.Trimesh, R: np.ndarray) -> dict:
@@ -51,8 +75,11 @@ def _score_orientation_3x3(mesh: trimesh.Trimesh, R: np.ndarray) -> dict:
     overhang_area = float(np.sum(face_areas[overhang_mask]))
     overhang_ratio = overhang_area / total_area
 
-    bottom_mask = dot_z < -0.95
-    contact_area = float(np.sum(face_areas[bottom_mask]))
+    contact_area = _bed_contact_area(
+        rotated_verts,
+        np.asarray(mesh.faces),
+        face_areas,
+    )
 
     support_volume = 0.0
     if overhang_area > 1e-9:
@@ -79,67 +106,20 @@ def fine_tune_orientation(
     z_range: tuple = FINE_TUNE_Z_RANGE,
     step: float = FINE_TUNE_STEP,
 ) -> dict:
-    """Fine-tune orientation by rotating ±30° around Z-axis to minimize overhangs."""
-    best_overhang = float("inf")
-    best_contact = 0.0
-    best_angle = 0.0
-    best_R = R_base
-    best_metrics = None
+    """Keep the aligned face orientation without arbitrary Z-axis rotation.
 
-    for angle_deg in np.arange(z_range[0], z_range[1] + step * 0.5, step):
-        angle_rad = math.radians(float(angle_deg))
-        R_z = rodrigues_rotation(np.array([0.0, 0.0, 1.0]), angle_rad)
-        R_candidate = R_z @ R_base
-
-        m = _score_orientation_3x3(mesh, R_candidate)
-        overhang = m["overhang_ratio"]
-        contact = m["contact_area"]
-
-        # FDM flatness constraint: bottom face must be a real flat plane
-        vertices = np.asarray(mesh.vertices, dtype=np.float64)
-        rotated_verts = vertices @ R_candidate.T
-        z_all = rotated_verts[:, 2]
-        z_min = float(z_all.min())
-        z_range_val = float(z_all.max()) - z_min
-        eps_flat = max(z_range_val * 0.005, 0.05)
-        bottom_mask = z_all < z_min + eps_flat
-        bottom_z = z_all[bottom_mask]
-        if len(bottom_z) >= 3:
-            z_variance = float(np.var(bottom_z))
-            if z_variance >= 0.1:
-                continue
-
-        improved = False
-        if overhang < best_overhang - 1e-6:
-            improved = True
-        elif abs(overhang - best_overhang) < 1e-6 and contact > best_contact + 1e-3:
-            improved = True
-
-        if improved:
-            best_overhang = overhang
-            best_contact = contact
-            best_angle = float(angle_deg)
-            best_R = R_candidate
-            best_metrics = m
-
-    if best_metrics is None:
-        best_metrics = _score_orientation_3x3(mesh, R_base)
-
-    report_parts = []
-    if abs(best_angle) > 0.01:
-        report_parts.append("绕Z轴微调{:.0f}度".format(best_angle))
-        if best_metrics["overhang_ratio"] < 0.01:
-            report_parts.append("消除悬垂")
-        else:
-            report_parts.append("降低悬垂面积")
-    else:
-        report_parts.append("保持对齐方向，悬垂已最小")
-
+    Overhang ratio, bed contact, and model height are invariant under rotation
+    around the build Z axis.  The previous sweep therefore always selected the
+    first sampled angle (-30 degrees) even though no metric improved.
+    ``z_range`` and ``step`` remain accepted for API compatibility.
+    """
+    del z_range, step
+    metrics = _score_orientation_3x3(mesh, R_base)
     return {
-        "R": best_R,
-        "angle": round(best_angle, 1),
-        "metrics": best_metrics,
-        "report": "，".join(report_parts) if "".join(report_parts) else "方向已最优",
+        "R": np.asarray(R_base, dtype=np.float64).copy(),
+        "angle": 0.0,
+        "metrics": metrics,
+        "report": "保持面朝向，未添加无效的Z轴旋转",
     }
 
 
@@ -181,21 +161,11 @@ def evaluate_orientation(mesh: trimesh.Trimesh, rotation: np.ndarray) -> dict:
 
     xy_area = float(np.sum(face_areas * np.abs(dot_z)))
 
-    base_mask = dot_z < -0.95
-    base_area = float(np.sum(face_areas[base_mask]))
-
-    contact_area = base_area
-    try:
-        hull = rotated.convex_hull
-        if hull is not None and isinstance(hull, trimesh.Trimesh):
-            hull_verts = hull.vertices[hull.faces]
-            hull_z_centers = hull_verts[:, :, 2].mean(axis=1)
-            z_min_hull = float(hull.bounds[0, 2])
-            bottom_mask_hull = hull_z_centers < z_min_hull + z_height * 0.05
-            hull_areas = hull.area_faces
-            contact_area = float(np.sum(hull_areas[bottom_mask_hull]))
-    except Exception:
-        contact_area = base_area
+    contact_area = _bed_contact_area(
+        np.asarray(rotated.vertices, dtype=np.float64),
+        np.asarray(rotated.faces),
+        np.asarray(face_areas, dtype=np.float64),
+    )
 
     support_score = max(0.0, (1.0 - overhang_ratio) * 100.0)
     avg_dim = float((bounds[1] - bounds[0]).mean())
@@ -258,18 +228,15 @@ def get_stable_faces(model_path: str) -> dict:
     faces_result = []
 
     def _add_face(face_idx: int, normal: np.ndarray, area: float, label: str, face_vertices: np.ndarray):
-        up = -normal
-        norm_val = float(np.linalg.norm(up))
+        norm_val = float(np.linalg.norm(normal))
         if norm_val < 1e-8:
             return
-        up = up / norm_val
-        if up[2] < 0:
-            up = -up
+        up = -normal / norm_val
         key = tuple(np.round(up, 2))
         if key in used_up_keys:
             return
         used_up_keys.add(key)
-        R = rotation_from_up_vector(up)
+        R = rotation_from_bed_normal(normal)
         metrics_result = evaluate_orientation(mesh, R)
         vertices = [[round(float(v[0]), 6), round(float(v[1]), 6), round(float(v[2]), 6)] for v in face_vertices]
         faces_result.append(
@@ -328,8 +295,6 @@ def get_stable_faces(model_path: str) -> dict:
         fib = fibonacci_sphere_sampling(NUM_FIBONACCI_SAMPLES)
         for i in range(fib.shape[0]):
             up = fib[i].copy()
-            if up[2] < 0:
-                up = -up
             key = tuple(np.round(up, 2))
             if key in used_up_keys:
                 continue

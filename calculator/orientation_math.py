@@ -57,25 +57,29 @@ def align_face_to_z(normal: np.ndarray) -> np.ndarray:
 
 
 def rotation_to_euler(R: np.ndarray) -> dict:
-    """Convert a 3x3 or 4x4 rotation matrix to Euler angles (degrees)."""
+    """Convert a rotation matrix to Three.js-compatible intrinsic XYZ Euler angles.
+
+    Three.js ``Euler(order="XYZ")`` composes the matrix as ``Rx @ Ry @ Rz``.
+    These extraction formulas mirror ``Euler.setFromRotationMatrix`` so the
+    angles returned by the API reproduce the exact scored rotation in preview.
+    """
     if R.shape == (4, 4):
         R3 = R[:3, :3].astype(np.float64)
     else:
         R3 = np.asarray(R, dtype=np.float64)[:3, :3]
-    sy = math.sqrt(float(R3[0, 0]) ** 2 + float(R3[1, 0]) ** 2)
-    singular = sy < 1e-6
-    if not singular:
-        x = math.atan2(float(R3[2, 1]), float(R3[2, 2]))
-        y = math.atan2(-float(R3[2, 0]), sy)
-        z = math.atan2(float(R3[1, 0]), float(R3[0, 0]))
+
+    y = math.asin(float(np.clip(R3[0, 2], -1.0, 1.0)))
+    if abs(float(R3[0, 2])) < 0.9999999:
+        x = math.atan2(-float(R3[1, 2]), float(R3[2, 2]))
+        z = math.atan2(-float(R3[0, 1]), float(R3[0, 0]))
     else:
-        x = math.atan2(-float(R3[1, 2]), float(R3[1, 1]))
-        y = math.atan2(-float(R3[2, 0]), sy)
+        x = math.atan2(float(R3[2, 1]), float(R3[1, 1]))
         z = 0.0
+
     return {
-        "x": round(math.degrees(x), 1),
-        "y": round(math.degrees(y), 1),
-        "z": round(math.degrees(z), 1),
+        "x": round(math.degrees(x), 4),
+        "y": round(math.degrees(y), 4),
+        "z": round(math.degrees(z), 4),
     }
 
 
@@ -97,6 +101,20 @@ def rotation_from_up_vector(up: np.ndarray) -> np.ndarray:
     result = np.eye(4)
     result[:3, :3] = R3
     return result
+
+
+def rotation_from_bed_normal(normal: np.ndarray) -> np.ndarray:
+    """Return a 4x4 rotation that places a face normal against the print bed.
+
+    A face touching the bed must have its outward normal point toward ``-Z``.
+    Unlike the previous hemisphere-folding logic, this preserves the selected
+    side of the model for normals from every direction.
+    """
+    normal = np.asarray(normal, dtype=np.float64)
+    norm = float(np.linalg.norm(normal))
+    if norm < 1e-12:
+        return np.eye(4)
+    return rotation_from_up_vector(-normal / norm)
 
 
 def euler_to_up_vector(x_deg: float, y_deg: float, z_deg: float) -> np.ndarray:
