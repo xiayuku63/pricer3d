@@ -6,6 +6,7 @@ import { scene, camera, stlLoader, previewContainer, previewPlaceholder, request
 import { fitCameraToMesh } from './camera.js';
 import { createPreviewMaterial } from './render-style.js';
 import { getPreview3mf, getPreviewStl } from '../preview-cache.js';
+import { setModelLoadingProgress, finishModelLoadingProgress } from '../model-progress.js';
 
 // ── Shared mutable state (owned here, imported by scene.js and camera.js) ──
 export let currentMesh, currentMeshCenterOffset = null;
@@ -69,6 +70,26 @@ function _orientationEqual(a, b) {
     if (a == null && b == null) return true;
     if (a == null || b == null) return false;
     return ((a.x || 0) === (b.x || 0) && (a.y || 0) === (b.y || 0) && (a.z || 0) === (b.z || 0));
+}
+
+function _formatLabel(file, stage) {
+    const ext = file?.name?.includes('.') ? file.name.split('.').pop().toUpperCase() : 'MODEL';
+    return `${ext} - ${stage}`;
+}
+
+function _setPreviewProgress(file, stage, percent, detail = '') {
+    setModelLoadingProgress(previewPlaceholder, {
+        label: _formatLabel(file, stage),
+        percent,
+        detail: detail || file?.name || '',
+    });
+}
+
+function _finishPreviewProgress(file) {
+    finishModelLoadingProgress(previewPlaceholder, {
+        label: _formatLabel(file, 'Preview ready'),
+        detail: file?.name || '',
+    });
 }
 
 // ── Mesh color / recolor ──
@@ -210,7 +231,6 @@ function _installStlBuffer(arrayBuffer, file, orientation, colorKey, requestId) 
 
     scene.add(currentMesh);
     fitCameraToMesh(currentMesh);
-    previewPlaceholder.classList.add('hidden');
     _lastRenderedFileKey = (file.name || '') + ':' + (file.size || 0);
     _lastRenderedColorKey = colorKey;
     _lastRenderedOrientation = orientation ? { x: orientation.x || 0, y: orientation.y || 0, z: orientation.z || 0 } : null;
@@ -220,8 +240,12 @@ function _installStlBuffer(arrayBuffer, file, orientation, colorKey, requestId) 
 async function renderVia3mfScene(file, orientation = null, colorKey = null, requestId) {
     let objectUrl = null;
     try {
-        const sceneBlob = await getPreview3mf(file);
+        _setPreviewProgress(file, 'Preparing model', 5);
+        const sceneBlob = await getPreview3mf(file, (percent, detail) => {
+            if (requestId === _renderRequestId) _setPreviewProgress(file, 'Processing model', percent, detail);
+        });
         objectUrl = URL.createObjectURL(sceneBlob);
+        _setPreviewProgress(file, 'Loading scene', 82);
         const gltf = await new GLTFLoader().loadAsync(objectUrl);
         if (requestId !== _renderRequestId) return false;
 
@@ -275,6 +299,7 @@ async function renderVia3mfScene(file, orientation = null, colorKey = null, requ
             model.position.y += (bc - rotatedCenter.y);
         }
 
+        _setPreviewProgress(file, 'Placing model', 94);
         clearCurrentMesh();
         currentMesh = model;
         currentMeshCenterOffset = new THREE.Vector3(0, 0, 0);
@@ -287,6 +312,7 @@ async function renderVia3mfScene(file, orientation = null, colorKey = null, requ
         _lastRenderedFileKey = fileKey;
         _lastRenderedColorKey = colorKey;
         _lastRenderedOrientation = orientation ? { x: orientation.x || 0, y: orientation.y || 0, z: orientation.z || 0 } : null;
+        _finishPreviewProgress(file);
         return true;
     } catch (error) {
         console.warn('3MF entity preview failed:', error);
@@ -298,9 +324,15 @@ async function renderVia3mfScene(file, orientation = null, colorKey = null, requ
 
 async function renderViaNormalizedStl(file, orientation = null, colorKey = null, requestId) {
     try {
-        const stlBlob = await getPreviewStl(file);
+        _setPreviewProgress(file, 'Preparing model', 5);
+        const stlBlob = await getPreviewStl(file, (percent, detail) => {
+            if (requestId === _renderRequestId) _setPreviewProgress(file, 'Processing model', percent, detail);
+        });
+        _setPreviewProgress(file, 'Parsing normalized mesh', 88);
         const arrayBuffer = await stlBlob.arrayBuffer();
-        return _installStlBuffer(arrayBuffer, file, orientation, colorKey, requestId);
+        const installed = _installStlBuffer(arrayBuffer, file, orientation, colorKey, requestId);
+        if (installed && requestId === _renderRequestId) _finishPreviewProgress(file);
+        return installed;
     } catch (e) {
         console.warn('Normalized STL render failed:', e);
         return false;
@@ -326,8 +358,7 @@ export function renderSTL(file, colorKey = 'Blue', orientation = null) {
     const requestId = ++_renderRequestId;
     if (ext === '3mf') {
         clearCurrentMesh();
-        previewPlaceholder.textContent = 'Loading 3MF entities...';
-        previewPlaceholder.classList.remove('hidden');
+        _setPreviewProgress(file, 'Preparing 3MF entities', 0);
         _meshReadyPromise = renderVia3mfScene(file, orientation, colorKey, requestId).then((ok) => {
             if (!ok && requestId === _renderRequestId) {
                 previewPlaceholder.textContent = '3MF entity preview failed';
@@ -341,8 +372,7 @@ export function renderSTL(file, colorKey = 'Blue', orientation = null) {
         // STP/STEP/OBJ are normalized by the backend, then rendered through
         // the exact same STLLoader/centering/bed-placement path as native STL.
         clearCurrentMesh();
-        previewPlaceholder.textContent = 'Generating preview...';
-        previewPlaceholder.classList.remove('hidden');
+        _setPreviewProgress(file, 'Preparing preview', 0);
         _meshReadyPromise = renderViaNormalizedStl(file, orientation, colorKey, requestId).then((ok) => {
             if (!ok && requestId === _renderRequestId) {
                 previewPlaceholder.innerHTML = '<div style="text-align:center;padding-top:20%"><div style="font-size:1.5rem;font-weight:600;color:var(--color-text-muted);margin-bottom:1rem">' + ext.toUpperCase() + '</div><p style="color:var(--color-text-muted)">' + ext.toUpperCase() + ' preview failed</p><p style="color:var(--color-disabled-text);font-size:0.8rem">The file can still be sliced for quoting.</p></div>';
@@ -356,7 +386,11 @@ export function renderSTL(file, colorKey = 'Blue', orientation = null) {
     _meshReadyPromise = new Promise((resolve) => {
         const reader = new FileReader();
         reader.onloadstart = () => {
-            previewPlaceholder.textContent = 'Reading file...';
+            _setPreviewProgress(file, 'Reading model', 0);
+        };
+        reader.onprogress = (event) => {
+            if (requestId !== _renderRequestId || !event.lengthComputable) return;
+            _setPreviewProgress(file, 'Reading model', (event.loaded / event.total) * 60);
         };
         reader.onerror = () => {
             if (requestId === _renderRequestId) {
@@ -367,7 +401,10 @@ export function renderSTL(file, colorKey = 'Blue', orientation = null) {
         };
         reader.onload = (event) => {
             try {
-                resolve(_installStlBuffer(event.target.result, file, orientation, colorKey, requestId));
+                if (requestId === _renderRequestId) _setPreviewProgress(file, 'Parsing mesh', 75);
+                const installed = _installStlBuffer(event.target.result, file, orientation, colorKey, requestId);
+                if (installed && requestId === _renderRequestId) _finishPreviewProgress(file);
+                resolve(installed);
             } catch (e) {
                 if (requestId === _renderRequestId) {
                     previewPlaceholder.textContent = 'Preview failed: invalid STL geometry';

@@ -58,3 +58,15 @@ test('batch dirty styling highlights the whole modified control in green', async
     assert.match(source, /width: 10px;/);
     assert.match(source, /height: 10px;/);
 });
+
+
+test('batch apply action stays at the end of the batch settings row', async () => {
+    const html = await readFile(new URL('../static/partials/page-shell.html', import.meta.url), 'utf8');
+    const batchBar = html.indexOf('id="batch-edit-bar"');
+    const message = html.indexOf('id="batch-msg"', batchBar);
+    const applyButton = html.indexOf('id="batch-apply-btn"', batchBar);
+
+    assert.ok(batchBar >= 0);
+    assert.ok(message < applyButton);
+    assert.match(html.slice(applyButton, applyButton + 240), /ml-auto/);
+});

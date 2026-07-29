@@ -2,7 +2,9 @@
 
 import json
 import logging
+import os
 import re
+import shutil
 
 from fastapi import Depends, HTTPException, Request
 
@@ -13,6 +15,69 @@ from app.models_orm import QuoteHistory
 
 logger = logging.getLogger(__name__)
 
+
+def _quote_artifact_directories(current_user: dict) -> list[tuple[str, str]]:
+    """Return (allowed parent, target) pairs for current-user quote artifacts.
+
+    Quote files have existed in two layouts over the lifetime of the app:
+    direct quotes under ``data/uploads/<user>`` (G-code is stored beside the
+    normalized model), and ZIP/legacy jobs under ``USER_DATA_DIR/<user>``.
+    Configs and every other user-owned directory are intentionally excluded.
+    """
+    from app.utils import _user_base_dir
+
+    username = str(current_user["username"])
+    if not username or username in {".", ".."} or "/" in username or "\\" in username:
+        raise RuntimeError("Refusing unsafe username in quote artifact path")
+    user_folder = f"user_{int(current_user['id'])}_{username}"
+    direct_base = os.path.abspath(os.path.join("data", "uploads"))
+    user_root = os.path.abspath(os.path.join(_user_base_dir(), user_folder))
+    return [
+        (direct_base, os.path.join(direct_base, user_folder)),
+        (user_root, os.path.join(user_root, "uploads")),
+        (user_root, os.path.join(user_root, "outputs")),
+    ]
+
+
+def _safe_remove_quote_artifact_dir(allowed_parent: str, path: str) -> tuple[int, int]:
+    """Delete one approved user artifact root and return (roots, files)."""
+    parent = os.path.realpath(os.path.abspath(allowed_parent))
+    target = os.path.realpath(os.path.abspath(path))
+    try:
+        contained = os.path.commonpath([parent, target]) == parent
+    except ValueError:
+        contained = False
+    # Never delete the allowed parent itself, anything outside it, or a symlink
+    # target. This keeps recursive deletion within the exact quote-only roots.
+    if not contained or target == parent:
+        raise RuntimeError(f"Refusing unsafe quote artifact path: {path}")
+    if os.path.islink(os.path.abspath(path)):
+        raise RuntimeError(f"Refusing symlink quote artifact path: {path}")
+    if not os.path.exists(target):
+        return 0, 0
+    if not os.path.isdir(target):
+        raise RuntimeError(f"Quote artifact path is not a directory: {path}")
+
+    file_count = 0
+    for _, _, filenames in os.walk(target, followlinks=False):
+        file_count += len(filenames)
+    shutil.rmtree(target)
+    return 1, file_count
+
+
+def _clear_quote_artifacts(current_user: dict) -> dict[str, int]:
+    """Remove current-user uploaded models and G-code, and nothing else."""
+    summary = {"roots_deleted": 0, "files_deleted": 0}
+    seen: set[str] = set()
+    for allowed_parent, path in _quote_artifact_directories(current_user):
+        key = os.path.normcase(os.path.realpath(os.path.abspath(path)))
+        if key in seen:
+            continue
+        seen.add(key)
+        roots, files = _safe_remove_quote_artifact_dir(allowed_parent, path)
+        summary["roots_deleted"] += roots
+        summary["files_deleted"] += files
+    return summary
 
 def quote_history(limit: int = 20, offset: int = 0, current_user=Depends(get_current_user)):
     """Get quote history for current user."""
@@ -93,22 +158,32 @@ def delete_quote_history(id: int, request: Request, current_user=Depends(get_cur
 
 
 def clear_quote_history(request: Request, current_user=Depends(get_current_user)):
-    """Delete all quote history records for the current user."""
+    """Delete current-user history together with uploaded models and G-code."""
     uid = int(current_user["id"])
     try:
         with get_db_session() as db:
             count = db.query(QuoteHistory).filter(QuoteHistory.user_id == uid).delete()
-        logger.info(f"用户 {uid} 清理全部报价记录，共删除 {count} 条")
+            # Keep the DB delete in the same transaction scope as filesystem
+            # cleanup. A filesystem error raises here and rolls back history so
+            # the user can retry instead of silently leaving orphaned files.
+            artifacts = _clear_quote_artifacts(current_user)
+        logger.info(
+            "Cleared quote history for user %s: records=%s files=%s roots=%s",
+            uid,
+            count,
+            artifacts["files_deleted"],
+            artifacts["roots_deleted"],
+        )
         write_audit_event(
             action="quote.history.clear",
             request=request,
             user=current_user,
-            detail={"deleted_count": count},
+            detail={"deleted_count": count, **artifacts},
         )
-        return {"status": "ok", "deleted": count}
+        return {"status": "ok", "deleted": count, "artifacts": artifacts}
     except Exception as e:
-        logger.error(f"清理报价记录失败: user_id={uid} error={str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"清理失败: {str(e)}")
+        logger.error(f"Failed to clear quote history: user_id={uid} error={str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Clear failed: {str(e)}")
 
 
 def save_quote_history(user_id: int, results: list) -> None:

@@ -11,7 +11,7 @@ const quoteConfigUrl = new URL('../static/js/modules/quote-config.js', import.me
 const orientationStateUrl = new URL('../static/js/modules/orientation-state.js', import.meta.url);
 
 const { getAffectedFilenamesForGlobalSlicerChange, slicerParamsEqual } = await import(quoteConfigUrl);
-const { normalizeOrientation, getResultOrientation, withResultOrientation } = await import(orientationStateUrl);
+const { normalizeOrientation, getResultOrientation, resolveRequoteOrientation, withResultOrientation } = await import(orientationStateUrl);
 
 test('user-center save syncs the active slicer preset before re-quoting', async () => {
     const source = await readFile(profileUrl, 'utf8');
@@ -153,12 +153,16 @@ test('model orientation survives result updates and supports an explicit zero-de
     assert.deepEqual(normalizeOrientation({ x: 'bad', y: null, z: 30 }), { x: 0, y: 0, z: 30 });
 });
 
-test('re-quote sends the saved orientation instead of triggering auto orientation', async () => {
+test('re-quote preserves a saved orientation unless smart placement is explicitly enabled', async () => {
+    const saved = withResultOrientation({ filename: 'part.stl' }, { x: 18, y: -4, z: 90 });
+    assert.deepEqual(resolveRequoteOrientation(saved, false), { x: 18, y: -4, z: 90 });
+    assert.equal(resolveRequoteOrientation(saved, true), null);
+
     const source = await readFile(quoteApiUrl, 'utf8');
-    assert.match(source, /const orientation = getResultOrientation\(existing\);/);
-    assert.match(source, /const opts = \{ material, color, quantity, _printer_model: pm, _slicer_preset_id: sp, orientation \};/);
+    assert.match(source, /const smartPlacementEnabled = .*batch-auto-orient.*checked/);
+    assert.match(source, /const orientation = resolveRequoteOrientation\(existing, smartPlacementEnabled\);/);
+    assert.match(source, /auto_orient: smartPlacementEnabled/);
     assert.match(source, /const orientX = options\.orient_x != null \? options\.orient_x : orientation\?\.x;/);
-    assert.match(source, /!orientation/);
 });
 
 test('preview reads model orientation from the result row', async () => {

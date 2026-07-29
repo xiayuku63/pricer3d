@@ -21,6 +21,10 @@ export function getResultOrientation(result, fallback = null) {
     return fallback ? normalizeOrientation(fallback) : null;
 }
 
+export function resolveRequoteOrientation(result, smartPlacementEnabled = false) {
+    return smartPlacementEnabled ? null : getResultOrientation(result);
+}
+
 export function withResultOrientation(result, orientation) {
     const normalized = normalizeOrientation(orientation);
     return {

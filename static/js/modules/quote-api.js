@@ -12,9 +12,9 @@ import { renderResultsTable, recalcSummaryFromCurrentResults } from './quote-ren
 import { ensureThumbnailForFile } from './preview.js';
 import { loadQuoteHistory } from './history.js';
 import { t } from './i18n.js';
-import { uploadWithProgress, showProgress, showProgressSuccess, showProgressError, hideProgress, showToast } from './upload.js';
+import { uploadWithProgress, showProgress, updateProgress, showProgressSuccess, showProgressError, hideProgress, showToast } from './upload.js';
 import { getAffectedFilenamesForGlobalSlicerChange, getAffectedFilenamesForPresetChange } from './quote-config.js';
-import { getResultOrientation, withResultOrientation } from './orientation-state.js';
+import { getResultOrientation, resolveRequoteOrientation, withResultOrientation } from './orientation-state.js';
 import { resolveUploadDefaults } from './upload-defaults.js';
 
 let _dom = {};
@@ -83,7 +83,7 @@ async function _syncThumbnailsWithQuoteResults(files, results) {
         if (!file || !result?.color) continue;
         // The upload preview is generated before the API response arrives. Rebuild
         // it from the server-selected color so it cannot retain a stale global default.
-        await ensureThumbnailForFile(file, result.color, getResultOrientation(result));
+        await ensureThumbnailForFile(file, result.color, getResultOrientation(result), () => {});
     }
 }
 
@@ -129,12 +129,16 @@ export async function quoteSingleFileWithOptions(file, options, signal) {
     formData.append("use_prusaslicer", "true");
     const autoOrientCheckbox1 = document.getElementById('batch-auto-orient');
     const orientation = options.orientation || options._orientation;
-    // 如果传了指定朝向，不再走自动摆放（避免双重旋转）
-    if (autoOrientCheckbox1 && autoOrientCheckbox1.checked && !orientation
-        && !options.orient_x && !options.orient_y && !options.orient_z) {
+    const autoOrientRequested = options.auto_orient === true
+        || (options.auto_orient == null && autoOrientCheckbox1?.checked);
+    const hasExplicitOrientation = options.orient_x != null
+        || options.orient_y != null
+        || options.orient_z != null;
+    // Explicit/manual angles take precedence; smart placement must not double-rotate the model.
+    if (autoOrientRequested && !orientation && !hasExplicitOrientation) {
         formData.append('auto_orient', 'true');
     }
-    // 传递指定朝向 (来自"保存"按钮)
+    // Pass an explicit orientation when saving from the preview.
     const orientX = options.orient_x != null ? options.orient_x : orientation?.x;
     const orientY = options.orient_y != null ? options.orient_y : orientation?.y;
     const orientZ = options.orient_z != null ? options.orient_z : orientation?.z;
@@ -158,6 +162,112 @@ export async function quoteSelectedFiles(selectedFiles) {
 
 export async function quoteSelectedFilesWithProgress(selectedFiles) {
     return _quoteSelectedFilesInternal(selectedFiles, true);
+}
+
+function _buildPendingQuoteResult(file, colorOverride = null) {
+    const defaults = _getUploadDefaults();
+    const existing = currentResults.find((item) => item && item.filename === file.name) || null;
+    return {
+        ...(existing || {}),
+        filename: file.name,
+        status: 'pending',
+        _calculating: true,
+        material: existing?.material || defaults.material || quoteOptions.material,
+        brand: existing?.brand || defaults.brand || quoteOptions.brand || '',
+        color: colorOverride || existing?.color || defaults.color || quoteOptions.color || '#ffffff',
+        quantity: Math.max(1, Number.parseInt(existing?.quantity ?? quoteOptions.quantity, 10) || 1),
+        _printer_model: existing?._printer_model || defaults.printer_model || '',
+        _slicer_preset_id: existing && Object.prototype.hasOwnProperty.call(existing, '_slicer_preset_id')
+            ? existing._slicer_preset_id
+            : defaults.slicer_preset_id,
+    };
+}
+
+/** Resolve initial thumbnail colors from the exact defaults used by pending rows. */
+export function getInitialQuoteColorMap(files) {
+    const colors = {};
+    Array.from(files || []).forEach((file) => {
+        if (file?.name) colors[file.name] = _buildPendingQuoteResult(file).color;
+    });
+    return colors;
+}
+
+/** Insert the row as soon as its thumbnail is ready, before calculation starts. */
+export function markFileAsCalculating(file, colorOverride = null) {
+    if (!file?.name) return;
+    mergeResultsByFilename([_buildPendingQuoteResult(file, colorOverride)]);
+    renderResultsTable();
+    recalcSummaryFromCurrentResults();
+}
+
+function _pendingQuoteOptions(file) {
+    const item = currentResults.find((result) => result && result.filename === file.name) || {};
+    const defaults = _getUploadDefaults();
+    const smartPlacementEnabled = Boolean(document.getElementById('batch-auto-orient')?.checked);
+    return {
+        material: item.material || defaults.material || quoteOptions.material,
+        brand: item.brand || defaults.brand || quoteOptions.brand || '',
+        color: item.color || defaults.color || quoteOptions.color || '#ffffff',
+        quantity: Math.max(1, Number.parseInt(item.quantity ?? quoteOptions.quantity, 10) || 1),
+        _printer_model: item._printer_model || defaults.printer_model || '',
+        _slicer_preset_id: Object.prototype.hasOwnProperty.call(item, '_slicer_preset_id')
+            ? item._slicer_preset_id
+            : defaults.slicer_preset_id,
+        orientation: getResultOrientation(item),
+        auto_orient: smartPlacementEnabled,
+        entity_colors: item._entity_colors || {},
+    };
+}
+
+/** Quote files one by one so each result row can transition from calculating to done. */
+export async function quoteSelectedFilesSequentially(selectedFiles, useProgress = false) {
+    const files = Array.from(selectedFiles || []);
+    if (!files.length) return;
+    const controller = _newAbortController();
+    const signal = controller.signal;
+
+    files.forEach((file) => {
+        const existing = currentResults.find((item) => item && item.filename === file.name);
+        if (!existing || !existing._calculating) markFileAsCalculating(file);
+    });
+    if (useProgress) showProgress(`逐项计算报价 (${files.length} 个文件)...`);
+
+    for (let index = 0; index < files.length; index += 1) {
+        if (signal.aborted) break;
+        const file = files[index];
+        const percentBefore = (index / files.length) * 100;
+        if (useProgress) updateProgress(percentBefore, `${index + 1}/${files.length} - ${file.name} - ${t('quote.calculating')}`);
+        markFileAsCalculating(file);
+        try {
+            const updated = await quoteSingleFileWithOptions(file, _pendingQuoteOptions(file), signal);
+            mergeResultsByFilename([updated]);
+            if (updated?.color) {
+                await ensureThumbnailForFile(file, updated.color, getResultOrientation(updated), () => {});
+            }
+        } catch (error) {
+            if (error.name === 'AbortError' || signal.aborted) break;
+            mergeResultsByFilename([{
+                filename: file.name,
+                status: 'failed',
+                error: error.message || t('quote.requestFailed'),
+            }]);
+        }
+        renderResultsTable();
+        recalcSummaryFromCurrentResults();
+        if (useProgress) updateProgress(((index + 1) / files.length) * 100, `${index + 1}/${files.length} - ${file.name}`);
+    }
+
+    if (useProgress && !signal.aborted) {
+        showProgressSuccess(`报价完成，共处理 ${files.length} 个文件`);
+        hideProgress();
+        showToast(`报价完成：${files.length} 个文件已处理`, 'success');
+        setTimeout(() => loadQuoteHistory(authToken), 500);
+    }
+    return currentResults;
+}
+
+export async function quoteSelectedFilesSequentiallyWithProgress(selectedFiles) {
+    return quoteSelectedFilesSequentially(selectedFiles, true);
 }
 
 async function _quoteSelectedFilesInternal(selectedFiles, useProgress) {
@@ -307,6 +417,7 @@ export async function reQuoteAllSelectedFiles(reasonLabel, shouldRequote) {
     const controller = _newAbortController();
     const signal = controller.signal;
 
+    const smartPlacementEnabled = Boolean(document.getElementById('batch-auto-orient')?.checked);
     const filesToRequote = new Set(files.map((file) => file.name));
     currentResults.splice(0, currentResults.length, ...currentResults.map((item) => {
         if (!item || !item.filename) return item;
@@ -341,14 +452,14 @@ export async function reQuoteAllSelectedFiles(reasonLabel, shouldRequote) {
         const sp = existing?._slicer_preset_explicit
             ? (existing._slicer_preset_id ?? null)
             : (quoteOptions.slicer_preset_id ?? _getActiveSlicerPresetId() ?? null);
-        const orientation = getResultOrientation(existing);
+        const orientation = resolveRequoteOrientation(existing, smartPlacementEnabled);
         if (fileNameDisplay) fileNameDisplay.textContent = `${reasonLabel}：${i + 1}/${files.length}（${file.name}）`;
         try {
             await ensureThumbnailForFile(file, color);
             if (signal.aborted) break;
             // null is meaningful: it explicitly selects "no preset" and must
             // not fall back to the current global preset.
-            const opts = { material, color, quantity, _printer_model: pm, _slicer_preset_id: sp, orientation };
+            const opts = { material, color, quantity, _printer_model: pm, _slicer_preset_id: sp, orientation, auto_orient: smartPlacementEnabled };
             if (existing?.brand) opts.brand = existing.brand;
             const updated = await quoteSingleFileWithOptions(file, opts, signal);
             mergeResultsByFilename([orientation ? withResultOrientation(updated, orientation) : updated]);

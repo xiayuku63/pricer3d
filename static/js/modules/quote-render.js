@@ -624,9 +624,17 @@ function _buildPrintSuggestionHtml(item) {
     return html;
 }
 
+function _isCalculating(item) {
+    return Boolean(item?._calculating || item?._recalculating);
+}
+
+function _calculationStatusText(item) {
+    return item?._calculating ? t('quote.calculating') : t('quote.recalculating');
+}
+
 // -- Summary recalculation --
 export function recalcSummaryFromCurrentResults() {
-    const successItems = currentResults.filter((i) => i.status === "success" && !i._recalculating);
+    const successItems = currentResults.filter((i) => i.status === "success" && !_isCalculating(i));
     const failedItems = currentResults.filter((i) => i.status === "failed");
     const sumFiles = document.getElementById('sum-total-files');
     const sumStatus = document.getElementById('sum-status');
@@ -777,7 +785,7 @@ export function renderResultsTable() {
         const tr = document.createElement('tr');
         const isEven = pageIdx % 2 === 0;
         const zebraClass = isEven ? 'bg-white' : 'bg-gray-50/50';
-        const statusClass = item.status === 'failed' ? 'table-row-failed border-l-4 border-l-red-400' : (item._recalculating ? 'table-row-pending' : 'table-row-success border-l-4 border-l-green-400');
+        const statusClass = _isCalculating(item) ? 'table-row-pending' : (item.status === 'failed' ? 'table-row-failed border-l-4 border-l-red-400' : 'table-row-success border-l-4 border-l-green-400');
         tr.className = `border-t border-gray-100 ${zebraClass} ${statusClass} hover:bg-indigo-50/40 transition-colors`;
         tr.setAttribute('data-row-file', item.filename);
         const ext = item.filename && item.filename.includes('.') ? item.filename.split('.').pop().toLowerCase() : '-';
@@ -788,7 +796,8 @@ export function renderResultsTable() {
 
             const geometryText = `<div class="whitespace-nowrap">体积: ${item.volume_cm3} cm³</div><div class="whitespace-nowrap">表面积: ${item.surface_area_cm2} cm²</div><div class="whitespace-nowrap">尺寸: ${item.dimensions}</div>`;
             const thumbnail = thumbnailMap.get(item.filename) || buildPlaceholderThumbnail(ext);
-            const recalculating = !!item._recalculating;
+            const calculating = _isCalculating(item);
+            const calculationLabel = _calculationStatusText(item);
             const isRealThumbnail = thumbnail && thumbnail.startsWith('data:image/png');
             const previewButtonHtml = isRealThumbnail
                 ? `<button type="button" data-preview-file="${item.filename}" data-preview-ext="${ext}" class="block rounded border border-gray-200 overflow-hidden hover:border-indigo-300 transition-colors"><img src="${thumbnail}" alt="静态图" class="w-32 h-20 object-cover bg-white" /></button>`
@@ -811,23 +820,24 @@ export function renderResultsTable() {
                 <td class="px-2 py-1.5"><div class="quote-config-grid min-w-[320px]"><div class="quote-config-row quote-config-row-printer"><select data-field="_printer_model" aria-label="打印机" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5">${pmOptions}</select><select data-field="_nozzle_diameter" aria-label="喷嘴直径" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5">${nozzleOptions}</select><select data-field="_slicer_preset_id" aria-label="预设" class="row-edit text-[10px] border border-gray-300 rounded px-1 py-0.5">${presetOptions}</select></div><div class="quote-config-row quote-config-row-material"><select data-field="_brand" aria-label="品牌" class="row-edit row-brand-select text-[11px] border border-gray-300 rounded px-1 py-0.5">${brandOptionsHtml}</select><select data-field="material" aria-label="材料" class="row-edit text-[11px] border border-gray-300 rounded px-1 py-0.5">${materialOptionsHtml}</select><div class="quote-config-row-color" data-field="color">${renderedRowColors.html}</div></div></div></td>
                 <td class="px-2 py-1.5"><input data-field="quantity" type="number" min="1" value="${item.quantity}" class="row-edit w-14 text-[11px] border border-gray-300 rounded px-1 py-0.5" /></td>
                 <td class="px-2 py-1.5">
-                    <div class="text-[10px] leading-tight">${recalculating ? '-' : (item.weight_g / Math.max(1, item.quantity)).toFixed(1)}g</div>
-                    <div class="text-xs leading-tight font-medium">${recalculating ? '-' : item.weight_g + 'g'}</div>
+                    <div class="text-[10px] leading-tight">${calculating ? '-' : (item.weight_g / Math.max(1, item.quantity)).toFixed(1)}g</div>
+                    <div class="text-xs leading-tight font-medium">${calculating ? '-' : item.weight_g + 'g'}</div>
                 </td>
                 <td class="px-2 py-1.5\\">
-                    <div class="text-[10px] leading-tight">${recalculating ? '-' : formatTimeHMS(item.unit_time_h || (item.estimated_time_h / Math.max(1, item.quantity)))}</div>
-                    <div class="text-xs leading-tight font-medium">${recalculating ? '-' : formatTimeHMS(item.estimated_time_h)}</div>
+                    <div class="text-[10px] leading-tight">${calculating ? '-' : formatTimeHMS(item.unit_time_h || (item.estimated_time_h / Math.max(1, item.quantity)))}</div>
+                    <div class="text-xs leading-tight font-medium">${calculating ? '-' : formatTimeHMS(item.estimated_time_h)}</div>
                 </td>
                 <td class="px-2 py-1.5">
-                    <div class="text-[10px] leading-tight">${recalculating ? '-' : ('¥ ' + Number(item.unit_cost_cny || 0).toFixed(2))}</div>
-                    <div class="text-xs leading-tight font-medium">${recalculating ? '-' : ('¥ ' + Number(item.cost_cny || 0).toFixed(2))}</div>
+                    <div class="text-[10px] leading-tight">${calculating ? '-' : ('¥ ' + Number(item.unit_cost_cny || 0).toFixed(2))}</div>
+                    <div class="text-xs leading-tight font-medium">${calculating ? '-' : ('¥ ' + Number(item.cost_cny || 0).toFixed(2))}</div>
                 </td>
-                <td data-role="status-cell" class="px-2 py-1.5 whitespace-nowrap font-medium text-[11px] ${recalculating ? 'text-amber-600' : 'text-green-600'}"><span class="inline-block w-2 h-2 rounded-full mr-1 align-middle ${recalculating ? 'bg-amber-500' : 'bg-green-500'}"></span>${recalculating ? t('quote.recalculating') : t('common.success')}</td>
+                <td data-role="status-cell" class="px-2 py-1.5 whitespace-nowrap font-medium text-[11px] ${calculating ? 'text-amber-600' : 'text-green-600'}"><span class="inline-block w-2 h-2 rounded-full mr-1 align-middle ${calculating ? 'bg-amber-500' : 'bg-green-500'}"></span>${calculating ? calculationLabel : t('common.success')}</td>
                 <td class="px-2 py-1.5 space-x-1"><button type="button" data-delete-file="${item.filename}" class="text-xs text-red-500 hover:text-red-700">${t('common.delete')}</button></td>
             `;
         } else {
             const thumbnail = thumbnailMap.get(item.filename) || buildPlaceholderThumbnail(ext);
-            const recalculating = !!item._recalculating;
+            const calculating = _isCalculating(item);
+            const calculationLabel = _calculationStatusText(item);
             const isRealThumbnail = thumbnail && thumbnail.startsWith('data:image/png');
             const previewButtonHtml = isRealThumbnail
                 ? `<button type="button" data-preview-file="${item.filename}" data-preview-ext="${ext}" class="block rounded border border-gray-200 overflow-hidden hover:border-indigo-300 transition-colors"><img src="${thumbnail}" alt="静态图" class="w-32 h-20 object-cover bg-white" /></button>`
@@ -851,8 +861,8 @@ export function renderResultsTable() {
                 <td class="px-2 py-1.5"><input data-field="quantity" type="number" min="1" value="${quantityValue}" class="row-edit w-14 text-[11px] border border-gray-300 rounded px-1 py-0.5" /></td>
                 <td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td><td class="px-2 py-1.5">-</td>
                 <td data-role="status-cell" class="px-2 py-1.5 whitespace-nowrap">
-                    ${recalculating ? `
-                    <span class="relative cursor-default text-amber-600 font-medium text-[11px]"><span class="inline-block w-2 h-2 rounded-full bg-amber-500 mr-1 align-middle"></span>${t('quote.recalculating')}</span>
+                    ${calculating ? `
+                    <span class="relative cursor-default text-amber-600 font-medium text-[11px]"><span class="inline-block w-2 h-2 rounded-full bg-amber-500 mr-1 align-middle"></span>${calculationLabel}</span>
                     ` : `
                     <span class="status-fail-badge relative cursor-default text-red-600 font-medium text-[11px]"><span class="inline-block w-2 h-2 rounded-full bg-red-500 mr-1 align-middle"></span>${t('common.failed')}
                         <span class="status-fail-tooltip hidden absolute z-50 top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-2 text-[11px] font-normal text-left text-white bg-gray-800 rounded-lg shadow-lg whitespace-normal break-words leading-relaxed">${escapeHtml(item.error || t('common.error'))}</span>
@@ -864,7 +874,7 @@ export function renderResultsTable() {
         }
         tbody.appendChild(tr);
         // ── 合并详情展开行（切片数据 + 费用明细 + 材料说明 + 打印建议）── 
-        if (!item._recalculating && item.status === 'success') {
+        if (!_isCalculating(item) && item.status === 'success') {
             const detailTr = document.createElement('tr');
             detailTr.className = 'border-t border-gray-50';
             detailTr.setAttribute('data-detail-row', item.filename);
@@ -974,7 +984,7 @@ function renderResultsCards() {
         const materialOptionsHtml = filteredMobileMaterials.map((m) => `<option value="${m.name}" ${m.name === (item.material || quoteOptions.material) ? 'selected' : ''}>${m.name}</option>`).join('');
         const quantityValue = item.quantity || quoteOptions.quantity || 1;
 
-        if (item.status === 'success' && !item._recalculating) {
+        if (item.status === 'success' && !_isCalculating(item)) {
             const card = document.createElement('div');
             card.className = 'tw-card p-4';
             card.setAttribute('data-card-file', item.filename);
@@ -1044,7 +1054,7 @@ function renderResultsCards() {
                 </div>
             `;
             container.appendChild(card);
-        } else if (item._recalculating) {
+        } else if (_isCalculating(item)) {
             const card = document.createElement('div');
             card.className = 'tw-card p-4';
             card.setAttribute('data-card-file', item.filename);
@@ -1053,7 +1063,7 @@ function renderResultsCards() {
                     <div class="w-28 flex-shrink-0">${previewHtml}</div>
                     <div class="flex-1 min-w-0">
                         <p class="text-[12px] font-medium text-gray-900 truncate" title="${escapeHtml(item.filename)}">${escapeHtml(item.filename)}${_buildParamBadge(item)}</p>
-                        <p class="mt-3 text-[12px] text-amber-600">${t('quote.recalculating')}</p>
+                        <p class="mt-3 text-[12px] text-amber-600">${_calculationStatusText(item)}</p>
                     </div>
                 </div>
             `;

@@ -46,7 +46,7 @@ export function initQuoteHistory() {
     const historyClearBtn = document.getElementById('history-clear-btn');
     if (historyClearBtn) {
         historyClearBtn.addEventListener('click', async () => {
-            if (!confirm(t('history.confirmClear') || '确定清理全部报价历史记录？此操作不可恢复。')) return;
+            if (!confirm(t('history.confirmClear') || '确定清理全部报价历史记录、上传模型和 G-code 文件？其他配置不会受影响，此操作不可恢复。')) return;
             try {
                 const resp = await fetch('/api/quote/history', {
                     method: 'DELETE',

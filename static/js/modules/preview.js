@@ -19,6 +19,10 @@ import { t } from './i18n.js';
 import { getResultOrientation, hasNonZeroOrientation } from './orientation-state.js';
 import { addPreviewLighting, configurePreviewRenderer, createPreviewMaterial } from './viewer/render-style.js';
 import { getPreview3mf, getPreviewGlb } from './preview-cache.js';
+import {
+    showModelProgress, updateModelProgress, completeModelProgress,
+    startModelProgressItems, updateModelProgressItem,
+} from './model-progress.js';
 
 let dom = {};
 let entityColorEventsBound = false;
@@ -261,17 +265,23 @@ const stlLoader = new STLLoader();
 // Parsed-geometry cache for STL thumbnails: skip re-parsing when only the color changes
 const _thumbGeometryCache = new Map();
 
-export async function buildStlThumbnail(file, colorKey = "Blue", orientation = null) {
-    const _fileKey = (file.name || '') + ':' + (file.size || 0);
-    let _baseGeo = _thumbGeometryCache.get(_fileKey);
-    if (!_baseGeo) {
-        const arrayBuffer = await file.arrayBuffer();
-        _baseGeo = stlLoader.parse(arrayBuffer);
-        _baseGeo.computeVertexNormals();
-        _thumbGeometryCache.set(_fileKey, _baseGeo);
+export async function buildStlThumbnail(file, colorKey = "Blue", orientation = null, onProgress = null) {
+    const fileKey = (file.name || '') + ':' + (file.size || 0);
+    let baseGeometry = _thumbGeometryCache.get(fileKey);
+    if (!baseGeometry) {
+        onProgress?.(5, 'Reading STL model');
+        const arrayBuffer = await readFileWithProgress(file, (percent) => {
+            onProgress?.(5 + percent * 0.45, 'Reading STL model');
+        });
+        onProgress?.(55, 'Parsing STL mesh');
+        baseGeometry = stlLoader.parse(arrayBuffer);
+        baseGeometry.computeVertexNormals();
+        _thumbGeometryCache.set(fileKey, baseGeometry);
+    } else {
+        onProgress?.(55, 'Using cached STL mesh');
     }
-    // Clone so the per-render center() does not mutate the cached geometry
-    const geometry = _baseGeo.clone();
+    // Clone so per-render centering does not mutate cached geometry.
+    const geometry = baseGeometry.clone();
     geometry.center();
 
     const width = 220, height = 140;
@@ -297,7 +307,6 @@ export async function buildStlThumbnail(file, colorKey = "Blue", orientation = n
     const mesh = new THREE.Mesh(geometry, createPreviewMaterial(colorHex));
     mesh.castShadow = true;
     mesh.receiveShadow = true;
-    // 若指定朝向，先旋转几何体再渲染缩略图
     if (orientation) {
         mesh.rotation.x = THREE.MathUtils.degToRad(orientation.x || 0);
         mesh.rotation.y = THREE.MathUtils.degToRad(orientation.y || 0);
@@ -316,12 +325,14 @@ export async function buildStlThumbnail(file, colorKey = "Blue", orientation = n
     const center = box.getCenter(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z) || 1;
     const fov = cam.fov * (Math.PI / 180);
-    let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.7;
+    const cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.7;
     cam.position.set(center.x, center.y, center.z + cameraZ);
     cam.lookAt(center);
 
+    onProgress?.(85, 'Rendering STL thumbnail');
     thumbRenderer.render(scene, cam);
     const dataUrl = thumbRenderer.domElement.toDataURL('image/png');
+    onProgress?.(100, 'STL thumbnail ready');
 
     mesh.geometry.dispose();
     mesh.material.dispose();
@@ -329,10 +340,19 @@ export async function buildStlThumbnail(file, colorKey = "Blue", orientation = n
     return dataUrl;
 }
 
-export async function buildNonStlThumbnail(file, colorKey, orientation = null) {
+export async function buildNonStlThumbnail(file, colorKey, orientation = null, onProgress = null) {
     const ext = file.name.includes('.') ? file.name.split('.').pop().toLowerCase() : '';
     const is3mf = ext === '3mf';
-    const glbBlob = await (is3mf ? getPreview3mf(file) : getPreviewGlb(file));
+    onProgress?.(5, `Preparing ${ext.toUpperCase()} model`);
+    // The shared conversion cache avoids duplicate backend work for one file.
+    // Reserve the final stages for GLB parsing and thumbnail rendering.
+    const conversionProgress = (percent, detail) => {
+        onProgress?.(5 + percent * 0.65, detail);
+    };
+    const glbBlob = await (is3mf
+        ? getPreview3mf(file, conversionProgress)
+        : getPreviewGlb(file, conversionProgress));
+    onProgress?.(75, `Loading ${ext.toUpperCase()} preview data`);
     const url = URL.createObjectURL(glbBlob);
 
     const thumbRenderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
@@ -343,6 +363,7 @@ export async function buildNonStlThumbnail(file, colorKey, orientation = null) {
     const cam = new THREE.PerspectiveCamera(45, 220 / 140, 0.1, 10000);
 
     const loader = new GLTFLoader();
+    onProgress?.(82, `Parsing ${ext.toUpperCase()} mesh`);
     const gltf = await loader.loadAsync(url);
     URL.revokeObjectURL(url);
 
@@ -384,12 +405,14 @@ export async function buildNonStlThumbnail(file, colorKey, orientation = null) {
     const center = box.getCenter(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z) || 1;
     const fov = cam.fov * (Math.PI / 180);
-    let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.7;
+    const cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.7;
     cam.position.set(center.x, center.y, center.z + cameraZ);
     cam.lookAt(center);
 
+    onProgress?.(92, `Rendering ${ext.toUpperCase()} thumbnail`);
     thumbRenderer.render(scene, cam);
     const dataUrl = thumbRenderer.domElement.toDataURL('image/png');
+    onProgress?.(100, `${ext.toUpperCase()} thumbnail ready`);
 
     model.traverse(c => {
         if (c.isMesh) { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); }
@@ -398,38 +421,80 @@ export async function buildNonStlThumbnail(file, colorKey, orientation = null) {
     return dataUrl;
 }
 
-export async function ensureThumbnailForFile(file, colorKey, orientation = null) {
+export async function ensureThumbnailForFile(file, colorKey, orientation = null, onProgress = null) {
     const ext = file.name.includes('.') ? file.name.split('.').pop().toLowerCase() : '';
+    const useSharedProgress = typeof onProgress !== 'function';
+    const report = onProgress || ((percent, detail) => updateModelProgress(percent, `${file.name} - ${detail}`));
+    if (useSharedProgress) showModelProgress(`Generating ${ext.toUpperCase() || 'model'} preview...`, file.name);
     try {
         const orient = orientation || { x: 0, y: 0, z: 0 };
-        const thumb = ext === 'stl' ? await buildStlThumbnail(file, colorKey, orientation) : await buildNonStlThumbnail(file, colorKey, orientation);
-        // 同时存两份：带朝向的key + 文件名key（兼容现有读取逻辑）
+        const thumb = ext === 'stl'
+            ? await buildStlThumbnail(file, colorKey, orientation, report)
+            : await buildNonStlThumbnail(file, colorKey, orientation, report);
         thumbnailMap.set(file.name, thumb);
         if (orientation) {
             const orientKey = file.name + '|' + orient.x + '_' + orient.y + '_' + orient.z;
             thumbnailMap.set(orientKey, thumb);
         }
+        return true;
     } catch (e) {
         console.warn('Thumbnail failed for', file.name, 'color=' + colorKey + ':', e.message);
         thumbnailMap.set(file.name, buildPlaceholderThumbnail(ext));
+        report(100, `${ext.toUpperCase() || 'Model'} thumbnail failed; using placeholder`);
+        return false;
+    } finally {
+        if (useSharedProgress) completeModelProgress(`${ext.toUpperCase() || 'Model'} preview ready`);
     }
 }
 
-export async function buildThumbnails(selectedFiles, colorByFilename = {}) {
-    for (const file of selectedFiles) {
-        var selectedColor = colorByFilename[file.name] || quoteOptions.color;
-        // Ensure we never pass an empty color (would trigger hash-based fallback)
+function readFileWithProgress(file, onProgress) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(reader.error || new Error('Model file read failed'));
+        reader.onprogress = (event) => {
+            if (event.lengthComputable) onProgress?.((event.loaded / event.total) * 100);
+        };
+        reader.onload = () => resolve(reader.result);
+        reader.readAsArrayBuffer(file);
+    });
+}
+
+export async function buildThumbnails(selectedFiles, colorByFilename = {}, onProgress = null, onFileReady = null) {
+    const files = Array.from(selectedFiles || []);
+    if (files.length === 0) return;
+    const useSharedProgress = typeof onProgress !== 'function';
+    const report = onProgress || ((percent, detail) => updateModelProgress(percent, detail));
+    if (useSharedProgress) {
+        showModelProgress(`Generating model previews (${files.length} files)...`);
+        startModelProgressItems(files.map((file, index) => ({ id: index, filename: file.name })));
+    }
+
+    for (let index = 0; index < files.length; index += 1) {
+        const file = files[index];
+        if (useSharedProgress) updateModelProgressItem(index, { state: 'processing', percent: 0 });
+        let selectedColor = colorByFilename[file.name] || quoteOptions.color;
         if (!selectedColor || String(selectedColor).trim() === '') {
             selectedColor = '#ffffff';
         }
-        // Normalize to hex if possible so thumbnails use the real material color
-        var _thumbColorObj = colorToObj(selectedColor);
-        if (_thumbColorObj && _thumbColorObj.hex) selectedColor = _thumbColorObj.hex;
-        await ensureThumbnailForFile(file, selectedColor);
+        const thumbColorObj = colorToObj(selectedColor);
+        if (thumbColorObj && thumbColorObj.hex) selectedColor = thumbColorObj.hex;
+        const thumbnailReady = await ensureThumbnailForFile(file, selectedColor, null, (filePercent, detail) => {
+            const overall = ((index + filePercent / 100) / files.length) * 100;
+            report(overall, `${index + 1}/${files.length} - ${file.name} - ${detail}`);
+            if (useSharedProgress) updateModelProgressItem(index, {
+                state: 'processing', percent: filePercent, detail,
+            });
+        });
+        if (useSharedProgress) updateModelProgressItem(index, {
+            state: thumbnailReady ? 'complete' : 'error', percent: 100,
+        });
+        onFileReady?.({ file, index, total: files.length, thumbnailReady });
+        report(((index + 1) / files.length) * 100, `${index + 1}/${files.length} - ${file.name}`);
     }
+    if (useSharedProgress) completeModelProgress(`Model previews ready (${files.length} files)`);
 }
 
-// ── Preview modal ──
+// Preview modal
 export function openPreviewModal(onFaceClickCb) {
     const { previewModal, previewContainer, viewCube, layFaceBtn, orientSaveBtn, orientLearnedBtn } = dom;
     const setButtonLabel = (button, label) => {

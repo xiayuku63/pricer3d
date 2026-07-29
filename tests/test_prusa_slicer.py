@@ -44,7 +44,9 @@ def test_windows_ignores_native_prusaslicer_path():
         return path == r"C:\Program Files\Prusa3D\PrusaSlicer\prusa-slicer.exe"
 
     with patch("sys.platform", "win32"):
-        with patch("parser.prusa_slicer.os.getenv", return_value=r"C:\Program Files\Prusa3D\PrusaSlicer\prusa-slicer.exe"):
+        with patch(
+            "parser.prusa_slicer.os.getenv", return_value=r"C:\Program Files\Prusa3D\PrusaSlicer\prusa-slicer.exe"
+        ):
             with patch("parser.prusa_slicer._env_file_prusa_executable", return_value=""):
                 with patch("parser.prusa_slicer.shutil.which", return_value=None):
                     with patch("parser.prusa_slicer.os.path.isfile", side_effect=fake_isfile):
@@ -80,6 +82,7 @@ def test_slice_command_does_not_use_unsupported_headless_option(tmp_path):
             result = prusa_slicer.run_prusa_slice(
                 "tests/fixtures/test_cube.stl",
                 str(output_path),
+                use_cache=False,
             )
 
     command = run.call_args.args[0]
@@ -99,10 +102,13 @@ def test_absolute_windows_wsl_wrapper_is_split_into_argv_items():
 def test_wsl_wrapper_translates_windows_model_paths():
     exe = r"C:\Windows\System32\wsl.exe -- prusa-slicer"
     with patch.object(sys, "platform", "win32"):
-        assert prusa_slicer.translate_path_for_executable(
-            r"D:\Projects\pricer3d\data\part.step",
-            exe,
-        ) == "/mnt/d/Projects/pricer3d/data/part.step"
+        assert (
+            prusa_slicer.translate_path_for_executable(
+                r"D:\Projects\pricer3d\data\part.step",
+                exe,
+            )
+            == "/mnt/d/Projects/pricer3d/data/part.step"
+        )
 
 
 def test_appimage_uses_fuse_free_extraction_mode():

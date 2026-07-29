@@ -142,6 +142,24 @@
     border-left: 3px solid var(--color-warning) !important;
     animation: pulse-border 1.5s ease-in-out infinite;
 }
+.table-row-pending td:first-child {
+    position: relative;
+}
+.table-row-pending td:first-child::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--color-warning);
+    animation: pulse-indicator 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-indicator {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+}
 
 @keyframes pulse-border {
     0%, 100% { border-left-color: var(--color-warning); }

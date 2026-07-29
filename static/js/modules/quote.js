@@ -31,6 +31,8 @@ import {
 } from './quote-render.js';
 import {
     quoteSingleFileWithOptions, quoteSelectedFiles, quoteSelectedFilesWithProgress,
+    quoteSelectedFilesSequentially, quoteSelectedFilesSequentiallyWithProgress,
+    markFileAsCalculating, getInitialQuoteColorMap,
     mergeResultsByFilename, normalizeResultsWithCurrentOptions, reQuoteAllSelectedFiles,
     abortActiveRecalc, getSlicerConfigSnapshot, getAffectedFilenamesForSlicerConfigChange,
     getAffectedFilenamesForSlicerPresetChange,
@@ -55,6 +57,8 @@ export {
     quoteSingleFileWithOptions,
     quoteSelectedFiles,
     quoteSelectedFilesWithProgress,
+    quoteSelectedFilesSequentially, quoteSelectedFilesSequentiallyWithProgress,
+    markFileAsCalculating, getInitialQuoteColorMap,
     mergeResultsByFilename,
     normalizeResultsWithCurrentOptions,
     reQuoteAllSelectedFiles,
