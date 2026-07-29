@@ -19,6 +19,10 @@ export function portalPreviewModal() {
     return portalModalToBody('preview-modal');
 }
 
+export function portalQuoteHistoryModal() {
+    return portalModalToBody('quote-history-modal');
+}
+
 export function initColorDropdownUI({ quoteOptions, currentResults, selectedFilesMap, thumbnailMap, dom, ensureThumbnailForFile, recolorCurrentMesh, updatePreviewColor, getCurrentPreviewFilename, refreshOptionsSummary }) {
     function saveFrontMaterialSnapshot() {
         const previous = loadFrontSettingsSnapshot() || {};

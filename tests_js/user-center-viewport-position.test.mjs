@@ -54,3 +54,18 @@ test('preview modal is portaled to document.body so fixed positioning uses the v
         globalThis.document = previousDocument;
     }
 });
+
+
+test('quote history modal is portaled to document.body so it stays centered in the viewport', async () => {
+    const { modal, document } = withModalDocument('quote-history-modal');
+    const previousDocument = globalThis.document;
+    globalThis.document = document;
+
+    try {
+        const { portalQuoteHistoryModal } = await loadPortalHelper();
+        portalQuoteHistoryModal();
+        assert.equal(modal.parentElement, document.body);
+    } finally {
+        globalThis.document = previousDocument;
+    }
+});

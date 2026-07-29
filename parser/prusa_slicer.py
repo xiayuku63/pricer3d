@@ -19,6 +19,14 @@ from contextlib import nullcontext
 from functools import lru_cache
 from typing import Optional
 
+from parser.slice_cache import (
+    build_slice_cache_key,
+    load_cached_slice,
+    slice_cache_enabled,
+    slice_cache_lock,
+    store_cached_slice,
+)
+
 logger = logging.getLogger(__name__)
 
 # FUSE-free AppImage extraction is not safe when several processes launch the
@@ -118,9 +126,7 @@ def prusa_executable() -> Optional[str]:
             return _c
 
     # Well-known Linux paths
-    for _p in (
-        "/snap/bin/prusa-slicer",
-    ):
+    for _p in ("/snap/bin/prusa-slicer",):
         if os.path.isfile(_p):
             return _p
     return None
@@ -634,6 +640,7 @@ def run_prusa_slice(
     jerk_limit: Optional[float] = None,
     max_volumetric_speed: Optional[float] = None,
     multicolor_slots: Optional[list[dict]] = None,
+    use_cache: Optional[bool] = None,
 ) -> dict:
     """
     Run PrusaSlicer headless. Merges system/user/quote config into temp INI.
@@ -724,41 +731,78 @@ def run_prusa_slice(
     )
     logger.debug(f"PrusaSlicer command: {' '.join(cmd)}")
 
-    try:
+    cache_key = None
+    if slice_cache_enabled(use_cache):
+        try:
+            cache_key = build_slice_cache_key(
+                model_path,
+                config_path,
+                command=cmd_parts,
+                enable_supports=enable_supports,
+            )
+        except (OSError, ValueError):
+            logger.warning("PrusaSlicer cache key generation failed; slicing normally", exc_info=True)
+
+    def _safe_decode(data: bytes) -> str:
+        if not data:
+            return ""
+        try:
+            return data.decode("utf-8")
+        except UnicodeDecodeError:
+            # Strip null bytes (from WSL UTF-16LE proxy warnings)
+            # then decode remaining ASCII/UTF-8 content
+            return data.replace(b"\x00", b"").decode("utf-8", errors="replace").strip()
+
+    def _execute_slice() -> dict:
+        # Never allow a failed slicer invocation to be mistaken for success by
+        # leaving an older G-code file at the destination.
+        try:
+            if os.path.exists(output_gcode_path):
+                os.unlink(output_gcode_path)
+        except OSError:
+            pass
+
         # WSL stderr may contain UTF-16LE proxy warnings mixed with
         # UTF-8 program output → read as bytes, decode robustly
         with prusa_execution_lock(exe):
             proc = subprocess.run(cmd, capture_output=True, text=False, timeout=_SLICE_TIMEOUT)
 
-        def _safe_decode(data: bytes) -> str:
-            if not data:
-                return ""
-            try:
-                return data.decode("utf-8")
-            except UnicodeDecodeError:
-                # Strip null bytes (from WSL UTF-16LE proxy warnings)
-                # then decode remaining ASCII/UTF-8 content
-                return data.replace(b"\x00", b"").decode("utf-8", errors="replace").strip()
-
         stdout = _safe_decode(proc.stdout).strip()
         stderr = _safe_decode(proc.stderr).strip()
 
         if proc.returncode != 0 and not os.path.exists(output_gcode_path):
-            # Check WSL path variant if using WSL
-            if _is_wsl and not os.path.exists(output_gcode_path):
-                _wsl_alt = _wsl_path(output_gcode_path)
-                if os.path.exists(_wsl_alt):
-                    output_gcode_path = _wsl_alt
-            if not os.path.exists(output_gcode_path):
-                error_msg = stderr or stdout or f"exit code {proc.returncode}"
-                raise RuntimeError(f"PrusaSlicer failed: {error_msg[:400]}")
+            error_msg = stderr or stdout or f"exit code {proc.returncode}"
+            raise RuntimeError(f"PrusaSlicer failed: {error_msg[:400]}")
 
         if stderr:
             logger.debug(f"PrusaSlicer stderr: {stderr[:200]}")
 
         stats = parse_prusa_gcode_stats(output_gcode_path)
         stats["preset_used"] = preset_label
-        logger.info(f"PrusaSlicer result: cm³={stats['filament_cm3']} g={stats['filament_g']} time={stats['time_str']}")
+        stats["cache_hit"] = False
+        return stats
+
+    try:
+        if cache_key:
+            with slice_cache_lock(cache_key):
+                stats = load_cached_slice(cache_key, output_gcode_path)
+                if stats is None:
+                    stats = _execute_slice()
+                    store_cached_slice(cache_key, output_gcode_path, stats)
+                    stats["_slice_cache_key"] = cache_key
+                else:
+                    stats["preset_used"] = preset_label
+                    logger.info("PrusaSlicer cache hit: key=%s model=%s", cache_key[:12], os.path.basename(model_path))
+        else:
+            stats = _execute_slice()
+
+        logger.info(
+            "PrusaSlicer result: cm³=%s g=%s time=%s cache_hit=%s",
+            stats["filament_cm3"],
+            stats["filament_g"],
+            stats["time_str"],
+            stats.get("cache_hit", False),
+        )
         return stats
 
     except subprocess.TimeoutExpired:

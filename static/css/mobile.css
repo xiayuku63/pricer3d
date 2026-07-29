@@ -141,6 +141,27 @@
         font-size: 0.875rem !important;
         padding: 10px 16px !important;
     }
+    #quote-default-controls-row {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 8px;
+    }
+    #batch-recalculate-actions {
+        width: 100%;
+    }
+    #batch-recalculate-actions {
+        width: 100%;
+        min-height: 0;
+        padding: 10px 12px;
+    }
+    #batch-recalculate-actions input[type="checkbox"] {
+        width: 16px !important;
+        min-height: 16px;
+        padding: 0 !important;
+    }
+    #batch-recalculate-btn {
+        flex: 1;
+        min-height: 40px;
+    }
 }
 
 /* ── Export buttons: full width on mobile ── */

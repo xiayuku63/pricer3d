@@ -139,6 +139,8 @@ export default {
   'quote.remove': 'Remove',
   'quote.recalc': 'Recalc',
   'quote.recalculate': 'Recalculate',
+  'quote.calculationOptions': 'Calculation',
+  'quote.smartPlacement': 'Smart placement',
   'quote.recalculating': 'Recalculating...',
   'quote.noFiles': 'No files uploaded yet. Drag STL/STP/3MF files here or click to upload.',
   'quote.quoteBtn': 'Generate Quote',
@@ -438,7 +440,7 @@ export default {
   // ── History ──
   'history.title': 'Quote History',
   'history.clearAll': 'Clear All',
-  'history.confirmClear': 'Clear all quote history? This cannot be undone.',
+  'history.confirmClear': 'Clear all quote history, uploaded models, and G-code files? Other settings are not affected. This cannot be undone.',
   'history.time': 'Time',
   'history.files': 'Files',
   'history.status': 'Status',

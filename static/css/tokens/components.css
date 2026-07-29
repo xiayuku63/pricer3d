@@ -622,6 +622,80 @@ select:focus-visible,
   flex-shrink: 0;
 }
 
+.settings-controls-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  align-items: stretch;
+  gap: 12px;
+  min-width: 0;
+}
+
+.settings-fields-panel {
+  min-width: 0;
+  overflow: visible;
+}
+
+.settings-row-actions {
+  min-width: 0;
+  min-height: 72px;
+}
+
+.batch-recalculate-actions {
+  min-height: 72px;
+  padding: 12px 14px;
+  border-color: rgba(16, 185, 129, 0.22);
+  background: linear-gradient(180deg, rgba(248, 253, 251, 0.94), rgba(239, 249, 246, 0.88));
+}
+
+.batch-recalculate-actions-title {
+  flex-shrink: 0;
+  padding-right: 10px;
+  border-right: 1px solid var(--color-border-strong);
+  color: var(--color-text-secondary);
+}
+
+.dark .batch-recalculate-actions {
+  border-color: rgba(52, 211, 153, 0.3);
+  background: linear-gradient(180deg, rgba(15, 31, 35, 0.78), rgba(15, 23, 42, 0.66));
+}
+
+@media (min-width: 641px) and (max-width: 1799px) {
+  #quote-default-settings-bar,
+  #batch-edit-bar {
+    gap: 8px;
+  }
+
+  #front-default-printer-model,
+  #batch-printer-model {
+    width: 145px;
+    max-width: 145px;
+  }
+
+  #front-default-slicer-preset,
+  #batch-slicer-preset {
+    width: 145px;
+    max-width: 145px;
+  }
+
+  #front-default-brand,
+  #batch-brand,
+  #front-default-material,
+  #batch-material {
+    width: 100px;
+    max-width: 100px;
+  }
+
+  .batch-recalculate-actions {
+    gap: 8px;
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .batch-recalculate-actions-title {
+    padding-right: 8px;
+  }
+}
+
 @media (max-width: 639px) {
   #front-default-brand,
   #front-default-material,

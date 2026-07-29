@@ -22,7 +22,11 @@ import {
 
 import { buildThumbnails } from './preview.js';
 import { t } from './i18n.js';
-import { mergeResultsByFilename, quoteSelectedFilesWithProgress, renderResultsTable, recalcSummaryFromCurrentResults } from './quote.js';
+import {
+    mergeResultsByFilename,
+    quoteSelectedFilesSequentiallyWithProgress, markFileAsCalculating, getInitialQuoteColorMap,
+    renderResultsTable, recalcSummaryFromCurrentResults,
+} from './quote.js';
 import { openLoginModal } from './auth.js';
 import { resolveUploadDefaults } from './upload-defaults.js';
 
@@ -493,8 +497,9 @@ async function _handleZipUpload(zipFiles, modelFiles, validFiles) {
         // Process any remaining model files
         if (modelFiles.length > 0) {
             modelFiles.forEach(function(f) { selectedFilesMap.set(f.name, f); });
-            await buildThumbnails(modelFiles);
-            await quoteSelectedFilesWithProgress(modelFiles);
+            const initialColors = getInitialQuoteColorMap(modelFiles);
+            await buildThumbnails(modelFiles, initialColors, null, ({ file }) => markFileAsCalculating(file, initialColors[file.name]));
+            await quoteSelectedFilesSequentiallyWithProgress(modelFiles);
         }
     } catch (err) {
         const zipCancelBtn = document.getElementById('zip-cancel-btn');
@@ -673,9 +678,10 @@ async function _handleModelUpload(modelFiles) {
 
     try {
         showProgress(`生成模型预览 (${modelFiles.length} 个文件)...`);
-        await buildThumbnails(modelFiles);
+        const initialColors = getInitialQuoteColorMap(modelFiles);
+        await buildThumbnails(modelFiles, initialColors, null, ({ file }) => markFileAsCalculating(file, initialColors[file.name]));
         renderFilePreviewChips(modelFiles);
-        await quoteSelectedFilesWithProgress(modelFiles);
+        await quoteSelectedFilesSequentiallyWithProgress(modelFiles);
         dom.fileNameDisplay.textContent = `当前列表共 ${selectedFilesMap.size} 个文件，新增 ${modelFiles.length} 个文件报价完成`;
         renderFilePreviewChips([]);
     } catch (err) {

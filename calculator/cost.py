@@ -246,6 +246,7 @@ def calculate_cost(
     prusaslicer_used = False
     support_weight_g_per_part = 0.0
     output_gcode = None
+    stats: dict = {}
 
     # ── PrusaSlicer ──
     if use_prusaslicer and model_path and os.path.exists(model_path):
@@ -430,6 +431,7 @@ def calculate_cost(
         ),
         "slicer_preset_used": preset_used,
         "slicer_estimated_time_s": int(slicer_time_s) if slicer_time_s is not None else None,
+        "slicer_cache_hit": bool(stats.get("cache_hit")) if isinstance(stats, dict) else False,
         "prusa_time_correction": float(cfg.get("prusa_time_correction") or 1.0),
         "setup_fee_cny": round(setup_fee, 2),
         "min_job_fee_cny": round(min_job_fee, 2),
@@ -442,9 +444,14 @@ def calculate_cost(
     # ── G-code analysis ──
     from calculator.gcode_utils import analyze_gcode_output
 
-    gcode_summary = None
-    if prusaslicer_used and output_gcode and os.path.exists(output_gcode):
+    gcode_summary = stats.get("gcode_summary") if prusaslicer_used and isinstance(stats, dict) else None
+    if gcode_summary is None and prusaslicer_used and output_gcode and os.path.exists(output_gcode):
         gcode_summary = analyze_gcode_output(output_gcode)
+        cache_key = stats.get("_slice_cache_key") if isinstance(stats, dict) else None
+        if gcode_summary and cache_key:
+            from parser.slice_cache import store_cached_slice_analysis
+
+            store_cached_slice_analysis(cache_key, gcode_summary)
 
     # Cleanup temp oriented model
     if _oriented_tmp_path and os.path.exists(_oriented_tmp_path):
@@ -465,6 +472,7 @@ def calculate_cost(
         round(total_time_h, 3),
         breakdown,
     )
+
 
 def _is_first_layer_extrusion_error(error: Exception) -> bool:
     """Identify PrusaSlicer's recoverable no-extrusion-on-first-layer error."""
@@ -534,7 +542,6 @@ def _retry_slice_with_axis_orientations(
     except Exception as exc:
         logger.warning("PrusaSlicer first-layer orientation recovery unavailable: %s", exc)
     return None
-
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -667,7 +674,11 @@ async def process_single_file(
                 )
                 if len(candidate["colors"]) > 1:
                     multicolor_project = candidate
-                    density = selected_material_spec.get("density", 1.24) if isinstance(selected_material_spec, dict) else 1.24
+                    density = (
+                        selected_material_spec.get("density", 1.24)
+                        if isinstance(selected_material_spec, dict)
+                        else 1.24
+                    )
                     multicolor_slots = [{"color": item, "density": density} for item in candidate["colors"]]
             except ModelNormalizationError as exc:
                 logger.info("3MF multi-color project not used: %s (%s)", exc, exc.code)

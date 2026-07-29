@@ -31,7 +31,8 @@ test("preview modal renders an entity color editor after a multi-entity 3MF load
     assert.match(modal, /id="entity-color-add-input" type="color"/);
     assert.match(preview, /renderEntityColorControls/);
     assert.match(preview, /setCurrentMeshEntityColor/);
-    assert.match(preview, /is3mf \? getPreview3mf\(file\) : getPreviewGlb\(file\)/);
+    assert.match(preview, /getPreview3mf\(file, conversionProgress\)/);
+    assert.match(preview, /getPreviewGlb\(file, conversionProgress\)/);
     assert.match(preview, /data-entity-color-trigger/);
     assert.match(preview, /data-entity-color-option/);
     assert.match(preview, /data-entity-color-add/);

@@ -58,6 +58,8 @@ export function showProgress(label) {
     _progressPercent.textContent = '0%';
     _progressLabel.textContent = label || '上传中...';
     _progressDetail.textContent = '';
+    // Per-file rows belong to preview generation, not the following quote request.
+    _progressContainer.querySelector('[data-model-progress-list]')?.remove();
     // Animate bar background
     _progressBar.classList.remove('bg-red-500');
     _progressBar.classList.add('bg-indigo-600');
@@ -335,9 +337,15 @@ export function uploadWithProgress(url, formData, token) {
 
         xhr.upload.addEventListener('progress', (e) => {
             if (e.lengthComputable) {
-                const percent = (e.loaded / e.total) * 100;
+                // Reserve the final 10% for backend parsing/conversion/slicing so
+                // a completed upload never looks like a stalled model request.
+                const percent = (e.loaded / e.total) * 90;
                 updateProgress(percent, `${formatFileSize(e.loaded)} / ${formatFileSize(e.total)}`);
             }
+        });
+
+        xhr.upload.addEventListener('load', () => {
+            updateProgress(90, 'Upload complete. Processing model files...');
         });
 
         xhr.addEventListener('load', () => {

@@ -131,7 +131,9 @@
                             </div>
                         </dl>
 
-                        <div id="quote-default-settings-bar" class="apple-toolbar mt-5 flex items-center gap-3 p-4 flex-wrap relative z-20">
+                        <div id="quote-default-controls-row" class="settings-controls-row mt-5">
+                            <!-- Default settings and save action -->
+                            <div id="quote-default-settings-bar" class="apple-toolbar settings-fields-panel flex min-w-0 items-center gap-2.5 p-4 flex-nowrap relative z-20">
                             <span class="text-xs font-medium whitespace-nowrap" style="color: var(--color-primary-text);" data-i18n="settings.defaultSettings">默认设置：</span>
                             <div class="flex items-center gap-1.5">
                                 <label class="text-[11px] tw-text-secondary" data-i18n="quote.printerModel">打印机</label>
@@ -168,10 +170,20 @@
                             </div>
                             <button id="front-default-save-btn" type="button" class="tw-btn-primary text-[11px] px-3 py-1.5 whitespace-nowrap ml-auto" data-i18n="settings.saveDefaults">保存默认设置</button>
                             <span id="front-default-msg" class="text-[11px] tw-text-primary hidden"></span>
+                            </div>
+                            <!-- Calculation actions -->
+                            <div id="batch-recalculate-actions" class="apple-toolbar settings-row-actions batch-recalculate-actions flex items-center gap-3" role="group" aria-label="计算选项">
+                                <span class="batch-recalculate-actions-title text-[11px] font-medium whitespace-nowrap" data-i18n="quote.calculationOptions">计算选项</span>
+                                <label class="inline-flex items-center gap-1.5 text-[11px] tw-text-secondary cursor-pointer whitespace-nowrap">
+                                  <input type="checkbox" id="batch-auto-orient" class="rounded" style="border-color: var(--color-border-strong); color: var(--color-success);">
+                                  <span data-i18n="quote.smartPlacement">智能摆放</span>
+                                </label>
+                                <button id="batch-recalculate-btn" type="button" class="tw-btn-primary text-[11px] px-3 py-1.5 whitespace-nowrap" style="background-color: var(--color-success);" data-i18n="quote.recalculate">重新计算</button>
+                            </div>
                         </div>
 
                         <!-- 批量设置工具栏 -->
-                        <div id="batch-edit-bar" class="apple-toolbar mt-3 flex items-center gap-3 p-4 flex-wrap relative z-20">
+                        <div id="batch-edit-bar" class="apple-toolbar settings-fields-panel mt-3 flex min-w-0 items-center gap-2.5 p-4 flex-nowrap relative z-20">
                             <span class="text-xs font-medium whitespace-nowrap" style="color: var(--color-primary-text);" data-i18n="quote.batchSettings">批量设置：</span>
                             <div class="flex items-center gap-1.5" data-batch-field="_printer_model">
                                 <label class="text-[11px] tw-text-secondary" data-i18n="quote.printerModel">打印机</label>
@@ -205,13 +217,8 @@
                                 <label class="text-[11px] tw-text-secondary" data-i18n="quote.quantity">数量</label>
                                 <input id="batch-quantity" type="number" min="1" value="1" class="w-16 text-[11px] border rounded px-2 py-1 tw-bg-surface" style="border-color: var(--color-border-strong);" />
                             </div>
-                            <button id="batch-apply-btn" type="button" class="tw-btn-primary text-[11px] px-3 py-1.5 whitespace-nowrap" data-i18n="quote.applyToAll">应用修改到全部</button>
                             <span id="batch-msg" class="text-[11px] tw-text-primary hidden"></span>
-                            <label class="inline-flex items-center gap-1 text-[11px] tw-text-secondary cursor-pointer ml-auto">
-                              <input type="checkbox" id="batch-auto-orient" class="rounded" style="border-color: var(--color-border-strong); color: var(--color-success);">
-                              智能摆放
-                            </label>
-                            <button id="batch-recalculate-btn" type="button" class="tw-btn-primary text-[11px] px-3 py-1.5 whitespace-nowrap" style="background-color: var(--color-success);" data-i18n="quote.recalculate">重新计算</button>
+                            <button id="batch-apply-btn" type="button" class="tw-btn-primary text-[11px] px-3 py-1.5 whitespace-nowrap ml-auto" data-i18n="quote.applyToAll">应用修改到全部</button>
                         </div>
 
                         <!-- 导出按钮组 -->

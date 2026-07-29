@@ -11,7 +11,7 @@ import { fetchUserSettings, updateDropdowns } from '../settings.js';
 import { fetchPrinterModels } from '../presets.js';
 import { loadQuoteHistory } from '../history.js';
 import { buildThumbnails } from '../preview.js';
-import { quoteSelectedFiles } from '../quote.js';
+import { quoteSelectedFilesSequentially, markFileAsCalculating, getInitialQuoteColorMap } from '../quote.js';
 import { clearClusters } from '../layface.js';
 import { t } from '../i18n.js';
 
@@ -146,8 +146,9 @@ export async function handleAuthSuccess(data) {
         const totalFiles = selectedFilesMap.size || filesToQuote.length;
         if (fileNameDisplay) fileNameDisplay.textContent = t('auth.postLoginProgress', {total: totalFiles, new: filesToQuote.length});
         try {
-            await buildThumbnails(filesToQuote);
-            await quoteSelectedFiles(filesToQuote);
+            const initialColors = getInitialQuoteColorMap(filesToQuote);
+            await buildThumbnails(filesToQuote, initialColors, null, ({ file }) => markFileAsCalculating(file, initialColors[file.name]));
+            await quoteSelectedFilesSequentially(filesToQuote);
             if (fileNameDisplay) fileNameDisplay.textContent = t('auth.postLoginDone', {total: selectedFilesMap.size, new: filesToQuote.length});
         } catch (err) {
             if (dom.errorMsg) { dom.errorMsg.textContent = err.message; dom.errorContainer.classList.remove('hidden'); }
