@@ -61,11 +61,11 @@ export function buildSteps() {
                 _realTarget: '#cfg-printer-model-main',
             }
         ),
-        s('.uc-tab-btn[data-uc-tab="print-params"]',
+        s('.pp-sub-tab-btn[data-pp-tab="materials"]',
             'onboarding.step4_title',
             'onboarding.step4_desc',
             {
-                position: 'right',
+                position: 'bottom',
                 action: () => {
                     // Switch to print-params tab, then materials sub-tab
                     const tab = document.querySelector('.uc-tab-btn[data-uc-tab="print-params"]');
@@ -78,9 +78,26 @@ export function buildSteps() {
                 waitAfter: 200,
             }
         ),
-        s('.uc-tab-btn[data-uc-tab="costs"]',
+        s('.pp-sub-tab-btn[data-pp-tab="slicer"]',
             'onboarding.step5_title',
             'onboarding.step5_desc',
+            {
+                position: 'bottom',
+                action: () => {
+                    // Switch to print-params tab, then slicer sub-tab
+                    const tab = document.querySelector('.uc-tab-btn[data-uc-tab="print-params"]');
+                    if (tab) tab.click();
+                    setTimeout(() => {
+                        const subTab = document.querySelector('.pp-sub-tab-btn[data-pp-tab="slicer"]');
+                        if (subTab) subTab.click();
+                    }, 50);
+                },
+                waitAfter: 200,
+            }
+        ),
+        s('.uc-tab-btn[data-uc-tab="costs"]',
+            'onboarding.step6_title',
+            'onboarding.step6_desc',
             {
                 position: 'right',
                 action: () => {
@@ -91,15 +108,15 @@ export function buildSteps() {
             }
         ),
         s('#user-center-save-btn',
-            'onboarding.step6_title',
-            'onboarding.step6_desc',
+            'onboarding.step7_title',
+            'onboarding.step7_desc',
             {
                 position: 'top',
             }
         ),
         s('#drop-zone',
-            'onboarding.step7_title',
-            'onboarding.step7_desc',
+            'onboarding.step8_title',
+            'onboarding.step8_desc',
             {
                 position: 'top',
                 action: () => {
