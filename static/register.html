@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -174,23 +174,33 @@
             color: #fbbf24;
         }
     </style>
+    <link rel="stylesheet" href="/static/css/auth.css?v=1">
     <script>
         (() => {
             const t = localStorage.getItem('pricer3d_theme_v1');
-            if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+            const dark = t === 'dark' || (t !== 'light' && window.matchMedia?.('(prefers-color-scheme: dark)').matches);
+            document.documentElement.classList.toggle('dark', dark);
+            document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+            document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
         })();
     </script>
+    <link rel="stylesheet" href="/static/css/liquid-glass.css?v=1">
 </head>
-<body class="bg-gray-50 min-h-screen p-4 lg:p-6" style="padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left))">
-    <div class="max-w-lg mx-auto bg-white rounded-xl shadow-md overflow-hidden">
-        <div class="p-5 sm:p-8 space-y-6">
+<body class="auth-page min-h-screen" style="padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left))">
+    <div class="auth-shell max-w-lg mx-auto">
+        <div class="auth-card auth-register-card p-5 sm:p-8 space-y-6">
             <!-- Header -->
-            <div class="flex flex-col sm:flex-row items-start sm:justify-between gap-4">
-                <a href="/" class="hover:opacity-80">
-                    <div class="uppercase tracking-wide text-sm text-indigo-500 font-semibold mb-1">3D Printing Parts Automated Quoting System</div>
-                    <h2 class="text-2xl font-bold text-gray-900">用户注册</h2>
+            <div class="auth-header flex flex-col sm:flex-row items-start sm:justify-between gap-4">
+                <a href="/" class="auth-brand hover:opacity-80">
+                    <span class="auth-brand-mark" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+                    </span>
+                    <span>
+                        <span class="auth-brand-eyebrow">Pricer3D</span>
+                        <span class="auth-brand-title">创建账户</span>
+                    </span>
                 </a>
-                <a href="/" class="text-sm px-3 py-1.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 whitespace-nowrap shrink-0">返回首页</a>
+                <a href="/" class="auth-quiet-button text-sm px-3 py-1.5 whitespace-nowrap shrink-0">返回首页</a>
             </div>
 
             <!-- Step Indicator -->
@@ -407,6 +417,6 @@
         </div>
     </div>
 
-    <script type="module" src="/static/js/register.js?v=2"></script>
+    <script type="module" src="/static/js/register.js?v=3"></script>
 </body>
 </html>

@@ -62,7 +62,7 @@ import {
 } from './modules/presets.js';
 import {
     initMembership, openMembershipModal, closeMembershipModal,
-    refreshMembershipStatus, toggleMembershipOrders,
+    refreshMembershipStatus, toggleMembershipOrders, confirmPayment, closePaymentModal,
 } from './modules/membership.js';
 import {
     initQuote, quoteSingleFileWithOptions, quoteSelectedFiles,
@@ -97,9 +97,10 @@ import { initLiveClock } from './modules/live-clock.js';
 import { collectAppDomRefs } from './modules/app-dom.js';
 import {
     initColorDropdownUI, initMobileNavigation, initAppLifecycle,
-    portalUserCenterModal, portalPreviewModal, portalQuoteHistoryModal,
+    portalModalToBody, portalUserCenterModal, portalPreviewModal, portalQuoteHistoryModal,
 } from './modules/app-shell.js';
 import { initSettingsAreaEvents, initResultsAreaEvents } from './modules/app-events.js';
+import { initAdminUsers } from './admin_users.js';
 
 // ═══════════════════════════════════════════════
 //  App entry point
@@ -114,6 +115,8 @@ document.addEventListener('DOMContentLoaded', () => {
     portalUserCenterModal();
     portalPreviewModal();
     portalQuoteHistoryModal();
+    portalModalToBody('payment-modal');
+    portalModalToBody('admin-users-modal');
     // Init live clock
     initLiveClock();
     const _getMaxFiles = () => (currentUser && currentUser.is_member) ? Infinity : 5;
@@ -164,6 +167,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // Auth - form events are wired by _wireLoginForm() in auth.js init
     _bind(dom.openLoginBtn, 'click', () => openLoginModal(dom));
 
+    let adminUsersInitialized = false;
+    const openAdminUsersModal = () => {
+        dom.userDropdown?.classList.add('hidden');
+        if (!currentUser?.is_admin || !dom.adminUsersModal) return;
+        if (!adminUsersInitialized) {
+            initAdminUsers(dom.adminUsersModal);
+            adminUsersInitialized = true;
+        }
+        dom.adminUsersModal.classList.remove('hidden');
+    };
+    const closeAdminUsersModal = () => dom.adminUsersModal?.classList.add('hidden');
+
     // Language switcher
     const langSwitchBtn = document.getElementById('lang-switch-btn');
     if (langSwitchBtn) {
@@ -196,7 +211,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     _bind(dom.userMenuBtn, 'click', () => dom.userDropdown.classList.toggle('hidden'));
-    _bind(dom.openAdminUsersBtn, 'click', () => { dom.userDropdown.classList.add('hidden'); window.__navigateIfLeaving('/admin/users'); });
+    _bind(dom.openAdminUsersBtn, 'click', openAdminUsersModal);
     _bind(dom.openMembershipBtn, 'click', () => { dom.userDropdown.classList.add('hidden'); openMembershipModal(); });
     if (dom.openUserCenterBtn) dom.openUserCenterBtn.addEventListener('click', () => {
         dom.userDropdown.classList.add('hidden');
@@ -225,6 +240,12 @@ document.addEventListener('DOMContentLoaded', () => {
     _bind(dom.membershipBackdrop, 'click', closeMembershipModal);
     _bind(dom.membershipRefreshBtn, 'click', refreshMembershipStatus);
     _bind(dom.membershipOrdersBtn, 'click', toggleMembershipOrders);
+    _bind(dom.paymentPayBtn, 'click', confirmPayment);
+    _bind(dom.paymentCloseBtn, 'click', closePaymentModal);
+    _bind(dom.paymentCancelBtn, 'click', closePaymentModal);
+    _bind(dom.paymentBackdrop, 'click', closePaymentModal);
+    _bind(dom.adminUsersCloseBtn, 'click', closeAdminUsersModal);
+    _bind(dom.adminUsersBackdrop, 'click', closeAdminUsersModal);
 
     // Slicer presets
     _bind(dom.slicerPresetsRefreshBtn, 'click', fetchSlicerPresets);

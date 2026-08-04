@@ -71,20 +71,9 @@ function buildTimezoneSelector() {
 
   const container = document.createElement('div');
   container.id = 'live-clock-tz-selector';
-  container.style.cssText = `
-    position: absolute;
-    top: 100%;
-    left: 0;
-    z-index: 9999;
-    min-width: 180px;
-    margin-top: 4px;
-    padding: 4px 0;
-    border: 1px solid var(--color-border, #e0e0e0);
-    border-radius: var(--radius-md, 8px);
-    background: var(--color-card-bg, #fff);
-    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-  `;
-  container.className = 'tw-card';
+  container.className = 'tw-card live-clock-tz-panel';
+  container.setAttribute('role', 'menu');
+  container.setAttribute('aria-label', '\u65f6\u533a / Timezone');
 
   const header = document.createElement('div');
   header.style.cssText = 'padding: 6px 12px; font-size: 0.75rem; font-weight: 600; color: var(--color-text-muted, #888); border-bottom: 1px solid var(--color-border, #e0e0e0);';
@@ -125,6 +114,26 @@ function buildTimezoneSelector() {
   return container;
 }
 
+function positionSelector(selector) {
+  const clockEl = document.getElementById('live-clock');
+  if (!clockEl || !selector) return;
+
+  const rect = clockEl.getBoundingClientRect();
+  const viewportPadding = 8;
+  const gap = 8;
+  const panelWidth = Math.max(selector.offsetWidth || 220, 220);
+  const panelHeight = selector.offsetHeight || 280;
+  const openUpward = rect.bottom + gap + panelHeight > window.innerHeight - viewportPadding;
+  const maxLeft = window.innerWidth - panelWidth - viewportPadding;
+  const left = Math.min(Math.max(rect.right - panelWidth, viewportPadding), Math.max(viewportPadding, maxLeft));
+  const top = openUpward
+    ? Math.max(viewportPadding, rect.top - gap - panelHeight)
+    : Math.min(window.innerHeight - panelHeight - viewportPadding, rect.bottom + gap);
+
+  selector.style.left = `${Math.round(left)}px`;
+  selector.style.top = `${Math.round(top)}px`;
+}
+
 function showSelector() {
   if (selectorVisible) return;
   hideSelector(); // clean up any stale instance
@@ -133,18 +142,28 @@ function showSelector() {
   if (!clockEl) return;
 
   const selector = buildTimezoneSelector();
-  clockEl.parentNode.style.position = 'relative';
-  clockEl.parentNode.appendChild(selector);
+  document.body.appendChild(selector);
   selectorVisible = true;
+  positionSelector(selector);
+
+  // Keep the fixed panel attached to the clock while the viewport moves.
+  window.addEventListener('resize', _repositionSelector);
+  window.addEventListener('scroll', _repositionSelector, true);
 
   // Click outside to close
   document.addEventListener('click', _outsideClickHandler);
+}
+
+function _repositionSelector() {
+  positionSelector(document.getElementById('live-clock-tz-selector'));
 }
 
 function hideSelector() {
   const sel = document.getElementById('live-clock-tz-selector');
   if (sel) sel.remove();
   selectorVisible = false;
+  window.removeEventListener('resize', _repositionSelector);
+  window.removeEventListener('scroll', _repositionSelector, true);
   document.removeEventListener('click', _outsideClickHandler);
 }
 

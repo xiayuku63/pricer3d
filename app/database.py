@@ -273,14 +273,18 @@ def get_app_defaults() -> dict:
     from .models_orm import AppDefault
 
     with get_db_session() as db:
-        row = db.query(AppDefault).filter(AppDefault.key == APP_DEFAULTS_KEY).first()
-    if not row or not row.value_json:
+        value_json = (
+            db.query(AppDefault.value_json)
+            .filter(AppDefault.key == APP_DEFAULTS_KEY)
+            .scalar()
+        )
+    if not value_json:
         return {
             "materials": normalize_materials(DEFAULT_MATERIALS),
             "colors": [],
             "pricing_config": dict(DEFAULT_PRICING_CONFIG),
         }
-    raw = json.loads(row.value_json)
+    raw = json.loads(value_json)
     raw_materials = raw.get("materials")
     raw_pricing = raw.get("pricing_config")
     materials = _dedupe_materials(

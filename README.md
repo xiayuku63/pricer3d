@@ -1,4 +1,4 @@
-﻿# Pricer3D — 3D 打印自动报价系统
+# Pricer3D — 3D 打印自动报价系统
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-0.45.2-blue" alt="version">
@@ -121,8 +121,15 @@ PRUSA_EXECUTABLE=C:\\Program Files\\Prusa3D\\PrusaSlicer\\prusa-slicer-console.e
 | `PAYMENT_PROVIDER` | 支付实现 | `mock` |
 | `PRUSA_EXECUTABLE` | PrusaSlicer 可执行文件路径 | 自动检测 |
 | `PRUSA_SLICE_CACHE` | 是否启用 G-code 切片缓存 | `1` |
+| `TERMS_VERSION` / `PRIVACY_VERSION` | 用户协议和隐私政策版本 | `v2` |
+| `LEGAL_EFFECTIVE_DATE` | 法律文件生效日期 | `2026-07-31` |
+| `LEGAL_OPERATOR_NAME` | 运营主体名称 | `Pricer3D 运营方` |
+| `LEGAL_CONTACT_EMAIL` | 法律与隐私联系邮箱 | - |
+| `LEGAL_CONTACT_ADDRESS` | 运营主体联系地址 | - |
 
 完整配置见 [.env.example](.env.example) 和 [app/settings.py](app/settings.py)。生产环境不要使用开发密钥，也不要把 `.env.prod` 提交到仓库。
+
+法律文件上线前，请将 `LEGAL_OPERATOR_NAME`、`LEGAL_CONTACT_EMAIL` 和 `LEGAL_CONTACT_ADDRESS` 替换为真实主体信息，并由运营方或法律顾问审核《用户协议》和《隐私政策》内容。修改法律文本时同步递增 `TERMS_VERSION` 或 `PRIVACY_VERSION`。
 
 ## 项目结构
 

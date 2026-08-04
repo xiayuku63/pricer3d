@@ -86,7 +86,10 @@ export async function saveUserSettings(options = {}) {
     const originalBtnText = _setButtonLoadingState(saveBtn, t('settings.saving'));
     
     try {
-        const formulaOk = await validateCurrentFormulas();
+        const isMemberSave = currentUser?.membership_level === 'member';
+        // Free users cannot edit formulas, so do not validate the locked
+        // formula fields before saving their editable settings.
+        const formulaOk = !isMemberSave || await validateCurrentFormulas();
         if (!formulaOk) {
             _restoreButtonState(saveBtn, originalBtnText);
             return;
@@ -103,7 +106,6 @@ export async function saveUserSettings(options = {}) {
             newDefaultColor,
         } = _collectDefaultSettings();
 
-        const isMemberSave = currentUser?.membership_level === 'member';
         const pricingToSend = isMemberSave ? PRICING_CONFIG : (() => {
             const { unit_cost_formula, total_cost_formula, ...rest } = PRICING_CONFIG;
             return rest;

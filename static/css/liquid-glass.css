@@ -1,0 +1,1382 @@
+﻿/*
+ * Pricer3D Liquid Glass UI
+ * Shared visual layer for the iOS-inspired translucent workspace.
+ * Keep behavior/layout in the existing stylesheets; this file owns the finish.
+ */
+:root {
+  --lg-blue: #0a84ff;
+  --lg-cyan: #32ade6;
+  --lg-purple: #af52de;
+  --lg-pink: #ff375f;
+  --lg-ink: #152238;
+  --lg-muted: #66758a;
+  --lg-border: rgba(255, 255, 255, .66);
+  --lg-border-dark: rgba(255, 255, 255, .17);
+  --lg-glass: rgba(255, 255, 255, .58);
+  --lg-glass-strong: rgba(255, 255, 255, .76);
+  --lg-glass-soft: rgba(255, 255, 255, .34);
+  --lg-shadow: 0 24px 70px rgba(36, 61, 102, .16), 0 3px 12px rgba(31, 48, 79, .08);
+  --lg-shadow-dark: 0 24px 70px rgba(0, 0, 0, .35), 0 3px 12px rgba(0, 0, 0, .20);
+  --lg-radius: 24px;
+  --lg-radius-sm: 15px;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+html {
+  background: #eaf2ff;
+}
+
+body {
+  position: relative;
+  isolation: isolate;
+  color: var(--color-text, var(--lg-ink));
+  background:
+    radial-gradient(42rem 34rem at 0% -8%, rgba(10, 132, 255, .22), transparent 64%),
+    radial-gradient(34rem 30rem at 100% 0%, rgba(50, 173, 230, .18), transparent 63%),
+    radial-gradient(32rem 24rem at 78% 88%, rgba(50, 173, 230, .17), transparent 64%),
+    linear-gradient(135deg, #f7fbff 0%, #eaf2ff 48%, #edf6ff 100%) !important;
+  background-attachment: fixed !important;
+}
+
+body::before,
+body::after {
+  position: fixed;
+  z-index: -1;
+  display: block;
+  pointer-events: none;
+  content: '';
+  border-radius: 999px;
+  filter: blur(2px);
+  opacity: .7;
+}
+
+body::before {
+  top: 18%;
+  left: -6rem;
+  width: 18rem;
+  height: 18rem;
+  background: radial-gradient(circle, rgba(10, 132, 255, .17), transparent 68%);
+  animation: liquid-float-a 18s ease-in-out infinite alternate;
+}
+
+body::after {
+  right: -5rem;
+  bottom: 8%;
+  width: 22rem;
+  height: 22rem;
+  background: radial-gradient(circle, rgba(10, 132, 255, .13), transparent 68%);
+  animation: liquid-float-b 24s ease-in-out infinite alternate;
+}
+
+@keyframes liquid-float-a { to { transform: translate(4rem, 3rem) scale(1.15); } }
+@keyframes liquid-float-b { to { transform: translate(-3rem, -2rem) scale(.9); } }
+
+/* Shared glass material */
+.tw-card,
+.apple-shell,
+.apple-hero,
+.apple-toolbar,
+.apple-metric,
+.tw-dropdown-panel,
+.modal-panel,
+.settings-section,
+.admin-panel,
+.settings-hero,
+.card,
+.panel,
+.container > .card,
+table,
+#mobile-nav-drawer,
+#login-modal > div:last-child,
+#membership-modal > div:last-child,
+#options-modal > div:last-child,
+#user-center-modal > div:last-child,
+#quote-history-modal > div:last-child,
+#preview-modal > div:last-child,
+#orient-modal > div:last-child {
+  border-color: var(--lg-border) !important;
+  background-color: var(--lg-glass) !important;
+  box-shadow: var(--lg-shadow) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(145%);
+  backdrop-filter: blur(28px) saturate(145%);
+}
+
+.tw-card,
+.apple-shell,
+.settings-section,
+.admin-panel,
+.card,
+.panel {
+  border-radius: var(--lg-radius) !important;
+}
+
+.apple-shell {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .72) !important;
+}
+
+.apple-shell::after,
+.tw-card::after,
+.apple-hero::after {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  content: '';
+  border-radius: inherit;
+  background: linear-gradient(120deg, rgba(255,255,255,.32), transparent 35%, transparent 72%, rgba(255,255,255,.12));
+  opacity: .55;
+  mix-blend-mode: screen;
+}
+
+.apple-shell > *,
+.tw-card > *,
+.apple-hero > * {
+  position: relative;
+  z-index: 1;
+}
+
+.apple-hero {
+  border: 1px solid rgba(255, 255, 255, .72) !important;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,.70), rgba(255,255,255,.27)),
+    radial-gradient(circle at 80% 0%, rgba(50,173,230,.16), transparent 46%),
+    radial-gradient(circle at 0% 100%, rgba(10,132,255,.14), transparent 45%) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 18px 42px rgba(66, 96, 146, .11) !important;
+}
+
+.apple-kicker {
+  color: var(--lg-blue) !important;
+  letter-spacing: .16em;
+}
+
+.apple-muted-pill,
+.tw-badge-success,
+.tw-badge-failed,
+.tw-badge-pending,
+.status-badge,
+.badge {
+  border: 1px solid rgba(255,255,255,.74) !important;
+  background: rgba(255,255,255,.42) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.8), 0 4px 12px rgba(50,75,110,.06) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(130%);
+  backdrop-filter: blur(14px) saturate(130%);
+}
+
+.apple-metric {
+  border: 1px solid rgba(255,255,255,.62) !important;
+  background: linear-gradient(145deg, rgba(255,255,255,.56), rgba(255,255,255,.23)) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.72), 0 10px 25px rgba(56,82,124,.08) !important;
+}
+
+/* Flat glass controls */
+button,
+.tw-btn-primary,
+.tw-btn-secondary,
+.tw-btn-danger,
+.tw-btn-ghost,
+.theme-toggle-control,
+.language-toggle-control,
+.tab-btn,
+.action-btn,
+button[type='submit'],
+button[type='button'] {
+  position: relative;
+  transform: none;
+  border: 1px solid rgba(255,255,255,.64) !important;
+  border-radius: var(--lg-radius-sm) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.76),
+    0 6px 16px rgba(47, 84, 139, .10) !important;
+  transition: box-shadow .18s ease, filter .18s ease, background-color .18s ease, border-color .18s ease !important;
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  backdrop-filter: blur(18px) saturate(150%);
+}
+
+button::before,
+.tw-btn-primary::before,
+.tw-btn-secondary::before,
+.tw-btn-danger::before,
+.tw-btn-ghost::before {
+  display: none !important;
+}
+
+button:hover,
+.tw-btn-primary:hover,
+.tw-btn-secondary:hover,
+.tw-btn-danger:hover,
+.tw-btn-ghost:hover,
+.theme-toggle-control:hover,
+.language-toggle-control:hover {
+  transform: none;
+  filter: saturate(1.05) brightness(1.025);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.86),
+    0 8px 20px rgba(47, 84, 139, .13) !important;
+}
+
+button:active,
+.tw-btn-primary:active,
+.tw-btn-secondary:active,
+.tw-btn-danger:active,
+.tw-btn-ghost:active,
+.theme-toggle-control:active,
+.language-toggle-control:active {
+  transform: none;
+  filter: saturate(.98);
+  box-shadow:
+    inset 0 1px 4px rgba(19, 50, 90, .12),
+    0 4px 12px rgba(47, 84, 139, .09) !important;
+}
+
+.tw-btn-primary,
+button.tw-btn-primary,
+button[type='submit'] {
+  background: linear-gradient(145deg, #42a5ff, var(--lg-blue)) !important;
+  color: #fff !important;
+  border-color: rgba(255,255,255,.5) !important;
+}
+
+.tw-btn-secondary,
+.tw-btn-ghost,
+.theme-toggle-control,
+.language-toggle-control {
+  background: linear-gradient(145deg, rgba(255,255,255,.74), rgba(255,255,255,.37)) !important;
+  color: var(--lg-ink) !important;
+}
+
+.tw-btn-danger { background: linear-gradient(145deg, #ff6b6b, #ff3b30) !important; color: #fff !important; }
+
+/* Inputs, selects and editor surfaces */
+input:not([type='checkbox']):not([type='radio']),
+select,
+textarea,
+.tw-input,
+.styled-select,
+.combo-i,
+.combo-w .combo-d {
+  border: 1px solid rgba(255,255,255,.74) !important;
+  border-radius: var(--lg-radius-sm) !important;
+  background: rgba(255,255,255,.48) !important;
+  color: var(--color-text, var(--lg-ink)) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.78), 0 5px 14px rgba(52,80,120,.06) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(130%);
+  backdrop-filter: blur(16px) saturate(130%);
+}
+
+input:not([type='checkbox']):not([type='radio']):focus,
+select:focus,
+textarea:focus,
+.tw-input:focus,
+.styled-select:focus,
+.combo-i:focus {
+  border-color: rgba(10,132,255,.62) !important;
+  outline: none !important;
+  background: rgba(255,255,255,.72) !important;
+  box-shadow: 0 0 0 4px rgba(10,132,255,.15), inset 0 1px 0 rgba(255,255,255,.9), 0 8px 18px rgba(10,132,255,.10) !important;
+}
+
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: var(--lg-blue);
+}
+
+/* Navigation and application chrome */
+.mobile-nav-item,
+#mobile-menu-btn,
+#mobile-nav-drawer,
+#user-menu-btn,
+.tw-dropdown-option {
+  border-radius: var(--lg-radius-sm) !important;
+}
+
+.mobile-nav-item:hover,
+.mobile-nav-item[data-active='true'],
+.mobile-nav-item.active,
+.tw-dropdown-option:hover {
+  background: rgba(255,255,255,.56) !important;
+  color: var(--lg-blue) !important;
+}
+
+#mobile-nav-drawer {
+  background: rgba(242,248,255,.74) !important;
+  border-left: 1px solid rgba(255,255,255,.82) !important;
+}
+
+/* Tables and dense workspaces */
+table,
+.apple-table-wrap,
+.table-wrap,
+.results-table,
+.data-table {
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.66) !important;
+  border-radius: var(--lg-radius-sm) !important;
+  background: rgba(255,255,255,.36) !important;
+}
+
+thead,
+.table-header {
+  background: rgba(255,255,255,.40) !important;
+}
+
+tbody tr {
+  background: rgba(255,255,255,.18) !important;
+}
+
+tbody tr:hover {
+  background: rgba(255,255,255,.48) !important;
+}
+
+td,
+th {
+  border-color: rgba(113,145,190,.18) !important;
+}
+
+/* Modal backdrops and panels */
+.fixed.inset-0[style*='--color-overlay'],
+#login-backdrop,
+#membership-backdrop,
+#options-backdrop,
+#user-center-backdrop,
+#quote-history-backdrop,
+#preview-backdrop,
+#orient-backdrop {
+  background: rgba(16, 31, 61, .34) !important;
+  -webkit-backdrop-filter: blur(9px);
+  backdrop-filter: blur(9px);
+}
+
+.tw-dropdown-panel {
+  border: 1px solid rgba(255,255,255,.78) !important;
+  background: rgba(245,250,255,.78) !important;
+  border-radius: var(--lg-radius-sm) !important;
+}
+
+hr,
+[style*='border-top'],
+[style*='border-bottom'] {
+  border-color: rgba(117, 148, 189, .20) !important;
+}
+
+::selection {
+  color: #fff;
+  background: rgba(10,132,255,.68);
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: rgba(255,255,255,.20); }
+::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background-clip: padding-box; background-color: rgba(81, 126, 185, .42); }
+::-webkit-scrollbar-thumb:hover { background-color: rgba(10,132,255,.62); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
+}
+
+/* Dark liquid glass */
+html.dark {
+  background: #07111f;
+}
+
+html.dark body {
+  color: #edf5ff;
+  background:
+    radial-gradient(42rem 34rem at 0% -8%, rgba(10,132,255,.26), transparent 64%),
+    radial-gradient(34rem 30rem at 100% 0%, rgba(50,173,230,.22), transparent 63%),
+    radial-gradient(32rem 24rem at 78% 88%, rgba(50,173,230,.18), transparent 64%),
+    linear-gradient(135deg, #081524 0%, #0d1b2f 48%, #0b213a 100%) !important;
+}
+
+html.dark .tw-card,
+html.dark .apple-shell,
+html.dark .apple-hero,
+html.dark .apple-toolbar,
+html.dark .apple-metric,
+html.dark .settings-section,
+html.dark .admin-panel,
+html.dark .card,
+html.dark .panel,
+html.dark table,
+html.dark #mobile-nav-drawer {
+  border-color: var(--lg-border-dark) !important;
+  background-color: rgba(20, 35, 57, .58) !important;
+  box-shadow: var(--lg-shadow-dark) !important;
+}
+
+html.dark .apple-hero {
+  background:
+    linear-gradient(135deg, rgba(48, 78, 119, .54), rgba(19, 37, 61, .34)),
+    radial-gradient(circle at 80% 0%, rgba(50,173,230,.22), transparent 46%),
+    radial-gradient(circle at 0% 100%, rgba(10,132,255,.20), transparent 45%) !important;
+}
+
+html.dark button,
+html.dark .tw-btn-secondary,
+html.dark .tw-btn-ghost,
+html.dark .theme-toggle-control,
+html.dark .language-toggle-control,
+html.dark input:not([type='checkbox']):not([type='radio']),
+html.dark select,
+html.dark textarea,
+html.dark .tw-input,
+html.dark .styled-select,
+html.dark .combo-i,
+html.dark .combo-w .combo-d {
+  border-color: rgba(255,255,255,.17) !important;
+  background: rgba(37, 58, 87, .62) !important;
+  color: #edf5ff !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 5px 14px rgba(0,0,0,.16) !important;
+}
+
+html.dark .tw-btn-secondary,
+html.dark .tw-btn-ghost,
+html.dark .theme-toggle-control,
+html.dark .language-toggle-control {
+  color: #edf5ff !important;
+}
+
+html.dark .mobile-nav-item:hover,
+html.dark .mobile-nav-item[data-active='true'],
+html.dark .mobile-nav-item.active,
+html.dark .tw-dropdown-option:hover,
+html.dark tbody tr:hover {
+  background: rgba(74, 113, 161, .35) !important;
+}
+
+html.dark thead,
+html.dark .table-header {
+  background: rgba(48, 74, 110, .35) !important;
+}
+
+html.dark tbody tr {
+  background: rgba(16, 31, 51, .28) !important;
+}
+
+html.dark .tw-dropdown-panel {
+  background: rgba(20, 35, 57, .88) !important;
+}
+
+html.dark #mobile-nav-drawer {
+  background: rgba(15, 31, 51, .86) !important;
+}
+
+@media (max-width: 640px) {
+  .tw-card,
+  .apple-shell,
+  .settings-section,
+  .admin-panel {
+    border-radius: 20px !important;
+  }
+
+  body { background-attachment: scroll !important; }
+  button, .tw-btn-primary, .tw-btn-secondary, .tw-btn-danger, .tw-btn-ghost { box-shadow: inset 0 1px 0 rgba(255,255,255,.76), 0 6px 16px rgba(47,84,139,.10) !important; }
+}
+
+/* Legacy standalone workspaces: bring their local chrome into the same material language. */
+.app-container {
+  min-height: 100vh;
+  background: transparent !important;
+}
+
+.app-container .sidebar {
+  background: rgba(239, 247, 255, .48) !important;
+  border-right: 1px solid rgba(255,255,255,.64) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(145%);
+  backdrop-filter: blur(30px) saturate(145%);
+  box-shadow: 12px 0 36px rgba(55,86,130,.10);
+}
+
+.app-container .sidebar-header,
+.app-container .main-header {
+  background: rgba(255,255,255,.28) !important;
+  border-color: rgba(255,255,255,.58) !important;
+}
+
+.app-container .sidebar-header h2,
+.app-container .main-header h1,
+.app-container .main-header .breadcrumb span,
+.app-container .info-item .info-value,
+.app-container .nozzle-item .nozzle-size {
+  color: var(--lg-blue) !important;
+}
+
+.app-container .printer-group-header,
+.app-container .nozzle-item,
+.app-container .info-item,
+.app-container .toggle-row,
+.app-container .card,
+.app-container .empty-state {
+  border-color: rgba(255,255,255,.58) !important;
+  background: rgba(255,255,255,.36) !important;
+  color: var(--lg-ink) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(135%);
+  backdrop-filter: blur(20px) saturate(135%);
+}
+
+.app-container .printer-group-header:hover,
+.app-container .printer-group-header.active,
+.app-container .nozzle-item:hover,
+.app-container .nozzle-item.active {
+  background: rgba(255,255,255,.66) !important;
+  color: var(--lg-blue) !important;
+}
+
+.app-container .main-content {
+  background: transparent !important;
+}
+
+.app-container .main-header {
+  box-shadow: 0 10px 30px rgba(55,86,130,.08);
+}
+
+.app-container .content-area {
+  background: transparent !important;
+}
+
+.app-container .btn-save {
+  background: linear-gradient(145deg, #42a5ff, var(--lg-blue)) !important;
+  color: #fff !important;
+}
+
+.app-container .btn-save:disabled {
+  background: rgba(111, 142, 181, .42) !important;
+  color: rgba(32, 52, 78, .56) !important;
+}
+
+body:has(.app-container) {
+  padding: 0 !important;
+  background:
+    radial-gradient(42rem 34rem at 0% -8%, rgba(10,132,255,.22), transparent 64%),
+    radial-gradient(34rem 30rem at 100% 0%, rgba(50,173,230,.18), transparent 63%),
+    linear-gradient(135deg, #f7fbff 0%, #eaf2ff 48%, #edf6ff 100%) !important;
+}
+
+body:has(.app-container) .toast {
+  border: 1px solid rgba(255,255,255,.70) !important;
+  border-radius: var(--lg-radius-sm) !important;
+  box-shadow: var(--lg-shadow) !important;
+}
+
+body:has(.app-container) .toast.success { background: rgba(52,199,89,.80) !important; }
+body:has(.app-container) .toast.error { background: rgba(255,59,48,.80) !important; }
+body:has(.app-container) .toast.info { background: rgba(10,132,255,.80) !important; }
+
+/* Material and quote legacy pages */
+body:has(.tab-button),
+body:has(.filter-chip) {
+  background: transparent !important;
+}
+
+body:has(.tab-button) nav,
+body:has(.tab-button) .tab-button,
+body:has(.filter-chip) nav,
+body:has(.filter-chip) .filter-chip,
+body:has(.filter-chip) .card,
+body:has(.filter-chip) .modal,
+body:has(.filter-chip) .modal-overlay {
+  border-color: rgba(255,255,255,.62) !important;
+}
+
+body:has(.tab-button) nav,
+body:has(.filter-chip) nav {
+  background: rgba(255,255,255,.44) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(145%);
+  backdrop-filter: blur(24px) saturate(145%);
+}
+
+body:has(.tab-button) .tab-button.active,
+body:has(.tab-button) .tab-button:hover,
+body:has(.filter-chip) .filter-chip:hover,
+body:has(.filter-chip) .filter-chip.active {
+  color: var(--lg-blue) !important;
+  background: rgba(255,255,255,.60) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.78), 0 4px 12px rgba(51,82,125,.08) !important;
+}
+
+html.dark .app-container .sidebar {
+  background: rgba(14, 30, 50, .72) !important;
+  border-color: rgba(255,255,255,.14) !important;
+}
+html.dark .app-container .sidebar-header,
+html.dark .app-container .main-header {
+  background: rgba(27, 48, 76, .46) !important;
+  border-color: rgba(255,255,255,.14) !important;
+}
+html.dark .app-container .printer-group-header,
+html.dark .app-container .nozzle-item,
+html.dark .app-container .info-item,
+html.dark .app-container .toggle-row,
+html.dark .app-container .card,
+html.dark .app-container .empty-state {
+  background: rgba(29, 50, 78, .58) !important;
+  color: #edf5ff !important;
+  border-color: rgba(255,255,255,.14) !important;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   Unified typography and spacing
+   One type ramp and one control rhythm for equivalent UI elements.
+   ════════════════════════════════════════════════════════════════════ */
+:root {
+  --lg-font-text: "SF Pro Text", "PingFang SC", "Microsoft YaHei UI", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --lg-font-display: "SF Pro Display", "PingFang SC", "Microsoft YaHei UI", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --lg-type-display: 22px;
+  --lg-type-title: 18px;
+  --lg-type-subtitle: 16px;
+  --lg-type-body: 14px;
+  --lg-type-control: 13px;
+  --lg-type-compact: 12px;
+  --lg-type-micro: 11px;
+  --lg-leading-display: 1.25;
+  --lg-leading-body: 1.5;
+  --lg-leading-control: 18px;
+  --lg-leading-compact: 16px;
+  --lg-control-height: 38px;
+  --lg-control-height-compact: 32px;
+  --lg-control-height-touch: 44px;
+  --lg-control-padding-x: 14px;
+  --lg-control-padding-y: 9px;
+  --lg-control-padding-x-compact: 10px;
+  --lg-control-padding-y-compact: 7px;
+  --lg-panel-padding: 20px;
+  --lg-panel-padding-compact: 16px;
+  --lg-content-gap: 12px;
+}
+
+body,
+button,
+input,
+select,
+textarea,
+optgroup,
+option {
+  font-family: var(--lg-font-text) !important;
+  font-variant-numeric: tabular-nums;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  font-size: var(--lg-type-body);
+  line-height: var(--lg-leading-body);
+  letter-spacing: -0.008em;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.auth-brand-title,
+.stat-value,
+.apple-metric dd {
+  font-family: var(--lg-font-display) !important;
+  letter-spacing: -0.025em;
+}
+
+h1 { font-size: var(--lg-type-display) !important; line-height: var(--lg-leading-display) !important; }
+h2 { font-size: var(--lg-type-display) !important; line-height: var(--lg-leading-display) !important; }
+h3 { font-size: var(--lg-type-title) !important; line-height: 1.35 !important; }
+h4 { font-size: var(--lg-type-subtitle) !important; line-height: 1.4 !important; }
+
+p,
+li,
+dd,
+dt {
+  line-height: var(--lg-leading-body);
+}
+
+.apple-kicker,
+.eyebrow,
+.auth-brand-eyebrow {
+  font-size: var(--lg-type-micro) !important;
+  line-height: 1.35 !important;
+  letter-spacing: .14em !important;
+}
+
+.apple-muted-pill,
+.badge,
+.status-badge,
+.tw-badge-success,
+.tw-badge-failed,
+.tw-badge-pending,
+.stat-label,
+.step-label {
+  min-height: 24px;
+  padding: 4px 9px !important;
+  font-size: var(--lg-type-compact) !important;
+  line-height: var(--lg-leading-compact) !important;
+  letter-spacing: 0;
+}
+
+/* Standard buttons share one readable type size and one text-to-edge inset. */
+.tw-btn-primary,
+.tw-btn-secondary,
+.tw-btn-danger,
+.tw-btn-ghost,
+.theme-toggle-control,
+.language-toggle-control,
+.btn,
+.btn-primary,
+.btn-secondary,
+.btn-danger,
+.action-btn,
+.btn-save,
+.apple-preview-btn,
+.auth-quiet-button,
+.tab-btn,
+button[type="submit"] {
+  min-height: var(--lg-control-height);
+  padding: var(--lg-control-padding-y) var(--lg-control-padding-x) !important;
+  font-size: var(--lg-type-control) !important;
+  font-weight: 600 !important;
+  line-height: var(--lg-leading-control) !important;
+  letter-spacing: -0.006em;
+}
+
+/* Icon-only controls keep a square hit area rather than inheriting text padding. */
+#mobile-menu-btn,
+#mobile-nav-close-btn,
+.view-cube-btn,
+button[aria-label]:empty {
+  min-width: var(--lg-control-height-touch) !important;
+  width: var(--lg-control-height-touch);
+  min-height: var(--lg-control-height-touch) !important;
+  height: var(--lg-control-height-touch);
+  padding: 0 !important;
+}
+
+.mobile-nav-item,
+#mobile-open-login-btn,
+#mobile-theme-toggle-btn,
+#mobile-logout-btn {
+  min-height: 48px !important;
+  padding: 12px 16px !important;
+  font-size: var(--lg-type-body) !important;
+  line-height: 20px !important;
+}
+
+.theme-toggle-control,
+.language-toggle-control,
+#open-login-btn,
+#open-membership-btn,
+#user-menu-btn {
+  min-height: 36px !important;
+  padding: 8px 12px !important;
+  font-size: var(--lg-type-control) !important;
+  line-height: var(--lg-leading-control) !important;
+}
+
+/* Regular form fields. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+select,
+textarea,
+.tw-input,
+.combo-i,
+.number-input {
+  min-height: var(--lg-control-height);
+  padding: var(--lg-control-padding-y) 12px !important;
+  font-size: var(--lg-type-control) !important;
+  line-height: var(--lg-leading-control) !important;
+  letter-spacing: -0.006em;
+}
+
+label,
+.form-label,
+.input-label {
+  font-size: var(--lg-type-control) !important;
+  line-height: var(--lg-leading-control) !important;
+}
+
+/* Dense quote toolbars use the compact tier consistently. */
+.apple-toolbar,
+.settings-fields-panel,
+.batch-recalculate-actions {
+  gap: var(--lg-content-gap) !important;
+  padding: var(--lg-panel-padding-compact) !important;
+}
+
+#quote-default-settings-bar,
+#batch-edit-bar {
+  row-gap: 10px !important;
+  column-gap: 10px !important;
+}
+
+#quote-default-settings-bar label,
+#batch-edit-bar label,
+#batch-recalculate-actions label,
+#quote-default-settings-bar > span,
+#batch-edit-bar > span {
+  font-size: var(--lg-type-compact) !important;
+  line-height: var(--lg-leading-compact) !important;
+}
+
+#quote-default-settings-bar .styled-select-wrapper,
+#batch-edit-bar .styled-select-wrapper,
+#quote-default-settings-bar .styled-select-trigger,
+#batch-edit-bar .styled-select-trigger,
+#quote-default-settings-bar select,
+#batch-edit-bar select,
+#batch-quantity,
+#quote-default-settings-bar .color-dd-trigger,
+#batch-edit-bar .color-dd-trigger {
+  min-height: var(--lg-control-height-compact) !important;
+  height: var(--lg-control-height-compact) !important;
+  padding-top: var(--lg-control-padding-y-compact) !important;
+  padding-bottom: var(--lg-control-padding-y-compact) !important;
+  font-size: var(--lg-type-compact) !important;
+  line-height: var(--lg-leading-compact) !important;
+}
+
+#quote-default-settings-bar .styled-select-trigger,
+#batch-edit-bar .styled-select-trigger,
+#batch-quantity {
+  padding-right: var(--lg-control-padding-x-compact) !important;
+  padding-left: var(--lg-control-padding-x-compact) !important;
+}
+
+#quote-default-settings-bar button,
+#batch-edit-bar button,
+#batch-recalculate-actions button,
+.apple-table-wrap button,
+.settings-row-actions button {
+  min-height: var(--lg-control-height-compact) !important;
+  padding: var(--lg-control-padding-y-compact) var(--lg-control-padding-x-compact) !important;
+  font-size: var(--lg-type-compact) !important;
+  line-height: var(--lg-leading-compact) !important;
+}
+
+/* Dropdowns are visually equivalent to compact form controls. */
+.tw-dropdown-option,
+.styled-select-item {
+  min-height: 36px !important;
+  padding: 9px 12px !important;
+  gap: 8px !important;
+  font-size: var(--lg-type-control) !important;
+  line-height: var(--lg-leading-control) !important;
+}
+
+.styled-select-trigger {
+  min-height: var(--lg-control-height-compact) !important;
+  height: var(--lg-control-height-compact) !important;
+  padding: var(--lg-control-padding-y-compact) var(--lg-control-padding-x-compact) !important;
+  font-size: var(--lg-type-compact) !important;
+  line-height: var(--lg-leading-compact) !important;
+}
+
+/* Metrics, cards and tables share the same internal breathing room. */
+.apple-metric,
+.stat,
+.info-item {
+  padding: var(--lg-panel-padding-compact) !important;
+}
+
+.apple-metric dt,
+.stat-label,
+.info-label {
+  font-size: var(--lg-type-control) !important;
+  line-height: var(--lg-leading-control) !important;
+}
+
+.apple-metric dd,
+.stat-value,
+.info-value {
+  margin-top: 8px !important;
+  font-size: var(--lg-type-subtitle) !important;
+  line-height: 1.35 !important;
+}
+
+.apple-metric #sum-total-cost {
+  font-size: 24px !important;
+  line-height: 1.15 !important;
+}
+
+table th,
+table td,
+.admin-users-modal th,
+.admin-users-modal td {
+  padding: 10px 12px !important;
+  font-size: var(--lg-type-compact) !important;
+  line-height: var(--lg-leading-compact) !important;
+}
+
+table th,
+.admin-users-modal th {
+  font-weight: 600 !important;
+  letter-spacing: .01em;
+}
+
+/* Modal headings, labels, fields and action rows follow the same scale. */
+[id$="-modal"] h2 { font-size: var(--lg-type-title) !important; }
+[id$="-modal"] h3,
+[id$="-modal"] h4 { font-size: var(--lg-type-subtitle) !important; }
+[id$="-modal"] label { font-size: var(--lg-type-control) !important; }
+[id$="-modal"] p,
+[id$="-modal"] li { font-size: var(--lg-type-control); }
+[id$="-modal"] .text-xs,
+[id$="-modal"] .text-\[11px\] { font-size: var(--lg-type-compact) !important; line-height: var(--lg-leading-compact) !important; }
+
+.auth-card,
+.auth-login-card,
+.auth-register-card {
+  font-size: var(--lg-type-body);
+}
+
+.auth-card label,
+#login-modal label {
+  margin-bottom: 6px !important;
+  font-size: var(--lg-type-control) !important;
+  line-height: var(--lg-leading-control) !important;
+}
+
+.auth-card input:not([type="checkbox"]),
+#login-modal input:not([type="checkbox"]) {
+  min-height: var(--lg-control-height-touch) !important;
+  padding: 11px 13px !important;
+  font-size: var(--lg-type-body) !important;
+  line-height: 20px !important;
+}
+
+.auth-card button:not(.auth-quiet-button),
+#login-modal button:not(.auth-quiet-button) {
+  min-height: var(--lg-control-height-touch);
+  padding: 11px 16px !important;
+  font-size: var(--lg-type-body) !important;
+  line-height: 20px !important;
+}
+
+/* Standalone management pages use the same type and inset scale. */
+.sidebar-header { padding: var(--lg-panel-padding) !important; }
+.sidebar-header h2 { font-size: var(--lg-type-title) !important; line-height: 1.35 !important; }
+.sidebar-header p,
+.main-header .breadcrumb,
+.toggle-desc,
+.empty-hint { font-size: var(--lg-type-compact) !important; line-height: var(--lg-leading-compact) !important; }
+
+.printer-tree { padding: 12px !important; }
+.printer-group-header,
+.nozzle-item { padding: 10px 12px !important; }
+.printer-group-header .printer-name,
+.nozzle-item .nozzle-label,
+.toggle-label { font-size: var(--lg-type-control) !important; line-height: var(--lg-leading-control) !important; }
+
+.main-header { min-height: 76px; padding: 16px 24px !important; }
+.content-area { padding: 24px !important; }
+.card-header { padding: 14px 18px !important; }
+.card-body { padding: 18px !important; }
+
+body:has(.tab-button) .tab-button,
+body:has(.filter-chip) .filter-chip {
+  min-height: var(--lg-control-height);
+  padding: 9px 14px !important;
+  font-size: var(--lg-type-control) !important;
+  line-height: var(--lg-leading-control) !important;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --lg-type-display: 20px;
+    --lg-panel-padding: 16px;
+    --lg-panel-padding-compact: 14px;
+  }
+
+  body { font-size: var(--lg-type-control); }
+
+  .apple-toolbar,
+  .settings-fields-panel,
+  .batch-recalculate-actions {
+    gap: 10px !important;
+    padding: 14px !important;
+  }
+
+  #quote-default-settings-bar label,
+  #batch-edit-bar label,
+  #batch-recalculate-actions label {
+    font-size: var(--lg-type-compact) !important;
+  }
+
+  table th,
+  table td {
+    padding: 9px 10px !important;
+  }
+
+  .content-area { padding: 16px !important; }
+}
+
+/* Preserve the aligned desktop grid after the typography scale increases. */
+#quote-default-settings-bar,
+#batch-edit-bar {
+  column-gap: 6px !important;
+}
+
+#front-default-save-btn,
+#batch-apply-btn {
+  padding-right: 9px !important;
+  padding-left: 9px !important;
+  white-space: nowrap;
+}
+
+/* Keep equivalent field groups aligned without letting text or actions cross panel edges. */
+@media (min-width: 1024px) and (max-width: 1799px) {
+  #quote-default-settings-bar {
+    grid-template-columns: 78px minmax(132px, 1.25fr) 88px minmax(122px, 1.15fr) minmax(82px, .9fr) minmax(94px, 1fr) 64px minmax(0, .3fr) auto !important;
+  }
+
+  #batch-edit-bar {
+    grid-template-columns: 78px minmax(150px, 1.2fr) 98px minmax(145px, 1.15fr) minmax(100px, .9fr) minmax(112px, 1fr) 68px 104px minmax(0, .25fr) auto !important;
+  }
+
+  #quote-default-settings-bar > .flex.items-center,
+  #batch-edit-bar > .flex.items-center {
+    gap: 5px !important;
+  }
+}
+
+@media (min-width: 1024px) and (max-width: 1799px) {
+  #quote-default-settings-bar {
+    grid-template-columns: 78px minmax(145px, 1.2fr) 105px minmax(135px, 1.1fr) minmax(95px, .9fr) minmax(105px, 1fr) 68px minmax(0, .2fr) auto !important;
+  }
+
+  #batch-edit-bar {
+    grid-template-columns: 78px minmax(160px, 1.2fr) 110px minmax(160px, 1.15fr) minmax(112px, .9fr) minmax(128px, 1fr) 72px 105px minmax(0, .2fr) auto !important;
+  }
+}
+
+@media (min-width: 1024px) and (max-width: 1799px) {
+  #quote-default-settings-bar {
+    grid-template-columns: 78px 146px 128px 143px 114px 114px 77px minmax(0, 1fr) auto !important;
+  }
+
+  #batch-edit-bar {
+    grid-template-columns: 78px 165px 128px 160px 125px 140px 80px 105px minmax(0, 1fr) auto !important;
+  }
+}
+
+/* Control radius pass: ordinary controls are rounded, not pill-shaped. */
+:root {
+  --lg-control-radius: 10px;
+  --lg-control-radius-compact: 8px;
+}
+
+button,
+.tw-btn-primary,
+.tw-btn-secondary,
+.tw-btn-danger,
+.tw-btn-ghost,
+.theme-toggle-control,
+.language-toggle-control,
+.tab-btn,
+.action-btn,
+.btn-save,
+.apple-preview-btn,
+.auth-quiet-button,
+button[type="submit"],
+button[type="button"] {
+  border-radius: var(--lg-control-radius) !important;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+select,
+textarea,
+.tw-input,
+.styled-select,
+.combo-i,
+.combo-w .combo-d,
+.number-input {
+  border-radius: var(--lg-control-radius) !important;
+}
+
+.styled-select-trigger,
+.color-dd-trigger,
+.tw-popup-trigger,
+#batch-quantity {
+  border-radius: var(--lg-control-radius-compact) !important;
+}
+
+.tw-dropdown-option,
+.styled-select-item {
+  border-radius: var(--lg-control-radius-compact) !important;
+}
+
+#mobile-nav-drawer,
+.tw-dropdown-panel {
+  border-radius: 16px !important;
+}
+
+.apple-muted-pill,
+.tw-badge-success,
+.tw-badge-failed,
+.tw-badge-pending,
+.badge,
+.status-badge {
+  border-radius: 9999px !important;
+}
+
+/* Specificity keeps compact select triggers at the smaller radius. */
+button.styled-select-trigger,
+button.color-dd-trigger,
+button.tw-popup-trigger {
+  border-radius: var(--lg-control-radius-compact) !important;
+}
+
+/* Give the settings fields the space they need before resorting to ellipsis. */
+@media (min-width: 1024px) and (max-width: 1799px) {
+  .settings-controls-row {
+    grid-template-columns: minmax(0, 1fr) 240px !important;
+  }
+
+  #quote-default-settings-bar {
+    grid-template-columns: 78px 165px 125px 145px 115px 125px 75px minmax(0, 1fr) auto !important;
+  }
+
+  #batch-edit-bar {
+    grid-template-columns: 78px 175px 135px 160px 125px 145px 80px 105px minmax(0, 1fr) auto !important;
+  }
+}
+
+@media (min-width: 1800px) {
+  .settings-controls-row {
+    grid-template-columns: minmax(0, 1fr) 260px !important;
+  }
+
+  #quote-default-settings-bar {
+    grid-template-columns: 88px 200px 145px 175px 130px 150px 85px minmax(0, 1fr) auto !important;
+  }
+
+  #batch-edit-bar {
+    grid-template-columns: 88px 210px 145px 190px 140px 160px 90px 110px minmax(0, 1fr) auto !important;
+  }
+}
+
+/* Shared-field alignment: default and batch rows use identical columns through color. */
+@media (min-width: 1024px) and (max-width: 1799px) {
+  #quote-default-settings-bar {
+    grid-template-columns: 78px 165px 125px 145px 115px 125px 75px minmax(0, 1fr) auto !important;
+  }
+
+  #batch-edit-bar {
+    grid-template-columns: 78px 165px 125px 145px 115px 125px 75px 105px minmax(0, 1fr) auto !important;
+  }
+}
+
+@media (min-width: 1800px) {
+  #quote-default-settings-bar {
+    grid-template-columns: 88px 200px 145px 175px 130px 150px 85px minmax(0, 1fr) auto !important;
+  }
+
+  #batch-edit-bar {
+    grid-template-columns: 88px 200px 145px 175px 130px 150px 85px 110px minmax(0, 1fr) auto !important;
+  }
+}
+
+/* Compact paired controls in the preview sidebar. */
+#orient-center-btn,
+#orient-reset-btn {
+  min-width: 0;
+  min-height: 46px;
+  padding: 8px 9px !important;
+  gap: 6px !important;
+  font-size: 12px !important;
+  line-height: 16px !important;
+  white-space: nowrap;
+}
+
+#orient-center-btn > span,
+#orient-reset-btn > span {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+#orient-center-btn > svg,
+#orient-reset-btn > svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+}
+
+/* Center and reset are full-width actions, one per row. */
+.apple-preview-button-grid {
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 8px !important;
+}
+
+#orient-center-btn,
+#orient-reset-btn {
+  min-height: var(--lg-control-height);
+  padding: var(--lg-control-padding-y) var(--lg-control-padding-x) !important;
+  gap: 8px !important;
+  font-size: var(--lg-type-control) !important;
+  line-height: var(--lg-leading-control) !important;
+}
+
+
+/* Modal surfaces share the same opaque-enough glass material, including the
+   administrator workspace and the user center.  Keeping this as a named
+   surface prevents one modal from falling back to the legacy card background. */
+.modal-glass-surface,
+#login-modal .auth-card,
+#membership-modal .tw-card,
+#options-modal .tw-card,
+#user-center-modal .tw-card,
+#quote-history-modal .tw-card,
+#preview-modal .tw-card,
+#orient-modal .tw-card,
+#payment-modal .tw-card,
+#admin-users-modal .admin-panel {
+  border: 1px solid rgba(255,255,255,.72) !important;
+  border-radius: var(--lg-radius) !important;
+  background: rgba(255,255,255,.68) !important;
+  box-shadow: var(--lg-shadow) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(145%);
+  backdrop-filter: blur(28px) saturate(145%);
+}
+
+html.dark .modal-glass-surface,
+html.dark #login-modal .auth-card,
+html.dark #membership-modal .tw-card,
+html.dark #options-modal .tw-card,
+html.dark #user-center-modal .tw-card,
+html.dark #quote-history-modal .tw-card,
+html.dark #preview-modal .tw-card,
+html.dark #orient-modal .tw-card,
+html.dark #payment-modal .tw-card,
+html.dark #admin-users-modal .admin-panel {
+  border-color: var(--lg-border-dark) !important;
+  background: rgba(20,35,57,.84) !important;
+  box-shadow: var(--lg-shadow-dark) !important;
+}
+
+/* Header badges are labels, but they should use the same rounded-rectangle
+   geometry as the rest of the controls rather than pill geometry. */
+.apple-muted-pill {
+  border-radius: var(--lg-control-radius) !important;
+}
+
+/* The timezone menu is portaled to body and positioned from the clock's
+   viewport rectangle, so it cannot be clipped or offset by the hero flex row. */
+.live-clock-tz-panel {
+  position: fixed !important;
+  z-index: 2000 !important;
+  width: min(228px, calc(100vw - 16px));
+  min-width: 200px;
+  max-height: min(360px, calc(100vh - 16px));
+  margin: 0 !important;
+  padding: 6px 0 !important;
+  overflow: auto;
+  border: 1px solid rgba(255,255,255,.82) !important;
+  border-radius: var(--lg-control-radius) !important;
+  background: #f8fbff !important;
+  color: var(--color-text, var(--lg-ink)) !important;
+  box-shadow: 0 18px 42px rgba(27,60,107,.24), 0 3px 12px rgba(27,60,107,.12) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+.live-clock-tz-panel > div {
+  background: #eef5ff !important;
+  color: var(--color-text-muted, #66758a) !important;
+}
+
+.live-clock-tz-panel > button {
+  display: block;
+  width: 100%;
+  min-height: 36px !important;
+  margin: 0 !important;
+  padding: 8px 12px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: #f8fbff !important;
+  box-shadow: none !important;
+  color: var(--color-text, var(--lg-ink)) !important;
+  text-align: left;
+  backdrop-filter: none !important;
+}
+
+.live-clock-tz-panel > button:hover,
+.live-clock-tz-panel > button:focus-visible {
+  background: #e1efff !important;
+  color: var(--lg-blue) !important;
+  box-shadow: none !important;
+}
+
+html.dark .live-clock-tz-panel {
+  border-color: rgba(255,255,255,.22) !important;
+  background: var(--color-surface-solid, #1c2738) !important;
+  color: var(--color-text, #f2f5fc) !important;
+  box-shadow: 0 18px 42px rgba(0,0,0,.46), 0 3px 12px rgba(0,0,0,.28) !important;
+}
+
+html.dark .live-clock-tz-panel > div {
+  background: #24334a !important;
+  color: var(--color-text-muted, #c8d2e4) !important;
+}
+
+html.dark .live-clock-tz-panel > button {
+  background: var(--color-surface-solid, #1c2738) !important;
+  color: var(--color-text, #f2f5fc) !important;
+}
+
+html.dark .live-clock-tz-panel > button:hover,
+html.dark .live-clock-tz-panel > button:focus-visible {
+  background: #2a3a52 !important;
+  color: #7ec3ff !important;
+}
+
+/* Override legacy navigation/auth rules that still used a larger radius. */
+#mobile-menu-btn,
+#user-menu-btn,
+.auth-card button:not(.auth-quiet-button),
+#login-modal button:not(.auth-quiet-button) {
+  border-radius: var(--lg-control-radius) !important;
+}
+
+/* Shared square close control for modal headers. */
+.modal-icon-close {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 40px;
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  padding: 0 !important;
+  border-radius: var(--lg-control-radius) !important;
+}
+
+.modal-icon-close > svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Keep the global-default tooltip above the modal body instead of letting the
+   next stacked panel paint over it. */
+#user-center-modal .tw-card > .flex.items-center.justify-between {
+  position: relative;
+  z-index: 20;
+  overflow: visible !important;
+}
+
+#user-center-modal .user-center-default-tip {
+  z-index: 90 !important;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 8px !important;
+  background: rgba(17, 31, 52, .96) !important;
+  color: #fff !important;
+  box-shadow: 0 12px 28px rgba(0,0,0,.24) !important;
+  line-height: 1.5;
+  pointer-events: none;
+}
+
+/* Dark mode: remove the large light-sheen pseudo-layer that reads as a
+   rectangular shadow over the upper-left workspace. */
+html.dark .tw-card::after,
+html.dark .apple-shell::after,
+html.dark .apple-hero::after {
+  display: none !important;
+}

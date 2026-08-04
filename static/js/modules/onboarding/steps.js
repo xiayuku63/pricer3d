@@ -17,24 +17,40 @@ export function buildSteps() {
         action: opts.action || null,    // function to run before showing this step
         cleanup: opts.cleanup || null,  // function to run when leaving this step
         waitAfter: opts.waitAfter || 0, // ms to wait after action before positioning
+        canAdvance: opts.canAdvance || null, // guard for the tooltip's Next button
+        advanceOnTargetClick: Boolean(opts.advanceOnTargetClick),
+        elevatedTarget: opts.elevatedTarget || null, // container that must remain above the overlay
+        _realTarget: opts._realTarget || null,
     });
 
     return [
         s('#user-menu-btn',
             'onboarding.step1_title',
             'onboarding.step1_desc',
-            { position: 'bottom' }
+            {
+                position: 'bottom',
+                // The guide deliberately requires the user to open the menu instead
+                // of displaying a menu item that has not been revealed by interaction.
+                canAdvance: () => {
+                    const dropdown = document.getElementById('user-dropdown');
+                    return Boolean(dropdown && !dropdown.classList.contains('hidden'));
+                },
+            }
         ),
         s('#open-user-center-btn',
             'onboarding.step2_title',
             'onboarding.step2_desc',
             {
                 position: 'bottom',
-                action: () => {
-                    // Make sure user dropdown is visible
-                    const dropdown = document.getElementById('user-dropdown');
-                    if (dropdown) dropdown.classList.remove('hidden');
+                // Step 1 keeps this menu open. Elevate its stacking context so the
+                // actual menu item stays visible above the onboarding overlay.
+                elevatedTarget: '#user-dropdown',
+                // Continue only after the user selects the real menu entry.
+                canAdvance: () => {
+                    const modal = document.getElementById('user-center-modal');
+                    return Boolean(modal && !modal.classList.contains('hidden'));
                 },
+                advanceOnTargetClick: true,
             }
         ),
         s('#open-user-center-btn',  // Will trigger opening user center
@@ -43,12 +59,10 @@ export function buildSteps() {
             {
                 position: 'bottom',
                 action: () => {
-                    // Close dropdown, open user center
-                    const dropdown = document.getElementById('user-dropdown');
-                    if (dropdown) dropdown.classList.add('hidden');
+                    // User Center is opened by the actual menu click in step 2.
+                    // This step only selects the relevant settings tab afterwards.
                     const modal = document.getElementById('user-center-modal');
-                    if (modal) modal.classList.remove('hidden');
-                    // Click the print-params parent tab, then printer sub-tab
+                    if (!modal || modal.classList.contains('hidden')) return;
                     const parentTab = document.querySelector('.uc-tab-btn[data-uc-tab="print-params"]');
                     if (parentTab) parentTab.click();
                     setTimeout(() => {
@@ -58,7 +72,7 @@ export function buildSteps() {
                 },
                 waitAfter: 300,
                 // Target the printer selector inside user center
-                _realTarget: '#cfg-printer-model-main',
+                _realTarget: '#gen-printer-model',
             }
         ),
         s('.pp-sub-tab-btn[data-pp-tab="materials"]',

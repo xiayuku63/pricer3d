@@ -14,7 +14,7 @@ import sqlite3
 from datetime import datetime, timezone
 
 from .database import init_db, get_db_conn, get_app_defaults
-from .config import DEFAULT_MATERIALS, DEFAULT_PRICING_CONFIG
+from .config import DEFAULT_MATERIALS, DEFAULT_PRICING_CONFIG, TERMS_VERSION, PRIVACY_VERSION
 
 
 def _backfill_user(conn: sqlite3.Connection, uid: int, username: str) -> dict[str, bool]:
@@ -67,11 +67,16 @@ def _backfill_user(conn: sqlite3.Connection, uid: int, username: str) -> dict[st
     # legal acceptance
     now_iso = datetime.now(timezone.utc).isoformat()
     if row["terms_accepted_at"] is None:
-        conn.execute("UPDATE users SET terms_accepted_at = ?, terms_version = ? WHERE id = ?", (now_iso, "v1", uid))
+        conn.execute(
+            "UPDATE users SET terms_accepted_at = ?, terms_version = ? WHERE id = ?", (now_iso, TERMS_VERSION, uid)
+        )
         fixed["terms_accepted_at"] = True
 
     if row["privacy_accepted_at"] is None:
-        conn.execute("UPDATE users SET privacy_accepted_at = ?, privacy_version = ? WHERE id = ?", (now_iso, "v1", uid))
+        conn.execute(
+            "UPDATE users SET privacy_accepted_at = ?, privacy_version = ? WHERE id = ?",
+            (now_iso, PRIVACY_VERSION, uid),
+        )
         fixed["privacy_accepted_at"] = True
 
     return fixed

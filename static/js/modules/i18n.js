@@ -63,11 +63,21 @@ export async function setLang(l) {
   // 更新 DOM 中 data-i18n 元素
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
-    if (key) {
-      el.textContent = t(key);
-    }
+    if (key) _setLocalizedText(el, t(key));
   });
-  // 更新 placeholder
+  document.querySelectorAll('[data-i18n-aria-label]').forEach(el => {
+    const key = el.getAttribute('data-i18n-aria-label');
+    if (key) el.setAttribute('aria-label', t(key));
+  });
+  document.querySelectorAll('[data-i18n-alt]').forEach(el => {
+    const key = el.getAttribute('data-i18n-alt');
+    if (key) el.setAttribute('alt', t(key));
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    const key = el.getAttribute('data-i18n-title');
+    if (key) el.setAttribute('title', t(key));
+  });
+  // Update placeholder attributes.
   document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
     const ph = el.getAttribute('data-i18n-placeholder');
     if (ph) el.placeholder = t(ph);
@@ -78,12 +88,26 @@ export async function setLang(l) {
     try { fn({ lang: l, prev }); } catch (e) { console.error(e); }
   });
 
+  document.title = t('app.pageTitle');
   window.dispatchEvent(new CustomEvent('i18n-change', { detail: { lang: l, prev } }));
 }
 
 /**
  * 切换语言
  */
+function _setLocalizedText(el, value) {
+  const textNodes = [...el.childNodes].filter(node => node.nodeType === Node.TEXT_NODE && node.nodeValue.trim());
+  if (textNodes.length) {
+    const node = textNodes[textNodes.length - 1];
+    node.nodeValue = node.nodeValue.replace(node.nodeValue.trim(), value);
+  } else if (!el.children.length) {
+    el.textContent = value;
+  } else {
+    const target = el.querySelector('[data-i18n-content]');
+    if (target) target.textContent = value;
+  }
+}
+
 export function toggleLang() {
   const idx = SUPPORTED_LANGS.findIndex(l => l.code === lang);
   const next = SUPPORTED_LANGS[(idx + 1) % SUPPORTED_LANGS.length];

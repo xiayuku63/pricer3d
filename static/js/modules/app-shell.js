@@ -322,7 +322,7 @@ export function initMobileNavigation({ mobileNav, dom, getCurrentUser, getAuthTo
         const histBtn = document.getElementById('open-quote-history-btn');
         if (histBtn) histBtn.click();
     });
-    bind(mobileNav.openAdminUsersBtn, 'click', () => { closeMobileNav(); window.__navigateIfLeaving('/admin/users'); });
+    bind(mobileNav.openAdminUsersBtn, 'click', () => { closeMobileNav(); document.getElementById('open-admin-users-btn')?.click(); });
     bind(mobileNav.openUserCenterBtn, 'click', () => {
         closeMobileNav();
         const currentUser = getCurrentUser();

@@ -558,7 +558,7 @@ export function initResultsAreaEvents({
                     dom.fileNameDisplay.textContent = t('quote.noFileSelected');
                     dom.fileNameDisplay.classList.remove('text-indigo-600', 'font-medium');
                 } else {
-                    dom.fileNameDisplay.textContent = `当前列表共 ${selectedFilesMap.size} 个文件`;
+                    dom.fileNameDisplay.textContent = t('quote.fileListCount', { count: selectedFilesMap.size });
                     dom.fileNameDisplay.classList.add('text-indigo-600', 'font-medium');
                 }
                 closePreviewModal();
@@ -608,7 +608,7 @@ export function initResultsAreaEvents({
                             recalcSummaryFromCurrentResults();
                         })
                         .catch((err) => {
-                            mergeResultsByFilename([{ filename, status: 'failed', error: err.message || '重算失败', material, color, quantity }]);
+                            mergeResultsByFilename([{ filename, status: 'failed', error: err.message || t('quote.requoteFailed'), material, color, quantity }]);
                             renderResultsTable();
                             recalcSummaryFromCurrentResults();
                         });
@@ -637,7 +637,7 @@ export function initResultsAreaEvents({
                     dom.fileNameDisplay.textContent = t('quote.noFileSelected');
                     dom.fileNameDisplay.classList.remove('text-indigo-600', 'font-medium');
                 } else {
-                    dom.fileNameDisplay.textContent = `当前列表共 ${selectedFilesMap.size} 个文件`;
+                    dom.fileNameDisplay.textContent = t('quote.fileListCount', { count: selectedFilesMap.size });
                     dom.fileNameDisplay.classList.add('text-indigo-600', 'font-medium');
                 }
                 closePreviewModal();
@@ -677,7 +677,7 @@ export function initResultsAreaEvents({
         if (!currentUser || !authToken) { openLoginModal(); return; }
         const successItems = currentResults.filter((r) => r && r.status === 'success');
         if (successItems.length === 0) {
-            alert('没有可导出的报价结果，请先上传模型并报价');
+            alert(t('quote.noExportResults'));
             return;
         }
         const btn = document.getElementById('export-pdf-btn');
@@ -715,10 +715,10 @@ export function initResultsAreaEvents({
                 body: JSON.stringify({ items }),
             });
             if (resp.status === 403) {
-                alert('会员专属功能，请先升级会员');
+                alert(t('membership.memberOnly'));
                 return;
             }
-            if (!resp.ok) throw new Error('导出失败');
+            if (!resp.ok) throw new Error(t('quote.exportFailed'));
             const blob = await resp.blob();
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -729,7 +729,7 @@ export function initResultsAreaEvents({
             a.remove();
             URL.revokeObjectURL(url);
         } catch (e) {
-            alert(e.message || '导出失败');
+            alert(e.message || t('quote.exportFailed'));
         } finally {
             if (btn) { btn.disabled = false; btn.textContent = origText; }
         }
@@ -762,7 +762,7 @@ export function initResultsAreaEvents({
                 dom.fileNameDisplay.textContent = t('quote.noFileSelected');
                 dom.fileNameDisplay.classList.remove('text-indigo-600', 'font-medium');
             } else {
-                dom.fileNameDisplay.textContent = `当前列表共 ${selectedFilesMap.size} 个文件`;
+                dom.fileNameDisplay.textContent = t('quote.fileListCount', { count: selectedFilesMap.size });
             }
         });
     }

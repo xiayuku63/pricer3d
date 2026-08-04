@@ -112,6 +112,26 @@ export function closeMembershipModal() {
     clearMsg();
 }
 
+function showPaymentMsg(text, ok = false) {
+    const { paymentMsg } = dom;
+    if (!paymentMsg) return;
+    paymentMsg.textContent = text;
+    paymentMsg.className = ok ? 'text-xs text-green-600' : 'text-xs text-red-600';
+    paymentMsg.classList.remove('hidden');
+}
+
+function clearPaymentMsg() {
+    const { paymentMsg } = dom;
+    if (!paymentMsg) return;
+    paymentMsg.textContent = '';
+    paymentMsg.classList.add('hidden');
+}
+
+export function closePaymentModal() {
+    if (dom.paymentModal) dom.paymentModal.classList.add('hidden');
+    clearPaymentMsg();
+}
+
 // ── Refresh status ──
 
 export async function refreshMembershipStatus() {
@@ -189,14 +209,48 @@ async function startCheckout(planCode) {
         const data = await resp.json();
         if (!resp.ok) throw new Error(data.detail || t('membership.createOrderFailed'));
         if (data.pay_url) {
-            // Open mock payment in new tab
-            window.open(data.pay_url, '_blank', 'noopener');
-            showMsg(t('membership.orderCreated', { orderNo: data.order_no }), true);
+            // Keep the payment flow in the current page instead of opening a new tab.
+            if (dom.paymentOrderNo) dom.paymentOrderNo.textContent = data.order_no || '-';
+            clearPaymentMsg();
+            if (dom.paymentPayBtn) {
+                dom.paymentPayBtn.disabled = false;
+                dom.paymentPayBtn.textContent = '\u786e\u8ba4\u652f\u4ed8';
+            }
+            if (dom.paymentModal) dom.paymentModal.classList.remove('hidden');
         } else {
-            // If no pay_url, try mock complete directly
             showMsg(t('membership.noPaymentChannel'), false);
         }
     } catch (e) { showMsg(e.message || t('membership.createOrderFailed'), false); }
+}
+
+export async function confirmPayment() {
+    const orderNo = dom.paymentOrderNo?.textContent?.trim() || '';
+    const btn = dom.paymentPayBtn;
+    if (!orderNo || orderNo === '-') {
+        showPaymentMsg('\u8ba2\u5355\u53f7\u7f3a\u5931', false);
+        return;
+    }
+    if (!authToken) {
+        showPaymentMsg('\u672a\u767b\u5f55\uff0c\u8bf7\u5148\u767b\u5f55\u540e\u518d\u652f\u4ed8', false);
+        return;
+    }
+    if (btn) { btn.disabled = true; btn.textContent = '\u5904\u7406\u4e2d...'; }
+    clearPaymentMsg();
+    try {
+        const resp = await authFetch('/api/billing/mock/complete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order_no: orderNo }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.detail || '\u652f\u4ed8\u5931\u8d25');
+        showPaymentMsg(`\u652f\u4ed8\u6210\u529f\uff0c\u4f1a\u5458\u5df2\u751f\u6548\u3002\u5230\u671f\u65f6\u95f4\uff1a${data.membership_expires_at || '\u6c38\u4e45'}`, true);
+        if (btn) btn.textContent = '\u5df2\u652f\u4ed8';
+        await refreshMembershipStatus();
+    } catch (e) {
+        showPaymentMsg(e.message || '\u786e\u8ba4\u652f\u4ed8', false);
+        if (btn) { btn.disabled = false; btn.textContent = '\u786e\u8ba4\u652f\u4ed8'; }
+    }
 }
 
 // ── Order history ──
