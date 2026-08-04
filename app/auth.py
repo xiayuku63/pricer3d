@@ -28,6 +28,8 @@ from .config import (
     RESEND_API_KEY,
     VERIFY_CODE_TTL_SECONDS,
     VERIFY_CODE_MAX_ATTEMPTS,
+    TERMS_VERSION,
+    PRIVACY_VERSION,
 )
 from .db import get_db_session
 from .models_orm import User, VerificationCode, LoginFailure
@@ -352,8 +354,8 @@ def create_user(
                 membership_expires_at=membership_expires_at,
                 terms_accepted_at=accepted_at,
                 privacy_accepted_at=accepted_at,
-                terms_version="v1",
-                privacy_version="v1",
+                terms_version=TERMS_VERSION,
+                privacy_version=PRIVACY_VERSION,
             )
             db.add(user)
             db.flush()

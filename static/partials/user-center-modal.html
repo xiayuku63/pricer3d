@@ -1,21 +1,23 @@
-            <!-- 用户中心弹窗 -->
+﻿            <!-- 用户中心弹窗 -->
             <div id="user-center-modal" class="hidden fixed inset-0 z-[70]">
                 <div id="user-center-backdrop" class="absolute inset-0" style="background-color: var(--color-overlay);"></div>
                 <div class="relative z-10 h-full w-full flex items-center justify-center p-4">
-                    <div class="w-full max-w-5xl tw-card shadow-xl overflow-hidden flex flex-col h-[85vh] max-h-[85vh] min-h-0" style="border-radius: var(--radius-lg);">
+                    <div class="modal-glass-surface w-full max-w-5xl tw-card shadow-xl overflow-hidden flex flex-col h-[85vh] max-h-[85vh] min-h-0" style="border-radius: var(--radius-lg);">
                         <div class="px-4 py-3 flex items-center justify-between" style="border-bottom: 1px solid var(--color-border);">
                             <h4 class="text-sm font-semibold tw-text-strong" data-i18n="settings.title">用户中心</h4>
                             <div class="flex items-center gap-2">
                                 <div class="relative group">
                                     <button id="user-center-set-defaults-btn" type="button" class="hidden text-xs px-3 py-1.5 rounded-md border border-dashed flex items-center gap-1" style="border-color: var(--color-warning-400); color: var(--color-warning-600);">
                                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
-                                        <span data-i18n="settings.setAsGlobalDefault">设为全局默认</span>
+                                        <span data-i18n="settings.setAsGlobalDefault">设为所有用户默认</span>
                                     </button>
-                                    <div class="hidden group-hover:block absolute right-0 top-full mt-1 w-56 p-2 text-white text-[11px] rounded-md shadow-lg z-50" style="background-color: var(--color-neutral-800);" data-i18n="settings.setAsGlobalDefaultHint">
+                                    <div class="user-center-default-tip hidden group-hover:block absolute right-0 top-full mt-1 w-56 p-2 text-white text-[11px] rounded-md shadow-lg z-50" style="background-color: var(--color-neutral-800);" data-i18n="settings.setAsGlobalDefaultHint">
                                         将当前设置复制为所有新用户的初始默认值。仅管理员可用，不影响您自己的设置。
                                     </div>
                                 </div>
-                                <button id="user-center-close-btn" type="button" class="tw-text-muted hover:tw-text" data-i18n="common.close">关闭</button>
+                                <button id="user-center-close-btn" type="button" class="modal-icon-close tw-btn-ghost tw-text-muted hover:tw-text transition-colors" aria-label="关闭用户中心" data-i18n-aria-label="common.close">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                </button>
                             </div>
                         </div>
                         <div class="flex flex-1 overflow-hidden min-h-0">

@@ -83,8 +83,12 @@ class Settings(BaseSettings):
     admin_usernames: str = "admin"
 
     # ── Legal ──
-    terms_version: str = "v1"
-    privacy_version: str = "v1"
+    terms_version: str = "v2"
+    privacy_version: str = "v2"
+    legal_effective_date: str = "2026-07-31"
+    legal_operator_name: str = "Pricer3D 运营方"
+    legal_contact_email: str = ""
+    legal_contact_address: str = ""
 
     # ── Derived / computed ──
     @property

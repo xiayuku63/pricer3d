@@ -63,6 +63,69 @@ class TestAuthFlow:
         # login may fail if captcha not matched, just verify structured response
         assert "code" in r.json()
 
+    def test_phone_register_uses_persisted_app_defaults(self, monkeypatch):
+        """Phone registration must succeed when custom app defaults exist."""
+        import json
+
+        from app import routes_auth
+        from app.config import APP_DEFAULTS_KEY, DEFAULT_MATERIALS, DEFAULT_PRICING_CONFIG
+        from app.db import get_db_session
+        from app.models_orm import AppDefault
+
+        with get_db_session() as db:
+            db.query(AppDefault).filter(AppDefault.key == APP_DEFAULTS_KEY).delete()
+            db.add(
+                AppDefault(
+                    key=APP_DEFAULTS_KEY,
+                    value_json=json.dumps(
+                        {
+                            "materials": DEFAULT_MATERIALS,
+                            "pricing_config": DEFAULT_PRICING_CONFIG,
+                        }
+                    ),
+                )
+            )
+
+        monkeypatch.setattr(routes_auth, "verify_captcha_or_raise", lambda *_args: None)
+        monkeypatch.setattr(routes_auth, "consume_verification_code", lambda *_args: True)
+
+        import asyncio
+
+        from fastapi import Request
+        from app.models import RegisterRequest
+
+        request = Request(
+            {
+                "type": "http",
+                "method": "POST",
+                "path": "/api/auth/register",
+                "headers": [],
+                "client": ("127.0.0.1", 50000),
+                "server": ("testserver", 80),
+                "scheme": "http",
+                "query_string": b"",
+            }
+        )
+        data = asyncio.run(
+            routes_auth.register(
+                RegisterRequest(
+                    username="phone_regression_user",
+                    password="testpass123",
+                    register_channel="phone",
+                    phone="+8613800138999",
+                    phone_code="123456",
+                    captcha_id="captcha-regression",
+                    captcha_code="ABCD",
+                    accept_terms=True,
+                    accept_privacy=True,
+                ),
+                request,
+            )
+        )
+
+        assert data["user"]["username"] == "phone_regression_user"
+        assert data["access_token"]
+
     def test_register_duplicate(self):
         client.post(
             "/api/auth/register",

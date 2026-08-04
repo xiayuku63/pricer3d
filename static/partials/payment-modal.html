@@ -1,0 +1,25 @@
+﻿<!-- 模拟支付弹窗 -->
+<div id="payment-modal" class="hidden fixed inset-0 z-[80]" role="dialog" aria-modal="true" aria-labelledby="payment-modal-title">
+    <div id="payment-backdrop" class="absolute inset-0" style="background-color: var(--color-overlay);"></div>
+    <div class="relative z-10 h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-lg tw-card shadow-xl overflow-hidden" style="border-radius: var(--radius-lg);">
+            <div class="px-5 py-3 flex items-center justify-between" style="border-bottom: 1px solid var(--color-border);">
+                <h4 id="payment-modal-title" class="text-sm font-semibold tw-text-strong">会员充值</h4>
+                <button id="payment-close-btn" type="button" class="tw-text-muted hover:tw-text text-sm" data-i18n="common.close">关闭</button>
+            </div>
+            <div class="p-5 space-y-4">
+                <div>
+                    <div class="text-xs font-semibold uppercase tracking-wide" style="color: var(--color-primary);">Mock Payment</div>
+                    <h5 class="text-lg font-bold tw-text-strong mt-1">会员充值（模拟支付）</h5>
+                    <p class="text-xs tw-text-muted mt-1">订单号：<span id="payment-order-no" class="font-mono">-</span></p>
+                </div>
+                <p class="text-sm tw-text leading-relaxed">这是开发用的模拟支付流程。点击“确认支付”后，系统会校验订单并将你的账号升级为会员。</p>
+                <p id="payment-msg" class="hidden text-xs"></p>
+                <div class="flex gap-2">
+                    <button id="payment-pay-btn" type="button" class="flex-1 tw-btn-primary py-2 px-3 rounded-md text-sm">确认支付</button>
+                    <button id="payment-cancel-btn" type="button" class="tw-btn-secondary py-2 px-3 rounded-md text-sm">取消</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

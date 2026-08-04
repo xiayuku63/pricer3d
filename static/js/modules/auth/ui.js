@@ -66,6 +66,12 @@ export function _switchToView(viewId, title, subtitle) {
 
 export function initAuth(d) {
     dom = d;
+    // The app shell uses backdrop-filter, which creates a containing block for fixed
+    // descendants. Mount the auth modal under <body> so it stays viewport-centered.
+    const loginModal = document.getElementById('login-modal');
+    if (loginModal && loginModal.parentElement !== document.body) {
+        document.body.appendChild(loginModal);
+    }
     import('./login.js').then(m => m._wireLoginForm(d));
 }
 

@@ -242,12 +242,13 @@ function goToStep(step) {
 
 // ── Email Status Badge ──
 
-function updateEmailStatusBadge(status) {
+function updateEmailStatusBadge(status, channel = registerChannel) {
     let html = '';
+    const sentIcon = channel === 'phone' ? '📱' : '✉️';
     if (status === 'sending') {
         html = '<span class="email-status-badge email-status-sent">⏳ 发送中...</span>';
     } else if (status === 'sent') {
-        html = '<span class="email-status-badge email-status-sent">✉️ 已发送</span>';
+        html = `<span class="email-status-badge email-status-sent">${sentIcon} 已发送</span>`;
     } else if (status === 'verified') {
         html = '<span class="email-status-badge email-status-verified">✓ 已验证</span>';
     } else if (status === 'expired') {
@@ -510,13 +511,14 @@ function setRegisterChannel(ch) {
     emailSection.classList.toggle('hidden', !emailActive);
     phoneSection.classList.toggle('hidden', emailActive);
     channelEmailBtn.className = emailActive
-        ? "w-full px-3 py-1.5 rounded-md bg-indigo-600 text-white text-sm"
-        : "w-full px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 text-sm hover:bg-gray-50";
+        ? "w-full px-3 py-2.5 rounded-xl bg-indigo-600 text-white text-sm min-h-[44px]"
+        : "w-full px-3 py-2.5 rounded-xl border border-gray-300 text-gray-700 text-sm hover:bg-gray-50 min-h-[44px]";
     channelPhoneBtn.className = !emailActive
-        ? "w-full px-3 py-1.5 rounded-md bg-indigo-600 text-white text-sm"
-        : "w-full px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 text-sm hover:bg-gray-50";
+        ? "w-full px-3 py-2.5 rounded-xl bg-indigo-600 text-white text-sm min-h-[44px]"
+        : "w-full px-3 py-2.5 rounded-xl border border-gray-300 text-gray-700 text-sm hover:bg-gray-50 min-h-[44px]";
 
-    // Update button text based on channel
+    // Keep the step indicator and action text aligned with the selected channel.
+    stepLabels[1].textContent = emailActive ? '邮箱验证' : '手机验证';
     const spanEl = step1NextBtn.querySelector('span');
     if (emailActive) {
         spanEl.textContent = '下一步：验证邮箱';

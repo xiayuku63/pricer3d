@@ -6,7 +6,7 @@
                         <!-- Header -->
                         <div class="px-5 py-3 flex items-center justify-between shrink-0" style="border-bottom: 1px solid var(--color-border);">
                             <h4 class="text-sm font-semibold tw-text-strong" data-i18n="membership.title">会员套餐</h4>
-                            <button id="membership-close-btn" type="button" class="tw-text-muted hover:tw-text text-sm">关闭</button>
+                            <button id="membership-close-btn" type="button" class="tw-text-muted hover:tw-text text-sm"> <span data-i18n="common.close">关闭</span></button>
                         </div>
 
                         <!-- Body (scrollable) -->
@@ -25,31 +25,31 @@
                             <!-- 会员权益 -->
                             <div class="rounded-lg overflow-hidden" style="border: 1px solid var(--color-border);">
                                 <div class="px-4 py-2" style="border-bottom: 1px solid var(--color-border);">
-                                    <span class="text-xs font-medium tw-text">会员权益</span>
+                                    <span class="text-xs font-medium tw-text" data-i18n="membership.benefits">会员权益</span>
                                 </div>
                                 <div class="px-4 py-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
                                     <div>
-                                        <div class="text-xs font-medium tw-text-strong">专属折扣</div>
-                                        <div id="membership-benefit-discount" class="text-[11px] tw-text-muted">报价享受会员专属折扣</div>
+                                        <div class="text-xs font-medium tw-text-strong" data-i18n="membership.exclusiveDiscount">专属折扣</div>
+                                        <div id="membership-benefit-discount" class="text-[11px] tw-text-muted" data-i18n="membership.discountDescription">报价享受会员专属折扣</div>
                                     </div>
                                     <div>
-                                        <div class="text-xs font-medium tw-text-strong">优先处理</div>
-                                        <div class="text-[11px] tw-text-muted">会员订单优先排产</div>
+                                        <div class="text-xs font-medium tw-text-strong" data-i18n="membership.priorityProcessing">优先处理</div>
+                                        <div class="text-[11px] tw-text-muted" data-i18n="membership.priorityDescription">会员订单优先排产</div>
                                     </div>
                                     <div>
-                                        <div class="text-xs font-medium tw-text-strong">详细报表</div>
-                                        <div class="text-[11px] tw-text-muted">完整费用明细和历史记录</div>
+                                        <div class="text-xs font-medium tw-text-strong" data-i18n="membership.detailedReports">详细报表</div>
+                                        <div class="text-[11px] tw-text-muted" data-i18n="membership.reportsDescription">完整费用明细和历史记录</div>
                                     </div>
                                     <div>
-                                        <div class="text-xs font-medium tw-text-strong">专属客服</div>
-                                        <div class="text-[11px] tw-text-muted">一对一技术支持</div>
+                                        <div class="text-xs font-medium tw-text-strong" data-i18n="membership.dedicatedSupport">专属客服</div>
+                                        <div class="text-[11px] tw-text-muted" data-i18n="membership.supportDescription">一对一技术支持</div>
                                     </div>
                                 </div>
                             </div>
 
                             <!-- 套餐列表 -->
                             <div>
-                                <div class="text-xs font-medium tw-text mb-2">选择套餐</div>
+                                <div class="text-xs font-medium tw-text mb-2" data-i18n="membership.choosePlan">选择套餐</div>
                                 <div id="membership-plans" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
                             </div>
 
@@ -58,8 +58,8 @@
 
                             <!-- 操作按钮 -->
                             <div class="flex flex-col sm:flex-row gap-2 pt-1">
-                                <button id="membership-refresh-btn" type="button" class="tw-btn-secondary w-full sm:flex-1 py-2 px-3 rounded-md text-sm">刷新会员状态</button>
-                                <button id="membership-orders-btn" type="button" class="w-full sm:flex-1 py-2 px-3 rounded-md text-sm" style="border: 1px solid var(--color-border-strong); color: var(--color-text);">查看订单</button>
+                                <button id="membership-refresh-btn" type="button" class="tw-btn-secondary w-full sm:flex-1 py-2 px-3 rounded-md text-sm"> <span data-i18n="membership.refreshStatus">刷新会员状态</span></button>
+                                <button id="membership-orders-btn" type="button" class="w-full sm:flex-1 py-2 px-3 rounded-md text-sm" style="border: 1px solid var(--color-border-strong); color: var(--color-text);"> <span data-i18n="membership.viewOrders">查看订单</span></button>
                             </div>
 
                             <!-- 订单历史 -->
@@ -67,15 +67,15 @@
                                 <table class="min-w-full text-[11px] text-left">
                                     <thead style="background-color: var(--color-bg); color: var(--color-text-secondary);">
                                         <tr>
-                                            <th class="px-2 py-2">订单号</th>
-                                            <th class="px-2 py-2">套餐</th>
-                                            <th class="px-2 py-2">金额</th>
-                                            <th class="px-2 py-2">状态</th>
-                                            <th class="px-2 py-2">创建</th>
+                                            <th class="px-2 py-2" data-i18n="membership.orderNumber">订单号</th>
+                                            <th class="px-2 py-2" data-i18n="membership.plan">套餐</th>
+                                            <th class="px-2 py-2" data-i18n="membership.amount">金额</th>
+                                            <th class="px-2 py-2" data-i18n="membership.status">状态</th>
+                                            <th class="px-2 py-2" data-i18n="membership.created">创建</th>
                                         </tr>
                                     </thead>
                                     <tbody id="membership-orders-tbody" style="background-color: var(--color-surface);">
-                                        <tr><td colspan="5" class="px-2 py-3 tw-text-muted">暂无数据</td></tr>
+                                        <tr><td colspan="5" class="px-2 py-3 tw-text-muted" data-i18n="membership.noOrders">暂无数据</td></tr>
                                     </tbody>
                                 </table>
                             </div>

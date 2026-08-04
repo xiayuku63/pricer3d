@@ -119,9 +119,12 @@ async def update_user_settings(payload: UserSettingsUpdate, request: Request, cu
         seen_material_keys.add(key)
 
     with get_db_session() as db:
-        existing_user = db.query(User.materials).filter(User.id == current_user["id"]).first()
+        existing_user = db.query(User).filter(User.id == current_user["id"]).first()
+        # Copy ORM values while the session is open. They are needed later for
+        # free-user formula preservation and cannot be read from a detached row.
+        existing_materials_json = getattr(existing_user, "materials", None) if existing_user else None
+        existing_pricing_json = getattr(existing_user, "pricing_config", None) if existing_user else None
 
-    existing_materials_json = getattr(existing_user, "materials", None) if existing_user else None
     existing_materials = normalize_materials(json.loads(existing_materials_json) if existing_materials_json else [])
     existing_by_key = {}
     for material in existing_materials:
@@ -150,8 +153,26 @@ async def update_user_settings(payload: UserSettingsUpdate, request: Request, cu
     materials_json = json.dumps(merged_materials)
     pricing_json = None
     if payload.pricing_config is not None:
-        unit_ok, unit_err, _ = validate_formula_expression(payload.pricing_config.unit_cost_formula)
-        total_ok, total_err, _ = validate_formula_expression(payload.pricing_config.total_cost_formula)
+        pricing_data = payload.pricing_config.model_dump()
+        if not is_member_user(current_user):
+            # Formula fields are locked for free users. The UI intentionally
+            # omits them, but Pydantic fills their schema defaults with empty
+            # strings. Preserve the saved/default formulas server-side instead
+            # of validating those placeholder values.
+            try:
+                existing_pricing_raw = json.loads(existing_pricing_json) if existing_pricing_json else {}
+            except (TypeError, ValueError, json.JSONDecodeError):
+                existing_pricing_raw = {}
+            existing_pricing = merge_pricing_config(existing_pricing_raw)
+            pricing_data["unit_cost_formula"] = str(
+                existing_pricing.get("unit_cost_formula") or DEFAULT_PRICING_CONFIG["unit_cost_formula"]
+            )
+            pricing_data["total_cost_formula"] = str(
+                existing_pricing.get("total_cost_formula") or DEFAULT_PRICING_CONFIG["total_cost_formula"]
+            )
+
+        unit_ok, unit_err, _ = validate_formula_expression(pricing_data["unit_cost_formula"])
+        total_ok, total_err, _ = validate_formula_expression(pricing_data["total_cost_formula"])
         if not unit_ok or not total_ok:
             messages = []
             if not unit_ok:
@@ -159,7 +180,7 @@ async def update_user_settings(payload: UserSettingsUpdate, request: Request, cu
             if not total_ok:
                 messages.append(f"总价公式：{total_err or '无效'}")
             raise HTTPException(status_code=400, detail="；".join(messages) or "公式无效")
-        pricing_json = json.dumps(payload.pricing_config.model_dump())
+        pricing_json = json.dumps(pricing_data)
     with get_db_session() as db:
         user = db.query(User).filter(User.id == current_user["id"]).first()
         if not user:

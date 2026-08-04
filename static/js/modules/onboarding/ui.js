@@ -12,6 +12,9 @@ let _overlayEl = null;
 let _highlightEl = null;
 let _tooltipEl = null;
 let _activeTargetClass = false;
+let _activeElevatedTargetClass = false;
+let _targetClickEl = null;
+let _targetClickHandler = null;
 let _running = false;
 
 // ── State accessors (used by index.js) ──
@@ -147,6 +150,16 @@ export async function showStep() {
         targetEl.classList.add('onb-target-active');
         _activeTargetClass = targetEl;
 
+        // Some targets live inside a lower stacking context (for example the
+        // user dropdown). Lift that container above the dimmed overlay too.
+        const elevatedTarget = step.elevatedTarget ? document.querySelector(step.elevatedTarget) : null;
+        if (elevatedTarget) {
+            elevatedTarget.classList.add('onb-elevated-target');
+            _activeElevatedTargetClass = elevatedTarget;
+        }
+
+        _bindTargetAdvance(step, targetEl);
+
         // Show tooltip
         _showTooltip(step, rect);
     } else {
@@ -202,8 +215,16 @@ function _showTooltip(step, targetRect) {
     _addArrow(targetRect, position);
 
     // Wire buttons
-    _tooltipEl.querySelector('#onb-skip-btn').addEventListener('click', () => finish());
-    _tooltipEl.querySelector('#onb-next-btn').addEventListener('click', () => _nextStep());
+    _tooltipEl.querySelector('#onb-skip-btn').addEventListener('click', (event) => {
+        event.stopPropagation();
+        finish();
+    });
+    _tooltipEl.querySelector('#onb-next-btn').addEventListener('click', (event) => {
+        // The global click-away handler closes the user menu for every click
+        // outside it. Keep the menu open while moving from step 1 to step 2.
+        event.stopPropagation();
+        _nextStep();
+    });
 }
 
 function _showTooltipCentered(step) {
@@ -235,8 +256,14 @@ function _showTooltipCentered(step) {
 
     document.body.appendChild(_tooltipEl);
 
-    _tooltipEl.querySelector('#onb-skip-btn').addEventListener('click', () => finish());
-    _tooltipEl.querySelector('#onb-next-btn').addEventListener('click', () => _nextStep());
+    _tooltipEl.querySelector('#onb-skip-btn').addEventListener('click', (event) => {
+        event.stopPropagation();
+        finish();
+    });
+    _tooltipEl.querySelector('#onb-next-btn').addEventListener('click', (event) => {
+        event.stopPropagation();
+        _nextStep();
+    });
 }
 
 function _positionTooltip(targetRect, position) {
@@ -317,10 +344,37 @@ function _addArrow(targetRect, position) {
 // ── Step navigation ──
 async function _nextStep() {
     const step = _steps[_currentStep];
+    if (step?.canAdvance && !step.canAdvance()) {
+        _showAdvanceHint(step);
+        return;
+    }
     if (step && step.cleanup) step.cleanup();
 
     _currentStep++;
     showStep();
+}
+
+function _showAdvanceHint(step) {
+    const desc = _tooltipEl?.querySelector('.onb-tooltip-desc');
+    if (!desc) return;
+    desc.textContent = t('onboarding.complete_step_first');
+    desc.classList.add('onb-tooltip-desc-hint');
+}
+
+function _bindTargetAdvance(step, targetEl) {
+    if (!step.advanceOnTargetClick) return;
+
+    _targetClickEl = targetEl;
+    _targetClickHandler = () => {
+        // Let the target's normal click handler update the UI first (opening
+        // the User Center modal), then render the next onboarding step.
+        setTimeout(() => {
+            if (_targetClickEl === targetEl && _steps[_currentStep] === step) {
+                _nextStep();
+            }
+        }, 0);
+    };
+    targetEl.addEventListener('click', _targetClickHandler);
 }
 
 function finish() {
@@ -347,9 +401,18 @@ function _removeUI() {
     if (_tooltipEl) { _tooltipEl.remove(); _tooltipEl = null; }
     // Remove any arrow elements
     document.querySelectorAll('.onb-arrow').forEach(el => el.remove());
+    if (_targetClickEl && _targetClickHandler) {
+        _targetClickEl.removeEventListener('click', _targetClickHandler);
+        _targetClickEl = null;
+        _targetClickHandler = null;
+    }
     if (_activeTargetClass) {
         _activeTargetClass.classList.remove('onb-target-active');
         _activeTargetClass = false;
+    }
+    if (_activeElevatedTargetClass) {
+        _activeElevatedTargetClass.classList.remove('onb-elevated-target');
+        _activeElevatedTargetClass = false;
     }
 }
 

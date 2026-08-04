@@ -29,9 +29,10 @@ test('calculation controls are isolated beside the default settings row', async 
     assert.match(shell, /id="quote-default-controls-row" class="settings-controls-row/);
     assert.match(shell, /id="batch-edit-bar" class="[^"]*mt-3/);
     assert.match(shell, /id="batch-recalculate-actions" class="apple-toolbar/);
-    assert.match(shell, /data-i18n="quote.calculationOptions"/);
+    assert.match(shell, /data-i18n-aria-label="quote.calculationOptions"/);
+    assert.doesNotMatch(shell, /<span[^>]*data-i18n="quote.calculationOptions"/);
     assert.match(shell, /data-i18n="quote.smartPlacement"/);
     assert.match(css, /\.batch-recalculate-actions\s*\{/);
-    assert.match(css, /grid-template-columns:\s*minmax\(0, 1fr\) 240px/);
+    assert.match(css, /grid-template-columns:\s*minmax\(0, 1fr\) 286px/);
     assert.match(css, /border-color:\s*rgba\(16, 185, 129/);
 });

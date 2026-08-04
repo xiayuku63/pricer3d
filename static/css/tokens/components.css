@@ -622,12 +622,168 @@ select:focus-visible,
   flex-shrink: 0;
 }
 
+/*
+ * Desktop toolbars use shared columns so matching fields line up across the
+ * default and batch rows. Labels live in their own fixed-width columns; the
+ * controls therefore keep the same start position in every supported language.
+ */
+#quote-default-settings-bar,
+#batch-edit-bar {
+  display: grid;
+  align-items: center;
+  column-gap: 6px;
+  row-gap: 8px;
+}
+
+#quote-default-settings-bar {
+  grid-template-columns: 96px 190px 120px 188px 145px 155px 92px minmax(0, 1fr) auto;
+}
+
+#batch-edit-bar {
+  grid-template-columns: 96px 190px 120px 188px 145px 155px 92px 122px minmax(0, 1fr) auto;
+}
+
+#quote-default-settings-bar > [data-i18n^="settings."],
+#batch-edit-bar > [data-i18n="quote.batchSettings"] {
+  grid-column: 1;
+  min-width: 0;
+}
+
+#quote-default-settings-bar > .flex.items-center,
+#batch-edit-bar > .flex.items-center {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+  align-items: center;
+  min-width: 0;
+  gap: 6px;
+}
+
+#quote-default-settings-bar > .flex.items-center > label,
+#batch-edit-bar > .flex.items-center > label {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+#quote-default-settings-bar > .flex.items-center:nth-of-type(1),
+#batch-edit-bar > .flex.items-center:nth-of-type(1) {
+  grid-column: 2;
+}
+
+#quote-default-settings-bar > .flex.items-center:nth-of-type(2),
+#batch-edit-bar > .flex.items-center:nth-of-type(2) {
+  grid-column: 3;
+}
+
+#quote-default-settings-bar > .flex.items-center:nth-of-type(3),
+#batch-edit-bar > .flex.items-center:nth-of-type(3) {
+  grid-column: 4;
+}
+
+#quote-default-settings-bar > .flex.items-center:nth-of-type(4),
+#batch-edit-bar > .flex.items-center:nth-of-type(4) {
+  grid-column: 5;
+}
+
+#quote-default-settings-bar > .flex.items-center:nth-of-type(5),
+#batch-edit-bar > .flex.items-center:nth-of-type(5) {
+  grid-column: 6;
+}
+
+#quote-default-settings-bar > .flex.items-center:nth-of-type(6),
+#batch-edit-bar > .flex.items-center:nth-of-type(6) {
+  grid-column: 7;
+}
+
+#batch-edit-bar > .flex.items-center:nth-of-type(7) {
+  grid-column: 8;
+  grid-template-columns: max-content 72px;
+  justify-content: start;
+}
+
+#quote-default-settings-bar #front-default-color-dropdown,
+#batch-edit-bar #batch-color-dropdown,
+#quote-default-settings-bar #front-default-color-dropdown .color-dd-wrapper,
+#batch-edit-bar #batch-color-dropdown .color-dd-wrapper,
+#quote-default-settings-bar #front-default-color-dropdown .color-dd-trigger,
+#batch-edit-bar #batch-color-dropdown .color-dd-trigger {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+}
+
+#quote-default-settings-bar .styled-select-host,
+#batch-edit-bar .styled-select-host,
+#quote-default-settings-bar .styled-select-wrapper,
+#batch-edit-bar .styled-select-wrapper,
+#quote-default-settings-bar select,
+#batch-edit-bar select {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+}
+
+#batch-quantity {
+  box-sizing: border-box;
+  width: 72px !important;
+  min-width: 72px !important;
+  max-width: 72px !important;
+  height: 26px;
+  min-height: 26px;
+  padding: 4px 8px;
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface-solid);
+  color: var(--color-text);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+#quote-default-settings-bar > #front-default-save-btn {
+  grid-column: 9;
+}
+
+#batch-edit-bar > #batch-apply-btn {
+  grid-column: 10;
+}
+
+#quote-default-settings-bar > #front-default-save-btn,
+#batch-edit-bar > #batch-apply-btn {
+  justify-self: end;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+#quote-default-settings-bar > #front-default-msg {
+  grid-column: 8;
+}
+
+#batch-edit-bar > #batch-msg {
+  grid-column: 9;
+}
+
+#quote-default-settings-bar > #front-default-msg,
+#batch-edit-bar > #batch-msg {
+  min-width: 0;
+}
+
 .settings-controls-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 240px;
+  grid-template-columns: minmax(0, 1fr) 286px;
   align-items: stretch;
   gap: 12px;
   min-width: 0;
+}
+
+/*
+ * The calculation controls need room for the translated label, checkbox, and
+ * action button. Keep that column wide enough so the two toolbars stay aligned.
+ */
+#quote-default-controls-row {
+  container-name: quote-default-controls;
+  container-type: inline-size;
 }
 
 .settings-fields-panel {
@@ -642,16 +798,14 @@ select:focus-visible,
 
 .batch-recalculate-actions {
   min-height: 72px;
-  padding: 12px 14px;
+  justify-content: space-between;
+  padding: 12px 16px;
   border-color: rgba(16, 185, 129, 0.22);
   background: linear-gradient(180deg, rgba(248, 253, 251, 0.94), rgba(239, 249, 246, 0.88));
 }
 
-.batch-recalculate-actions-title {
-  flex-shrink: 0;
-  padding-right: 10px;
-  border-right: 1px solid var(--color-border-strong);
-  color: var(--color-text-secondary);
+#batch-recalculate-btn {
+  margin-right: 0;
 }
 
 .dark .batch-recalculate-actions {
@@ -662,7 +816,8 @@ select:focus-visible,
 @media (min-width: 641px) and (max-width: 1799px) {
   #quote-default-settings-bar,
   #batch-edit-bar {
-    gap: 8px;
+    column-gap: 6px;
+    row-gap: 8px;
   }
 
   #front-default-printer-model,
@@ -687,13 +842,10 @@ select:focus-visible,
 
   .batch-recalculate-actions {
     gap: 8px;
-    padding-right: 10px;
-    padding-left: 10px;
+    padding-right: 16px;
+    padding-left: 16px;
   }
 
-  .batch-recalculate-actions-title {
-    padding-right: 8px;
-  }
 }
 
 @media (max-width: 639px) {
@@ -1281,4 +1433,19 @@ table.min-w-full.text-\\[11px\\] tbody td {
 
 .dark .entity-color-select-trigger {
   background: rgba(15, 23, 42, 0.72);
+}
+
+
+/* Compact the default controls before allowing the two toolbars to overflow. */
+@container quote-default-controls (max-width: 1640px) {
+  #quote-default-settings-bar,
+  #batch-edit-bar {
+    column-gap: 6px;
+  }
+
+  #quote-default-settings-bar .styled-select-trigger,
+  #batch-edit-bar .styled-select-trigger {
+    padding-left: 6px;
+    padding-right: 6px;
+  }
 }

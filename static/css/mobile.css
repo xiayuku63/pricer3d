@@ -108,6 +108,7 @@
 @media (max-width: 640px) {
     #quote-default-settings-bar,
     #batch-edit-bar {
+        display: flex;
         flex-direction: column;
         align-items: stretch;
         gap: 8px;
@@ -532,3 +533,11 @@
 
 /* ── Improve focus states for accessibility ── */
 @media (max-width: 768px) {
+    #mobile-theme-toggle-btn {
+        border: 1px solid var(--color-border-strong);
+    }
+
+    .dark #mobile-theme-toggle-btn {
+        background: var(--color-surface-hover);
+    }
+}

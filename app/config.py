@@ -44,6 +44,10 @@ SHOW_DEV_CODES = _settings.show_dev_codes
 
 TERMS_VERSION = _settings.terms_version
 PRIVACY_VERSION = _settings.privacy_version
+LEGAL_EFFECTIVE_DATE = _settings.legal_effective_date
+LEGAL_OPERATOR_NAME = _settings.legal_operator_name
+LEGAL_CONTACT_EMAIL = _settings.legal_contact_email or _settings.smtp_from
+LEGAL_CONTACT_ADDRESS = _settings.legal_contact_address
 
 UPLOADS_DIR = _settings.uploads_dir
 OUTPUTS_DIR = _settings.outputs_dir

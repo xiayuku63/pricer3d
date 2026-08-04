@@ -391,8 +391,8 @@ async def admin_login(request: Request):
                     membership_level="free",
                     terms_accepted_at=accepted_at,
                     privacy_accepted_at=accepted_at,
-                    terms_version="v1",
-                    privacy_version="v1",
+                    terms_version=TERMS_VERSION,
+                    privacy_version=PRIVACY_VERSION,
                 )
             )
             db.commit()

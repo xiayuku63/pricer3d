@@ -278,3 +278,13 @@
     position: relative;
     z-index: 9999 !important;
 }
+
+/* Lift dropdown panels that contain a guided target above the overlay. */
+.onb-elevated-target {
+    z-index: 10001 !important;
+}
+
+.onb-tooltip-desc-hint {
+    color: #b45309;
+    font-weight: 600;
+}

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -42,14 +42,15 @@
         .hidden { display:none !important; }
         @media (max-width: 720px) { body { padding:12px; } .admin-panel { padding:16px; } .tabs { margin-left:-16px; margin-right:-16px; padding:0 16px; } .stat-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .admin-topbar { align-items:flex-start; } }
     </style>
+    <link rel="stylesheet" href="/static/css/liquid-glass.css?v=1">
 </head>
 <body>
-    <main class="admin-shell">
+    <main class="admin-shell" data-admin-users-page>
         <header class="admin-topbar">
             <div class="brand-mark"><span class="brand-icon">P3</span><span>Pricer3D <small class="tw-text-muted">/ 管理后台</small></span></div>
             <a href="/" class="tw-btn-secondary px-3 py-2 text-xs">返回报价</a>
         </header>
-        <section class="tw-card admin-panel">
+        <section class="modal-glass-surface tw-card admin-panel">
             <div class="eyebrow">Operations console</div>
             <div class="flex items-end justify-between gap-4 flex-wrap mt-1">
                 <div><h1 class="text-2xl font-semibold tw-text-heading">用户管理</h1><p class="text-xs tw-text-muted mt-2">管理账号权益，查看关键操作与服务运行状态。</p></div>
