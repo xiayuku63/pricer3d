@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 中文语言包 (Chinese Language Pack)
  * 所有中文翻译字符串集中在此文件
  */
@@ -492,6 +492,14 @@ export default {
   'orientation.learnedSuccess': '智能摆放✓',
   'orientation.learnedFailed': '摆放失败',
   'orientation.autoLearn': '智能摆放',
+  'orientation.manualAnalyzing': '正在识别可放置面，请稍候...',
+  'orientation.manualReady': '可放置面已高亮：移动鼠标预览，点击青色面完成摆放；按 Esc 退出。',
+  'orientation.manualApplied': '手动摆放已完成。请确认方向，然后点击“保存当前方向并报价”。',
+  'orientation.manualCancelled': '已退出手动摆放模式。',
+  'orientation.smartAnalyzingButton': '智能分析中...',
+  'orientation.smartAnalyzing': '智能摆放正在分析模型并计算推荐方向，请稍候...',
+  'orientation.smartApplied': '智能摆放已完成。请检查模型方向，然后点击“保存当前方向并报价”。',
+  'orientation.smartFailed': '智能摆放失败：{msg}',
   'orientation.adjustTitle': '方向调整',
   'orientation.actionsTitle': '操作',
   'orientation.centerModel': '模型居中',

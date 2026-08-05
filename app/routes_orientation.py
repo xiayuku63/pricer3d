@@ -9,6 +9,7 @@ import os
 import uuid
 import json
 import logging
+import time
 from datetime import datetime, timezone
 from fastapi import Depends, UploadFile, File, HTTPException, Request, Form
 
@@ -138,11 +139,24 @@ async def list_coplanar_clusters(
         with open(tmp_path, "wb") as f:
             f.write(content)
 
+        load_started = time.perf_counter()
         mesh = _load_mesh(tmp_path)
+        load_ms = (time.perf_counter() - load_started) * 1000.0
         if mesh.vertices.shape[0] == 0:
             return {"filename": filename, "clusters": []}
 
+        cluster_started = time.perf_counter()
         clusters = cluster_coplanar_faces(mesh, include_upward_faces=True)
+        cluster_ms = (time.perf_counter() - cluster_started) * 1000.0
+        logger.info(
+            "manual placement profile filename=%s vertices=%d faces=%d clusters=%d load_ms=%.1f cluster_ms=%.1f",
+            filename,
+            int(len(mesh.vertices)),
+            int(len(mesh.faces)),
+            len(clusters),
+            load_ms,
+            cluster_ms,
+        )
         return {"filename": filename, "clusters": clusters}
     except Exception as e:
         logger.error("共面聚类分析失败 %s: %s", filename, e)

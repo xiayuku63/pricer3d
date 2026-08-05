@@ -5,14 +5,21 @@ import test from 'node:test';
 const layfaceUrl = new URL('../static/js/modules/layface.js', import.meta.url);
 const orientationUrl = new URL('../static/js/modules/orientation-ui.js', import.meta.url);
 
-test('lay-on-face renders labeled 3D candidate overlays without a placement-plane API', async () => {
+test('lay-on-face renders exact merged surface patches without labels or ellipse markers', async () => {
     const [layface, orientation] = await Promise.all([
         readFile(layfaceUrl, 'utf8'),
         readFile(orientationUrl, 'utf8'),
     ]);
 
-    assert.match(layface, /new THREE\.Sprite\(/);
-    assert.match(layface, /clusterLabel/);
+    assert.match(layface, /buildCandidatePatchData/);
+    assert.match(layface, /new THREE\.LineSegments\(/);
+    assert.match(layface, /clusterTriangleIds\[hit\.faceIndex\]/);
+    assert.match(layface, /vertexColors: true/);
+    assert.match(layface, /const FACE_FILL_COLOR = 0x06b6d4/);
+    assert.match(layface, /const FACE_OUTLINE_COLOR = 0x155e75/);
+    assert.match(layface, /const FACE_FILL_OPACITY = 0\.38/);
+    assert.doesNotMatch(layface, /new THREE\.Sprite\(/);
+    assert.doesNotMatch(layface, /clusterLabel|CanvasTexture|_buildEllipseOverlay|FACE_OVAL_/);
     assert.doesNotMatch(layface, /showPlacementPlane|hidePlacementPlane|_buildPlaceablePlaneVisual/);
     assert.doesNotMatch(orientation, /showPlacementPlane|hidePlacementPlane/);
     const faceMinZFn = layface.slice(layface.indexOf('function _getFaceWorldMinZ'), layface.indexOf('export function placeFaceOnBed'));
@@ -42,4 +49,20 @@ test('re-entering manual placement preserves the current mesh orientation', asyn
 
     assert.doesNotMatch(toggleBody, /resetMeshPlacementForLayFace\(\)/);
     assert.match(toggleBody, /clearClusters\(\)/);
+});
+
+test('candidate overlays respect model depth so the solid model never becomes a see-through wireframe', async () => {
+    const layface = await readFile(layfaceUrl, 'utf8');
+    const fillStart = layface.indexOf('const fillMaterial = new THREE.MeshBasicMaterial');
+    const fillEnd = layface.indexOf('clusterFillMesh =', fillStart);
+    const fillMaterial = layface.slice(fillStart, fillEnd);
+    const outlineStart = layface.indexOf('const outlineMaterial = new THREE.LineBasicMaterial');
+    const outlineEnd = layface.indexOf('clusterOutlineSegments =', outlineStart);
+    const outlineMaterial = layface.slice(outlineStart, outlineEnd);
+
+    assert.match(fillMaterial, /depthTest: true/);
+    assert.match(fillMaterial, /polygonOffset: true/);
+    assert.doesNotMatch(fillMaterial, /depthTest: false/);
+    assert.match(outlineMaterial, /depthTest: true/);
+    assert.doesNotMatch(outlineMaterial, /depthTest: false/);
 });
