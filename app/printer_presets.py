@@ -10,6 +10,7 @@ from fastapi import HTTPException
 
 from .db import get_db_session
 from .models_orm import PrinterPreset
+from .printer_gcode import PrinterLifecycleGcode, extract_lifecycle_from_profile
 
 _logger = logging.getLogger(__name__)
 
@@ -29,6 +30,12 @@ def list_printer_presets(user_id: int) -> list[dict]:
         except Exception as e:
             _logger.debug("printer_presets: failed to parse nozzles JSON for preset id=%s: %s", r.id, e)
             nozzles = [0.4]
+        try:
+            profile = base64.b64decode(str(r.profile_b64 or "").encode("ascii"), validate=False)
+            lifecycle = extract_lifecycle_from_profile(profile)
+        except Exception as e:
+            _logger.debug("printer_presets: failed to parse lifecycle for preset id=%s: %s", r.id, e)
+            lifecycle = extract_lifecycle_from_profile("")
         out.append(
             {
                 "id": int(r.id),
@@ -38,6 +45,7 @@ def list_printer_presets(user_id: int) -> list[dict]:
                 "bed_height": float(r.bed_height),
                 "nozzle": float(r.nozzle),
                 "nozzles": nozzles,
+                **lifecycle,
                 "created_at": str(r.created_at or ""),
             }
         )
@@ -71,6 +79,7 @@ def get_printer_preset_by_id(user_id: int, preset_id: int) -> Optional[dict]:
         "bed_height": float(row.bed_height),
         "nozzle": float(row.nozzle),
         "nozzles": nozzles,
+        **extract_lifecycle_from_profile(profile),
         "profile": bytes(profile),
         "created_at": str(row.created_at or ""),
     }
@@ -83,8 +92,11 @@ def _generate_printer_profile(
     nozzle: float = 0.4,
     acceleration: int = 10000,
     speed: int = 250,
+    *,
+    lifecycle: PrinterLifecycleGcode | None = None,
 ) -> str:
     """Generate INI content for a printer profile."""
+    lifecycle_settings = (lifecycle or PrinterLifecycleGcode.build()).as_ini_settings()
     return f"""# {int(bed_width)}x{int(bed_depth)}x{int(bed_height)}mm printer profile
 bed_shape = 0x0,{int(bed_width)}x0,{int(bed_width)}x{int(bed_depth)},0x{int(bed_depth)}
 bed_temperature = 55
@@ -124,11 +136,24 @@ nozzle_diameter = {nozzle}
 filament_diameter = 1.75
 layer_height = 0.2
 first_layer_height = 0.35
+gcode_flavor = {lifecycle_settings["gcode_flavor"]}
+start_gcode = {lifecycle_settings["start_gcode"]}
+before_layer_gcode = {lifecycle_settings["before_layer_gcode"]}
+layer_gcode = {lifecycle_settings["layer_gcode"]}
+end_gcode = {lifecycle_settings["end_gcode"]}
 """
 
 
 def upsert_printer_preset(
-    user_id: int, name: str, bed_width: float, bed_depth: float, bed_height: float, nozzle: float, nozzles: list[float]
+    user_id: int,
+    name: str,
+    bed_width: float,
+    bed_depth: float,
+    bed_height: float,
+    nozzle: float,
+    nozzles: list[float],
+    *,
+    lifecycle: PrinterLifecycleGcode | None = None,
 ) -> dict:
     uid = int(user_id or 0)
     if uid <= 0:
@@ -144,7 +169,16 @@ def upsert_printer_preset(
     if not nzs:
         nzs = [nz]
 
-    profile = _generate_printer_profile(bw, bd, bh, nozzle=nz)
+    try:
+        profile = _generate_printer_profile(
+            bw,
+            bd,
+            bh,
+            nozzle=nz,
+            lifecycle=lifecycle,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     b64 = base64.b64encode(profile.encode("utf-8")).decode("ascii")
     created_at = datetime.now(timezone.utc).isoformat()
     nozzles_json = json.dumps(nzs)
@@ -184,6 +218,7 @@ def upsert_printer_preset(
             "bed_height": float(row.bed_height),
             "nozzle": float(row.nozzle),
             "nozzles": nzs,
+            **extract_lifecycle_from_profile(profile),
             "created_at": str(row.created_at),
         }
     return result

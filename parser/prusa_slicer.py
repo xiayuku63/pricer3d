@@ -19,6 +19,7 @@ from contextlib import nullcontext
 from functools import lru_cache
 from typing import Optional
 
+from app.printer_gcode import lifecycle_settings
 from parser.slice_cache import (
     build_slice_cache_key,
     load_cached_slice,
@@ -439,6 +440,18 @@ def generate_slice_config(
             ini_content = ""
 
     sections = _parse_ini_sections(ini_content)
+
+    # Older saved profiles may predate lifecycle hooks. Supply conservative
+    # defaults without overwriting profiles that intentionally define them.
+    machine_section = next((name for name in sections if name.startswith("machine:")), None)
+    if machine_section is None:
+        machine_section = "machine:custom"
+        sections[machine_section] = {}
+    machine_settings = sections[machine_section]
+    defaults = lifecycle_settings(gcode_flavor="marlin2")
+    machine_settings.setdefault("gcode_flavor", defaults["gcode_flavor"])
+    for key in ("start_gcode", "before_layer_gcode", "layer_gcode", "end_gcode"):
+        machine_settings.setdefault(key, defaults[key])
 
     # ── Apply user preset overrides ──
     # System preset (is_default=True) is NOT merged — quote params override it.
