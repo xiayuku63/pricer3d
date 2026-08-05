@@ -131,6 +131,7 @@ def create_app() -> FastAPI:
         api_list_printers,
     )
     from .routes_printer import (
+        api_get_printer_gcode_defaults,
         api_list_printer_presets,
         api_get_printer_preset,
         api_create_printer_preset,
@@ -224,6 +225,7 @@ def create_app() -> FastAPI:
     app.get("/api/slicer/printers")(api_list_printers)
 
     # printer presets
+    app.get("/api/printer/gcode-defaults")(api_get_printer_gcode_defaults)
     app.get("/api/printer/presets")(api_list_printer_presets)
     app.get("/api/printer/presets/{preset_id}")(api_get_printer_preset)
     app.post("/api/printer/presets")(api_create_printer_preset)
