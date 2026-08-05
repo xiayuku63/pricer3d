@@ -16,8 +16,12 @@ log "🚀 Pricer3D One-Click Deploy"
 log "Dir: $APP_DIR"
 
 # ── 1. Pull latest code ──
-log "📦 Pulling latest code from GitHub..."
-git pull origin main
+if [ "${SKIP_GIT_PULL:-0}" = "1" ]; then
+  log "Repository already synchronized by CI"
+else
+  log "Pulling latest code from GitHub..."
+  git pull --ff-only origin main
+fi
 
 # ── 2. Ensure .env.prod exists ──
 log "📝 Checking .env.prod..."

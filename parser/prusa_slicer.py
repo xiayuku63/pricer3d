@@ -208,6 +208,10 @@ def translate_path_for_executable(path: str, exe: str) -> str:
     if _sys.platform != "win32":
         return path
 
+    normalized = path.replace("\\", "/")
+    if len(normalized) >= 3 and normalized[1] == ":" and normalized[2] == "/":
+        return f"/mnt/{normalized[0].lower()}{normalized[2:]}"
+
     absolute = os.path.abspath(path).replace("\\", "/")
     if len(absolute) >= 2 and absolute[1] == ":":
         return f"/mnt/{absolute[0].lower()}{absolute[2:]}"
