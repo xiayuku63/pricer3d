@@ -1,4 +1,4 @@
-﻿import assert from 'node:assert/strict';
+import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
@@ -56,4 +56,52 @@ test('3MF occlusion checks real descendant meshes instead of the group root', as
     assert.match(source, /occluder\.traverse/);
     assert.match(intersectionBody, /intersectObjects\(occluderMeshes, false\)/);
     assert.doesNotMatch(intersectionBody, /intersectObject\(occluder, false\)/);
+});
+
+
+test('manual placement caches occluder meshes and coalesces hover work per frame', async () => {
+    const [layface, orientation] = await Promise.all([
+        readFile(layfaceUrl, 'utf8'),
+        readFile(orientationUiUrl, 'utf8'),
+    ]);
+
+    assert.match(layface, /let cachedOccluderRoot = null;/);
+    assert.match(layface, /let cachedOccluderMeshes = \[\];/);
+    assert.match(layface, /occluder === cachedOccluderRoot/);
+    assert.match(layface, /cachedOccluderMeshes = meshes/);
+    assert.match(orientation, /requestAnimationFrame\(flushLayFaceHover\)/);
+    assert.match(orientation, /cancelAnimationFrame\(layFaceHoverFrame\)/);
+    assert.match(orientation, /pendingLayFacePointer/);
+});
+
+test('smart and manual placement announce loading, interaction, completion, cancellation, and failure states', async () => {
+    const [orientation, zh, en, css] = await Promise.all([
+        readFile(orientationUiUrl, 'utf8'),
+        readFile(new URL('../static/js/modules/i18n/zh.js', import.meta.url), 'utf8'),
+        readFile(new URL('../static/js/modules/i18n/en.js', import.meta.url), 'utf8'),
+        readFile(new URL('../static/css/tokens/components.css', import.meta.url), 'utf8'),
+    ]);
+
+    assert.match(orientation, /import \{ showToast \} from '\.\/upload\.js'/);
+    assert.match(orientation, /function setOrientationHint/);
+    assert.match(orientation, /aria-busy/);
+    for (const key of [
+        'orientation.manualAnalyzing',
+        'orientation.manualReady',
+        'orientation.manualApplied',
+        'orientation.manualCancelled',
+        'orientation.smartAnalyzing',
+        'orientation.smartApplied',
+        'orientation.smartFailed',
+    ]) {
+        assert.match(orientation, new RegExp(key.replace('.', '\\.')));
+        assert.match(zh, new RegExp(`'${key}'`));
+        assert.match(en, new RegExp(`'${key}'`));
+    }
+    assert.match(orientation, /showToast\(readyMessage, 'info'/);
+    assert.match(orientation, /showToast\(successMessage, 'success'/);
+    assert.match(orientation, /showToast\(message, 'error'/);
+    assert.match(css, /\.apple-preview-hint\[data-tone="loading"\]/);
+    assert.match(css, /\.apple-preview-hint\[data-tone="success"\]/);
+    assert.match(css, /orientation-hint-pulse/);
 });

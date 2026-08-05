@@ -14,6 +14,8 @@ import {
 } from './state.js';
 import { t } from './i18n.js';
 import { openLoginModal } from './auth.js';
+import { getCoplanarClusters } from './preview-cache.js';
+import { showToast } from './upload.js';
 import {
     commitOrientationDraft,
     createOrientationDraft,
@@ -28,6 +30,8 @@ let hoverRaycaster = new THREE.Raycaster();
 let hoverMouse = new THREE.Vector2();
 let hoveredClusterIndex = -1;
 let layFaceHoverBound = false;
+let layFaceHoverFrame = 0;
+let pendingLayFacePointer = null;
 let layFaceState = 'idle';
 let layFaceAbortController = null;
 let layFaceEscapeBound = false;
@@ -46,10 +50,13 @@ export function initOrientationUI(d) { dom = d; }
 // ── Face click handler (set from main.js) ──
 window._onFaceClicked = null;
 
-function setLayFaceHint(visible, message = null) {
+function setOrientationHint(visible, message = null, tone = 'info') {
     const { layFaceHint } = dom;
     if (!layFaceHint) return;
     layFaceHint.textContent = message || t('orientation.pickFaceHint');
+    layFaceHint.dataset.tone = tone;
+    layFaceHint.setAttribute('role', tone === 'error' ? 'alert' : 'status');
+    layFaceHint.setAttribute('aria-busy', String(tone === 'loading'));
     layFaceHint.classList.toggle('hidden', !visible);
 }
 
@@ -69,6 +76,7 @@ function handleLayFaceEscape(event) {
     if (event.key !== 'Escape' || layFaceState === 'idle') return;
     event.preventDefault();
     cleanupLayFaceMode();
+    showToast(t('orientation.manualCancelled'), 'info', 3000);
 }
 
 function bindLayFaceEscape() {
@@ -83,7 +91,16 @@ function unbindLayFaceEscape() {
     layFaceEscapeBound = false;
 }
 
+function cancelPendingLayFaceHover() {
+    if (layFaceHoverFrame) {
+        cancelAnimationFrame(layFaceHoverFrame);
+        layFaceHoverFrame = 0;
+    }
+    pendingLayFacePointer = null;
+}
+
 function resetClusterHoverState() {
+    cancelPendingLayFaceHover();
     if (hoveredClusterIndex >= 0) {
         setClusterHover(hoveredClusterIndex, false);
         hoveredClusterIndex = -1;
@@ -94,16 +111,20 @@ function resetClusterHoverState() {
     }
 }
 
-function handleLayFaceHover(event) {
-    if (!renderer || !renderer.domElement || !currentMesh || !isClusterMode()) return;
+function flushLayFaceHover() {
+    layFaceHoverFrame = 0;
+    const point = pendingLayFacePointer;
+    pendingLayFacePointer = null;
+    if (!point || !renderer || !renderer.domElement || !currentMesh || !isClusterMode()) return;
+
     const rect = renderer.domElement.getBoundingClientRect();
-    hoverMouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    hoverMouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    hoverMouse.x = ((point.clientX - rect.left) / rect.width) * 2 - 1;
+    hoverMouse.y = -((point.clientY - rect.top) / rect.height) * 2 + 1;
     hoverRaycaster.setFromCamera(hoverMouse, camera);
     const hit = intersectClusters(hoverRaycaster, currentMesh);
     const nextIndex = hit ? hit.index : -1;
     if (nextIndex === hoveredClusterIndex) {
-        if (renderer.domElement) renderer.domElement.style.cursor = hit ? 'pointer' : '';
+        renderer.domElement.style.cursor = hit ? 'pointer' : '';
         return;
     }
     if (hoveredClusterIndex >= 0) {
@@ -113,8 +134,15 @@ function handleLayFaceHover(event) {
     if (hoveredClusterIndex >= 0) {
         setClusterHover(hoveredClusterIndex, true);
     }
-    if (renderer.domElement) renderer.domElement.style.cursor = hit ? 'pointer' : '';
+    renderer.domElement.style.cursor = hit ? 'pointer' : '';
     requestRender();
+}
+
+function handleLayFaceHover(event) {
+    pendingLayFacePointer = { clientX: event.clientX, clientY: event.clientY };
+    if (!layFaceHoverFrame) {
+        layFaceHoverFrame = requestAnimationFrame(flushLayFaceHover);
+    }
 }
 
 function bindLayFaceHover() {
@@ -125,6 +153,7 @@ function bindLayFaceHover() {
 }
 
 function unbindLayFaceHover() {
+    cancelPendingLayFaceHover();
     if (!layFaceHoverBound || !renderer || !renderer.domElement) return;
     renderer.domElement.removeEventListener('mousemove', handleLayFaceHover);
     renderer.domElement.removeEventListener('mouseleave', resetClusterHoverState);
@@ -139,7 +168,7 @@ export function cleanupLayFaceMode() {
     clearClusters();
     unbindLayFaceHover();
     unbindLayFaceEscape();
-    setLayFaceHint(false);
+    setOrientationHint(false);
     window.__onLayFaceClick = null;
     setLayFaceButtonLabel(t('orientation.autoOrient'));
 }
@@ -236,27 +265,35 @@ export async function toggleLayFace() {
     if (!file) return;
 
     if (layFaceState === 'loading') return;
+    if (layFaceState === 'active') {
+        cleanupLayFaceMode();
+        showToast(t('orientation.manualCancelled'), 'info', 3000);
+        return;
+    }
+
+    const manualAnalyzingMessage = t('orientation.manualAnalyzing');
+    setOrientationHint(true, manualAnalyzingMessage, 'loading');
+    showToast(manualAnalyzingMessage, 'info', 4000);
+
     if (!currentMesh) {
         layFaceState = 'loading';
         bindLayFaceEscape();
         setLayFaceButtonLabel(t('orientation.analyzing'), { disabled: true });
-        setLayFaceHint(true, t('orientation.analyzing'));
+        setOrientationHint(true, t('orientation.manualAnalyzing'), 'loading');
         const ready = await waitForMeshReady();
         if (!ready || !currentMesh) {
             cleanupLayFaceMode();
-            setLayFaceButtonLabel(t('orientation.requestFailed'));
+            const message = t('orientation.requestFailed');
+            setOrientationHint(true, message, 'error');
+            showToast(message, 'error', 4500);
+            setLayFaceButtonLabel(message);
             setTimeout(() => setLayFaceButtonLabel(t('orientation.autoOrient')), 2000);
             return;
         }
         layFaceState = 'idle';
-        setLayFaceHint(false);
+        setOrientationHint(true, manualAnalyzingMessage, 'loading');
         setLayFaceButtonLabel(t('orientation.autoOrient'));
     }
-    if (layFaceState === 'active') {
-        cleanupLayFaceMode();
-        return;
-    }
-
     // Re-entering manual placement must preserve the current orientation. The
     // face placement operation already replaces the mesh quaternion directly;
     // resetting here makes the second invocation jump back to the initial pose.
@@ -266,24 +303,26 @@ export async function toggleLayFace() {
     layFaceState = 'loading';
     bindLayFaceEscape();
     setLayFaceButtonLabel(t('orientation.analyzing'), { disabled: true });
-    setLayFaceHint(true, t('orientation.analyzing'));
-    const formData = new FormData();
-    formData.append('file', file);
+    setOrientationHint(true, t('orientation.manualAnalyzing'), 'loading');
     const controller = new AbortController();
     layFaceAbortController = controller;
     try {
-        const resp = await authFetch('/api/orientation/coplanar', { method: 'POST', body: formData, signal: controller.signal });
+        const cached = await getCoplanarClusters(file, authFetch, controller.signal);
+        const resp = cached?.resp;
+        const data = cached?.data || {};
         if (!resp || resp.status === 401) {
             cleanupLayFaceMode();
             openLoginModal();
             return;
         }
-        const data = await resp.json();
         if (!resp.ok) throw new Error(data.detail || t('orientation.analyzeError'));
         const clusters = data.clusters || [];
         if (clusters.length === 0) {
             cleanupLayFaceMode();
-            setLayFaceButtonLabel(t('orientation.noFace'));
+            const message = t('orientation.noFace');
+            setOrientationHint(true, message, 'warning');
+            showToast(message, 'warning', 4500);
+            setLayFaceButtonLabel(message);
             setTimeout(() => setLayFaceButtonLabel(t('orientation.autoOrient')), 2000);
             return;
         }
@@ -296,6 +335,9 @@ export async function toggleLayFace() {
             cleanupLayFaceMode();
             placeFaceOnBed(currentMesh, cluster.normal, 'Z', cluster.face_vertices);
             syncOrientationFromMesh();
+            const message = t('orientation.manualApplied');
+            setOrientationHint(true, message, 'success');
+            showToast(message, 'success', 5500);
             return true;
         };
 
@@ -306,27 +348,35 @@ export async function toggleLayFace() {
                     cleanupLayFaceMode();
                     placeFaceOnBed(currentMesh, c.normal, 'Z', c.face_vertices);
                     syncOrientationFromMesh();
+                    const message = t('orientation.manualApplied');
+                    setOrientationHint(true, message, 'success');
+                    showToast(message, 'success', 5500);
                 }
             },
             setClusterHover
         );
         bindLayFaceHover();
         layFaceState = 'active';
-        setLayFaceHint(true, t('orientation.pickFaceHint'));
+        const readyMessage = t('orientation.manualReady');
+        setOrientationHint(true, readyMessage, 'action');
+        showToast(readyMessage, 'info', 5500);
         requestRender();
         setLayFaceButtonLabel(t('orientation.exit'), { active: true });
     } catch (e) {
         if (e.name === 'AbortError') return;
         console.error('Lay on Face error:', e);
         cleanupLayFaceMode();
-        setLayFaceButtonLabel(e.message || t('orientation.requestFailedLogin'));
+        const message = e.message || t('orientation.requestFailedLogin');
+        setOrientationHint(true, message, 'error');
+        showToast(message, 'error', 5000);
+        setLayFaceButtonLabel(message);
         setTimeout(() => setLayFaceButtonLabel(t('orientation.autoOrient')), 3000);
     } finally {
         if (layFaceAbortController === controller) layFaceAbortController = null;
         if (layFaceState === 'loading') {
             layFaceState = 'idle';
             unbindLayFaceEscape();
-            setLayFaceHint(false);
+            setOrientationHint(false);
             setLayFaceButtonLabel(t('orientation.autoOrient'));
         }
     }
@@ -412,6 +462,10 @@ export async function learnedAutoOrient() {
     // 退出手动摆放模式（如果有）
     beginCurrentOrientationDraft();
     cleanupLayFaceMode();
+    const smartAnalyzingMessage = t('orientation.smartAnalyzing');
+    if (orientLearnedBtn) setButtonLabelText(orientLearnedBtn, t('orientation.smartAnalyzingButton'));
+    setOrientationHint(true, smartAnalyzingMessage, 'loading');
+    showToast(smartAnalyzingMessage, 'info', 4500);
 
     try {
         // 先清除彩块避免干扰
@@ -464,9 +518,15 @@ export async function learnedAutoOrient() {
             }, 2000);
         }
 
+        const successMessage = t('orientation.smartApplied');
+        setOrientationHint(true, successMessage, 'success');
+        showToast(successMessage, 'success', 6000);
         console.log('智能摆放完成:', data);
     } catch (e) {
         console.error('智能摆放失败:', e);
+        const message = t('orientation.smartFailed', { msg: e.message || t('common.unknownError') });
+        setOrientationHint(true, message, 'error');
+        showToast(message, 'error', 6000);
         if (orientLearnedBtn) {
             setButtonLabelText(orientLearnedBtn, t('orientation.learnedFailed'));
             setTimeout(() => {

@@ -5,6 +5,7 @@
 const glbRequests = new Map();
 const stlRequests = new Map();
 const threeMfRequests = new Map();
+const coplanarRequests = new Map();
 
 export function previewFileKey(file) {
     return [file?.name || '', file?.size || 0, file?.lastModified || 0].join(':');
@@ -88,4 +89,44 @@ export function getPreview3mf(file, onProgress = null) {
         });
     threeMfRequests.set(key, request);
     return request;
+}
+
+/**
+ * Cache the manual-placement candidate request for one uploaded file.
+ *
+ * The orientation endpoint is authenticated, so the caller supplies authFetch
+ * rather than this module reaching into application state.  The in-flight
+ * promise is shared by repeated toggles and removed on failure so a transient
+ * network/auth error can be retried.
+ */
+export function getCoplanarClusters(file, requestFn = fetch, signal = undefined) {
+    const key = previewFileKey(file);
+    const existing = coplanarRequests.get(key);
+    if (existing) return existing;
+
+    const formData = new FormData();
+    formData.append('file', file);
+    const options = { method: 'POST', body: formData };
+    if (signal) options.signal = signal;
+
+    const request = Promise.resolve(requestFn('/api/orientation/coplanar', options))
+        .then(async (resp) => {
+            const data = await resp.json();
+            if (!resp.ok) coplanarRequests.delete(key);
+            return { resp, data };
+        })
+        .catch((error) => {
+            coplanarRequests.delete(key);
+            throw error;
+        });
+    coplanarRequests.set(key, request);
+    return request;
+}
+
+export function clearCoplanarClusters(file = null) {
+    if (file) {
+        coplanarRequests.delete(previewFileKey(file));
+    } else {
+        coplanarRequests.clear();
+    }
 }

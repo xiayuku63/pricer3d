@@ -1,4 +1,4 @@
-﻿/**
+/**
  * English Language Pack
  * All English translation strings are centralized here
  */
@@ -497,6 +497,14 @@ export default {
   'orientation.learnedSuccess': 'Auto Orient ✓',
   'orientation.learnedFailed': 'Orient Failed',
   'orientation.autoLearn': 'Auto Orient',
+  'orientation.manualAnalyzing': 'Detecting placeable surfaces. Please wait...',
+  'orientation.manualReady': 'Placeable surfaces are highlighted. Hover to preview, click a cyan face to place it, or press Esc to exit.',
+  'orientation.manualApplied': 'Manual placement is complete. Check the orientation, then choose "Save Orientation & Quote".',
+  'orientation.manualCancelled': 'Manual placement mode exited.',
+  'orientation.smartAnalyzingButton': 'Analyzing...',
+  'orientation.smartAnalyzing': 'Auto Orient is analyzing the model and calculating a recommended orientation. Please wait...',
+  'orientation.smartApplied': 'Auto Orient is complete. Check the model, then choose "Save Orientation & Quote".',
+  'orientation.smartFailed': 'Auto Orient failed: {msg}',
   'orientation.adjustTitle': 'Orientation',
   'orientation.actionsTitle': 'Actions',
   'orientation.centerModel': 'Center Model',

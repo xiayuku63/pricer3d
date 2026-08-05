@@ -7,6 +7,7 @@ with iterative normal averaging, PCA refinement, and post-merge passes.
 
 import math
 import logging
+from collections import deque
 import numpy as np
 import trimesh
 
@@ -81,18 +82,44 @@ def _merge_planar_clusters_internal(
                     if abs(da - db) <= offset_tol * 2:
                         union(a, b)
 
-    # Pass 2: global merge of all same-plane fragments
+    # Pass 2: global merge of all same-plane fragments.
+    #
+    # The previous implementation compared every pair of clusters.  Curved or
+    # heavily triangulated meshes can produce one cluster per triangle, turning
+    # this cleanup pass into O(K^2).  Quantized normal/offset buckets keep the
+    # exact validation step while limiting comparisons to nearby plane bins.
+    normal_bin = max(1e-3, math.sqrt(max(1e-6, 2.0 * (1.0 - cos_threshold))))
+    offset_bin = max(float(offset_tol) * 2.0, 1e-6)
+    buckets: dict[tuple[int, int, int, int], list[int]] = {}
+
+    def bucket_key(index: int) -> tuple[int, int, int, int]:
+        normal = np.asarray(clusters[index]["normal"], dtype=np.float64)
+        offset = float(clusters[index]["plane_offset"])
+        return (
+            int(round(float(normal[0]) / normal_bin)),
+            int(round(float(normal[1]) / normal_bin)),
+            int(round(float(normal[2]) / normal_bin)),
+            int(round(offset / offset_bin)),
+        )
+
     for i in range(n):
-        for j in range(i + 1, n):
-            if find(i) == find(j):
-                continue
-            na = np.array(clusters[i]["normal"])
-            nb = np.array(clusters[j]["normal"])
-            if float(np.dot(na, nb)) >= cos_threshold:
-                da = clusters[i]["plane_offset"]
-                db = clusters[j]["plane_offset"]
-                if abs(da - db) <= offset_tol * 2:
-                    union(i, j)
+        key = bucket_key(i)
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for dz in (-1, 0, 1):
+                    for do in (-1, 0, 1):
+                        candidates = buckets.get((key[0] + dx, key[1] + dy, key[2] + dz, key[3] + do), ())
+                        for j in candidates:
+                            if find(i) == find(j):
+                                continue
+                            na = np.asarray(clusters[i]["normal"], dtype=np.float64)
+                            nb = np.asarray(clusters[j]["normal"], dtype=np.float64)
+                            if float(np.dot(na, nb)) >= cos_threshold:
+                                da = float(clusters[i]["plane_offset"])
+                                db = float(clusters[j]["plane_offset"])
+                                if abs(da - db) <= offset_tol * 2:
+                                    union(i, j)
+        buckets.setdefault(key, []).append(i)
 
     # Build merged groups
     groups: dict[int, list[int]] = {}
@@ -367,7 +394,7 @@ def cluster_coplanar_faces(
 
     Returns:
         [{normal, area, face_count, centroid, vertices, stability, face_vertices, ...}, ...]
-        sorted by area descending, capped at 20 clusters.
+        sorted by area descending, capped at MAX_RETURN_CLUSTERS.
     """
     faces = mesh.faces
     vertices = mesh.vertices.astype(np.float64)
@@ -407,11 +434,7 @@ def cluster_coplanar_faces(
     model_diag = float(np.linalg.norm(vertices.max(axis=0) - vertices.min(axis=0)))
     offset_tol = max(min(model_diag * 0.002, 0.5), 0.05)
     cos_threshold = COPLANAR_COS_THRESHOLD
-    min_cluster_area = (
-        max(model_diag * model_diag * 1e-4, 1e-4)
-        if include_upward_faces
-        else MIN_COPLANAR_AREA_MM2
-    )
+    min_cluster_area = max(model_diag * model_diag * 1e-4, 1e-4) if include_upward_faces else MIN_COPLANAR_AREA_MM2
 
     order = np.argsort(-areas)
     visited = np.zeros(n_faces, dtype=bool)
@@ -425,12 +448,12 @@ def cluster_coplanar_faces(
         cluster_n = 1.0
         cluster_offset_sum = float(plane_offsets[seed_idx])
 
-        queue = [int(seed_idx)]
+        queue = deque([int(seed_idx)])
         cluster_faces: list[int] = []
         visited[seed_idx] = True
 
         while queue:
-            fi = queue.pop(0)
+            fi = queue.popleft()
             cluster_faces.append(fi)
             w = float(areas[fi]) + 1e-9
             cluster_normal = (cluster_normal * cluster_n + norms[fi] * w) / (cluster_n + w)
@@ -526,12 +549,16 @@ def cluster_coplanar_faces(
             hull_planes = None
     hull_available = hull_planes is not None and len(hull_planes[0]) > 0
 
-    def _run_internal_face_filter(offset_tol: float) -> list[dict]:
-        """Run filter A (hull coplanarity at given offset tol) + B + 4 safety nets.
+    def _run_internal_face_filter(
+        offset_tol: float,
+        run_expensive_safety_checks: bool = True,
+    ) -> list[dict]:
+        """Filter candidates against convex-hull planes and optional safety nets.
 
-        Returns the list of surviving merged clusters.  ``offset_tol`` controls
-        how strictly filter A requires the candidate plane to coincide with a
-        convex-hull plane.
+        A strict convex-hull plane match is sufficient for the normal manual
+        placement path: a valid contact plane must be a supporting plane of the
+        solid.  The contains/ray/proximity checks remain available as a
+        fallback for malformed meshes or when the hull is unavailable.
         """
         hp_n, hp_o = (hull_planes[0], hull_planes[1]) if hull_available else (None, None)
         out: list[dict] = []
@@ -571,6 +598,10 @@ def cluster_coplanar_faces(
 
             # ── 补充防护: 原4道内部面过滤 ──
             # (此时已通过过滤A的凸包表面验证; 此4道为补充防护, 极少触发)
+            if not run_expensive_safety_checks and hull_available:
+                out.append(mc)
+                continue
+
             inside_reason = None
 
             # 方法1: contains() 检测空腔内部面
@@ -630,15 +661,32 @@ def cluster_coplanar_faces(
         return out
 
     # 紧容差过滤 (仅真正在凸包表面的外表面通过 → 内部面被剔除)
-    filtered = _run_internal_face_filter(HULL_PLANE_OFFSET_TOL_TIGHT)
-    # 兜底: 紧容差若 0 候选 (极端几何, 如无平面的纯曲面凸包), 降级到旧容差
-    # (v0.40.0 行为) 保证不返回空列表 — 宁可降级也不要让 UI 拿到 0 个候选.
+    fast_manual_filter = bool(include_upward_faces and hull_available)
+    filtered = _run_internal_face_filter(
+        HULL_PLANE_OFFSET_TOL_TIGHT,
+        run_expensive_safety_checks=not fast_manual_filter,
+    )
+    # Fall back to the broader historical tolerance only when the strict hull
+    # match yields no candidates.
     if not filtered and hull_available:
-        logger.debug(f"凸包紧过滤后 0 候选, 降级 offset_tol={HULL_PLANE_OFFSET_TOL_FALLBACK:.3f}mm")
-        filtered = _run_internal_face_filter(HULL_PLANE_OFFSET_TOL_FALLBACK)
-    merged = filtered
+        logger.debug(
+            "strict hull filter returned no candidates; retrying offset_tol=%.3fmm",
+            HULL_PLANE_OFFSET_TOL_FALLBACK,
+        )
+        filtered = _run_internal_face_filter(
+            HULL_PLANE_OFFSET_TOL_FALLBACK,
+            run_expensive_safety_checks=not fast_manual_filter,
+        )
 
-    # ── Step 5: generate output ──
+    # Trim before outline extraction and JSON cleanup so discarded clusters do
+    # not pay the expensive output-geometry cost.
+    merged = sorted(
+        filtered,
+        key=lambda cluster: float(cluster.get("area", 0.0)),
+        reverse=True,
+    )[:MAX_RETURN_CLUSTERS]
+
+    # Step 5: generate output
     result = []
     for mc in merged:
         cf = mc["faces"]
