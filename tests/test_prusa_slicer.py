@@ -111,6 +111,23 @@ def test_wsl_wrapper_translates_windows_model_paths():
         )
 
 
+def test_wsl_absolute_windows_path_does_not_use_host_abspath():
+    exe = r"C:\Windows\System32\wsl.exe -- prusa-slicer"
+    with patch.object(sys, "platform", "win32"):
+        with patch.object(
+            prusa_slicer.os.path,
+            "abspath",
+            return_value="/home/runner/work/pricer3d/pricer3d/D:/Projects/pricer3d/data/part.step",
+        ) as abspath:
+            translated = prusa_slicer.translate_path_for_executable(
+                r"D:\Projects\pricer3d\data\part.step",
+                exe,
+            )
+
+    assert translated == "/mnt/d/Projects/pricer3d/data/part.step"
+    abspath.assert_not_called()
+
+
 def test_appimage_uses_fuse_free_extraction_mode():
     with patch.object(prusa_slicer.os.path, "isfile", return_value=True):
         with patch.object(prusa_slicer.os.path, "realpath", return_value="/usr/local/bin/prusa-slicer.AppImage"):

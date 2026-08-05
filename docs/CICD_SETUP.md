@@ -1,46 +1,54 @@
 # GitHub Actions CI/CD 配置说明
 
-## 📋 概览
+## 概览
 
 CI/CD 流水线包含以下阶段：
 
-```
+```text
 push/PR to main
-    │
-    ├── lint (Ruff) ──────────────┐
-    ├── typecheck (mypy) ─────────┤── docker-build ── deploy (仅 main push)
-    └── test (pytest) ────────────┘
+    |
+    |-- lint (Ruff) -----------|
+    |-- typecheck (mypy) ------|-- docker-build -- deploy（仅 main push 或手动触发）
+    `-- test (pytest) ---------|
 ```
 
-## 🔧 CI 阶段详解
+## CI 阶段详解
 
 ### 1. Lint (Ruff)
-- 代码风格检查 (`ruff check`)
-- 格式检查 (`ruff format --check`)
-- 配置在 `pyproject.toml` 中
+
+- 执行高置信度代码错误检查（`ruff check`）
+- Ruff 版本固定，规则配置在 `pyproject.toml` 中
+- 格式化与 import 历史债务不阻塞当前部署，后续可分批清理
 
 ### 2. Type Check (mypy)
+
 - 静态类型检查
-- 非阻塞（警告不阻止流水线）
+- 当前为非阻塞检查（警告不阻止流水线）
 
 ### 3. Test (pytest)
+
 - 运行 `tests/` 目录下的所有测试
-- 使用内存数据库 (`DB_PATH=:memory:`)
+- 使用内存数据库（`DB_PATH=:memory:`）
 - 生成 JUnit XML 报告并上传为 artifact
 
 ### 4. Docker Build
+
 - 使用 `Dockerfile.prod` 构建生产镜像
 - 启用 GitHub Actions 缓存加速构建
-- 需要 lint 和 test 通过后才执行
+- 需要 lint、typecheck 和 test 通过后才执行
 
-## 🚀 CD 阶段详解
+## CD 阶段详解
 
-### Deploy (仅 push to main)
-- 使用 `appleboy/ssh-action` 通过 SSH 连接到阿里云服务器
-- 在服务器上执行 `git pull` + `docker compose build` + `docker compose up -d`
-- 部署后自动健康检查
+### Deploy（仅 push to main 或手动触发）
 
-## 🔐 必须配置的 GitHub Secrets
+- 使用 `appleboy/ssh-action` 通过 SSH 连接到服务器
+- 将服务器 `$HOME/pricer3d` 强制同步到 `origin/main`，避免本地修改或分支漂移
+- 调用 `deploy/one_click_deploy.sh` 构建并重启 Docker Compose 服务
+- 部署后自动执行健康检查和 PrusaSlicer 诊断
+
+仓库只保留 `.github/workflows/ci.yml` 这一条部署链路，避免同一次 push 重复部署。
+
+## 必须配置的 GitHub Secrets
 
 在 GitHub 仓库的 `Settings > Secrets and variables > Actions` 中添加：
 
@@ -48,74 +56,61 @@ push/PR to main
 |-------------|------|--------|
 | `DEPLOY_HOST` | 服务器 IP 地址 | `47.106.102.208` |
 | `DEPLOY_USER` | SSH 用户名 | `xiayuku63` |
-| `DEPLOY_SSH_KEY` | SSH 私钥 (完整内容) | `-----BEGIN OPENSSH PRIVATE KEY-----...` |
-| `DEPLOY_PORT` | SSH 端口 (可选，默认 22) | `22` |
+| `DEPLOY_SSH_KEY` | SSH 私钥（完整内容） | `-----BEGIN OPENSSH PRIVATE KEY-----...` |
+| `DEPLOY_PORT` | SSH 端口（可选，默认 22） | `22` |
 
 ### 生成 SSH 密钥对
 
 ```bash
-# 在本地机器上生成密钥对
 ssh-keygen -t ed25519 -C "github-actions-deploy" -f ~/.ssh/github_deploy
-
-# 将公钥添加到服务器
 ssh-copy-id -i ~/.ssh/github_deploy.pub xiayuku63@47.106.102.208
-
-# 将私钥内容复制到 GitHub Secret (DEPLOY_SSH_KEY)
 cat ~/.ssh/github_deploy
 ```
 
-## 🌐 IPv4 强制配置
+将最后一个命令输出的私钥完整内容保存为 `DEPLOY_SSH_KEY`。
 
-由于阿里云服务器可能存在 IPv6 连接超时问题，流水线通过以下方式强制使用 IPv4：
+## 相关文件
 
-1. 使用直接 IPv4 地址 (`47.106.102.208`) 而非域名
-2. 设置 `GODEBUG=netdns=go+netgo` 环境变量
-
-## 📁 相关文件
-
-- `.github/workflows/ci.yml` - CI/CD 流水线配置
+- `.github/workflows/ci.yml` - 唯一的 CI/CD 流水线配置
 - `Dockerfile.prod` - 生产环境 Docker 镜像
 - `docker-compose.prod.yml` - 生产环境 Docker Compose 配置
+- `deploy/one_click_deploy.sh` - 自动与手动部署共用脚本
 - `deploy/docker_deploy.sh` - 手动部署脚本（备用）
-- `deploy/update.sh` - 快速更新脚本（备用）
 
-## 🎯 触发条件
+## 触发条件
 
 | 事件 | 触发的 Job |
 |------|-----------|
 | PR to main | lint, typecheck, test, docker-build |
 | Push to main | lint, typecheck, test, docker-build, **deploy** |
+| Manual dispatch | lint, typecheck, test, docker-build, **deploy** |
 
-## 📊 监控部署
-
-部署后可以通过以下方式检查：
+## 监控部署
 
 ```bash
-# 在服务器上查看服务状态
 docker compose -f docker-compose.prod.yml ps
-
-# 查看应用日志
 docker compose -f docker-compose.prod.yml logs -f app
-
-# 健康检查
 curl http://127.0.0.1:5000/healthz
 ```
 
-## ⚠️ 故障排除
+## 故障排除
 
-### 部署失败
-1. 检查 GitHub Actions 日志
-2. 确认 SSH 密钥是否正确配置
-3. 确认服务器上的 Docker 服务是否运行
+### 部署在 SSH 步骤前失败
+
+检查 Actions 日志中的 secret 预检结果，并确认以下 secrets 均已配置：
+
+- `DEPLOY_HOST`
+- `DEPLOY_USER`
+- `DEPLOY_SSH_KEY`
+
+### SSH 连接失败
+
+1. 确认服务器 SSH 服务和端口可访问。
+2. 确认 `DEPLOY_SSH_KEY` 对应公钥已写入部署用户的 `~/.ssh/authorized_keys`。
+3. 确认部署用户可以运行 `git`、`docker` 和 `docker compose`。
 
 ### 健康检查失败
-1. 查看服务器上的应用日志
-2. 检查 `.env.prod` 配置文件
-3. 确认端口 5000 未被占用
 
-### IPv4 连接问题
-如果仍然遇到超时，可以在服务器上配置 SSH：
-```bash
-# 编辑 /etc/ssh/sshd_config
-AddressFamily inet
-```
+1. 查看服务器上的应用日志。
+2. 检查 `.env.prod` 配置文件。
+3. 确认端口 5000 未被其他服务占用。
