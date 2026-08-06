@@ -78,6 +78,14 @@ jobs:
           tags: pricer3d:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          outputs: type=docker,dest=/tmp/pricer3d-image.tar
+
+      - name: Upload Docker image artifact
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        uses: actions/upload-artifact@v7
+        with:
+          name: pricer3d-image-${{ github.sha }}
+          path: /tmp/pricer3d-image.tar
 
   deploy:
     name: Deploy to Production
@@ -118,6 +126,11 @@ jobs:
       - name: Package deployment revision
         run: git archive --format=tar.gz --output="pricer3d-release-${{ github.sha }}.tar.gz" HEAD
 
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: pricer3d-image-${{ github.sha }}
+
       - name: Upload deployment revision
         uses: appleboy/scp-action@v1.0.0
         with:
@@ -127,6 +140,18 @@ jobs:
           port: ${{ secrets.DEPLOY_PORT || 22 }}
           timeout: 600s
           source: pricer3d-release-${{ github.sha }}.tar.gz
+          target: /tmp
+          overwrite: true
+
+      - name: Upload Docker image
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          timeout: 600s
+          source: pricer3d-image.tar
           target: /tmp
           overwrite: true
 
@@ -165,10 +190,13 @@ jobs:
             mkdir -p "$APP_DIR"
             find "$APP_DIR" -mindepth 1 -maxdepth 1 ! -name '.env.prod' -exec rm -rf -- {} +
             cp -a "$STAGE_DIR"/. "$APP_DIR"/
-            rm -rf "$ARCHIVE" "$STAGE_DIR"
+            docker load --input "/tmp/pricer3d-image.tar"
+            docker tag "pricer3d:${RELEASE_ID}" pricer3d-app:latest
+            rm -f "$ARCHIVE" "/tmp/pricer3d-image.tar"
+            rm -rf "$STAGE_DIR"
 
-            echo "Running deployment script..."
-            SKIP_GIT_PULL=1 bash "$APP_DIR/deploy/one_click_deploy.sh"
+            echo "Running deployment script with preloaded image..."
+            SKIP_GIT_PULL=1 SKIP_DOCKER_BUILD=1 bash "$APP_DIR/deploy/one_click_deploy.sh"
 
             # Restore legacy /app/data into the new persistent volume.
             if [ -d "$MIGRATION_DIR/data" ] && docker inspect pricer3d-app >/dev/null 2>&1; then
