@@ -37,12 +37,20 @@ else
   ok ".env.prod exists"
 fi
 
-# ── 3. Build and restart ──
-log "🐳 Building Docker image (this may take a few minutes)..."
-docker compose -f docker-compose.prod.yml build
+# ?? 3. Build and restart ??
+if [ "${SKIP_DOCKER_BUILD:-0}" = "1" ]; then
+  log "Using Docker image preloaded by CI"
+else
+  log "Building Docker image (this may take a few minutes)..."
+  docker compose -f docker-compose.prod.yml build
+fi
 
-log "🔄 Restarting services..."
-docker compose -f docker-compose.prod.yml up -d
+log "Restarting services..."
+if [ "${SKIP_DOCKER_BUILD:-0}" = "1" ]; then
+  docker compose -f docker-compose.prod.yml up -d --no-build
+else
+  docker compose -f docker-compose.prod.yml up -d
+fi
 
 # ── 4. Wait for readiness ──
 log "⏳ Waiting for app to be ready..."
