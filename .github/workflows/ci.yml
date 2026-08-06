@@ -216,4 +216,10 @@ jobs:
             fi
 
             rm -rf "$MIGRATION_DIR"
+            echo "Checking public HTTP endpoint on port 8080..."
+            if ! curl -sf http://127.0.0.1:8080/healthz > /dev/null 2>&1; then
+              docker compose -f "$APP_DIR/docker-compose.prod.yml" logs --tail=50 nginx
+              exit 1
+            fi
+
             echo "Deployment successful"

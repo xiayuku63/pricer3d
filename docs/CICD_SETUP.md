@@ -89,8 +89,9 @@ cat ~/.ssh/github_deploy
 公网访问端口：
 
 - HTTP：`http://47.106.102.208:8080`
-- HTTPS：`https://47.106.102.208:8443`
+- HTTPS will be enabled on port 8443 after the production certificate is available
 - 应用内部健康检查仍使用 `127.0.0.1:5000`
+
 ## 监控部署
 
 ```bash
