@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFile } from "node:fs/promises";
 
 import { getCoplanarClusters, getPreview3mf, getPreviewGlb, getPreviewStl } from "../static/js/modules/preview-cache.js";
 
@@ -125,4 +126,14 @@ test("does not retain failed manual-placement responses", async () => {
     const retried = await getCoplanarClusters(file, request);
     assert.equal(retried.resp.ok, true);
     assert.equal(calls, 2);
+});
+
+test("STEP preview prefetches the cached manual-placement profile after the model is visible", async () => {
+    const preview = await readFile(new URL("../static/js/modules/preview.js", import.meta.url), "utf8");
+
+    assert.match(preview, /function prefetchStepPlacementProfile/);
+    assert.match(preview, /normalizedExtension !== 'stp' && normalizedExtension !== 'step'/);
+    assert.match(preview, /getCoplanarClusters\(file, authFetch\)/);
+    assert.match(preview, /requestIdleCallback\(prefetch, \{ timeout: 500 \}\)/);
+    assert.match(preview, /prefetchStepPlacementProfile\(file, ext\)/);
 });
