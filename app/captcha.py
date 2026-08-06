@@ -7,6 +7,7 @@ import logging
 import secrets
 import hashlib
 import threading
+from pathlib import Path
 from typing import Optional
 
 from fastapi import HTTPException
@@ -14,6 +15,8 @@ from fastapi import HTTPException
 from .config import JWT_SECRET_KEY, CAPTCHA_MAX_ATTEMPTS
 
 _logger = logging.getLogger(__name__)
+_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+_BUNDLED_FONT = _PROJECT_ROOT / "static" / "fonts" / "DejaVuSans-Bold.ttf"
 
 
 class CaptchaStore:
@@ -117,10 +120,12 @@ def captcha_image_bytes(text: str) -> tuple[str, bytes]:
 
     font = None
     font_candidates = [
+        str(_BUNDLED_FONT),
         os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "Fonts", "arial.ttf"),
         os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "Fonts", "segoeui.ttf"),
         "DejaVuSans.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
     ]
     for fp in font_candidates:
         try:
@@ -133,7 +138,10 @@ def captcha_image_bytes(text: str) -> tuple[str, bytes]:
             _logger.debug("captcha: failed to load font %s: %s", fp, e)
             font = None
     if font is None:
-        font = ImageFont.load_default()
+        try:
+            font = ImageFont.load_default(font_size)  # Pillow >= 10.1
+        except TypeError:
+            font = ImageFont.load_default()
 
     start_x = (width - (len(text) * char_step)) // 2
     for idx, ch in enumerate(text):
