@@ -76,6 +76,7 @@ export async function savePrinterPreset() {
         bed_height: Number(document.getElementById('pp-bed-z')?.value) || 256,
         nozzle: nozzles.includes(0.4) ? 0.4 : nozzles[0],
         nozzles,
+        ...readPrinterLifecyclePayload(),
     };
     try {
         const resp = await authFetch('/api/printer/presets', {
@@ -165,11 +166,57 @@ export function addEnabledPrinterSlot() {
 }
 
 // ── Custom printer form management ──
+const PRINTER_GCODE_FIELD_IDS = {
+    start_gcode: 'custom-pp-start-gcode',
+    before_layer_gcode: 'custom-pp-before-layer-gcode',
+    layer_gcode: 'custom-pp-layer-gcode',
+    end_gcode: 'custom-pp-end-gcode',
+};
+let printerGcodeDefaultsPromise = null;
+
+function ensurePrinterGcodeDefaults() {
+    const form = document.getElementById('custom-printer-form');
+    if (!form || form.dataset.gcodeDefaultsLoaded === 'true') return Promise.resolve();
+    if (printerGcodeDefaultsPromise) return printerGcodeDefaultsPromise;
+
+    printerGcodeDefaultsPromise = fetch('/api/printer/gcode-defaults')
+        .then(async response => {
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            const defaults = data?.defaults || {};
+            const flavor = document.getElementById('custom-pp-gcode-flavor');
+            if (flavor && defaults.gcode_flavor) flavor.value = defaults.gcode_flavor;
+            for (const [field, elementId] of Object.entries(PRINTER_GCODE_FIELD_IDS)) {
+                const element = document.getElementById(elementId);
+                if (element && !element.value) element.value = defaults[field] || '';
+            }
+            form.dataset.gcodeDefaultsLoaded = 'true';
+        })
+        .catch(error => {
+            console.warn('Failed to load printer lifecycle G-code defaults:', error);
+        })
+        .finally(() => { printerGcodeDefaultsPromise = null; });
+    return printerGcodeDefaultsPromise;
+}
+
+function readPrinterLifecyclePayload() {
+    const form = document.getElementById('custom-printer-form');
+    const defaultsLoaded = form?.dataset.gcodeDefaultsLoaded === 'true';
+    const payload = {
+        gcode_flavor: document.getElementById('custom-pp-gcode-flavor')?.value || 'marlin2',
+    };
+    for (const [field, elementId] of Object.entries(PRINTER_GCODE_FIELD_IDS)) {
+        payload[field] = defaultsLoaded ? (document.getElementById(elementId)?.value ?? '') : null;
+    }
+    return payload;
+}
+
 export function showCustomPrinterForm() {
     const form = document.getElementById('custom-printer-form');
     if (form) form.classList.remove('hidden');
     const nameEl = document.getElementById('custom-pp-name');
     if (nameEl) { nameEl.value = ''; nameEl.focus(); }
+    void ensurePrinterGcodeDefaults();
 }
 
 export function hideCustomPrinterForm() {
@@ -199,6 +246,7 @@ export async function saveCustomPrinter() {
         bed_height: Number(document.getElementById('custom-pp-bed-z')?.value) || 256,
         nozzle: nozzles.includes(0.4) ? 0.4 : nozzles[0],
         nozzles,
+        ...readPrinterLifecyclePayload(),
     };
     try {
         const resp = await authFetch('/api/printer/presets', {
