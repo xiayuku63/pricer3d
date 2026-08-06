@@ -1,13 +1,18 @@
 """Printer preset API routes."""
 
 import logging
-
 from fastapi import Request, Depends, HTTPException
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
 from .deps import get_current_user
 from .audit import write_audit_event
+from .printer_gcode import (
+    GCODE_FIELD_MAX_LEN,
+    GcodeFlavor,
+    PrinterLifecycleGcode,
+    default_lifecycle_values,
+)
 from .printer_presets import (
     list_printer_presets,
     get_printer_preset_by_id,
@@ -25,7 +30,16 @@ class PrinterPresetRequest(BaseModel):
     bed_depth: float = Field(256.0, ge=50.0, le=1000.0)
     bed_height: float = Field(256.0, ge=50.0, le=1000.0)
     nozzle: float = Field(0.4, description="默认喷嘴直径(mm)")
-    nozzles: list[float] = Field(default=[0.4], description="可用喷嘴列表")
+    nozzles: list[float] = Field(default_factory=lambda: [0.4], description="可用喷嘴列表")
+    gcode_flavor: GcodeFlavor = GcodeFlavor.MARLIN2
+    start_gcode: str | None = Field(None, max_length=GCODE_FIELD_MAX_LEN, description="打印前 G-code")
+    before_layer_gcode: str | None = Field(None, max_length=GCODE_FIELD_MAX_LEN, description="换层前 G-code")
+    layer_gcode: str | None = Field(None, max_length=GCODE_FIELD_MAX_LEN, description="换层后 G-code")
+    end_gcode: str | None = Field(None, max_length=GCODE_FIELD_MAX_LEN, description="打印后 G-code")
+
+
+async def api_get_printer_gcode_defaults():
+    return {"defaults": default_lifecycle_values()}
 
 
 async def api_list_printer_presets(current_user=Depends(get_current_user)):
@@ -54,6 +68,16 @@ async def api_create_printer_preset(
     payload: PrinterPresetRequest, request: Request, current_user=Depends(get_current_user)
 ):
     try:
+        try:
+            lifecycle = PrinterLifecycleGcode.build(
+                gcode_flavor=payload.gcode_flavor,
+                start_gcode=payload.start_gcode,
+                before_layer_gcode=payload.before_layer_gcode,
+                layer_gcode=payload.layer_gcode,
+                end_gcode=payload.end_gcode,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         preset = upsert_printer_preset(
             int(current_user["id"]),
             payload.name.strip(),
@@ -62,6 +86,7 @@ async def api_create_printer_preset(
             payload.bed_height,
             payload.nozzle,
             payload.nozzles,
+            lifecycle=lifecycle,
         )
         write_audit_event(
             action="printer.preset.create",
