@@ -54,3 +54,17 @@ test('disconnected coplanar patches remain separate but share one placement clus
     assert.equal(patch.boundaryPositions.length / 6, 6);
     assert.equal(patch.positions[0], 10);
 });
+
+test('compact STEP-style vertex and index data avoids duplicated triangle payloads', () => {
+    const patch = buildCandidatePatchData([{
+        patch_vertices: [
+            [0, 0, 0], [2, 0, 0], [2, 2, 0], [0, 2, 0],
+        ],
+        patch_indices: [0, 1, 2, 0, 2, 3],
+    }]);
+
+    assert.equal(patch.positions.length / 3, 4);
+    assert.equal(patch.indices.length / 3, 2);
+    assert.equal(patch.boundaryPositions.length / 6, 4);
+    assert.deepEqual(patch.triangleClusterIds, [0, 0]);
+});

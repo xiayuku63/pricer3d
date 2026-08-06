@@ -146,7 +146,7 @@ async def list_coplanar_clusters(
             return {"filename": filename, "clusters": []}
 
         cluster_started = time.perf_counter()
-        clusters = cluster_coplanar_faces(mesh, include_upward_faces=True)
+        clusters = cluster_coplanar_faces(mesh, include_upward_faces=True, compact_geometry=True)
         cluster_ms = (time.perf_counter() - cluster_started) * 1000.0
         logger.info(
             "manual placement profile filename=%s vertices=%d faces=%d clusters=%d load_ms=%.1f cluster_ms=%.1f",

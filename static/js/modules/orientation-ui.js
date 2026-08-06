@@ -333,7 +333,7 @@ export async function toggleLayFace() {
             const cluster = clusters[hit.index];
             if (!cluster || !cluster.normal) return false;
             cleanupLayFaceMode();
-            placeFaceOnBed(currentMesh, cluster.normal, 'Z', cluster.face_vertices);
+            placeFaceOnBed(currentMesh, cluster.normal, 'Z', cluster.patch_vertices || cluster.face_vertices);
             syncOrientationFromMesh();
             const message = t('orientation.manualApplied');
             setOrientationHint(true, message, 'success');
@@ -346,7 +346,7 @@ export async function toggleLayFace() {
                 const c = clusters[idx];
                 if (c && c.normal) {
                     cleanupLayFaceMode();
-                    placeFaceOnBed(currentMesh, c.normal, 'Z', c.face_vertices);
+                    placeFaceOnBed(currentMesh, c.normal, 'Z', c.patch_vertices || c.face_vertices);
                     syncOrientationFromMesh();
                     const message = t('orientation.manualApplied');
                     setOrientationHint(true, message, 'success');
