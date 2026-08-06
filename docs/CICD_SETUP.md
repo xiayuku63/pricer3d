@@ -85,12 +85,20 @@ cat ~/.ssh/github_deploy
 | Push to main | lint, typecheck, test, docker-build, **deploy** |
 | Manual dispatch | lint, typecheck, test, docker-build, **deploy** |
 
+'
+
+公网访问端口：
+
+- HTTP：`http://47.106.102.208:8080`
+- HTTPS：`https://47.106.102.208:8443`
+- 应用内部健康检查仍使用 `127.0.0.1:5000`
+'
 ## 监控部署
 
 ```bash
 docker compose -f docker-compose.prod.yml ps
 docker compose -f docker-compose.prod.yml logs -f app
-curl http://127.0.0.1:5000/healthz
+curl http://47.106.102.208:8080/healthz
 ```
 
 ## 故障排除
