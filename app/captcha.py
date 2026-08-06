@@ -88,18 +88,18 @@ def generate_captcha_text(length: int) -> str:
 
 def captcha_image_bytes(text: str) -> tuple[str, bytes]:
     try:
-        from PIL import Image, ImageDraw, ImageFont, ImageFilter
+        from PIL import Image, ImageDraw, ImageFont
     except Exception as e:
         _logger.debug("captcha: PIL not available, falling back to SVG: %s", e)
         svg = captcha_svg_fallback(text)
         return "image/svg+xml", svg.encode("utf-8")
 
     rnd = secrets.SystemRandom()
-    font_size = 30
-    char_step = 28
-    pad = 18
-    width = max(150, (len(text) * char_step) + (pad * 2))
-    height = 56
+    font_size = 36
+    char_step = 34
+    pad = 20
+    width = max(180, (len(text) * char_step) + (pad * 2))
+    height = 64
     img = Image.new("RGB", (width, height), (248, 250, 252))
     draw = ImageDraw.Draw(img)
     for _ in range(6):
@@ -145,7 +145,6 @@ def captcha_image_bytes(text: str) -> tuple[str, bytes]:
         glyph_draw.text((7, y), ch, font=font, fill=(17, 24, 39, 255))
         glyph = glyph.rotate(angle, resample=Image.Resampling.BICUBIC, expand=1)
         img.paste(glyph, (x, 0), glyph)
-    img = img.filter(ImageFilter.SMOOTH_MORE)
     buf = io.BytesIO()
     img.save(buf, format="PNG", optimize=True)
     return "image/png", buf.getvalue()
@@ -153,11 +152,11 @@ def captcha_image_bytes(text: str) -> tuple[str, bytes]:
 
 def captcha_svg_fallback(text: str) -> str:
     rnd = secrets.SystemRandom()
-    font_size = 24
-    char_step = 26
-    pad = 18
-    width = max(150, (len(text) * char_step) + (pad * 2))
-    height = 56
+    font_size = 30
+    char_step = 32
+    pad = 20
+    width = max(180, (len(text) * char_step) + (pad * 2))
+    height = 64
     start_x = (width - (len(text) * char_step)) // 2
     bg1 = "#f8fafc"
     bg2 = "#eef2ff"
@@ -175,7 +174,7 @@ def captcha_svg_fallback(text: str) -> str:
     chars = []
     for idx, ch in enumerate(text):
         x = int(start_x + idx * char_step + rnd.randint(-1, 1))
-        y = 36 + rnd.randint(-2, 2)
+        y = 42 + rnd.randint(-2, 2)
         rot = rnd.randint(-16, 16)
         size = font_size + rnd.randint(-1, 2)
         chars.append(
