@@ -104,6 +104,31 @@ jobs:
             echo "::error::Missing required GitHub Actions secrets: ${missing[*]}"
             exit 1
           fi
+          key_file=$(mktemp)
+          trap 'rm -f "$key_file"' EXIT
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$key_file"
+          if ! ssh-keygen -y -f "$key_file" >/dev/null 2>&1; then
+            echo "::error::DEPLOY_SSH_KEY is not a valid unencrypted private SSH key"
+            exit 1
+          fi
+
+      - name: Checkout deployment revision
+        uses: actions/checkout@v7
+
+      - name: Package deployment revision
+        run: git archive --format=tar.gz --output="pricer3d-release-${{ github.sha }}.tar.gz" HEAD
+
+      - name: Upload deployment revision
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          timeout: 600s
+          source: pricer3d-release-${{ github.sha }}.tar.gz
+          target: /tmp
+          overwrite: true
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.5
@@ -118,22 +143,49 @@ jobs:
             set -euo pipefail
 
             APP_DIR="$HOME/pricer3d"
-            REPO_URL="https://github.com/${{ github.repository }}.git"
+            RELEASE_ID="${{ github.sha }}"
+            ARCHIVE="/tmp/pricer3d-release-${RELEASE_ID}.tar.gz"
+            STAGE_DIR="/tmp/pricer3d-stage-${RELEASE_ID}"
+            MIGRATION_DIR="/tmp/pricer3d-migration-${RELEASE_ID}"
 
-            if [ -e "$APP_DIR" ] && [ ! -d "$APP_DIR/.git" ]; then
-              echo "? $APP_DIR exists but is not a Git repository"
-              exit 1
+            rm -rf "$STAGE_DIR"
+            mkdir -p "$STAGE_DIR" "$MIGRATION_DIR/data"
+            tar -xzf "$ARCHIVE" -C "$STAGE_DIR"
+
+            if [ -f "$APP_DIR/.env.prod" ]; then
+              cp "$APP_DIR/.env.prod" "$STAGE_DIR/.env.prod"
             fi
 
-            if [ ! -d "$APP_DIR/.git" ]; then
-              echo "Cloning repository..."
-              git clone --branch main --single-branch "$REPO_URL" "$APP_DIR"
+            # Preserve data from the legacy container before replacing it.
+            if docker inspect pricer3d >/dev/null 2>&1; then
+              docker cp pricer3d:/app/data/. "$MIGRATION_DIR/data/" 2>/dev/null || true
+              docker rm -f pricer3d
             fi
 
-            echo "Synchronizing main with origin..."
-            git -C "$APP_DIR" remote set-url origin "$REPO_URL"
-            git -C "$APP_DIR" fetch --prune origin main
-            git -C "$APP_DIR" checkout --force -B main origin/main
+            mkdir -p "$APP_DIR"
+            find "$APP_DIR" -mindepth 1 -maxdepth 1 ! -name '.env.prod' -exec rm -rf -- {} +
+            cp -a "$STAGE_DIR"/. "$APP_DIR"/
+            rm -rf "$ARCHIVE" "$STAGE_DIR"
 
             echo "Running deployment script..."
             SKIP_GIT_PULL=1 bash "$APP_DIR/deploy/one_click_deploy.sh"
+
+            # Restore legacy /app/data into the new persistent volume.
+            if [ -d "$MIGRATION_DIR/data" ] && docker inspect pricer3d-app >/dev/null 2>&1; then
+              docker cp "$MIGRATION_DIR/data/." pricer3d-app:/app/data/
+              docker restart pricer3d-app
+              for i in $(seq 1 12); do
+                sleep 5
+                if curl -sf http://127.0.0.1:5000/healthz > /dev/null 2>&1; then
+                  echo "Health check passed after data migration"
+                  break
+                fi
+                if [ "$i" -eq 12 ]; then
+                  docker compose -f "$APP_DIR/docker-compose.prod.yml" logs --tail=50 app
+                  exit 1
+                fi
+              done
+            fi
+
+            rm -rf "$MIGRATION_DIR"
+            echo "Deployment successful"

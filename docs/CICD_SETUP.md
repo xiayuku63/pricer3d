@@ -41,9 +41,9 @@ push/PR to main
 
 ### Deploy（仅 push to main 或手动触发）
 
-- 使用 `appleboy/ssh-action` 通过 SSH 连接到服务器
-- 将服务器 `$HOME/pricer3d` 强制同步到 `origin/main`，避免本地修改或分支漂移
-- 调用 `deploy/one_click_deploy.sh` 构建并重启 Docker Compose 服务
+- 使用 `appleboy/scp-action` 将 GitHub runner 上已校验的当前 revision 上传到服务器，避免服务器访问 GitHub 超时
+- 保留服务器 `.env.prod`，并迁移旧容器 `/app/data` 到新持久化卷
+- 使用 `appleboy/ssh-action` 远程执行 `deploy/one_click_deploy.sh`
 - 部署后自动执行健康检查和 PrusaSlicer 诊断
 
 仓库只保留 `.github/workflows/ci.yml` 这一条部署链路，避免同一次 push 重复部署。
@@ -55,7 +55,7 @@ push/PR to main
 | Secret 名称 | 说明 | 示例值 |
 |-------------|------|--------|
 | `DEPLOY_HOST` | 服务器 IP 地址 | `47.106.102.208` |
-| `DEPLOY_USER` | SSH 用户名 | `xiayuku63` |
+| `DEPLOY_USER` | SSH 用户名 | `root` |
 | `DEPLOY_SSH_KEY` | SSH 私钥（完整内容） | `-----BEGIN OPENSSH PRIVATE KEY-----...` |
 | `DEPLOY_PORT` | SSH 端口（可选，默认 22） | `22` |
 
