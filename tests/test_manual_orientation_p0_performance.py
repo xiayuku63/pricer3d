@@ -29,7 +29,7 @@ def test_manual_hull_filter_skips_per_cluster_ray_safety_checks(monkeypatch):
     assert ray_calls == 0
 
 
-def test_manual_output_is_trimmed_before_outline_extraction(monkeypatch):
+def test_manual_profile_skips_outline_work_for_curved_tessellation_fragments(monkeypatch):
     mesh = trimesh.creation.icosphere(subdivisions=2, radius=10.0)
     calls = 0
     original = orientation_cluster._extract_cluster_outline_p3d
@@ -43,8 +43,8 @@ def test_manual_output_is_trimmed_before_outline_extraction(monkeypatch):
 
     clusters = orientation_cluster.cluster_coplanar_faces(mesh, include_upward_faces=True)
 
-    assert len(clusters) == orientation_cluster.MAX_RETURN_CLUSTERS
-    assert calls == orientation_cluster.MAX_RETURN_CLUSTERS
+    assert clusters == []
+    assert calls == 0
 
 
 def test_plane_bucket_merge_keeps_disconnected_coplanar_fragments_together():
@@ -89,3 +89,65 @@ def test_plane_bucket_merge_keeps_disconnected_coplanar_fragments_together():
     assert len(merged) == 1
     assert merged[0]["faces"] == [0, 1]
     assert merged[0]["area"] == 1.0
+
+
+def test_manual_profile_discards_tessellated_curve_bands():
+    mesh = trimesh.creation.cylinder(radius=10.0, height=20.0, sections=256)
+
+    clusters = orientation_cluster.cluster_coplanar_faces(mesh, include_upward_faces=True)
+
+    assert len(clusters) == 2
+    assert all(cluster["area"] > 300.0 for cluster in clusters)
+
+
+def test_manual_compact_geometry_uses_shared_vertices_and_triangle_indices():
+    mesh = trimesh.creation.box(extents=[20.0, 30.0, 40.0])
+
+    clusters = orientation_cluster.cluster_coplanar_faces(
+        mesh,
+        include_upward_faces=True,
+        compact_geometry=True,
+    )
+
+    assert len(clusters) == 6
+    assert all("face_vertices" not in cluster for cluster in clusters)
+    assert all(len(cluster["patch_vertices"]) == 4 for cluster in clusters)
+    assert all(len(cluster["patch_indices"]) == 6 for cluster in clusters)
+
+
+def test_manual_profile_prunes_small_satellite_patch_from_large_support_plane():
+    large = trimesh.creation.box(extents=[20.0, 20.0, 2.0])
+    large.apply_translation([0.0, 0.0, 1.0])
+    satellite = trimesh.creation.box(extents=[6.0, 6.0, 2.0])
+    satellite.apply_translation([15.0, 0.0, 1.0])
+    mesh = trimesh.util.concatenate([large, satellite])
+
+    clusters = orientation_cluster.cluster_coplanar_faces(
+        mesh,
+        include_upward_faces=True,
+        compact_geometry=True,
+    )
+
+    support_planes = [cluster for cluster in clusters if cluster["normal"][2] != 0.0]
+    assert len(support_planes) == 2
+    assert all(cluster["area"] == 400.0 for cluster in support_planes)
+    assert all(len(cluster["patch_vertices"]) == 4 for cluster in support_planes)
+
+
+def test_manual_profile_keeps_equal_sized_disconnected_feet():
+    left = trimesh.creation.box(extents=[10.0, 10.0, 2.0])
+    left.apply_translation([-7.0, 0.0, 1.0])
+    right = trimesh.creation.box(extents=[10.0, 10.0, 2.0])
+    right.apply_translation([7.0, 0.0, 1.0])
+    mesh = trimesh.util.concatenate([left, right])
+
+    clusters = orientation_cluster.cluster_coplanar_faces(
+        mesh,
+        include_upward_faces=True,
+        compact_geometry=True,
+    )
+
+    support_planes = [cluster for cluster in clusters if cluster["normal"][2] != 0.0]
+    assert len(support_planes) == 2
+    assert all(cluster["area"] == 200.0 for cluster in support_planes)
+    assert all(len(cluster["patch_vertices"]) == 8 for cluster in support_planes)

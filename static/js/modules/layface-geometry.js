@@ -1,10 +1,10 @@
 /**
  * Build compact render data for manual-placement candidate patches.
  *
- * The API currently returns triangle vertices as a duplicated list. This helper
- * deduplicates vertices per cluster, preserves the original triangles (so
- * concave regions and holes stay correct), and extracts only boundary edges for
- * the white contour.
+ * New manual-placement responses provide a shared vertex pool plus triangle
+ * indices. Legacy duplicated face_vertices responses are still accepted. Both
+ * paths preserve concave regions, holes, and disconnected patches while
+ * extracting only true boundary edges for the contour.
  */
 
 const DEFAULT_QUANTIZATION = 1e-5;
@@ -50,7 +50,10 @@ export function buildCandidatePatchData(
     const clusterBoundaryRanges = Array.from({ length: clusters?.length || 0 }, () => null);
 
     (clusters || []).forEach((cluster, clusterIndex) => {
-        const rawVertices = trianglesForCluster(cluster);
+        const compactVertices = Array.isArray(cluster?.patch_vertices) ? cluster.patch_vertices : null;
+        const compactIndices = Array.isArray(cluster?.patch_indices) ? cluster.patch_indices : null;
+        const hasCompactGeometry = compactVertices?.length >= 3 && compactIndices?.length >= 3;
+        const rawVertices = hasCompactGeometry ? compactVertices : trianglesForCluster(cluster);
         if (rawVertices.length < 3) return;
 
         const vertexMap = new Map();
@@ -77,14 +80,8 @@ export function buildCandidatePatchData(
             return globalIndex;
         };
 
-        for (let offset = 0; offset + 2 < rawVertices.length; offset += 3) {
-            const triangle = [
-                getVertexIndex(rawVertices[offset]),
-                getVertexIndex(rawVertices[offset + 1]),
-                getVertexIndex(rawVertices[offset + 2]),
-            ];
-            if (triangle.some(index => index < 0) || new Set(triangle).size !== 3) continue;
-
+        const addTriangle = triangle => {
+            if (triangle.some(index => index < 0) || new Set(triangle).size !== 3) return;
             clusterTriangles.push(triangle);
             for (const [a, b] of [
                 [triangle[0], triangle[1]],
@@ -95,6 +92,30 @@ export function buildCandidatePatchData(
                 const edge = edgeCounts.get(edgeKey);
                 if (edge) edge.count += 1;
                 else edgeCounts.set(edgeKey, { a, b, count: 1 });
+            }
+        };
+
+        if (hasCompactGeometry) {
+            const globalVertexIndices = compactVertices.map(getVertexIndex);
+            const flatIndices = Array.isArray(compactIndices[0])
+                ? compactIndices.flat()
+                : compactIndices;
+            for (let offset = 0; offset + 2 < flatIndices.length; offset += 3) {
+                const localTriangle = [
+                    Number(flatIndices[offset]),
+                    Number(flatIndices[offset + 1]),
+                    Number(flatIndices[offset + 2]),
+                ];
+                if (localTriangle.some(index => !Number.isInteger(index) || index < 0 || index >= globalVertexIndices.length)) continue;
+                addTriangle(localTriangle.map(index => globalVertexIndices[index]));
+            }
+        } else {
+            for (let offset = 0; offset + 2 < rawVertices.length; offset += 3) {
+                addTriangle([
+                    getVertexIndex(rawVertices[offset]),
+                    getVertexIndex(rawVertices[offset + 1]),
+                    getVertexIndex(rawVertices[offset + 2]),
+                ]);
             }
         }
 

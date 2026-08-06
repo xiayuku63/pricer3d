@@ -5,6 +5,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import {
     selectedFilesMap, thumbnailMap, currentResults,
     currentPreviewFilename, setCurrentPreviewFilename, quoteOptions,
+    authToken, authFetch,
     colorToObj, getRenderColorHex, formatColorLabel, getCachedPrinterModels,
 } from './state.js';
 import {
@@ -18,7 +19,7 @@ import { clearClusters } from './layface.js';
 import { t } from './i18n.js';
 import { getResultOrientation, hasNonZeroOrientation } from './orientation-state.js';
 import { addPreviewLighting, configurePreviewRenderer, createPreviewMaterial } from './viewer/render-style.js';
-import { getPreview3mf, getPreviewGlb } from './preview-cache.js';
+import { getCoplanarClusters, getPreview3mf, getPreviewGlb } from './preview-cache.js';
 import {
     showModelProgress, updateModelProgress, completeModelProgress,
     startModelProgressItems, updateModelProgressItem,
@@ -552,6 +553,23 @@ export function closePreviewModal() {
     if (viewCube) viewCube.classList.add('hidden');
 }
 
+
+function prefetchStepPlacementProfile(file, extension) {
+    if (!authToken || !file) return;
+    const normalizedExtension = String(extension || file.name?.split('.').pop() || '')
+        .toLowerCase()
+        .replace(/^\./, '');
+    if (normalizedExtension !== 'stp' && normalizedExtension !== 'step') return;
+
+    const prefetch = () => {
+        getCoplanarClusters(file, authFetch).catch(() => {
+            // The manual-placement action will retry and surface any real error.
+        });
+    };
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(prefetch, { timeout: 500 });
+    else setTimeout(prefetch, 0);
+}
+
 export function previewByFilename(filename, ext) {
     const { previewPlaceholder } = dom;
     setCurrentPreviewFilename(filename);
@@ -594,6 +612,7 @@ export function previewByFilename(filename, ext) {
         if (ok) {
             applySavedEntityColors(rowData?._entity_colors);
             renderEntityColorControls();
+            prefetchStepPlacementProfile(file, ext);
         } else hideEntityColorControls();
     });
 }

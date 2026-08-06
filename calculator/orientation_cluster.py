@@ -18,6 +18,10 @@ logger = logging.getLogger(__name__)
 COPLANAR_ANGLE_TOLERANCE_DEG = 3.0
 COPLANAR_ANGLE_TOLERANCE_RAD = math.radians(COPLANAR_ANGLE_TOLERANCE_DEG)
 COPLANAR_COS_THRESHOLD = math.cos(COPLANAR_ANGLE_TOLERANCE_RAD)
+MANUAL_COPLANAR_ANGLE_TOLERANCE_DEG = 0.5
+MANUAL_COPLANAR_COS_THRESHOLD = math.cos(math.radians(MANUAL_COPLANAR_ANGLE_TOLERANCE_DEG))
+MANUAL_MIN_COPLANAR_AREA_MM2 = 5.0
+MANUAL_COMPONENT_AREA_RATIO = 0.25
 MIN_COPLANAR_AREA_MM2 = 10.0
 MAX_RETURN_CLUSTERS = 64
 
@@ -380,6 +384,7 @@ def get_convex_hull_candidate_planes(
 def cluster_coplanar_faces(
     mesh: trimesh.Trimesh,
     include_upward_faces: bool = False,
+    compact_geometry: bool = False,
 ) -> list[dict]:
     """Cluster mesh triangles into coplanar groups usable as print-bed contact faces.
 
@@ -416,25 +421,50 @@ def cluster_coplanar_faces(
     face_centers = (v0 + v1 + v2) / 3.0
     plane_offsets = np.einsum("ij,ij->i", norms, face_centers)
 
-    # ── Step 2: edge-adjacency graph ──
-    edge_to_faces: dict[tuple, list] = {}
-    for fi, (f0, f1, f2) in enumerate(faces):
-        for edge in [(min(f0, f1), max(f0, f1)), (min(f1, f2), max(f1, f2)), (min(f2, f0), max(f2, f0))]:
-            edge_to_faces.setdefault(edge, []).append(fi)
-
-    adj = [set() for _ in range(n_faces)]
-    for face_list in edge_to_faces.values():
-        for i in range(len(face_list)):
-            for j in range(i + 1, len(face_list)):
-                a, b = face_list[i], face_list[j]
-                adj[a].add(b)
-                adj[b].add(a)
+    # ?? Step 2: edge-adjacency graph ??
+    # trimesh computes shared-edge face pairs with vectorized NumPy grouping.
+    # Reusing it avoids three Python dict insertions per triangle, which is a
+    # noticeable part of cold STEP profile latency on dense tessellations.
+    adj: list[list[int]] = [[] for _ in range(n_faces)]
+    try:
+        adjacency_pairs = np.asarray(mesh.face_adjacency, dtype=np.int64)
+        for a, b in adjacency_pairs:
+            ia, ib = int(a), int(b)
+            adj[ia].append(ib)
+            adj[ib].append(ia)
+    except Exception:
+        edge_to_faces: dict[tuple, list] = {}
+        for fi, (f0, f1, f2) in enumerate(faces):
+            for edge in (
+                (min(f0, f1), max(f0, f1)),
+                (min(f1, f2), max(f1, f2)),
+                (min(f2, f0), max(f2, f0)),
+            ):
+                edge_to_faces.setdefault(edge, []).append(fi)
+        for face_list in edge_to_faces.values():
+            for i in range(len(face_list)):
+                for j in range(i + 1, len(face_list)):
+                    a, b = face_list[i], face_list[j]
+                    adj[a].append(b)
+                    adj[b].append(a)
 
     # ── Step 3: iterative-average-normal BFS ──
     model_diag = float(np.linalg.norm(vertices.max(axis=0) - vertices.min(axis=0)))
     offset_tol = max(min(model_diag * 0.002, 0.5), 0.05)
-    cos_threshold = COPLANAR_COS_THRESHOLD
-    min_cluster_area = max(model_diag * model_diag * 1e-4, 1e-4) if include_upward_faces else MIN_COPLANAR_AREA_MM2
+    if include_upward_faces:
+        # STEP cylinders and fillets are tessellated into many nearly-coplanar
+        # strips. A broad 3-degree tolerance merges those strips into selectable
+        # bands, which looks fragmented and creates unnecessary overlay work.
+        # Manual placement follows Bambu/Orca's much stricter hull-plane matching
+        # and ignores contact patches that are too small to be useful.
+        cos_threshold = MANUAL_COPLANAR_COS_THRESHOLD
+        min_cluster_area = max(
+            0.25,
+            min(MANUAL_MIN_COPLANAR_AREA_MM2, model_diag * model_diag * 0.01),
+        )
+    else:
+        cos_threshold = COPLANAR_COS_THRESHOLD
+        min_cluster_area = MIN_COPLANAR_AREA_MM2
 
     order = np.argsort(-areas)
     visited = np.zeros(n_faces, dtype=bool)
@@ -445,8 +475,17 @@ def cluster_coplanar_faces(
             continue
 
         cluster_normal = norms[seed_idx].copy()
-        cluster_n = 1.0
-        cluster_offset_sum = float(plane_offsets[seed_idx])
+        if include_upward_faces:
+            # Manual placement uses a strict seed-normal comparison like
+            # Bambu/Orca. Keeping the reference fixed prevents normal drift over
+            # tessellated curves and avoids normalizing a vector for every face.
+            weighted_normal = np.zeros(3, dtype=np.float64)
+            cluster_n = 0.0
+            cluster_offset_sum = 0.0
+        else:
+            weighted_normal = None
+            cluster_n = 1.0
+            cluster_offset_sum = float(plane_offsets[seed_idx])
 
         queue = deque([int(seed_idx)])
         cluster_faces: list[int] = []
@@ -456,10 +495,15 @@ def cluster_coplanar_faces(
             fi = queue.popleft()
             cluster_faces.append(fi)
             w = float(areas[fi]) + 1e-9
-            cluster_normal = (cluster_normal * cluster_n + norms[fi] * w) / (cluster_n + w)
-            cluster_normal /= float(np.linalg.norm(cluster_normal))
-            cluster_offset_sum += float(plane_offsets[fi]) * w
-            cluster_n += w
+            if include_upward_faces:
+                weighted_normal += norms[fi] * w
+                cluster_offset_sum += float(plane_offsets[fi]) * w
+                cluster_n += w
+            else:
+                cluster_normal = (cluster_normal * cluster_n + norms[fi] * w) / (cluster_n + w)
+                cluster_normal /= float(np.linalg.norm(cluster_normal))
+                cluster_offset_sum += float(plane_offsets[fi]) * w
+                cluster_n += w
 
             for ni in adj[fi]:
                 if visited[ni] or areas[ni] < 1e-6:
@@ -471,6 +515,11 @@ def cluster_coplanar_faces(
                     continue
                 visited[ni] = True
                 queue.append(ni)
+
+        if include_upward_faces and cluster_n > 1e-12:
+            normal_length = float(np.linalg.norm(weighted_normal))
+            if normal_length > 1e-12:
+                cluster_normal = weighted_normal / normal_length
 
         cluster_area = float(np.sum(areas[cluster_faces]))
         if cluster_area < min_cluster_area:
@@ -678,6 +727,70 @@ def cluster_coplanar_faces(
             run_expensive_safety_checks=not fast_manual_filter,
         )
 
+    def _prune_small_satellite_components(cluster: dict) -> dict:
+        """Drop tiny disconnected patches merged onto a much larger support plane.
+
+        STEP conversion can produce a clean primary contact patch plus small
+        coplanar teeth or boolean remnants. They share the same placement action
+        but make the visible candidate boundary look jagged. Equal-sized feet are
+        retained; only components much smaller than the largest patch are hidden.
+        """
+        cluster_faces = [int(face_index) for face_index in cluster.get("faces", ())]
+        if len(cluster_faces) <= 1:
+            return cluster
+
+        face_set = set(cluster_faces)
+        unseen = set(cluster_faces)
+        components: list[list[int]] = []
+        while unseen:
+            seed = unseen.pop()
+            stack = [seed]
+            component = [seed]
+            while stack:
+                face_index = stack.pop()
+                for neighbor in adj[face_index]:
+                    if neighbor not in face_set or neighbor not in unseen:
+                        continue
+                    unseen.remove(neighbor)
+                    stack.append(neighbor)
+                    component.append(neighbor)
+            components.append(component)
+
+        if len(components) <= 1:
+            return cluster
+
+        component_areas = [float(np.sum(areas[component])) for component in components]
+        largest_index = int(np.argmax(component_areas))
+        largest_area = component_areas[largest_index]
+        secondary_threshold = max(min_cluster_area, largest_area * MANUAL_COMPONENT_AREA_RATIO)
+        kept_components = [components[largest_index]]
+        for index, component in enumerate(components):
+            if index != largest_index and component_areas[index] >= secondary_threshold:
+                kept_components.append(component)
+
+        kept_faces = sorted(face_index for component in kept_components for face_index in component)
+        if len(kept_faces) == len(cluster_faces):
+            return cluster
+
+        kept_face_vertices = faces[kept_faces]
+        kept_points = vertices[kept_face_vertices].reshape(-1, 3)
+        pruned = dict(cluster)
+        pruned["faces"] = kept_faces
+        pruned["area"] = float(np.sum(areas[kept_faces]))
+        pruned["centroid"] = kept_points.mean(axis=0).tolist()
+        pruned["vert_indices"] = np.unique(kept_face_vertices.flatten()).tolist()
+        logger.debug(
+            "pruned manual placement satellite patches faces=%d->%d area=%.2f->%.2f",
+            len(cluster_faces),
+            len(kept_faces),
+            float(cluster.get("area", 0.0)),
+            pruned["area"],
+        )
+        return pruned
+
+    if include_upward_faces:
+        filtered = [_prune_small_satellite_components(cluster) for cluster in filtered]
+
     # Trim before outline extraction and JSON cleanup so discarded clusters do
     # not pay the expensive output-geometry cost.
     merged = sorted(
@@ -702,26 +815,32 @@ def cluster_coplanar_faces(
         bbox_diag = float(np.linalg.norm(bbox_max - bbox_min))
         stability = min(1.0, ca / max(bbox_diag * bbox_diag, 1e-9) * 10.0)
 
-        # Triangle vertices for Three.js highlighting
-        fv = vertices[faces[cf]].reshape(-1, 3).tolist()
-        fv_clean = [[_clean_value(v) for v in p] for p in fv]
+        cluster_face_vertices = faces[cf]
 
         # Outline polygon
         poly3d, poly2d = _extract_cluster_outline_p3d(cluster_points, cn, cc)
         poly3d_clean = [[_clean_value(v) for v in p] for p in poly3d]
 
-        result.append(
-            {
-                "normal": [_clean_value(v) for v in cn],
-                "area": round(_clean_value(ca), 2),
-                "face_count": len(cf),
-                "centroid": [_clean_value(v) for v in cc],
-                "bbox_size": [round(float(bbox_max[i] - bbox_min[i]), 2) for i in range(3)],
-                "stability": round(stability, 4),
-                "vertices": poly3d_clean,
-                "face_vertices": fv_clean,
-            }
-        )
+        item = {
+            "normal": [_clean_value(v) for v in cn],
+            "area": round(_clean_value(ca), 2),
+            "face_count": len(cf),
+            "centroid": [_clean_value(v) for v in cc],
+            "bbox_size": [round(float(bbox_max[i] - bbox_min[i]), 2) for i in range(3)],
+            "stability": round(stability, 4),
+            "vertices": poly3d_clean,
+        }
+        if compact_geometry:
+            # Manual placement only needs one shared vertex pool plus triangle
+            # indices. STEP tessellation otherwise repeats every vertex for every
+            # triangle, inflating JSON and frontend geometry-build time.
+            _, inverse = np.unique(cluster_face_vertices.reshape(-1), return_inverse=True)
+            item["patch_vertices"] = [[_clean_value(v) for v in point] for point in cluster_points.tolist()]
+            item["patch_indices"] = inverse.astype(int).tolist()
+        else:
+            fv = vertices[cluster_face_vertices].reshape(-1, 3).tolist()
+            item["face_vertices"] = [[_clean_value(v) for v in point] for point in fv]
+        result.append(item)
 
     result.sort(key=lambda c: c["area"], reverse=True)
     return result[:MAX_RETURN_CLUSTERS]
