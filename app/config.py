@@ -42,6 +42,7 @@ SMTP_USE_SSL = _settings.smtp_use_ssl
 RESEND_API_KEY = _settings.resend_api_key
 SHOW_DEV_CODES = _settings.show_dev_codes
 ENABLE_DEV_ADMIN_LOGIN = _settings.enable_dev_admin_login
+TRUST_PROXY = _settings.trust_proxy
 
 TERMS_VERSION = _settings.terms_version
 PRIVACY_VERSION = _settings.privacy_version

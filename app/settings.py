@@ -49,6 +49,13 @@ class Settings(BaseSettings):
     # even when APP_ENV is not "production" — fail-closed by default.
     enable_dev_admin_login: bool = False
 
+    # ── Proxy ──
+    # Trust X-Real-IP / X-Forwarded-For from the reverse proxy for client IP
+    # resolution (rate limiting, audit). Keep true when deployed behind the
+    # bundled nginx; set false when the app port is directly exposed, otherwise
+    # clients can spoof these headers and bypass IP rate limits.
+    trust_proxy: bool = True
+
     # ── Payment ──
     payment_provider: str = "mock"
 

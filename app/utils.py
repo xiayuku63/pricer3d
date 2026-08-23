@@ -18,6 +18,7 @@ from .config import (
     USERNAME_PATTERN,
     PASSWORD_MIN_LENGTH,
     PASSWORD_MAX_LENGTH,
+    TRUST_PROXY,
 )
 
 FILENAME_DISALLOWED_CHARS = set('\\/:*?"<>|')
@@ -99,9 +100,23 @@ def generate_numeric_code(length: int = 6) -> str:
 
 
 def get_client_ip(request: Request) -> str:
-    xff = request.headers.get("x-forwarded-for")
-    if xff:
-        return xff.split(",")[0].strip()
+    """Resolve the client IP for rate limiting / audit.
+
+    Behind the bundled nginx (TRUST_PROXY=1) prefer X-Real-IP — nginx
+    overwrites it with the actual peer IP. Fall back to the LAST
+    X-Forwarded-For entry: nginx's $proxy_add_x_forwarded_for appends the real
+    peer after any client-supplied prefix, so the first entry is attacker
+    controlled and the previous leftmost parse let anyone bypass IP rate
+    limits. With TRUST_PROXY=0 (app port directly exposed) forwarded headers
+    are ignored entirely.
+    """
+    if TRUST_PROXY:
+        real_ip = request.headers.get("x-real-ip", "").strip()
+        if real_ip:
+            return real_ip
+        xff = request.headers.get("x-forwarded-for", "").strip()
+        if xff:
+            return xff.split(",")[-1].strip()
     if request.client and request.client.host:
         return request.client.host
     return "unknown"

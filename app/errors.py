@@ -111,9 +111,25 @@ def register_exception_handlers(app):
             503: 50300,
         }
         error_code = code_map.get(exc.status_code, exc.status_code * 100)
+        message = str(exc.detail)
+        # Hand-raised HTTPExceptions interpolate raw exception strings into
+        # their detail ("INTERNAL_ERROR: ... ({str(e)})") — paths, SQL fragments
+        # and library internals must not reach clients on 5xx.
+        if exc.status_code >= 500:
+            from .config import IS_PRODUCTION
+
+            logger.error(
+                "HTTP %s on %s %s: %s",
+                exc.status_code,
+                request.method,
+                request.url.path,
+                message,
+            )
+            if IS_PRODUCTION:
+                message = "服务器内部错误"
         return error_response(
             code=error_code,
-            message=str(exc.detail),
+            message=message,
             status_code=exc.status_code,
         )
 
