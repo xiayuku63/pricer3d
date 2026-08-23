@@ -1,5 +1,6 @@
 """Auth routes – captcha, verification, register, login, me."""
 
+import asyncio
 import time
 import secrets
 import logging
@@ -20,6 +21,7 @@ from .config import (  # noqa: E402
     TERMS_VERSION,
     PRIVACY_VERSION,
     IS_PRODUCTION,
+    ENABLE_DEV_ADMIN_LOGIN,
     SHOW_DEV_CODES,
     DEFAULT_MATERIALS,
     DEFAULT_PRICING_CONFIG,
@@ -247,8 +249,15 @@ async def register(payload: RegisterRequest, request: Request):
     else:
         raise HTTPException(status_code=400, detail="不支持的注册方式")
 
-    user = create_user(
-        username, password, email=email, phone=phone, email_verified=email_verified, phone_verified=phone_verified
+    # create_user hashes the password with bcrypt: run off the event loop
+    user = await asyncio.to_thread(
+        create_user,
+        username,
+        password,
+        email=email,
+        phone=phone,
+        email_verified=email_verified,
+        phone_verified=phone_verified,
     )
     write_audit_event(
         action="auth.register",
@@ -295,7 +304,8 @@ async def login(payload: LoginRequest, request: Request):
             headers={"Retry-After": str(remaining)},
         )
     try:
-        user = authenticate_user(payload.identifier, password)
+        # bcrypt is CPU-heavy (~100-300ms): run off the event loop
+        user = await asyncio.to_thread(authenticate_user, payload.identifier, password)
     except HTTPException:
         locked2, remaining2 = record_login_failure(payload.identifier)
         write_audit_event(
@@ -353,13 +363,17 @@ async def login(payload: LoginRequest, request: Request):
 
 async def admin_login(request: Request):
     """Admin quick login — no captcha, no legal acceptance. Auto-creates admin user.
-    Only available in development environment."""
+
+    Fail-closed: only available when ENABLE_DEV_ADMIN_LOGIN=1 is explicitly set
+    AND the app is not running in production."""
     import json
     from .auth import get_password_hash, verify_password
 
-    # --- P0 security fix: admin-login only allowed in development ---
-    if IS_PRODUCTION:
+    # --- P0 security fix: admin-login requires explicit opt-in, never in production ---
+    if IS_PRODUCTION or not ENABLE_DEV_ADMIN_LOGIN:
         raise HTTPException(status_code=403, detail="ADMIN_LOGIN_DEV_ONLY")
+
+    logger.warning("admin-login dev backdoor used from %s", get_client_ip(request))
 
     admin_username = "admin"
     admin_password = "admin123"
@@ -546,7 +560,7 @@ async def password_reset_confirm(payload: ResetConfirmModel, request: Request):
 
     from .auth import get_password_hash
 
-    new_hash = get_password_hash(new_password)
+    new_hash = await asyncio.to_thread(get_password_hash, new_password)
     from .db import get_db_session
     from .models_orm import User as UserORM
 
