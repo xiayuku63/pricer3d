@@ -268,13 +268,20 @@ def parse_prusa_gcode_stats(gcode_path: str) -> dict:
         if len(values) > 1:
             result["filament_g_by_extruder"] = values
 
-    # Parse time: "estimated printing time (normal mode) = Xh Ym Zs" or "Xm Ys"
-    if m := re.search(r"; estimated printing time \(normal mode\) = (\d+)h (\d+)m (\d+)s", content):
-        result["time_s"] = int(m.group(1)) * 3600 + int(m.group(2)) * 60 + int(m.group(3))
-        result["time_str"] = f"{m.group(1)}h {m.group(2)}m {m.group(3)}s"
-    elif m := re.search(r"; estimated printing time \(normal mode\) = (\d+)m (\d+)s", content):
-        result["time_s"] = int(m.group(1)) * 60 + int(m.group(2))
-        result["time_str"] = f"{m.group(1)}m {m.group(2)}s"
+    # Parse time: "estimated printing time (normal mode) = [Xd] [Xh] Xm [Xs]".
+    # PrusaSlicer prints a "1d 2h 3m" segment once the estimate exceeds 24h,
+    # so tokenize every <number><unit> pair instead of matching fixed shapes.
+    if m := re.search(r"; estimated printing time \(normal mode\) = ([^\r\n]+)", content):
+        time_str = m.group(1).strip()
+        units = {"d": 86400, "h": 3600, "m": 60, "s": 1}
+        total_s = 0
+        matched = False
+        for value, unit in re.findall(r"(\d+)\s*([dhms])", time_str):
+            total_s += int(value) * units[unit]
+            matched = True
+        if matched:
+            result["time_s"] = total_s
+            result["time_str"] = time_str
 
     return result
 
@@ -787,9 +794,14 @@ def run_prusa_slice(
         stdout = _safe_decode(proc.stdout).strip()
         stderr = _safe_decode(proc.stderr).strip()
 
-        if proc.returncode != 0 and not os.path.exists(output_gcode_path):
+        if proc.returncode != 0:
+            # A non-zero exit must fail even when a partial G-code file was
+            # written before the crash — parsing it would silently underquote.
             error_msg = stderr or stdout or f"exit code {proc.returncode}"
             raise RuntimeError(f"PrusaSlicer failed: {error_msg[:400]}")
+
+        if not os.path.exists(output_gcode_path):
+            raise RuntimeError("PrusaSlicer produced no G-code output")
 
         if stderr:
             logger.debug(f"PrusaSlicer stderr: {stderr[:200]}")
