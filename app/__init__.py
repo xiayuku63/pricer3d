@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -18,15 +19,23 @@ from .errors import register_exception_handlers
 logger = logging.getLogger("uvicorn.error")
 
 
-class NoStoreStaticAssetsMiddleware(BaseHTTPMiddleware):
-    """Prevent browser/proxy cache from mixing ES module revisions."""
+class StaticAssetsCacheMiddleware(BaseHTTPMiddleware):
+    """Long-cache versioned static assets; revalidate everything else.
+
+    Templates reference assets as `main.js?v=101` — a content bump ships a new
+    URL, so versioned requests can be cached immutably for a year. Unversioned
+    requests (e.g. intra-module ES imports) keep revalidating via ETag/304 so
+    mixed ES module revisions can't happen. Replaces the previous blanket
+    no-store that re-downloaded the 1.2MB three.js on every page load.
+    """
 
     async def dispatch(self, request, call_next):
         response = await call_next(request)
         if request.url.path.startswith("/static/"):
-            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-            response.headers["Pragma"] = "no-cache"
-            response.headers["Expires"] = "0"
+            if request.query_params.get("v"):
+                response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+            else:
+                response.headers["Cache-Control"] = "no-cache"
         return response
 
 
@@ -74,7 +83,8 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     app = FastAPI(title="pricer3d — 3D Printing Quoting System", lifespan=lifespan)
-    app.add_middleware(NoStoreStaticAssetsMiddleware)
+    app.add_middleware(StaticAssetsCacheMiddleware)
+    app.add_middleware(GZipMiddleware, minimum_size=1024)
 
     # exception handlers (unified {code, message, data} format)
     register_exception_handlers(app)
@@ -295,27 +305,6 @@ def create_app() -> FastAPI:
     app.get("/api/orientation/model/status")(model_status)
     app.post("/api/admin/orientation/train")(admin_train_model)
     app.post("/api/orientation/auto-learned")(auto_learned_orient)
-
-    # todo
-    from .routes_todo import (
-        list_categories,
-        create_category,
-        delete_category,
-        list_todos,
-        get_todo,
-        create_todo,
-        update_todo,
-        delete_todo,
-    )
-
-    app.get("/api/categories")(list_categories)
-    app.post("/api/categories")(create_category)
-    app.delete("/api/categories/{category_id}")(delete_category)
-    app.get("/api/todos")(list_todos)
-    app.get("/api/todos/{todo_id}")(get_todo)
-    app.post("/api/todos")(create_todo)
-    app.put("/api/todos/{todo_id}")(update_todo)
-    app.delete("/api/todos/{todo_id}")(delete_todo)
 
     # pages
     app.get("/", response_class=HTMLResponse)(index)
