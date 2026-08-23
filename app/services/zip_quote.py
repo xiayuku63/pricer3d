@@ -1,5 +1,6 @@
 """ZIP quote business services."""
 
+import asyncio
 import json
 import logging
 import os
@@ -114,7 +115,7 @@ async def build_zip_preview_response(file: UploadFile):
 
     content = await _read_upload_limited(file)
 
-    parsed = _parse_zip_contents(content)
+    parsed = await asyncio.to_thread(_parse_zip_contents, content)
     match_result = parsed["match_result"]
     parsed["stl_files"]
     parsed["checklist"]
@@ -263,7 +264,8 @@ async def build_zip_quote_response(
         default_printer_id,
         default_nozzle,
         default_slicer_preset_id,
-    ) = _resolve_zip_defaults(current_user, file, session_id)
+    # ZIP 解压 + 清单解析 + DB 读取均为同步阻塞操作，整体移入线程池
+    ) = await asyncio.to_thread(_resolve_zip_defaults, current_user, file, session_id)
     user_materials = [dict(material) for material in user_materials if isinstance(material, dict)]
 
     if not is_member_user(current_user):

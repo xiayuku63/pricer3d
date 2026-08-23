@@ -40,7 +40,7 @@ def test_quote_and_preview_use_the_shared_smart_orientation_path():
     route_source = (root / "app" / "routes_orientation.py").read_text(encoding="utf-8")
 
     assert "get_smart_orientation_for_slicing(model_path)" in cost_source
-    assert "get_smart_orientation_for_slicing(tmp_path)" in route_source
+    assert "get_smart_orientation_for_slicing, tmp_path" in route_source  # asyncio.to_thread call
 
 
 @pytest.mark.parametrize(

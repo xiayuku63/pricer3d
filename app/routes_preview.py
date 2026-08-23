@@ -1,5 +1,6 @@
 """Preview routes — converts supported models to GLB for Three.js."""
 
+import asyncio
 import os
 import shutil
 import tempfile
@@ -42,20 +43,23 @@ async def preview_as_glb(file: UploadFile = File(...)):
         with open(source_path, "wb") as output:
             output.write(content)
 
-        normalized = normalize_model(
-            source_path,
-            output_dir=os.path.join(work_dir, "normalized"),
-        )
-        mesh = trimesh.load(normalized.mesh_path, force="mesh")
-        if isinstance(mesh, trimesh.Scene):
-            meshes = list(mesh.geometry.values())
-            if not meshes:
+        def _convert() -> bytes:
+            nonlocal normalized
+            normalized = normalize_model(
+                source_path,
+                output_dir=os.path.join(work_dir, "normalized"),
+            )
+            mesh = trimesh.load(normalized.mesh_path, force="mesh")
+            if isinstance(mesh, trimesh.Scene):
+                meshes = list(mesh.geometry.values())
+                if not meshes:
+                    raise ModelNormalizationError("模型中没有可预览的网格", code="MODEL_EMPTY")
+                mesh = trimesh.util.concatenate(meshes)
+            if not isinstance(mesh, trimesh.Trimesh) or len(mesh.vertices) == 0:
                 raise ModelNormalizationError("模型中没有可预览的网格", code="MODEL_EMPTY")
-            mesh = trimesh.util.concatenate(meshes)
-        if not isinstance(mesh, trimesh.Trimesh) or len(mesh.vertices) == 0:
-            raise ModelNormalizationError("模型中没有可预览的网格", code="MODEL_EMPTY")
+            return mesh.export(file_type="glb")
 
-        glb_bytes = mesh.export(file_type="glb")
+        glb_bytes = await asyncio.to_thread(_convert)
         return Response(content=glb_bytes, media_type="model/gltf-binary")
     except ModelNormalizationError as exc:
         status_code = 503 if exc.code == "STEP_CONVERTER_UNAVAILABLE" else 400
@@ -86,39 +90,43 @@ async def preview_3mf_scene(file: UploadFile = File(...)):
     try:
         with open(source_path, "wb") as output:
             output.write(content)
-        entities = load_3mf_entities(source_path)
-        scene = trimesh.Scene()
-        for entity in entities:
-            mesh = trimesh.Trimesh(
-                vertices=entity.vertices,
-                faces=entity.faces,
-                process=False,
-            )
-            color = entity.color or "#9CA3AF"
-            rgba = [int(color[index:index + 2], 16) for index in (1, 3, 5)] + [255]
-            material = trimesh.visual.material.PBRMaterial(
-                name=entity.name,
-                baseColorFactor=rgba,
-                metallicFactor=0.0,
-                roughnessFactor=0.65,
-            )
-            mesh.visual = trimesh.visual.TextureVisuals(material=material)
-            mesh.metadata = {
-                "entity_id": entity.entity_id,
-                "entity_name": entity.name,
-                "source_color": entity.color or "",
-                "source_object_id": entity.source_object_id,
-            }
-            scene.add_geometry(
-                mesh,
-                node_name=f"entity-{entity.entity_id}",
-                geom_name=f"entity-{entity.entity_id}",
-            )
-        glb_bytes = scene.export(file_type="glb")
+
+        def _build_scene() -> tuple[bytes, int]:
+            entities = load_3mf_entities(source_path)
+            scene = trimesh.Scene()
+            for entity in entities:
+                mesh = trimesh.Trimesh(
+                    vertices=entity.vertices,
+                    faces=entity.faces,
+                    process=False,
+                )
+                color = entity.color or "#9CA3AF"
+                rgba = [int(color[index:index + 2], 16) for index in (1, 3, 5)] + [255]
+                material = trimesh.visual.material.PBRMaterial(
+                    name=entity.name,
+                    baseColorFactor=rgba,
+                    metallicFactor=0.0,
+                    roughnessFactor=0.65,
+                )
+                mesh.visual = trimesh.visual.TextureVisuals(material=material)
+                mesh.metadata = {
+                    "entity_id": entity.entity_id,
+                    "entity_name": entity.name,
+                    "source_color": entity.color or "",
+                    "source_object_id": entity.source_object_id,
+                }
+                scene.add_geometry(
+                    mesh,
+                    node_name=f"entity-{entity.entity_id}",
+                    geom_name=f"entity-{entity.entity_id}",
+                )
+            return scene.export(file_type="glb"), len(entities)
+
+        glb_bytes, entity_count = await asyncio.to_thread(_build_scene)
         return Response(
             content=glb_bytes,
             media_type="model/gltf-binary",
-            headers={"X-3MF-Entity-Count": str(len(entities))},
+            headers={"X-3MF-Entity-Count": str(entity_count)},
         )
     except ModelNormalizationError as exc:
         logger.warning("3MF scene extraction failed: %s (%s)", exc, exc.code)
@@ -148,12 +156,16 @@ async def preview_as_stl(file: UploadFile = File(...)):
         with open(source_path, "wb") as output:
             output.write(content)
 
-        normalized = normalize_model(
-            source_path,
-            output_dir=os.path.join(work_dir, "normalized"),
-        )
-        with open(normalized.mesh_path, "rb") as normalized_file:
-            stl_bytes = normalized_file.read()
+        def _normalize_and_read() -> bytes:
+            nonlocal normalized
+            normalized = normalize_model(
+                source_path,
+                output_dir=os.path.join(work_dir, "normalized"),
+            )
+            with open(normalized.mesh_path, "rb") as normalized_file:
+                return normalized_file.read()
+
+        stl_bytes = await asyncio.to_thread(_normalize_and_read)
         if not stl_bytes:
             raise ModelNormalizationError("The normalized model is empty", code="MODEL_EMPTY")
         return Response(content=stl_bytes, media_type="model/stl")

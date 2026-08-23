@@ -8,7 +8,9 @@ POST /api/orientation/train    — 自学习标记训练样本。
 import os
 import uuid
 import json
+import asyncio
 import logging
+import tempfile
 import time
 from datetime import datetime, timezone
 from fastapi import Depends, UploadFile, File, HTTPException, Request, Form
@@ -20,6 +22,10 @@ from .deps import get_current_user
 from calculator.orientation import analyze_orientation, get_stable_faces, cluster_coplanar_faces, _load_mesh
 
 logger = logging.getLogger(__name__)
+
+# tempfile.gettempdir() works on Windows too; the old "/tmp/..." hardcode
+# landed on the current drive root outside WSL.
+_ORIENT_TMP_DIR = os.path.join(tempfile.gettempdir(), "pricer3d_orient")
 
 
 async def optimize_orientation(
@@ -49,14 +55,14 @@ async def optimize_orientation(
         except (json.JSONDecodeError, ValueError, TypeError) as e:
             raise HTTPException(status_code=400, detail=f"face_normal 格式错误: {str(e)[:100]}")
 
-    tmp_dir = "/tmp/pricer3d_orient"
+    tmp_dir = _ORIENT_TMP_DIR
     os.makedirs(tmp_dir, exist_ok=True)
     tmp_path = os.path.join(tmp_dir, f"{uuid.uuid4().hex}{ext}")
     try:
         with open(tmp_path, "wb") as f:
             f.write(content)
 
-        result = analyze_orientation(tmp_path, face_normal=normal)
+        result = await asyncio.to_thread(analyze_orientation, tmp_path, face_normal=normal)
         result["filename"] = filename
         return result
     except Exception as e:
@@ -88,14 +94,14 @@ async def list_stable_faces(
     if len(content) >= MAX_FILE_SIZE_BYTES:
         raise HTTPException(status_code=400, detail="文件大小超过限制 (100MB)")
 
-    tmp_dir = "/tmp/pricer3d_orient"
+    tmp_dir = _ORIENT_TMP_DIR
     os.makedirs(tmp_dir, exist_ok=True)
     tmp_path = os.path.join(tmp_dir, f"{uuid.uuid4().hex}{ext}")
     try:
         with open(tmp_path, "wb") as f:
             f.write(content)
 
-        result = get_stable_faces(tmp_path)
+        result = await asyncio.to_thread(get_stable_faces, tmp_path)
         result["filename"] = filename
         return result
     except Exception as e:
@@ -132,7 +138,7 @@ async def list_coplanar_clusters(
     if len(content) >= MAX_FILE_SIZE_BYTES:
         raise HTTPException(status_code=400, detail="文件大小超过限制 (100MB)")
 
-    tmp_dir = "/tmp/pricer3d_orient"
+    tmp_dir = _ORIENT_TMP_DIR
     os.makedirs(tmp_dir, exist_ok=True)
     tmp_path = os.path.join(tmp_dir, f"{uuid.uuid4().hex}{ext}")
     try:
@@ -140,13 +146,15 @@ async def list_coplanar_clusters(
             f.write(content)
 
         load_started = time.perf_counter()
-        mesh = _load_mesh(tmp_path)
+        mesh = await asyncio.to_thread(_load_mesh, tmp_path)
         load_ms = (time.perf_counter() - load_started) * 1000.0
         if mesh.vertices.shape[0] == 0:
             return {"filename": filename, "clusters": []}
 
         cluster_started = time.perf_counter()
-        clusters = cluster_coplanar_faces(mesh, include_upward_faces=True, compact_geometry=True)
+        clusters = await asyncio.to_thread(
+            cluster_coplanar_faces, mesh, include_upward_faces=True, compact_geometry=True
+        )
         cluster_ms = (time.perf_counter() - cluster_started) * 1000.0
         logger.info(
             "manual placement profile filename=%s vertices=%d faces=%d clusters=%d load_ms=%.1f cluster_ms=%.1f",
@@ -190,14 +198,14 @@ async def train_sample(
     if len(content) >= MAX_FILE_SIZE_BYTES:
         raise HTTPException(status_code=400, detail="文件大小超过限制 (100MB)")
 
-    tmp_dir = "/tmp/pricer3d_orient"
+    tmp_dir = _ORIENT_TMP_DIR
     os.makedirs(tmp_dir, exist_ok=True)
     tmp_path = os.path.join(tmp_dir, f"{uuid.uuid4().hex}{ext}")
     try:
         with open(tmp_path, "wb") as f:
             f.write(content)
 
-        mesh = _load_mesh(tmp_path)
+        mesh = await asyncio.to_thread(_load_mesh, tmp_path)
         if mesh.vertices.shape[0] == 0:
             return {"status": "ok", "message": "已标记 (无面级数据)"}
 
@@ -210,7 +218,7 @@ async def train_sample(
         )
 
         # Step 1: coplanar 聚类 → 候选面列表
-        clusters = cluster_coplanar_faces(mesh, include_upward_faces=True)
+        clusters = await asyncio.to_thread(cluster_coplanar_faces, mesh, include_upward_faces=True)
         if not clusters:
             # 无候选面时回退到全局特征 (兼容旧格式)
             logger.info("无 coplanar 候选面，写全局特征")
@@ -323,7 +331,7 @@ async def train_sample(
                     loaded = learner.load_samples("training_samples.jsonl")
                     if loaded:
                         try:
-                            acc = learner.train(loaded)
+                            acc = await asyncio.to_thread(learner.train, loaded)
                             auto_retrain_triggered = True
                             logger.info("自动重训完成: accuracy=%.3f", acc)
                         except Exception as e:
@@ -415,7 +423,7 @@ async def admin_train_model(
             detail=f"正样本不足 (n_positive={n_positive})，至少需要 2 个正样本",
         )
 
-    accuracy = learner.train(samples)
+    accuracy = await asyncio.to_thread(learner.train, samples)
 
     coef = None
     if learner.is_trained() and hasattr(learner.model, "coef_"):
@@ -451,7 +459,7 @@ async def auto_learned_orient(
     if len(content) >= MAX_FILE_SIZE_BYTES:
         raise HTTPException(status_code=400, detail="文件大小超过限制 (100MB)")
 
-    tmp_dir = "/tmp/pricer3d_orient"
+    tmp_dir = _ORIENT_TMP_DIR
     os.makedirs(tmp_dir, exist_ok=True)
     tmp_path = os.path.join(tmp_dir, f"{uuid.uuid4().hex}{ext}")
     try:
@@ -460,7 +468,7 @@ async def auto_learned_orient(
 
         from calculator.orientation import get_smart_orientation_for_slicing
 
-        result = get_smart_orientation_for_slicing(tmp_path)
+        result = await asyncio.to_thread(get_smart_orientation_for_slicing, tmp_path)
         euler = result.get("euler_angles_deg", {"x": 0, "y": 0, "z": 0})
         face = result.get("face") or {}
         normal = face.get("normal") if isinstance(face, dict) else None
