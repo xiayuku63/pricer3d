@@ -578,5 +578,10 @@ def save_quote_history(user_id: int, results: list) -> None:
                 infill=infill_val,
                 brand=str(brand)[:40] if brand else None,
                 cost_breakdown=cost_breakdown_str,
+                slicer_fallback=int(bool((breakdown or {}).get("slicer_fallback"))) if breakdown else 0,
+                slicer_error=(breakdown or {}).get("slicer_error") if breakdown else None,
+                slicer_estimated_time_s=float((breakdown or {}).get("slicer_estimated_time_s", 0) or 0)
+                if (breakdown or {}).get("slicer_estimated_time_s")
+                else None,
             )
             db.add(entry)

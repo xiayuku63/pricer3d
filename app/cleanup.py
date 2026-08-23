@@ -35,6 +35,19 @@ def _get_data_dir() -> str:
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "user")
 
 
+def _direct_uploads_base() -> str:
+    """Resolve the direct-quote uploads directory (calculator/cost.py save path).
+
+    Structure: data/uploads/<user_folder>/<YYYYMMDD>/<job>/ — models and
+    G-code mixed per job. Previously nothing cleaned this path (measured
+    4.7GB of accumulated quotes), so the daily loop now covers it.
+    """
+    env = os.getenv("DIRECT_UPLOADS_DIR", "").strip()
+    if env:
+        return env
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "uploads")
+
+
 def _dir_age_seconds(dirpath: str) -> float:
     """Return the age (in seconds) of the NEWEST file in the directory.
     If the directory is empty, return its own mtime.
@@ -118,34 +131,44 @@ def run_cleanup(data_dir: str | None = None) -> dict:
 
     logger.info("Starting cleanup: data_dir=%s dry_run=%s", data_dir, DRY_RUN)
 
-    result = {"outputs_deleted": 0, "uploads_deleted": 0}
+    result = {"outputs_deleted": 0, "uploads_deleted": 0, "direct_uploads_deleted": 0}
 
     if not os.path.isdir(data_dir):
         logger.warning("Data directory not found: %s", data_dir)
-        return result
+    else:
+        # Iterate user directories
+        for user_dir in sorted(os.listdir(data_dir)):
+            user_path = os.path.join(data_dir, user_dir)
+            if not os.path.isdir(user_path):
+                continue
 
-    # Iterate user directories
-    for user_dir in sorted(os.listdir(data_dir)):
-        user_path = os.path.join(data_dir, user_dir)
-        if not os.path.isdir(user_path):
-            continue
+            # Clean outputs (gcode) — 7 days
+            outputs_base = os.path.join(user_path, "outputs")
+            if os.path.isdir(outputs_base):
+                n = _cleanup_expired_dirs(outputs_base, GCODE_RETENTION_SECONDS, "gcode")
+                result["outputs_deleted"] += n
 
-        # Clean outputs (gcode) — 7 days
-        outputs_base = os.path.join(user_path, "outputs")
-        if os.path.isdir(outputs_base):
-            n = _cleanup_expired_dirs(outputs_base, GCODE_RETENTION_SECONDS, "gcode")
-            result["outputs_deleted"] += n
+            # Clean uploads — 30 days
+            uploads_base = os.path.join(user_path, "uploads")
+            if os.path.isdir(uploads_base):
+                n = _cleanup_expired_dirs(uploads_base, UPLOAD_RETENTION_SECONDS, "upload")
+                result["uploads_deleted"] += n
 
-        # Clean uploads — 30 days
-        uploads_base = os.path.join(user_path, "uploads")
-        if os.path.isdir(uploads_base):
-            n = _cleanup_expired_dirs(uploads_base, UPLOAD_RETENTION_SECONDS, "upload")
-            result["uploads_deleted"] += n
+    # Direct-quote flow: data/uploads/<user_folder>/<YYYYMMDD>/<job>/ — 30 days
+    direct_base = _direct_uploads_base()
+    if os.path.isdir(direct_base):
+        for user_folder in sorted(os.listdir(direct_base)):
+            user_folder_path = os.path.join(direct_base, user_folder)
+            if not os.path.isdir(user_folder_path):
+                continue
+            n = _cleanup_expired_dirs(user_folder_path, UPLOAD_RETENTION_SECONDS, "direct_upload")
+            result["direct_uploads_deleted"] += n
 
     logger.info(
-        "Cleanup done: %d gcode dirs, %d upload dirs deleted",
+        "Cleanup done: %d gcode dirs, %d upload dirs, %d direct-upload dirs deleted",
         result["outputs_deleted"],
         result["uploads_deleted"],
+        result["direct_uploads_deleted"],
     )
     return result
 

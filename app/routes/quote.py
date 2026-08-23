@@ -41,7 +41,6 @@ async def get_quote(
     entity_colors_json: Optional[str] = Form(default=None, max_length=20000),
     current_user=Depends(get_current_user),
 ):
-    logger.warning("ROUTE_DEBUG auto_orient=%s type=%s", auto_orient, type(auto_orient).__name__)
     try:
         return await build_quote_payload(
             request=request,
