@@ -652,7 +652,7 @@ export function refreshOptionsSummary() {
     const colorText = formatColorLabel(quoteOptions.color);
     const pm = document.getElementById("cfg-printer-model-main");
     const pmName = (pm && pm.selectedOptions[0]) ? pm.selectedOptions[0].text : t('quote.printerNotSet');
-    el.innerHTML = t('quote.printerModel') + '：' + pmName + ' | ' + t('quote.material') + ' ' + quoteOptions.material + '，' + t('quote.color') + ' ' + colorText + '，' + t('quote.quantity') + ' ' + quoteOptions.quantity;
+    el.innerHTML = t('quote.printerModel') + '：' + escapeHtml(pmName) + ' | ' + t('quote.material') + ' ' + escapeHtml(quoteOptions.material) + '，' + t('quote.color') + ' ' + escapeHtml(colorText) + '，' + t('quote.quantity') + ' ' + quoteOptions.quantity;
 }
 
 // ── Results table ──
@@ -800,8 +800,8 @@ export function renderResultsTable() {
             const calculationLabel = _calculationStatusText(item);
             const isRealThumbnail = thumbnail && thumbnail.startsWith('data:image/png');
             const previewButtonHtml = isRealThumbnail
-                ? `<button type="button" data-preview-file="${item.filename}" data-preview-ext="${ext}" class="block rounded border border-gray-200 overflow-hidden hover:border-indigo-300 transition-colors"><img src="${thumbnail}" alt="静态图" class="w-32 h-20 object-cover bg-white" /></button>`
-                : `<button type="button" data-preview-file="${item.filename}" data-preview-ext="${ext}" class="text-[12px] text-indigo-600 hover:text-indigo-700 border border-indigo-200 hover:border-indigo-300 rounded px-2 py-0.5">预览</button>`;
+                ? `<button type="button" data-preview-file="${escapeHtml(item.filename)}" data-preview-ext="${escapeHtml(ext)}" class="block rounded border border-gray-200 overflow-hidden hover:border-indigo-300 transition-colors"><img src="${thumbnail}" alt="静态图" class="w-32 h-20 object-cover bg-white" /></button>`
+                : `<button type="button" data-preview-file="${escapeHtml(item.filename)}" data-preview-ext="${escapeHtml(ext)}" class="text-[12px] text-indigo-600 hover:text-indigo-700 border border-indigo-200 hover:border-indigo-300 rounded px-2 py-0.5">预览</button>`;
 
             const brands = getBrandOptions();
             const currentBrand = item.brand || (MATERIAL_OPTIONS.find(m => m.name === item.material) || {}).brand || '';
@@ -832,7 +832,7 @@ export function renderResultsTable() {
                     <div class="text-xs leading-tight font-medium">${calculating ? '-' : ('¥ ' + Number(item.cost_cny || 0).toFixed(2))}</div>
                 </td>
                 <td data-role="status-cell" class="px-2 py-1.5 whitespace-nowrap font-medium text-[11px] ${calculating ? 'text-amber-600' : 'text-green-600'}"><span class="inline-block w-2 h-2 rounded-full mr-1 align-middle ${calculating ? 'bg-amber-500' : 'bg-green-500'}"></span>${calculating ? calculationLabel : t('common.success')}</td>
-                <td class="px-2 py-1.5 space-x-1"><button type="button" data-delete-file="${item.filename}" class="text-xs text-red-500 hover:text-red-700">${t('common.delete')}</button></td>
+                <td class="px-2 py-1.5 space-x-1"><button type="button" data-delete-file="${escapeHtml(item.filename)}" class="text-xs text-red-500 hover:text-red-700">${t('common.delete')}</button></td>
             `;
         } else {
             const thumbnail = thumbnailMap.get(item.filename) || buildPlaceholderThumbnail(ext);
@@ -840,16 +840,16 @@ export function renderResultsTable() {
             const calculationLabel = _calculationStatusText(item);
             const isRealThumbnail = thumbnail && thumbnail.startsWith('data:image/png');
             const previewButtonHtml = isRealThumbnail
-                ? `<button type="button" data-preview-file="${item.filename}" data-preview-ext="${ext}" class="block rounded border border-gray-200 overflow-hidden hover:border-indigo-300 transition-colors"><img src="${thumbnail}" alt="静态图" class="w-32 h-20 object-cover bg-white" /></button>`
-                : `<button type="button" data-preview-file="${item.filename}" data-preview-ext="${ext}" class="text-[12px] text-indigo-600 hover:text-indigo-700 border border-indigo-200 hover:border-indigo-300 rounded px-2 py-0.5">预览</button>`;
+                ? `<button type="button" data-preview-file="${escapeHtml(item.filename)}" data-preview-ext="${escapeHtml(ext)}" class="block rounded border border-gray-200 overflow-hidden hover:border-indigo-300 transition-colors"><img src="${thumbnail}" alt="静态图" class="w-32 h-20 object-cover bg-white" /></button>`
+                : `<button type="button" data-preview-file="${escapeHtml(item.filename)}" data-preview-ext="${escapeHtml(ext)}" class="text-[12px] text-indigo-600 hover:text-indigo-700 border border-indigo-200 hover:border-indigo-300 rounded px-2 py-0.5">预览</button>`;
             const selectedMaterial = item.material || quoteOptions.material;
             const selectedColor = item.color || quoteOptions.color;
             const brands3 = getBrandOptions();
             const currentBrand3 = item.brand || (MATERIAL_OPTIONS.find(m => m.name === selectedMaterial) || {}).brand || '';
             const effectiveBrand3 = currentBrand3 || brands3[0] || '';
-            const brandOptionsHtml = brands3.map(b => `<option value="${b}" ${b === effectiveBrand3 ? 'selected' : ''}>${b}</option>`).join('');
+            const brandOptionsHtml = brands3.map(b => `<option value="${escapeHtml(b)}" ${b === effectiveBrand3 ? 'selected' : ''}>${escapeHtml(b)}</option>`).join('');
             const filteredMaterials3 = effectiveBrand3 ? MATERIAL_OPTIONS.filter(m => (m.brand || 'Generic') === effectiveBrand3) : MATERIAL_OPTIONS;
-            const materialOptionsHtml = filteredMaterials3.map((m) => `<option value="${m.name}" ${m.name === selectedMaterial ? 'selected' : ''}>${m.name}</option>`).join('');
+            const materialOptionsHtml = filteredMaterials3.map((m) => `<option value="${escapeHtml(m.name)}" ${m.name === selectedMaterial ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('');
             const renderedRowColors = renderColorDropdown(selectedMaterial, selectedColor, true, effectiveBrand3);
             const quantityValue = item.quantity || quoteOptions.quantity || 1;
             // Per-file printer + preset
@@ -869,7 +869,7 @@ export function renderResultsTable() {
                     </span>
                     `}
                 </td>
-                <td class="px-2 py-1.5 space-x-1"><button type="button" data-delete-file="${item.filename}" class="text-xs text-red-500 hover:text-red-700">${t('common.delete')}</button></td>
+                <td class="px-2 py-1.5 space-x-1"><button type="button" data-delete-file="${escapeHtml(item.filename)}" class="text-xs text-red-500 hover:text-red-700">${t('common.delete')}</button></td>
             `;
         }
         tbody.appendChild(tr);
@@ -972,16 +972,16 @@ function renderResultsCards() {
         const thumbnail = thumbnailMap.get(item.filename) || buildPlaceholderThumbnail(ext);
         const isRealThumbnail = thumbnail && thumbnail.startsWith('data:image/png');
         const previewHtml = isRealThumbnail
-            ? `<button type="button" data-preview-file="${item.filename}" data-preview-ext="${ext}" class="block rounded border border-gray-200 overflow-hidden hover:border-indigo-300 transition-colors w-full"><img src="${thumbnail}" alt="预览" class="w-full h-28 object-cover bg-white" /></button>`
-            : `<button type="button" data-preview-file="${item.filename}" data-preview-ext="${ext}" class="w-full text-[12px] text-indigo-600 hover:text-indigo-700 border border-indigo-200 hover:border-indigo-300 rounded px-3 py-2">预览模型</button>`;
+            ? `<button type="button" data-preview-file="${escapeHtml(item.filename)}" data-preview-ext="${escapeHtml(ext)}" class="block rounded border border-gray-200 overflow-hidden hover:border-indigo-300 transition-colors w-full"><img src="${thumbnail}" alt="预览" class="w-full h-28 object-cover bg-white" /></button>`
+            : `<button type="button" data-preview-file="${escapeHtml(item.filename)}" data-preview-ext="${escapeHtml(ext)}" class="w-full text-[12px] text-indigo-600 hover:text-indigo-700 border border-indigo-200 hover:border-indigo-300 rounded px-3 py-2">预览模型</button>`;
 
         const { pmOptions, nozzleOptions, presetOptions } = _buildRowDropdownsHtml(item);
         const mobileBrands = getBrandOptions();
         const mobileCurrentBrand = item.brand || (MATERIAL_OPTIONS.find(m => m.name === (item.material || quoteOptions.material)) || {}).brand || '';
         const mobileEffectiveBrand = mobileCurrentBrand || mobileBrands[0] || '';
-        const mobileBrandOptionsHtml = mobileBrands.map(b => `<option value="${b}" ${b === mobileEffectiveBrand ? 'selected' : ''}>${b}</option>`).join('');
+        const mobileBrandOptionsHtml = mobileBrands.map(b => `<option value="${escapeHtml(b)}" ${b === mobileEffectiveBrand ? 'selected' : ''}>${escapeHtml(b)}</option>`).join('');
         const filteredMobileMaterials = mobileEffectiveBrand ? MATERIAL_OPTIONS.filter(m => (m.brand || 'Generic') === mobileEffectiveBrand) : MATERIAL_OPTIONS;
-        const materialOptionsHtml = filteredMobileMaterials.map((m) => `<option value="${m.name}" ${m.name === (item.material || quoteOptions.material) ? 'selected' : ''}>${m.name}</option>`).join('');
+        const materialOptionsHtml = filteredMobileMaterials.map((m) => `<option value="${escapeHtml(m.name)}" ${m.name === (item.material || quoteOptions.material) ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('');
         const quantityValue = item.quantity || quoteOptions.quantity || 1;
 
         if (item.status === 'success' && !_isCalculating(item)) {
