@@ -7,6 +7,7 @@ still works in parallel — they share the same DB_PATH.
 import os
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, Session, DeclarativeBase
+from sqlalchemy.pool import StaticPool
 
 from .config import DB_PATH
 
@@ -15,11 +16,24 @@ _db_dir = os.path.dirname(os.path.abspath(DB_PATH))
 if _db_dir and not os.path.exists(_db_dir):
     os.makedirs(_db_dir, exist_ok=True)
 
-engine = create_engine(
-    f"sqlite:///{DB_PATH}",
-    connect_args={"check_same_thread": False},
-    echo=False,
-)
+# In-memory SQLite: every pooled connection is a SEPARATE empty database, so a
+# worker thread checking out a second connection would see "no such table".
+# StaticPool pins the engine to one shared connection (check_same_thread=False).
+if DB_PATH == ":memory:":
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+        echo=False,
+    )
+else:
+    engine = create_engine(
+        f"sqlite:///{DB_PATH}",
+        # timeout = sqlite3 busy timeout: wait for the write lock instead of
+        # failing fast with "database is locked" under concurrent writes.
+        connect_args={"check_same_thread": False, "timeout": 30},
+        echo=False,
+    )
 
 
 @event.listens_for(engine, "connect")
@@ -31,7 +45,10 @@ def _set_sqlite_pragma(dbapi_connection, connection_record):
     cursor.close()
 
 
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+# expire_on_commit=False: keep loaded attributes accessible after the context
+# manager commits, so callers that build DTOs outside the `with` block don't
+# hit DetachedInstanceError (previously broke printer preset endpoints).
+SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
 
 
 class Base(DeclarativeBase):
