@@ -4,6 +4,7 @@ Environment-driven settings are now managed by app.settings (pydantic-settings).
 This module re-exports them for backward compatibility.
 """
 
+import os
 import re
 from .settings import get_settings
 from .material_seed import DEFAULT_COLOR_PALETTE, DEFAULT_MATERIALS as SEEDED_DEFAULT_MATERIALS
@@ -80,7 +81,10 @@ AUDIT_RETENTION_DAYS = _settings.audit_retention_days
 QUOTE_CONCURRENCY = _settings.quote_concurrency
 
 # ── 朝向学习配置 ──
-ORIENT_LEARNING_AUTO_RETRAIN = True  # 是否自动重训
+# 自动重训默认关闭：learner 模型目前不参与报价决策（candidates 的
+# learned_prob 恒为 None），自动重训只消耗 IO/CPU。开启请设
+# ORIENT_LEARNING_AUTO_RETRAIN=1。
+ORIENT_LEARNING_AUTO_RETRAIN = os.getenv("ORIENT_LEARNING_AUTO_RETRAIN", "0").strip().lower() in {"1", "true", "yes", "on"}
 ORIENT_LEARNING_MIN_NEW_SAMPLES = 10  # 新样本数阈值
 ORIENT_LEARNING_MIN_POSITIVE = 3  # 最少正样本数
 
