@@ -266,8 +266,21 @@ def apply_orientation_to_mesh(
 
 
 def get_smart_orientation_for_slicing(model_path: str) -> dict:
-    """Run the canonical smart-placement strategy used by preview and quoting."""
-    return get_best_face_for_slicing(model_path, method="geometry_v2")
+    """Run the canonical smart-placement strategy used by preview and quoting.
+
+    Results are content-address cached (calculator.orientation_cache): the
+    hull-clustering + candidate scoring costs seconds and is deterministic
+    for identical geometry, so re-quotes with different print params skip it.
+    """
+    from calculator.orientation_cache import orientation_cache_lookup, orientation_cache_store
+
+    cached = orientation_cache_lookup(model_path)
+    if cached is not None:
+        logger.info("朝向缓存命中: %s", os.path.basename(model_path))
+        return cached
+    result = get_best_face_for_slicing(model_path, method="geometry_v2")
+    orientation_cache_store(model_path, result)
+    return result
 
 
 def get_best_face_for_slicing(
