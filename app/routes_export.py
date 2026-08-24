@@ -7,7 +7,7 @@ import logging
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, field_validator
 
@@ -42,6 +42,8 @@ _EXPORT_COLUMNS = [
 # set in memory — cap it so CSV/XLSX assembly stays bounded.
 MAX_EXPORT_ROWS = 5000
 
+
+router = APIRouter()
 
 def _build_export_query(db, user_id: int, material: Optional[str], date_from: Optional[str], date_to: Optional[str]):
     """Build filtered query for quote history export."""
@@ -78,6 +80,7 @@ def _row_to_export_list(row) -> list:
     ]
 
 
+@router.get("/api/quote/export")
 async def export_quote_history(
     request: Request,
     format: str,
@@ -181,6 +184,7 @@ async def export_quote_history(
         raise HTTPException(status_code=500, detail=f"导出失败: {str(e)}")
 
 
+@router.get("/api/quote/export-pdf")
 async def export_quote_pdf(
     request: Request,
     ids: str,
@@ -323,6 +327,7 @@ class PdfInlineRequest(BaseModel):
     items: List[PdfInlineItem]
 
 
+@router.post("/api/quote/export-pdf-inline")
 async def export_pdf_inline(
     payload: PdfInlineRequest,
     request: Request,

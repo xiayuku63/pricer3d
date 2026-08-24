@@ -7,7 +7,9 @@ import hashlib
 import hmac
 from datetime import datetime, timezone
 
-from fastapi import Request, Depends, HTTPException
+from app.schemas.common import PaginatedData
+from app.schemas.user import BillingOrder
+from fastapi import APIRouter, Request, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from .config import PAYMENT_PROVIDER, PAYMENT_WEBHOOK_SECRET
@@ -29,6 +31,8 @@ class BillingMockCompleteRequest(BaseModel):
 
 # ---------- internal helpers ----------
 
+
+router = APIRouter()
 
 def _create_order_no() -> str:
     ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
@@ -133,10 +137,12 @@ def _mark_order_paid_and_upgrade(order_no: str, provider_txn_id: str, raw_json: 
 # ---------- routes ----------
 
 
+@router.get("/api/billing/plans")
 async def billing_plans():
     return {"items": _get_active_membership_plans()}
 
 
+@router.post("/api/billing/checkout", response_model=dict)
 async def billing_checkout(payload: BillingCheckoutRequest, request: Request, current_user=Depends(get_current_user)):
     plan = _get_plan_or_404(payload.plan_code)
     order_no = _create_order_no()
@@ -177,6 +183,7 @@ async def billing_checkout(payload: BillingCheckoutRequest, request: Request, cu
     }
 
 
+@router.get("/api/billing/orders", response_model=PaginatedData[BillingOrder])
 async def billing_orders(limit: int = 20, offset: int = 0, current_user=Depends(get_current_user)):
     safe_limit = max(1, min(int(limit), 100))
     safe_offset = max(0, int(offset))
@@ -206,6 +213,7 @@ async def billing_orders(limit: int = 20, offset: int = 0, current_user=Depends(
     return {"items": items, "limit": safe_limit, "offset": safe_offset}
 
 
+@router.post("/api/billing/mock/complete")
 async def billing_mock_complete(
     payload: BillingMockCompleteRequest, request: Request, current_user=Depends(get_current_user)
 ):
@@ -231,6 +239,7 @@ async def billing_mock_complete(
     return result
 
 
+@router.post("/api/billing/webhook")
 async def billing_webhook(request: Request):
     body = await request.body()
     provided = (request.headers.get("X-Payment-Signature") or "").strip()

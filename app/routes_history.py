@@ -5,15 +5,19 @@ import logging
 import os
 import shutil
 
-from fastapi import Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.audit import write_audit_event
 from app.db import get_db_session
+from app.schemas.common import PaginatedData
+from app.schemas.quote import QuoteHistoryItem
 from app.deps import get_current_user, is_member_user
 from app.models_orm import QuoteHistory
 
 logger = logging.getLogger(__name__)
 
+
+router = APIRouter()
 
 def _quote_artifact_directories(current_user: dict) -> list[tuple[str, str]]:
     """Return (allowed parent, target) pairs for current-user quote artifacts.
@@ -78,6 +82,7 @@ def _clear_quote_artifacts(current_user: dict) -> dict[str, int]:
         summary["files_deleted"] += files
     return summary
 
+@router.get("/api/quote/history", response_model=PaginatedData[QuoteHistoryItem])
 def quote_history(limit: int = 20, offset: int = 0, current_user=Depends(get_current_user)):
     """Get quote history for current user."""
     safe_limit = max(1, min(int(limit), 100))
@@ -125,6 +130,7 @@ def quote_history(limit: int = 20, offset: int = 0, current_user=Depends(get_cur
     return {"items": items, "total": total, "limit": safe_limit, "offset": safe_offset}
 
 
+@router.delete("/api/quote/history/{id}")
 def delete_quote_history(id: int, request: Request, current_user=Depends(get_current_user)):
     """Delete a single quote history record by id."""
     uid = int(current_user["id"])
@@ -156,6 +162,7 @@ def delete_quote_history(id: int, request: Request, current_user=Depends(get_cur
         raise HTTPException(status_code=500, detail=f"删除失败: {str(e)}")
 
 
+@router.delete("/api/quote/history")
 def clear_quote_history(request: Request, current_user=Depends(get_current_user)):
     """Delete current-user history together with uploaded models and G-code."""
     uid = int(current_user["id"])

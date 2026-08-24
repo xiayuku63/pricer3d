@@ -7,7 +7,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from fastapi import Request, Depends, HTTPException  # noqa: E402
+from fastapi import APIRouter, Request, Depends, HTTPException  # noqa: E402
 from fastapi.responses import Response  # noqa: E402
 
 
@@ -68,6 +68,8 @@ from .audit import write_audit_event  # noqa: E402
 from .middleware import rate_limiter  # noqa: E402
 
 
+router = APIRouter()
+
 def normalize_verify_target(channel: str, target: str) -> str:
     ch = (channel or "").strip().lower()
     if ch == "email":
@@ -80,6 +82,7 @@ def normalize_verify_target(channel: str, target: str) -> str:
 # ---------- Captcha ----------
 
 
+@router.get("/api/auth/captcha")
 async def get_captcha(request: Request):
     text = generate_captcha_text(CAPTCHA_LENGTH)
     captcha_id = secrets.token_urlsafe(24)
@@ -96,6 +99,7 @@ async def get_captcha(request: Request):
     return resp
 
 
+@router.get("/api/auth/captcha/image/{captcha_id}")
 async def get_captcha_image(captcha_id: str):
     raw, ct = captcha_store.get_image(str(captcha_id).strip())
     if not raw or not ct:
@@ -106,6 +110,7 @@ async def get_captcha_image(captcha_id: str):
 # ---------- Verification ----------
 
 
+@router.post("/api/auth/verify/send")
 async def send_verify_code(payload: VerifySendRequest, request: Request):
     channel = (payload.channel or "").strip().lower()
     target = normalize_verify_target(channel, payload.target)
@@ -167,6 +172,7 @@ async def send_verify_code(payload: VerifySendRequest, request: Request):
     return resp
 
 
+@router.post("/api/auth/verify/confirm")
 async def confirm_verify_code(payload: VerifyConfirmRequest, request: Request):
     channel = (payload.channel or "").strip().lower()
     target = normalize_verify_target(channel, payload.target)
@@ -186,6 +192,7 @@ async def confirm_verify_code(payload: VerifyConfirmRequest, request: Request):
 # ---------- Register Check ----------
 
 
+@router.post("/api/auth/register/check")
 async def check_register_exists(payload: RegisterCheckRequest):
     field = (payload.field or "").strip().lower()
     raw_value = (payload.value or "").strip()
@@ -216,6 +223,7 @@ async def check_register_exists(payload: RegisterCheckRequest):
 # ---------- Register ----------
 
 
+@router.post("/api/auth/register")
 async def register(payload: RegisterRequest, request: Request):
     verify_captcha_or_raise(payload.captcha_id, payload.captcha_code)
     require_legal_acceptance_or_raise(payload.accept_terms, payload.accept_privacy)
@@ -286,6 +294,7 @@ async def register(payload: RegisterRequest, request: Request):
 # ---------- Login ----------
 
 
+@router.post("/api/auth/login")
 async def login(payload: LoginRequest, request: Request):
     verify_captcha_or_raise(payload.captcha_id, payload.captcha_code)
     require_legal_acceptance_or_raise(payload.accept_terms, payload.accept_privacy)
@@ -361,6 +370,7 @@ async def login(payload: LoginRequest, request: Request):
 # ---------- Admin Login (no captcha, no legal, dev only) ----------
 
 
+@router.post("/api/auth/admin-login")
 async def admin_login(request: Request):
     """Admin quick login — no captcha, no legal acceptance. Auto-creates admin user.
 
@@ -441,6 +451,7 @@ async def admin_login(request: Request):
 # ---------- Me ----------
 
 
+@router.get("/api/auth/me", response_model=dict)
 async def auth_me(current_user=Depends(get_current_user)):
     import logging
 
@@ -501,6 +512,7 @@ class ResetConfirmModel(BaseModel):
     new_password: str = Field(..., min_length=6, max_length=100)
 
 
+@router.post("/api/auth/password/reset/request")
 async def password_reset_request(payload: ResetRequestModel, request: Request):
     """Request password reset email."""
     verify_captcha_or_raise(payload.captcha_id, payload.captcha_code)
@@ -546,6 +558,7 @@ async def password_reset_request(payload: ResetRequestModel, request: Request):
     return resp
 
 
+@router.post("/api/auth/password/reset/confirm")
 async def password_reset_confirm(payload: ResetConfirmModel, request: Request):
     """Confirm password reset with verification code."""
     new_password = validate_password_or_raise(payload.new_password)

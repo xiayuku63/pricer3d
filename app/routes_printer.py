@@ -1,7 +1,7 @@
 """Printer preset API routes."""
 
 import logging
-from fastapi import Request, Depends, HTTPException
+from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
@@ -38,10 +38,14 @@ class PrinterPresetRequest(BaseModel):
     end_gcode: str | None = Field(None, max_length=GCODE_FIELD_MAX_LEN, description="打印后 G-code")
 
 
+router = APIRouter()
+
+@router.get("/api/printer/gcode-defaults")
 async def api_get_printer_gcode_defaults():
     return {"defaults": default_lifecycle_values()}
 
 
+@router.get("/api/printer/presets")
 async def api_list_printer_presets(current_user=Depends(get_current_user)):
     try:
         items = list_printer_presets(int(current_user["id"]))
@@ -51,6 +55,7 @@ async def api_list_printer_presets(current_user=Depends(get_current_user)):
         raise HTTPException(status_code=500, detail=f"INTERNAL_ERROR: {str(e)}")
 
 
+@router.get("/api/printer/presets/{preset_id}")
 async def api_get_printer_preset(preset_id: int, current_user=Depends(get_current_user)):
     try:
         preset = get_printer_preset_by_id(int(current_user["id"]), int(preset_id))
@@ -64,6 +69,7 @@ async def api_get_printer_preset(preset_id: int, current_user=Depends(get_curren
         raise HTTPException(status_code=500, detail=f"INTERNAL_ERROR: {str(e)}")
 
 
+@router.post("/api/printer/presets")
 async def api_create_printer_preset(
     payload: PrinterPresetRequest, request: Request, current_user=Depends(get_current_user)
 ):
@@ -102,6 +108,7 @@ async def api_create_printer_preset(
         raise HTTPException(status_code=500, detail=f"INTERNAL_ERROR: {str(e)}")
 
 
+@router.delete("/api/printer/presets/{preset_id}")
 async def api_delete_printer_preset(preset_id: int, request: Request, current_user=Depends(get_current_user)):
     try:
         ok = delete_printer_preset(int(current_user["id"]), int(preset_id))
@@ -121,6 +128,7 @@ async def api_delete_printer_preset(preset_id: int, request: Request, current_us
         raise HTTPException(status_code=500, detail=f"INTERNAL_ERROR: {str(e)}")
 
 
+@router.get("/api/printer/presets/{preset_id}/download")
 async def api_download_printer_profile(preset_id: int, current_user=Depends(get_current_user)):
     try:
         profile = download_printer_profile(int(current_user["id"]), int(preset_id))

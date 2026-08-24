@@ -13,7 +13,7 @@ import logging
 import tempfile
 import time
 from datetime import datetime, timezone
-from fastapi import Depends, UploadFile, File, HTTPException, Request, Form
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Request, Form
 
 import numpy as np
 
@@ -28,6 +28,9 @@ logger = logging.getLogger(__name__)
 _ORIENT_TMP_DIR = os.path.join(tempfile.gettempdir(), "pricer3d_orient")
 
 
+router = APIRouter()
+
+@router.post("/api/orientation/optimize")
 async def optimize_orientation(
     request: Request,
     file: UploadFile = File(...),
@@ -76,6 +79,7 @@ async def optimize_orientation(
             pass
 
 
+@router.post("/api/orientation/faces")
 async def list_stable_faces(
     request: Request,
     file: UploadFile = File(...),
@@ -115,6 +119,7 @@ async def list_stable_faces(
             pass
 
 
+@router.post("/api/orientation/coplanar")
 async def list_coplanar_clusters(
     request: Request,
     file: UploadFile = File(...),
@@ -177,6 +182,7 @@ async def list_coplanar_clusters(
             pass
 
 
+@router.post("/api/orientation/train")
 async def train_sample(
     request: Request,
     file: UploadFile = File(...),
@@ -360,6 +366,7 @@ async def train_sample(
             pass
 
 
+@router.get("/api/orientation/model/status")
 async def model_status(
     request: Request,
     current_user=Depends(get_current_user),
@@ -394,6 +401,7 @@ async def model_status(
     }
 
 
+@router.post("/api/admin/orientation/train")
 async def admin_train_model(
     request: Request,
     current_user=Depends(get_current_user),
@@ -438,6 +446,7 @@ async def admin_train_model(
     }
 
 
+@router.post("/api/orientation/auto-learned")
 async def auto_learned_orient(
     request: Request,
     file: UploadFile = File(...),

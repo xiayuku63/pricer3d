@@ -6,10 +6,11 @@ Thin layer that validates request parameters and delegates to app.services.quote
 import logging
 from typing import List, Optional
 
-from fastapi import Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel, Field
 
 from app.deps import get_current_user
+from app.schemas.quote import QuoteResponse
 from app.services.quote import build_quote_payload
 from calculator.cost import FORMULA_ALIAS_TO_CANONICAL, validate_formula_expression
 
@@ -21,6 +22,10 @@ class FormulaValidateRequest(BaseModel):
     total_cost_formula: str = Field(..., min_length=1, max_length=800)
 
 
+router = APIRouter()
+
+
+@router.post("/api/quote", response_model=QuoteResponse)
 async def get_quote(
     request: Request,
     files: List[UploadFile] = File(...),
@@ -69,6 +74,7 @@ async def get_quote(
         raise HTTPException(status_code=500, detail=f"INTERNAL_ERROR: 报价请求失败 ({str(e)})")
 
 
+@router.post("/api/formula/validate", response_model=dict)
 async def validate_formula(payload: FormulaValidateRequest, current_user=Depends(get_current_user)):
     unit_ok, unit_err, unit_vars = validate_formula_expression(payload.unit_cost_formula)
     total_ok, total_err, total_vars = validate_formula_expression(payload.total_cost_formula)
