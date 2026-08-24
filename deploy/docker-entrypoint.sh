@@ -5,6 +5,12 @@ echo "[pricer3d] Starting pricer3d (PrusaSlicer only)..."
 echo "[pricer3d] Data dir:  ${DB_PATH:-/app/data/app.db}"
 echo "[pricer3d] Env:       ${APP_ENV:-development}"
 
+# Apply Alembic migrations (best-effort — the app's runtime init_db remains
+# the safety net for fresh databases and missed columns).
+echo "[pricer3d] Applying DB migrations..."
+/app/venv/bin/python3 -m alembic upgrade head 2>&1 \
+  || echo "[pricer3d] WARNING: alembic upgrade failed — continuing with runtime schema init"
+
 # Ensure desktop output directory exists
 mkdir -p /app/desktop_outputs 2>/dev/null || true
 
