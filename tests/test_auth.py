@@ -8,9 +8,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import pytest
 from fastapi.testclient import TestClient
 
-# Use in-memory SQLite for tests
-os.environ["DB_PATH"] = ":memory:"
-
+# DB_PATH is pinned in tests/conftest.py BEFORE any app import — setting it
+# here would lose the race to test_3mf_entities.py importing the app first.
 from main import app
 
 client = TestClient(app)
