@@ -1,5 +1,6 @@
 """Upload limits and short-lived preview sessions for ZIP quoting."""
 
+import shutil
 import time
 import uuid
 
@@ -7,7 +8,13 @@ from fastapi import HTTPException, UploadFile
 
 
 class PreviewSessionStore:
-    """In-memory, one-time storage for parsed ZIP preview data."""
+    """In-memory, one-time storage for parsed ZIP preview data.
+
+    Session payloads reference models via on-disk spool paths (``_spool_dir``)
+    instead of raw bytes, so an unconsumed upload stops holding hundreds of
+    megabytes in memory. Expired sessions delete their spool directory;
+    ``consume()`` transfers ownership to the caller instead.
+    """
 
     def __init__(self, ttl_seconds: int = 600):
         self._ttl_seconds = ttl_seconds
@@ -27,21 +34,33 @@ class PreviewSessionStore:
         if not entry:
             return None
         if entry["expires_at"] < time.time():
-            self._sessions.pop(session_id, None)
+            self._delete_session(session_id, entry)
             return None
         return entry["data"]
 
     def consume(self, session_id: str):
-        data = self.get(session_id)
-        if data is not None:
-            self._sessions.pop(session_id, None)
-        return data
+        entry = self._sessions.get(session_id)
+        if not entry:
+            return None
+        if entry["expires_at"] < time.time():
+            self._delete_session(session_id, entry)
+            return None
+        # Ownership of the spool dir moves to the caller (the quote flow
+        # copies files out and removes it); do NOT delete it here.
+        self._sessions.pop(session_id, None)
+        return entry["data"]
+
+    def _delete_session(self, session_id: str, entry: dict) -> None:
+        self._sessions.pop(session_id, None)
+        spool_dir = (entry.get("data") or {}).get("_spool_dir")
+        if spool_dir:
+            shutil.rmtree(spool_dir, ignore_errors=True)
 
     def _purge_expired(self) -> None:
         now = time.time()
         expired = [key for key, value in self._sessions.items() if value["expires_at"] < now]
         for key in expired:
-            self._sessions.pop(key, None)
+            self._delete_session(key, self._sessions[key])
 
 
 async def read_upload_limited(file: UploadFile, max_size_bytes: int, chunk_bytes: int = 1024 * 1024) -> bytes:

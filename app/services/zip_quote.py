@@ -4,6 +4,8 @@ import asyncio
 import json
 import logging
 import os
+import shutil
+import time
 import uuid
 from typing import Optional
 
@@ -107,6 +109,44 @@ def _zip_preview_model_path(result: dict, model: dict) -> Optional[str]:
     return model.get("_pre_saved_path") or result.get("_saved_path")
 
 
+def _spool_zip_models_to_disk(stl_files: list) -> str:
+    """Write ZIP model entries to a per-session spool dir and drop their bytes.
+
+    Returns the spool dir. Each entry gains ``_spool_path`` / ``_spool_dir``
+    and loses ``file_bytes``; the preview session store deletes the dir when
+    the session expires unconsumed.
+    """
+    import shutil as _shutil
+
+    from app.utils import _user_base_dir
+
+    spool_root = os.path.join(_user_base_dir(), "tmp_zip_sessions")
+    os.makedirs(spool_root, exist_ok=True)
+    # Sweep leftovers from sessions that were consumed and then crashed
+    # before cleanup (dir mtime far past any session TTL).
+    now = time.time()
+    try:
+        for name in os.listdir(spool_root):
+            path = os.path.join(spool_root, name)
+            try:
+                if os.path.isdir(path) and now - os.path.getmtime(path) > 86400:
+                    _shutil.rmtree(path, ignore_errors=True)
+            except OSError:
+                continue
+    except OSError:
+        pass
+
+    spool_dir = os.path.join(spool_root, uuid.uuid4().hex)
+    os.makedirs(spool_dir, exist_ok=True)
+    for stl in stl_files:
+        target = os.path.join(spool_dir, stl["filename"])
+        with open(target, "wb") as out:
+            out.write(stl.pop("file_bytes"))
+        stl["_spool_path"] = target
+        stl["_spool_dir"] = spool_dir
+    return spool_dir
+
+
 async def build_zip_preview_response(file: UploadFile):
     """Parse ZIP and return match analysis without slicing."""
     fname = (file.filename or "").lower()
@@ -117,8 +157,11 @@ async def build_zip_preview_response(file: UploadFile):
 
     parsed = await asyncio.to_thread(_parse_zip_contents, content)
     match_result = parsed["match_result"]
-    parsed["stl_files"]
-    parsed["checklist"]
+    # Release the raw archive immediately — everything downstream works from
+    # the per-entry spool files written below.
+    del content
+
+    spool_dir = _spool_zip_models_to_disk(parsed["stl_files"])
 
     matched_list = []
     for m in match_result["matched"]:
@@ -166,11 +209,13 @@ async def build_zip_preview_response(file: UploadFile):
 
     session_id = _store_preview_session(
         {
-            "file_bytes": content,
+            # Models live on disk (spool); the session itself only carries
+            # metadata so an unconsumed upload doesn't pin the archive,
+            # extracted entries and Excel bytes in memory for the TTL.
             "stl_files": parsed["stl_files"],
             "checklist": parsed["checklist"],
             "match_result": parsed["match_result"],
-            "excel_bytes": parsed["excel_bytes"],
+            "_spool_dir": spool_dir,
         }
     )
 
@@ -200,7 +245,8 @@ def _resolve_zip_defaults(current_user: dict, file: Optional[UploadFile], sessio
         stl_files = preview_data["stl_files"]
         checklist = preview_data["checklist"]
         match_result = preview_data["match_result"]
-        content = preview_data["file_bytes"]
+        # Session models are spooled on disk; the raw archive is gone.
+        content = None
     else:
         if not file:
             raise HTTPException(status_code=400, detail="请上传 .zip 压缩文件或提供 session_id")
@@ -300,16 +346,28 @@ async def build_zip_quote_response(
         checklist,
     )
 
-    # Pre-save all model files to disk so thumbnails work even if slicing fails
+    # Pre-save all model files to disk so thumbnails work even if slicing fails.
+    # Session uploads copy from their spool dir; direct uploads write the
+    # in-memory bytes and release them right after.
     _user_folder = f"user_{current_user['id']}_{current_user['username']}"
     _zip_job_id = uuid.uuid4().hex[:8]
     _zip_uploads_dir = os.path.join(_user_base_dir(), _user_folder, "uploads", _zip_job_id)
     os.makedirs(_zip_uploads_dir, exist_ok=True)
+    _spool_dirs = set()
     for _sf in stl_files:
         _saved = os.path.join(_zip_uploads_dir, _sf["filename"])
-        with open(_saved, "wb") as _f:
-            _f.write(_sf["file_bytes"])
+        _spool_src = _sf.get("_spool_path")
+        if _spool_src and os.path.isfile(_spool_src):
+            shutil.copyfile(_spool_src, _saved)
+            _spool_dirs.add(_sf.get("_spool_dir"))
+        else:
+            with open(_saved, "wb") as _f:
+                _f.write(_sf["file_bytes"])
         _sf["_pre_saved_path"] = _saved
+        _sf.pop("file_bytes", None)
+    for _dir in _spool_dirs:
+        if _dir:
+            shutil.rmtree(_dir, ignore_errors=True)
 
     total_stl = len(stl_files)
     if match_result["match_mode"] == "all":

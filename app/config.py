@@ -58,6 +58,7 @@ DB_PATH = _settings.db_path
 AUTH_RATE_LIMIT_PER_MIN = _settings.auth_rate_limit_per_min
 QUOTE_RATE_LIMIT_PER_MIN = _settings.quote_rate_limit_per_min
 CAPTCHA_RATE_LIMIT_PER_MIN = _settings.captcha_rate_limit_per_min
+ZIP_QUOTE_CONCURRENCY = max(1, _settings.zip_quote_concurrency)
 CAPTCHA_TTL_SECONDS = _settings.captcha_ttl_seconds
 CAPTCHA_LENGTH = _settings.captcha_length
 CAPTCHA_MAX_ATTEMPTS = _settings.captcha_max_attempts

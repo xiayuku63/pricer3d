@@ -11,9 +11,8 @@ class RequestStub:
         return self.disconnected
 
 
-def make_runner(processor, match_material=None):
-    return ZipQuoteRunner(
-        ZipQuoteRunConfig(
+def make_runner(processor, match_material=None, concurrency=None):
+    config = ZipQuoteRunConfig(
             material="PLA",
             color="White",
             quantity=2,
@@ -35,7 +34,7 @@ def make_runner(processor, match_material=None):
             resolve_checklist_printer=lambda default, printer, nozzle: "printer_04" if printer else default,
             zip_preview_model_path=lambda result, model: model.get("_pre_saved_path"),
         )
-    )
+    return ZipQuoteRunner(config, concurrency=concurrency) if concurrency is not None else ZipQuoteRunner(config)
 
 
 def collect_events(runner, request, items):
@@ -164,5 +163,37 @@ def test_runner_stops_before_processing_when_client_disconnects():
 
     events = collect_events(runner, RequestStub(disconnected=True), [("stl_only", stl)])
 
-    assert events == [{"type": "cancelled", "processed": 1}]
+    # "processed" now reports completed work (none ran), not the loop position
+    assert events == [{"type": "cancelled", "processed": 0}]
     assert calls == []
+
+def test_runner_processes_models_concurrently():
+    """Models run in parallel (bounded): wall time collapses and progress
+    counters stay monotonic in completion order."""
+    import time as _time
+
+    active = 0
+    peak = 0
+
+    def processor(file, **kwargs):
+        nonlocal active, peak
+        active += 1
+        peak = max(peak, active)
+        _time.sleep(0.05)
+        active -= 1
+        return {"status": "success", "cost_cny": 1, "weight_g": 1, "estimated_time_h": 1}
+
+    runner = make_runner(processor, concurrency=2)
+    items = [("stl_only", {"filename": f"m{i}.stl", "file_bytes": b"x"}) for i in range(6)]
+
+    started = _time.perf_counter()
+    events = collect_events(runner, RequestStub(), items)
+    elapsed = _time.perf_counter() - started
+
+    assert events[-1]["type"] == "complete"
+    assert len(events[-1]["results"]) == 6
+    progresses = [e for e in events if e["type"] == "progress"]
+    assert [e["current"] for e in progresses] == [1, 2, 3, 4, 5, 6]
+    # 6 files × 50ms with 2 workers ≈ 150ms; serial would be ≥300ms
+    assert elapsed < 0.3
+    assert peak == 2

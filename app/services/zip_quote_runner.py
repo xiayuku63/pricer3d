@@ -2,10 +2,13 @@
 
 import asyncio
 import io
+import os
 from dataclasses import dataclass
 from typing import Any, AsyncIterator, Callable, Optional
 
 from fastapi import UploadFile
+
+from app.config import ZIP_QUOTE_CONCURRENCY
 
 
 @dataclass(frozen=True)
@@ -28,55 +31,97 @@ class ZipQuoteRunConfig:
     zip_preview_model_path: Callable[..., Optional[str]]
 
 
-class ZipQuoteRunner:
-    """Execute matched and unmatched ZIP models with progress events."""
+def _open_model_source(stl: dict):
+    """Open the model bytes from the pre-saved disk path when available.
 
-    def __init__(self, config: ZipQuoteRunConfig):
+    ZIP entries are spooled to disk before the runner starts, so the working
+    set stays bounded even for large archives; the in-memory ``file_bytes``
+    fallback covers callers that did not pre-save.
+    """
+    path = stl.get("_pre_saved_path")
+    if path and os.path.isfile(path):
+        return open(path, "rb"), True
+    return io.BytesIO(stl["file_bytes"]), False
+
+
+class ZipQuoteRunner:
+    """Execute matched and unmatched ZIP models with progress events.
+
+    Models run concurrently (bounded by ZIP_QUOTE_CONCURRENCY); progress
+    events are emitted in completion order with a monotonic counter.
+    """
+
+    def __init__(self, config: ZipQuoteRunConfig, concurrency: int = ZIP_QUOTE_CONCURRENCY):
         self.config = config
+        self._concurrency = max(1, int(concurrency))
 
     async def stream(self, request, files_to_process: list[tuple[str, dict]]) -> AsyncIterator[dict]:
-        results = []
         total_files = len(files_to_process)
-        for index, (file_type, item) in enumerate(files_to_process, 1):
-            if await request.is_disconnected():
-                yield {"type": "cancelled", "processed": index}
+        results: list[Optional[dict]] = [None] * total_files
+        completed = 0
+        cancelled = False
+        semaphore = asyncio.Semaphore(self._concurrency)
+        events: asyncio.Queue = asyncio.Queue()
+
+        async def _worker(index: int, file_type: str, item) -> None:
+            nonlocal cancelled
+            if cancelled:
                 return
-            try:
-                if file_type == "matched":
-                    result, filename, pre_saved = await self._process_matched(item)
-                else:
-                    result, filename, pre_saved = await self._process_stl_only(item)
-                if not result.get("checklist_file_path") and pre_saved:
-                    result["checklist_file_path"] = pre_saved
-                results.append(result)
+            async with semaphore:
+                if cancelled or await request.is_disconnected():
+                    return
+                try:
+                    if file_type == "matched":
+                        result, filename, pre_saved = await self._process_matched(item)
+                    else:
+                        result, filename, pre_saved = await self._process_stl_only(item)
+                    if not result.get("checklist_file_path") and pre_saved:
+                        result["checklist_file_path"] = pre_saved
+                    results[index] = result
+                    status = "success" if result.get("status") == "success" else "failed"
+                except Exception as exc:
+                    filename, pre_saved = self._failure_metadata(file_type, item)
+                    result = {
+                        "filename": filename,
+                        "status": "failed",
+                        "error": str(exc),
+                        "cost_cny": 0,
+                        "weight_g": 0,
+                        "estimated_time_h": 0,
+                    }
+                    if pre_saved:
+                        result["checklist_file_path"] = pre_saved
+                    results[index] = result
+                    status = "failed"
+                await events.put((filename, status))
+
+        tasks = [
+            asyncio.create_task(_worker(index, file_type, item))
+            for index, (file_type, item) in enumerate(files_to_process)
+        ]
+        try:
+            while completed < total_files:
+                if await request.is_disconnected():
+                    cancelled = True
+                    yield {"type": "cancelled", "processed": completed}
+                    return
+                try:
+                    filename, status = await asyncio.wait_for(events.get(), timeout=1.0)
+                except asyncio.TimeoutError:
+                    continue
+                completed += 1
                 yield {
                     "type": "progress",
-                    "current": index,
+                    "current": completed,
                     "total": total_files,
                     "filename": filename,
-                    "status": "success" if result.get("status") == "success" else "failed",
+                    "status": status,
                 }
-            except Exception as exc:
-                filename, pre_saved = self._failure_metadata(file_type, item)
-                result = {
-                    "filename": filename,
-                    "status": "failed",
-                    "error": str(exc),
-                    "cost_cny": 0,
-                    "weight_g": 0,
-                    "estimated_time_h": 0,
-                }
-                if pre_saved:
-                    result["checklist_file_path"] = pre_saved
-                results.append(result)
-                yield {
-                    "type": "progress",
-                    "current": index,
-                    "total": total_files,
-                    "filename": filename,
-                    "status": "failed",
-                }
-        yield {"type": "complete", "results": results}
+            yield {"type": "complete", "results": [result for result in results if result is not None]}
+        finally:
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
 
     async def _process_matched(self, item: dict) -> tuple[dict, str, Optional[str]]:
         config = self.config
@@ -123,23 +168,28 @@ class ZipQuoteRunner:
             effective_layer_height = config.effective_layer_height
             effective_wall_count = config.effective_wall_count
             effective_infill = config.effective_infill
-        fake_file = UploadFile(filename=stl["filename"], file=io.BytesIO(stl["file_bytes"]))
-        result = await asyncio.to_thread(
-            config.process_single_file_sync,
-            fake_file,
-            material=checklist_material,
-            layer_height=effective_layer_height,
-            infill=effective_infill,
-            quantity=checklist_quantity,
-            color=checklist_color,
-            user_materials=config.user_materials,
-            pricing_config=file_pricing,
-            slicer_preset=file_preset,
-            perimeters=effective_wall_count,
-            current_user=config.current_user,
-            auto_orient=False,
-            selected_material_spec=material_spec,
-        )
+        source, owns_handle = _open_model_source(stl)
+        fake_file = UploadFile(filename=stl["filename"], file=source)
+        try:
+            result = await asyncio.to_thread(
+                config.process_single_file_sync,
+                fake_file,
+                material=checklist_material,
+                layer_height=effective_layer_height,
+                infill=effective_infill,
+                quantity=checklist_quantity,
+                color=checklist_color,
+                user_materials=config.user_materials,
+                pricing_config=file_pricing,
+                slicer_preset=file_preset,
+                perimeters=effective_wall_count,
+                current_user=config.current_user,
+                auto_orient=False,
+                selected_material_spec=material_spec,
+            )
+        finally:
+            if owns_handle:
+                source.close()
         # The processing wrapper may preserve a stale color from an existing
         # material/result. The checklist mapping is authoritative for both the
         # rendered result and the saved quote history.
@@ -170,28 +220,33 @@ class ZipQuoteRunner:
 
     async def _process_stl_only(self, stl: dict) -> tuple[dict, str, Optional[str]]:
         config = self.config
-        fake_file = UploadFile(filename=stl["filename"], file=io.BytesIO(stl["file_bytes"]))
+        source, owns_handle = _open_model_source(stl)
+        fake_file = UploadFile(filename=stl["filename"], file=source)
         file_pricing = dict(config.pricing_config)
         if config.default_compound_id:
             file_pricing["printer_model"] = config.default_compound_id
-        result = await asyncio.to_thread(
-            config.process_single_file_sync,
-            fake_file,
-            material=config.material,
-            layer_height=config.effective_layer_height,
-            infill=config.effective_infill,
-            quantity=config.quantity,
-            color=config.resolve_color_hex(config.color),
-            user_materials=config.user_materials,
-            pricing_config=file_pricing,
-            slicer_preset=config.default_preset,
-            perimeters=config.effective_wall_count,
-            current_user=config.current_user,
-            auto_orient=False,
-            selected_material_spec=config.match_selected_material(
-                config.user_materials, config.material, "", config.color
-            ),
-        )
+        try:
+            result = await asyncio.to_thread(
+                config.process_single_file_sync,
+                fake_file,
+                material=config.material,
+                layer_height=config.effective_layer_height,
+                infill=config.effective_infill,
+                quantity=config.quantity,
+                color=config.resolve_color_hex(config.color),
+                user_materials=config.user_materials,
+                pricing_config=file_pricing,
+                slicer_preset=config.default_preset,
+                perimeters=config.effective_wall_count,
+                current_user=config.current_user,
+                auto_orient=False,
+                selected_material_spec=config.match_selected_material(
+                    config.user_materials, config.material, "", config.color
+                ),
+            )
+        finally:
+            if owns_handle:
+                source.close()
         result["_checklist_params"] = False
         result["checklist_file_path"] = config.zip_preview_model_path(result, stl)
         return result, stl["filename"], stl.get("_pre_saved_path")

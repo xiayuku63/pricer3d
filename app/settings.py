@@ -92,6 +92,8 @@ class Settings(BaseSettings):
 
     # ── Quote ──
     quote_concurrency: int = 4
+    # ZIP 流水线并发（切片是瓶颈；AppImage 预解压后不再有全局锁）
+    zip_quote_concurrency: int = 3
 
     # ── Admin ──
     admin_usernames: str = "admin"
