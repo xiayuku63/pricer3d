@@ -8,6 +8,21 @@ echo "[pricer3d] Env:       ${APP_ENV:-development}"
 # Ensure desktop output directory exists
 mkdir -p /app/desktop_outputs 2>/dev/null || true
 
+# PrusaSlicer AppImage: prefer the build-time extraction; older images fall
+# back to a one-time extraction at startup. Either way the slicer runs
+# without --appimage-extract-and-run, unlocking concurrent slicing.
+if [ -z "$PRUSA_EXTRACTED_APPIMAGE_DIR" ] && [ -x /usr/local/bin/prusa-slicer.AppImage ]; then
+  _EXTRACT_DIR=/tmp/prusaslicer-extracted
+  if [ ! -x "$_EXTRACT_DIR/AppRun" ]; then
+    echo "[pricer3d] One-time AppImage extraction..."
+    (cd /tmp && env -u APPIMAGE_EXTRACT_AND_RUN /usr/local/bin/prusa-slicer.AppImage --appimage-extract >/dev/null 2>&1 \
+      && mv /tmp/squashfs-root "$_EXTRACT_DIR") || true
+  fi
+  if [ -x "$_EXTRACT_DIR/AppRun" ]; then
+    export PRUSA_EXTRACTED_APPIMAGE_DIR="$_EXTRACT_DIR"
+  fi
+fi
+
 # Background cleanup loop — runs daily
 (
   while true; do

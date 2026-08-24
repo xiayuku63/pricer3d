@@ -105,6 +105,22 @@ def prusa_executable() -> Optional[str]:
         elif os.path.isfile(_env_file):
             return _env_file
 
+    # Pre-extracted AppImage (set by the Docker image/entrypoint): running the
+    # extracted AppRun avoids the per-slice --appimage-extract-and-run cost and
+    # the process-wide serialization lock it requires.
+    _extracted_dir = os.getenv("PRUSA_EXTRACTED_APPIMAGE_DIR", "").strip()
+    if _extracted_dir:
+        for _candidate in (
+            os.path.join(_extracted_dir, "AppRun"),
+            os.path.join(_extracted_dir, "usr", "bin", "prusa-slicer"),
+        ):
+            if os.path.isfile(_candidate):
+                return _candidate
+        logger.warning(
+            "PRUSA_EXTRACTED_APPIMAGE_DIR='%s' set but no AppRun/prusa-slicer found inside; falling back",
+            _extracted_dir,
+        )
+
     if _sys.platform == "win32":
         _wsl = shutil.which("wsl.exe") or shutil.which("wsl")
         if _wsl:
@@ -642,6 +658,57 @@ def generate_slice_config(
 # ── Slice ──
 
 _SLICE_TIMEOUT = int(os.getenv("PRUSA_SLICE_TIMEOUT", "120"))
+# Large models legitimately slice for minutes at fine layer heights; scale the
+# base timeout with input size instead of failing everything above 120s.
+_SLICE_TIMEOUT_PER_MB = float(os.getenv("PRUSA_SLICE_TIMEOUT_PER_MB", "2"))
+_SLICE_TIMEOUT_MAX = int(os.getenv("PRUSA_SLICE_TIMEOUT_MAX", "900"))
+
+
+def _slice_timeout_for(model_path: str) -> int:
+    try:
+        size_mb = os.path.getsize(model_path) / (1024 * 1024)
+    except OSError:
+        size_mb = 0.0
+    return min(_SLICE_TIMEOUT_MAX, _SLICE_TIMEOUT + int(size_mb * _SLICE_TIMEOUT_PER_MB))
+
+
+def _kill_slicer_process_tree(proc: subprocess.Popen, cmd: list[str], output_gcode_path: str) -> None:
+    """Kill the slicer and its children.
+
+    A bare proc.kill() only terminates the launcher: on Windows the WSL relay
+    dies but the Linux-side prusa-slicer keeps burning CPU, and on Linux the
+    AppImage wrapper outlives the runtime. Kill the whole tree; for WSL also
+    pkill by the unique output basename (per-slice marker) to reach inside the
+    VM without disturbing concurrent slices.
+    """
+    import signal
+    import sys as _sys
+
+    try:
+        if _sys.platform == "win32":
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                capture_output=True,
+                timeout=10,
+            )
+            if cmd and "wsl" in os.path.basename(cmd[0].replace('"', "")).lower():
+                marker = os.path.basename(output_gcode_path)
+                if marker:
+                    subprocess.run(
+                        ["wsl.exe", "--", "pkill", "-9", "-f", marker],
+                        capture_output=True,
+                        timeout=10,
+                    )
+        else:
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except (ProcessLookupError, PermissionError, OSError):
+                proc.kill()
+    except Exception:
+        try:
+            proc.kill()
+        except Exception:
+            pass
 
 
 def run_prusa_slice(
@@ -786,13 +853,37 @@ def run_prusa_slice(
         except OSError:
             pass
 
-        # WSL stderr may contain UTF-16LE proxy warnings mixed with
-        # UTF-8 program output → read as bytes, decode robustly
-        with prusa_execution_lock(exe):
-            proc = subprocess.run(cmd, capture_output=True, text=False, timeout=_SLICE_TIMEOUT)
+        import sys as _sys
 
-        stdout = _safe_decode(proc.stdout).strip()
-        stderr = _safe_decode(proc.stderr).strip()
+        # Group the slicer so the whole tree can be killed on timeout
+        # (start_new_session on Linux, a new process group on Windows).
+        _popen_kwargs: dict = {}
+        if _sys.platform == "win32":
+            _popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+        else:
+            _popen_kwargs["start_new_session"] = True
+
+        timeout_s = _slice_timeout_for(model_path)
+        with prusa_execution_lock(exe):
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=False,
+                **_popen_kwargs,
+            )
+            try:
+                stdout_b, stderr_b = proc.communicate(timeout=timeout_s)
+            except subprocess.TimeoutExpired:
+                _kill_slicer_process_tree(proc, cmd, output_gcode_path)
+                try:
+                    proc.communicate(timeout=5)
+                except Exception:
+                    pass
+                raise RuntimeError(f"PrusaSlicer timed out ({timeout_s}s) for {os.path.basename(model_path)}")
+
+        stdout = _safe_decode(stdout_b).strip()
+        stderr = _safe_decode(stderr_b).strip()
 
         if proc.returncode != 0:
             # A non-zero exit must fail even when a partial G-code file was
