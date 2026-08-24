@@ -152,7 +152,11 @@ export async function quoteSingleFileWithOptions(file, options, signal) {
     if (signal) fetchOpts.signal = signal;
     const response = await authFetch('/api/quote', fetchOpts);
     const data = await response.json();
-    if (!response.ok) throw new Error(data.detail || data.error || t('quote.requestFailed'));
+    if (!response.ok) {
+        const error = new Error(data.message || data.detail || data.error || t('quote.requestFailed'));
+        error.status = response.status;
+        throw error;
+    }
     return data.results && data.results.length > 0 ? data.results[0] : { filename: file.name, status: "failed", error: "空响应" };
 }
 
@@ -219,7 +223,10 @@ function _pendingQuoteOptions(file) {
     };
 }
 
-/** Quote files one by one so each result row can transition from calculating to done. */
+/** Quote files through a small worker pool (default 2) so rows still
+ * transition calculating → done one by one, while slicing latency no longer
+ * serializes N files into N sequential round-trips. 429 responses back off
+ * once instead of failing the row. */
 export async function quoteSelectedFilesSequentially(selectedFiles, useProgress = false) {
     const files = Array.from(selectedFiles || []);
     if (!files.length) return;
@@ -232,11 +239,11 @@ export async function quoteSelectedFilesSequentially(selectedFiles, useProgress 
     });
     if (useProgress) showProgress(`逐项计算报价 (${files.length} 个文件)...`);
 
-    for (let index = 0; index < files.length; index += 1) {
-        if (signal.aborted) break;
-        const file = files[index];
-        const percentBefore = (index / files.length) * 100;
-        if (useProgress) updateProgress(percentBefore, `${index + 1}/${files.length} - ${file.name} - ${t('quote.calculating')}`);
+    let nextIndex = 0;
+    let completed = 0;
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    const runOne = async (file) => {
         markFileAsCalculating(file);
         try {
             const updated = await quoteSingleFileWithOptions(file, _pendingQuoteOptions(file), signal);
@@ -245,17 +252,54 @@ export async function quoteSelectedFilesSequentially(selectedFiles, useProgress 
                 await ensureThumbnailForFile(file, updated.color, getResultOrientation(updated), () => {});
             }
         } catch (error) {
-            if (error.name === 'AbortError' || signal.aborted) break;
-            mergeResultsByFilename([{
-                filename: file.name,
-                status: 'failed',
-                error: error.message || t('quote.requestFailed'),
-            }]);
+            if (error.status === 429 && !signal.aborted) {
+                // Server rate limit (30/min per IP): back off, then retry once.
+                await sleep(3000);
+                if (!signal.aborted) {
+                    try {
+                        const updated = await quoteSingleFileWithOptions(file, _pendingQuoteOptions(file), signal);
+                        mergeResultsByFilename([updated]);
+                        if (updated?.color) {
+                            await ensureThumbnailForFile(file, updated.color, getResultOrientation(updated), () => {});
+                        }
+                    } catch (retryError) {
+                        if (retryError.name === 'AbortError' || signal.aborted) return;
+                        mergeResultsByFilename([{
+                            filename: file.name,
+                            status: 'failed',
+                            error: retryError.message || t('quote.requestFailed'),
+                        }]);
+                    }
+                }
+            } else if (error.name === 'AbortError' || signal.aborted) {
+                return;
+            } else {
+                mergeResultsByFilename([{
+                    filename: file.name,
+                    status: 'failed',
+                    error: error.message || t('quote.requestFailed'),
+                }]);
+            }
         }
+        completed += 1;
         renderResultsTable();
         recalcSummaryFromCurrentResults();
-        if (useProgress) updateProgress(((index + 1) / files.length) * 100, `${index + 1}/${files.length} - ${file.name}`);
-    }
+        if (useProgress) updateProgress((completed / files.length) * 100, `${completed}/${files.length} - ${file.name}`);
+    };
+
+    const worker = async () => {
+        while (!signal.aborted) {
+            const index = nextIndex;
+            nextIndex += 1;
+            if (index >= files.length) return;
+            await runOne(files[index]);
+        }
+    };
+
+    const poolSize = Math.min(2, files.length);
+    const workers = [];
+    for (let i = 0; i < poolSize; i += 1) workers.push(worker());
+    await Promise.all(workers);
 
     if (useProgress && !signal.aborted) {
         showProgressSuccess(`报价完成，共处理 ${files.length} 个文件`);

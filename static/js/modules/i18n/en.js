@@ -198,6 +198,8 @@ export default {
   // ── ZIP Preview ──
   'zipPreview.title': 'ZIP File Preview',
   'zipPreview.parsing': 'Parsing checklist and models from ZIP...',
+  'zipPreview.uploading': 'Uploading',
+  'zipPreview.networkError': 'Network error, upload failed',
   'zipPreview.slicing': 'Starting slicing...',
   'zipPreview.oneZipOnly': 'Only one ZIP file at a time',
   'zipPreview.cancelled': 'ZIP slicing cancelled',

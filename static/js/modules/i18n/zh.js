@@ -193,6 +193,8 @@ export default {
   // ── ZIP Preview / ZIP预览 ──
   'zipPreview.title': 'ZIP 文件预览',
   'zipPreview.parsing': '正在解析 ZIP 文件中的清单与模型...',
+  'zipPreview.uploading': '上传中',
+  'zipPreview.networkError': '网络错误，上传失败',
   'zipPreview.slicing': '开始切片...',
   'zipPreview.oneZipOnly': '一次只能上传一个 ZIP 文件',
   'zipPreview.cancelled': '已取消 ZIP 切片',
