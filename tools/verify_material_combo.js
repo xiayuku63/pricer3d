@@ -84,6 +84,50 @@ const BASE = process.argv[2] || 'http://127.0.0.1:5000';
     assert(!after.anyOpen, 'dropdown should close after selection');
     assert(after.firstRowName && after.firstRowName.startsWith('PL'), `selected value should start with PL, got ${after.firstRowName}`);
 
+    // 7. Regression: switching to another row's combo must NOT close the new
+    // dropdown (previously the old input's deferred focusout killed it).
+    const secondInput = page.locator('#materials-tbody .combo-i[data-field="name"]').nth(1);
+    await secondInput.click();
+    await page.waitForTimeout(300); // > the 120ms deferred focusout window
+    const switchState = await page.evaluate(() => {
+        const dd = document.querySelector('body > .combo-d:not(.hidden)');
+        if (!dd) return { open: false };
+        const bg = getComputedStyle(dd).backgroundColor;
+        // rgb(r,g,b) is fully opaque; only rgba(...,a<1) is translucent.
+        const m = bg.match(/rgba?\(([^)]+)\)/);
+        const parts = m ? m[1].split(',').map((s) => parseFloat(s)) : [];
+        const bgAlpha = parts.length >= 4 ? parts[3] : 1;
+        const r = dd.getBoundingClientRect();
+        const input = document.activeElement;
+        const ir = input.getBoundingClientRect();
+        return {
+            open: true,
+            bgAlpha,
+            anchoredToInput: Math.abs(r.top - (ir.bottom + 4)) < 3,
+        };
+    });
+    console.log('after switch to row 2:', JSON.stringify(switchState));
+    assert(switchState.open, 'dropdown must stay open when switching combo inputs');
+    assert(parseFloat(switchState.bgAlpha) === 1, `dropdown background must be opaque, got alpha=${switchState.bgAlpha}`);
+    assert(switchState.anchoredToInput, 'dropdown must anchor to the focused input');
+
+    // 8. Modal scrolling must reposition (not close) the open dropdown.
+    await page.evaluate(() => {
+        const pane = document.querySelector('#materials-tbody').closest('.overflow-y-auto');
+        pane.scrollTop += 60;
+    });
+    await page.waitForTimeout(150);
+    const scrollState = await page.evaluate(() => {
+        const dd = document.querySelector('body > .combo-d:not(.hidden)');
+        if (!dd) return { open: false };
+        const r = dd.getBoundingClientRect();
+        const ir = document.activeElement.getBoundingClientRect();
+        return { open: true, anchoredToInput: Math.abs(r.top - (ir.bottom + 4)) < 3 };
+    });
+    console.log('after modal scroll:', JSON.stringify(scrollState));
+    assert(scrollState.open, 'dropdown must stay open while the modal scrolls');
+    assert(scrollState.anchoredToInput, 'dropdown must follow its input on scroll');
+
     await page.screenshot({ path: 'tools/verify_material_combo.png', fullPage: false });
 
     await browser.close();

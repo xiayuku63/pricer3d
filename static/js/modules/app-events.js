@@ -326,11 +326,39 @@ export function initSettingsAreaEvents({
             openComboDropdown(input);
             filterComboDropdown(input);
         });
+        // Set while the pointer is down inside an open panel — covers
+        // scrollbar drags and option hovers, which blur the input without
+        // being an "interact elsewhere" gesture.
+        let comboPointerInPanel = false;
+        document.addEventListener('mousedown', (e) => {
+            comboPointerInPanel = !!(e.target.closest && e.target.closest('.combo-d'));
+        }, true);
+
+        const repositionOrCloseAllCombos = () => {
+            const active = document.activeElement;
+            if (active && active.matches && active.matches('.combo-i')) {
+                const dd = findComboDropdown(active);
+                if (dd && !dd.classList.contains('hidden')) {
+                    positionComboDropdown(active, dd);
+                    return;
+                }
+            }
+            closeAllComboDropdowns();
+        };
+
         document.addEventListener('focusout', (e) => {
             if (!(e.target instanceof HTMLElement) || !e.target.matches('.combo-i')) return;
+            const input = e.target;
             setTimeout(() => {
-                if (e.target.matches(':focus')) return;
-                closeAllComboDropdowns();
+                if (input.matches(':focus')) return;
+                // Focus moved to another combo input: that input's open just
+                // took over the (single) panel; closing here would kill the
+                // fresh dropdown the instant it appeared.
+                const active = document.activeElement;
+                if (active && active.matches && active.matches('.combo-i')) return;
+                if (comboPointerInPanel) return;
+                const dd = findComboDropdown(input);
+                if (dd) closeComboDropdown(dd);
             }, 120);
         });
         document.addEventListener('mousedown', (e) => {
@@ -350,8 +378,9 @@ export function initSettingsAreaEvents({
         });
         document.addEventListener('scroll', (e) => {
             if (e.target && e.target.nodeType === 1 && e.target.closest && e.target.closest('.combo-d')) return;
-            closeAllComboDropdowns();
+            repositionOrCloseAllCombos();
         }, true);
+        window.addEventListener('resize', repositionOrCloseAllCombos);
 
         // The color panel is portaled to document.body while open so it is not
         // clipped by the table's overflow container. Delegate from document so
