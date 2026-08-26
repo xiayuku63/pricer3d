@@ -238,6 +238,121 @@ export function initSettingsAreaEvents({
             }
         });
 
+        // ── Material brand/type combo dropdowns ──
+        // The materials table sits inside an overflow-x-auto wrapper, which
+        // clips absolutely-positioned dropdowns to a few rows. Portal the open
+        // dropdown to document.body with fixed positioning — same approach as
+        // the color picker panels below.
+        const closeComboDropdown = (dd) => {
+            if (!dd) return;
+            if (typeof dd._comboCleanup === 'function') dd._comboCleanup();
+            dd.classList.add('hidden');
+        };
+        const closeAllComboDropdowns = () => {
+            document.querySelectorAll('.combo-d').forEach(closeComboDropdown);
+        };
+        const findComboDropdown = (input) => {
+            const wrapper = input.closest('.combo-w');
+            if (!wrapper) return null;
+            return wrapper.querySelector('.combo-d')
+                || [...document.querySelectorAll('body > .combo-d')].find((d) => d._comboWrapper === wrapper)
+                || null;
+        };
+        const positionComboDropdown = (input, dd) => {
+            const rect = input.getBoundingClientRect();
+            if (!rect.width) return;
+            dd.style.position = 'fixed';
+            dd.style.zIndex = '1000';
+            dd.style.maxHeight = '192px';
+            dd.style.width = `${Math.max(Math.ceil(rect.width), 140)}px`;
+            dd.style.left = `${Math.max(8, rect.left)}px`;
+            // Flip above the input when the viewport below is too tight.
+            const height = Math.min(dd.scrollHeight || 192, 192);
+            const spaceBelow = window.innerHeight - rect.bottom - 8;
+            if (spaceBelow < Math.min(height, 64) && rect.top > height + 8) {
+                dd.style.top = `${Math.max(8, rect.top - height - 4)}px`;
+            } else {
+                dd.style.top = `${rect.bottom + 4}px`;
+            }
+            // Keep inside the right viewport edge.
+            const ddRect = dd.getBoundingClientRect();
+            if (ddRect.right > window.innerWidth - 8) {
+                dd.style.left = `${Math.max(8, window.innerWidth - ddRect.width - 8)}px`;
+            }
+        };
+        const openComboDropdown = (input) => {
+            const wrapper = input.closest('.combo-w');
+            const dd = findComboDropdown(input);
+            if (!dd) return;
+            if (dd.classList.contains('hidden')) {
+                document.querySelectorAll('.combo-d').forEach((other) => {
+                    if (other !== dd) closeComboDropdown(other);
+                });
+                dd._comboWrapper = wrapper;
+                dd._comboCleanup = () => {
+                    wrapper.appendChild(dd);
+                    ['position', 'top', 'left', 'width', 'maxHeight', 'zIndex'].forEach((prop) => {
+                        dd.style[prop] = '';
+                    });
+                    delete dd._comboWrapper;
+                    delete dd._comboCleanup;
+                };
+                document.body.appendChild(dd);
+            }
+            dd._comboInput = input;
+            dd.classList.remove('hidden');
+            positionComboDropdown(input, dd);
+        };
+        const filterComboDropdown = (input) => {
+            const dd = findComboDropdown(input);
+            if (!dd) return;
+            const query = input.value.toLowerCase();
+            dd.querySelectorAll('.combo-opt').forEach((option) => {
+                option.classList.toggle('hidden', option.textContent.toLowerCase().indexOf(query) === -1);
+            });
+        };
+
+        document.addEventListener('focusin', (e) => {
+            const input = e.target.closest && e.target.closest('.combo-i');
+            if (!input) return;
+            openComboDropdown(input);
+            // Show the full list on focus; filtering kicks in while typing.
+            const dd = findComboDropdown(input);
+            if (dd) dd.querySelectorAll('.combo-opt').forEach((option) => option.classList.remove('hidden'));
+        });
+        document.addEventListener('input', (e) => {
+            const input = e.target.closest && e.target.closest('.combo-i');
+            if (!input) return;
+            openComboDropdown(input);
+            filterComboDropdown(input);
+        });
+        document.addEventListener('focusout', (e) => {
+            if (!(e.target instanceof HTMLElement) || !e.target.matches('.combo-i')) return;
+            setTimeout(() => {
+                if (e.target.matches(':focus')) return;
+                closeAllComboDropdowns();
+            }, 120);
+        });
+        document.addEventListener('mousedown', (e) => {
+            const option = e.target.closest && e.target.closest('.combo-opt');
+            if (!option) return;
+            const dd = option.closest('.combo-d');
+            const input = dd && (dd._comboInput || (dd._comboWrapper && dd._comboWrapper.querySelector('.combo-i')));
+            if (!input) return;
+            e.preventDefault(); // keep focus on the input so blur-hide doesn't eat the click
+            input.value = option.getAttribute('data-val') || '';
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            closeComboDropdown(dd);
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeAllComboDropdowns();
+        });
+        document.addEventListener('scroll', (e) => {
+            if (e.target && e.target.nodeType === 1 && e.target.closest && e.target.closest('.combo-d')) return;
+            closeAllComboDropdowns();
+        }, true);
+
         // The color panel is portaled to document.body while open so it is not
         // clipped by the table's overflow container. Delegate from document so
         // clicks on the portaled panel still reach the picker logic.

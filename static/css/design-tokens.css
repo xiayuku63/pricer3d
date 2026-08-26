@@ -407,7 +407,7 @@
 
 /* ── 材料库组合下拉框：强制深色背景 ── */
 .dark .combo-i,
-.dark .combo-w .combo-d,
+.dark .combo-d,
 .dark #materials-tbody input[type="text"],
 .dark #materials-tbody input[type="number"] {
   background-color: var(--color-surface-solid) !important;

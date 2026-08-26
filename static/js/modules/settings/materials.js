@@ -64,6 +64,11 @@ function _getTypeOptionsForRow(m, rowIdx) {
  * Render a custom combo input (input + styled dropdown) to replace <input>+<datalist>.
  * Supports typing to filter and clicking to select. Dropdown uses CSS variables for
  * dark-mode compatibility.
+ *
+ * Open/filter/close/select behaviour is delegated (app-events.js) and the
+ * dropdown is portaled to document.body while open — the materials table
+ * sits inside an overflow-x-auto wrapper, which clips plain absolute
+ * dropdowns to ~3 rows.
  * @param {string[]} opts - Array of option strings
  * @param {string} value - Current input value
  * @param {number|string} dataIdx - data-idx attribute value
@@ -73,13 +78,13 @@ function _getTypeOptionsForRow(m, rowIdx) {
 function renderComboInput(opts, value, dataIdx, dataField) {
     const escVal = escapeHtml(value);
     const optHtml = opts.map(o =>
-        `<div class="combo-opt px-2 py-1 text-xs cursor-pointer hover:bg-gray-100 truncate" data-val="${escapeHtml(o)}" onmousedown="event.preventDefault();var p=this.closest('.combo-w');var i=p.querySelector('.combo-i');i.value=this.getAttribute('data-val');i.dispatchEvent(new Event('input',{bubbles:true}));i.dispatchEvent(new Event('change',{bubbles:true}));p.querySelector('.combo-d').classList.add('hidden');i.blur();">${escapeHtml(o)}</div>`
+        `<div class="combo-opt px-2 py-1 text-xs cursor-pointer hover:bg-gray-100 truncate" data-val="${escapeHtml(o)}">${escapeHtml(o)}</div>`
     ).join('');
             return ` \
             <span class="combo-w relative" style="display:inline-flex;align-items:center;flex:1;min-width:0"> \
-                <input type="text" class="combo-i flex-1 min-w-0 border-gray-300 rounded-md text-xs px-2 py-1.5 tw-bg-surface" value="${escVal}" autocomplete="off" data-idx="${dataIdx}" data-field="${dataField}" onfocus="this.parentElement.querySelector('.combo-d').classList.remove('hidden')" oninput="var q=this.value.toLowerCase();var d=this.parentElement.querySelector('.combo-d');d.querySelectorAll('.combo-opt').forEach(function(o){o.classList.toggle('hidden',o.textContent.toLowerCase().indexOf(q)===-1)});d.classList.remove('hidden')" onblur="setTimeout(function(el){var dd=el.parentElement?.querySelector('.combo-d');if(dd)dd.classList.add('hidden')},150,this)"> \
+                <input type="text" class="combo-i flex-1 min-w-0 border-gray-300 rounded-md text-xs px-2 py-1.5 tw-bg-surface" value="${escVal}" autocomplete="off" data-idx="${dataIdx}" data-field="${dataField}"> \
                 <span class="combo-badge text-[11px] text-amber-500 leading-none flex-shrink-0 cursor-help ml-1 hidden" title="${dataField === 'brand' ? (t('material.brandCustom') || '自定义品牌') : (t('material.typeCustom') || '自定义类型')}">✦</span> \
-                <div class="combo-d tw-dropdown-panel hidden absolute z-50 left-0 right-0 top-full mt-0.5 max-h-48 overflow-y-auto" style="color:var(--color-text);min-width:100px">${optHtml}</div> \
+                <div class="combo-d tw-dropdown-panel hidden overflow-y-auto" data-idx="${dataIdx}" data-field="${dataField}" style="color:var(--color-text);min-width:100px">${optHtml}</div> \
             </span>`;
 }
 

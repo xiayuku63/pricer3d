@@ -258,7 +258,7 @@ textarea,
 .tw-input,
 .styled-select,
 .combo-i,
-.combo-w .combo-d {
+.combo-d {
   border: 1px solid rgba(255,255,255,.74) !important;
   border-radius: var(--lg-radius-sm) !important;
   background: rgba(255,255,255,.48) !important;
@@ -425,7 +425,7 @@ html.dark textarea,
 html.dark .tw-input,
 html.dark .styled-select,
 html.dark .combo-i,
-html.dark .combo-w .combo-d {
+html.dark .combo-d {
   border-color: rgba(255,255,255,.17) !important;
   background: rgba(37, 58, 87, .62) !important;
   color: #edf5ff !important;
@@ -1086,7 +1086,7 @@ textarea,
 .tw-input,
 .styled-select,
 .combo-i,
-.combo-w .combo-d,
+.combo-d,
 .number-input {
   border-radius: var(--lg-control-radius) !important;
 }
