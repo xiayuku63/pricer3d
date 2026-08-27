@@ -55,8 +55,6 @@ function _positionList(instance) {
     if (!_shouldPortalList(wrapper)) return;
     const rect = trigger.getBoundingClientRect();
     if (!rect.width) return;
-    const viewportMaxWidth = Math.max(180, window.innerWidth - 16);
-    const minWidth = Math.max(120, rect.width);
 
     if (list.parentElement !== document.body) {
         list.__portalOrigin = list.parentElement;
@@ -64,37 +62,45 @@ function _positionList(instance) {
         list.__portalHost = document.body;
     }
 
+    // Measure hidden and fully detached from the wrapper. Measuring an
+    // in-flow list next to a near-bottom-edge trigger previously produced
+    // collapsed/off-screen geometry (a "dead" dropdown that opens as a
+    // 2px sliver below the fold).
+    list.style.visibility = 'hidden';
     list.style.position = 'fixed';
     list.style.marginTop = '0';
-    list.style.minWidth = `${minWidth}px`;
-    list.style.maxWidth = `${viewportMaxWidth}px`;
     list.style.right = '';
-    list.style.width = 'max-content';
-    list.style.left = '0px';
-    list.style.top = '0px';
     list.style.bottom = '';
+    list.style.minWidth = `${Math.max(120, Math.ceil(rect.width))}px`;
+    list.style.maxWidth = `${Math.max(180, window.innerWidth - 16)}px`;
+    list.style.width = 'max-content';
     list.style.maxHeight = '320px';
+    list.style.top = '0px';
+    list.style.left = '0px';
 
-    const listRect = list.getBoundingClientRect();
-    const listWidth = Math.min(Math.max(listRect.width, minWidth), viewportMaxWidth);
-    const listHeight = Math.min(list.scrollHeight || listRect.height || 320, 320);
     const gap = 4;
-    const left = Math.max(8, Math.min(rect.left, window.innerWidth - listWidth - 8));
+    const listHeight = Math.min(list.scrollHeight || 320, 320);
     const spaceBelow = window.innerHeight - rect.bottom - gap;
     const spaceAbove = rect.top - gap;
-    const placeBelow = spaceBelow >= listHeight || spaceBelow >= spaceAbove;
-    const availableHeight = Math.max(120, Math.min(listHeight, placeBelow ? spaceBelow : spaceAbove));
-
-    list.style.zIndex = '100';
-    list.style.width = `${listWidth}px`;
-    list.style.maxHeight = `${availableHeight}px`;
-    list.style.left = `${left}px`;
-    if (placeBelow) {
-        list.style.top = `${rect.bottom + gap}px`;
-        list.style.bottom = '';
+    let top;
+    let maxHeight;
+    if (spaceBelow >= Math.min(listHeight, 64) || spaceBelow >= spaceAbove) {
+        top = rect.bottom + gap;
+        maxHeight = Math.max(120, Math.min(listHeight, spaceBelow));
     } else {
-        list.style.top = '';
-        list.style.bottom = `${window.innerHeight - rect.top + gap}px`;
+        top = Math.max(8, rect.top - listHeight - gap);
+        maxHeight = Math.max(120, Math.min(listHeight, spaceAbove));
+    }
+    list.style.zIndex = '100';
+    list.style.top = `${top}px`;
+    list.style.left = `${Math.max(8, rect.left)}px`;
+    list.style.maxHeight = `${maxHeight}px`;
+    list.style.visibility = '';
+
+    // Keep inside the right viewport edge.
+    const listRect = list.getBoundingClientRect();
+    if (listRect.right > window.innerWidth - 8) {
+        list.style.left = `${Math.max(8, window.innerWidth - listRect.width - 8)}px`;
     }
 }
 
@@ -197,6 +203,11 @@ function _ensureGlobalHandlers() {
                 instance.wrapper.classList.add('is-open');
                 _syncInstance(instance);
                 _positionList(instance);
+                // Re-settle once the portal has been laid out — first-pass
+                // geometry can be measured before styles/fonts settle.
+                requestAnimationFrame(() => {
+                    if (!instance.list.classList.contains('hidden')) _positionList(instance);
+                });
                 const activeItem = instance.list.querySelector('.tw-dropdown-option-active:not([disabled])')
                     || instance.list.querySelector('.styled-select-item:not([disabled])');
                 activeItem?.focus();

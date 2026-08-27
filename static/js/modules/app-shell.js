@@ -1,4 +1,4 @@
-import { loadFrontSettingsSnapshot, saveFrontSettingsSnapshot } from './state.js';
+import { loadFrontSettingsSnapshot, saveFrontSettingsSnapshot, colorToObj } from './state.js';
 
 // The page shell uses backdrop-filter, which creates a containing block for fixed
 // descendants. Portal these modals to body so their fixed positioning is relative
@@ -128,52 +128,61 @@ export function initColorDropdownUI({ quoteOptions, currentResults, selectedFile
         }
     }
 
-    function syncColorSelection(wrapper, hex) {
-        if (!wrapper || !hex) return;
+    function syncColorSelection(wrapper, value) {
+        if (!wrapper || !value) return;
+        const obj = colorToObj(value) || {};
+        const swatchHex = obj.hex || '#d1d5db';
         const valueInput = wrapper.querySelector('.row-color-value');
-        if (valueInput) valueInput.value = hex;
-        wrapper.setAttribute('data-selected-color', hex);
+        if (valueInput) valueInput.value = value;
+        wrapper.setAttribute('data-selected-color', value);
         const triggerSwatch = wrapper.querySelector('.color-dd-swatch');
         if (triggerSwatch) {
-            triggerSwatch.style.background = hex;
-            triggerSwatch.style.borderColor = getSwatchBorderColor(hex);
+            triggerSwatch.style.background = swatchHex;
+            triggerSwatch.style.borderColor = getSwatchBorderColor(swatchHex);
         }
         const triggerLabel = wrapper.querySelector('.color-dd-trigger-label');
-        if (triggerLabel) triggerLabel.textContent = hex;
+        if (triggerLabel) triggerLabel.textContent = value;
         const trigger = wrapper.querySelector('.color-dd-trigger');
-        if (trigger) trigger.title = hex;
+        if (trigger) trigger.title = value;
+        // Active match must handle name-only records (empty hex, e.g. "黑/灰").
+        const activeKey = obj.hex ? `h:${String(obj.hex).toLowerCase()}` : `n:${String(obj.name || '').toLowerCase()}`;
         wrapper.querySelectorAll('.color-dd-item').forEach((item) => {
-            const selected = String(item.getAttribute('data-color-hex') || '').toLowerCase() === String(hex).toLowerCase();
+            const itemObj = { hex: item.getAttribute('data-color-hex') || '', name: item.getAttribute('data-color-name') || '' };
+            const itemKey = itemObj.hex ? `h:${itemObj.hex.toLowerCase()}` : `n:${itemObj.name.toLowerCase()}`;
+            const selected = itemKey === activeKey;
             item.classList.toggle('color-dd-item-active', selected);
             item.setAttribute('aria-selected', selected ? 'true' : 'false');
         });
     }
 
-    async function applyInlineRecolor(rowCtx, hex) {
+    async function applyInlineRecolor(rowCtx, value) {
         const filename = rowCtx.getAttribute('data-row-file') || rowCtx.getAttribute('data-card-file');
         if (!filename) return;
         const idx = currentResults.findIndex((item) => item && item.filename === filename);
-        if (idx >= 0) currentResults[idx].color = hex;
+        // Keep the picked identity (may be a name-only record) in the result,
+        // but tint meshes/thumbnails with a resolvable hex.
+        const renderHex = colorToObj(value)?.hex || '#d1d5db';
+        if (idx >= 0) currentResults[idx].color = value;
 
         // Recolor the open viewer immediately. The thumbnail render is async,
         // so waiting for it can lose a race with the viewer's FileReader.
         if (getCurrentPreviewFilename() === filename) {
             try {
-                if (!updatePreviewColor?.(filename, hex)) recolorCurrentMesh(hex);
+                if (!updatePreviewColor?.(filename, renderHex)) recolorCurrentMesh(renderHex);
             } catch (e) { console.warn('3D preview recolor failed:', e.message); }
         }
 
         const file = selectedFilesMap.get(filename);
         if (file) {
             const rowOrientation = getResultOrientation((currentResults || []).find((r) => r && r.filename === filename));
-            try { await ensureThumbnailForFile(file, hex, rowOrientation); } catch (e) { console.warn('Thumbnail generation failed:', e.message); }
+            try { await ensureThumbnailForFile(file, renderHex, rowOrientation); } catch (e) { console.warn('Thumbnail generation failed:', e.message); }
             const newThumb = thumbnailMap.get(filename);
             if (newThumb) rowCtx.querySelectorAll('button[data-preview-file] img').forEach((img) => { img.src = newThumb; });
             // The viewer may still be parsing the file from FileReader. Retry
             // after the thumbnail work so that late-loaded meshes use the new
             // color too.
             if (getCurrentPreviewFilename() === filename) {
-                if (!updatePreviewColor?.(filename, hex)) recolorCurrentMesh(hex);
+                if (!updatePreviewColor?.(filename, renderHex)) recolorCurrentMesh(renderHex);
             }
         }
     }
@@ -202,7 +211,9 @@ export function initColorDropdownUI({ quoteOptions, currentResults, selectedFile
         const item = event.target.closest('.color-dd-item');
         if (item) {
             event.stopPropagation();
-            const hex = item.getAttribute('data-color-hex');
+            // Name-only records (empty hex) are valid picks — fall back to
+            // data-color-name so "黑/灰" style entries stay selectable.
+            const hex = item.getAttribute('data-color-hex') || item.getAttribute('data-color-name') || '';
             const wrapper = getWrapper(item);
             if (!wrapper || !hex) return;
             syncColorSelection(wrapper, hex);
