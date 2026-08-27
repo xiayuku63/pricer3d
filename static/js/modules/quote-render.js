@@ -5,6 +5,7 @@ import {
     MATERIAL_OPTIONS, formatColorLabel, escapeHtml, formatTimeHMS,
     renderColorDropdown,
     getUsedBrandOptions as getBrandOptions,
+    getMaterialsByBrand,
 } from './state.js';
 import { buildPlaceholderThumbnail } from './preview.js';
 import { t } from './i18n.js';
@@ -807,7 +808,7 @@ export function renderResultsTable() {
             const currentBrand = item.brand || (MATERIAL_OPTIONS.find(m => m.name === item.material) || {}).brand || '';
             const effectiveBrand = currentBrand || brands[0] || '';
             const brandOptionsHtml = brands.map(b => `<option value="${b}" ${b === effectiveBrand ? 'selected' : ''}>${b}</option>`).join('');
-            const filteredMaterials = effectiveBrand ? MATERIAL_OPTIONS.filter(m => (m.brand || 'Generic') === effectiveBrand) : MATERIAL_OPTIONS;
+            const filteredMaterials = getMaterialsByBrand(effectiveBrand);
             const materialOptionsHtml = filteredMaterials.map((m) => `<option value="${m.name}" ${m.name === item.material ? 'selected' : ''}>${m.name}</option>`).join('');
             const renderedRowColors = renderColorDropdown(item.material, item.color, true, effectiveBrand);
 
@@ -848,7 +849,7 @@ export function renderResultsTable() {
             const currentBrand3 = item.brand || (MATERIAL_OPTIONS.find(m => m.name === selectedMaterial) || {}).brand || '';
             const effectiveBrand3 = currentBrand3 || brands3[0] || '';
             const brandOptionsHtml = brands3.map(b => `<option value="${escapeHtml(b)}" ${b === effectiveBrand3 ? 'selected' : ''}>${escapeHtml(b)}</option>`).join('');
-            const filteredMaterials3 = effectiveBrand3 ? MATERIAL_OPTIONS.filter(m => (m.brand || 'Generic') === effectiveBrand3) : MATERIAL_OPTIONS;
+            const filteredMaterials3 = getMaterialsByBrand(effectiveBrand3);
             const materialOptionsHtml = filteredMaterials3.map((m) => `<option value="${escapeHtml(m.name)}" ${m.name === selectedMaterial ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('');
             const renderedRowColors = renderColorDropdown(selectedMaterial, selectedColor, true, effectiveBrand3);
             const quantityValue = item.quantity || quoteOptions.quantity || 1;
@@ -980,7 +981,7 @@ function renderResultsCards() {
         const mobileCurrentBrand = item.brand || (MATERIAL_OPTIONS.find(m => m.name === (item.material || quoteOptions.material)) || {}).brand || '';
         const mobileEffectiveBrand = mobileCurrentBrand || mobileBrands[0] || '';
         const mobileBrandOptionsHtml = mobileBrands.map(b => `<option value="${escapeHtml(b)}" ${b === mobileEffectiveBrand ? 'selected' : ''}>${escapeHtml(b)}</option>`).join('');
-        const filteredMobileMaterials = mobileEffectiveBrand ? MATERIAL_OPTIONS.filter(m => (m.brand || 'Generic') === mobileEffectiveBrand) : MATERIAL_OPTIONS;
+        const filteredMobileMaterials = getMaterialsByBrand(mobileEffectiveBrand);
         const materialOptionsHtml = filteredMobileMaterials.map((m) => `<option value="${escapeHtml(m.name)}" ${m.name === (item.material || quoteOptions.material) ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('');
         const quantityValue = item.quantity || quoteOptions.quantity || 1;
 
