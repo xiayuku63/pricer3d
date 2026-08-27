@@ -422,6 +422,12 @@ body > .combo-d {
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.18) !important;
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
+  /* .tw-dropdown-panel 的 overflow:hidden !important 会裁死超高的
+     选项列表（滚轮无效）——portal 态必须可滚。 */
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 .dark body > .combo-d,
 html.dark body > .combo-d {

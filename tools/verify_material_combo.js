@@ -128,6 +128,40 @@ const BASE = process.argv[2] || 'http://127.0.0.1:5000';
     assert(scrollState.open, 'dropdown must stay open while the modal scrolls');
     assert(scrollState.anchoredToInput, 'dropdown must follow its input on scroll');
 
+    // 9. Mouse wheel over the panel must scroll the option list (a
+    // .tw-dropdown-panel overflow:hidden !important used to clip it dead).
+    await page.evaluate(() => {
+        window.__wheelLog = [];
+        document.addEventListener('wheel', (e) => {
+            window.__wheelLog.push({
+                t: (e.target.className || e.target.tagName || '').toString().slice(0, 30),
+                prevented: e.defaultPrevented,
+            });
+        }, { capture: true, passive: true });
+    });
+    const wheel = await page.evaluate(() => {
+        const dd = document.querySelector('body > .combo-d:not(.hidden)');
+        if (!dd) return { open: false, overflowY: null, before: 0, max: 0 };
+        return { open: true, overflowY: getComputedStyle(dd).overflowY, before: dd.scrollTop, max: dd.scrollHeight - dd.clientHeight };
+    });
+    const ddBox = await page.locator('body > .combo-d:not(.hidden)').boundingBox();
+    const hitAt = await page.evaluate(([x, y]) => {
+        const el = document.elementFromPoint(x, y);
+        return el ? (el.className?.toString().slice(0, 30) || el.tagName) : 'none';
+    }, [ddBox.x + ddBox.width / 2, ddBox.y + ddBox.height / 2]);
+    await page.mouse.move(ddBox.x + ddBox.width / 2, ddBox.y + ddBox.height / 2);
+    await page.mouse.wheel(0, 160);
+    await page.waitForTimeout(300);
+    const wheelAfter = await page.evaluate(() => {
+        const dd = document.querySelector('body > .combo-d:not(.hidden)');
+        return { scrollTop: dd ? dd.scrollTop : -1, log: window.__wheelLog };
+    });
+    console.log('wheel:', JSON.stringify({ ...wheel, hitAt, after: wheelAfter.scrollTop, log: wheelAfter.log }));
+    assert(wheel.open, 'dropdown open for wheel test');
+    assert(wheel.overflowY === 'auto', `panel overflow-y must be auto, got ${wheel.overflowY}`);
+    assert(wheel.max > 0, 'panel should have scrollable overflow');
+    assert(wheelAfter.scrollTop > wheel.before, `wheel must scroll the list (before=${wheel.before}, after=${wheelAfter.scrollTop})`);
+
     await page.screenshot({ path: 'tools/verify_material_combo.png', fullPage: false });
 
     await browser.close();
