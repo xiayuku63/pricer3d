@@ -632,8 +632,18 @@ async function _handleCardEdit(card, filename, abortSignal) {
     const prevItem = idx >= 0 ? { ...currentResults[idx] } : null;
     const currentColor = idx >= 0 ? (currentResults[idx].color || quoteOptions.color) : quoteOptions.color;
     if (idx >= 0) {
-        // Immediately update color in currentResults so preview sees the correct color
-        currentResults[idx] = { ...currentResults[idx], color: currentColor, _recalculating: true };
+        // Sync every user-edited field, not just color — mid-recalc re-renders
+        // would otherwise repaint the row with the previous material/brand.
+        currentResults[idx] = {
+            ...currentResults[idx],
+            brand,
+            material,
+            quantity,
+            color: currentColor,
+            status: 'success',
+            _recalculating: true,
+            cost_cny: 0,
+        };
     }
     renderResultsTable();
 
@@ -788,8 +798,18 @@ async function _handleRowEdit(event, abortSignal) {
     const idx = currentResults.findIndex((i) => i.filename === filename);
     const prevItem = idx >= 0 ? { ...currentResults[idx] } : null;
     if (idx >= 0) {
-        // Immediately update color in currentResults so previewByFilename sees the new color
-        currentResults[idx] = { ...currentResults[idx], color, status: 'success', _recalculating: true, cost_cny: 0 };
+        // Sync every user-edited field (color alone let mid-recalc re-renders
+        // repaint the row with the previous material/brand/quantity).
+        currentResults[idx] = {
+            ...currentResults[idx],
+            brand,
+            material,
+            quantity,
+            color,
+            status: 'success',
+            _recalculating: true,
+            cost_cny: 0,
+        };
     }
     recalcSummaryFromCurrentResults();
 
