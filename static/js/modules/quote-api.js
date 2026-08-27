@@ -516,7 +516,15 @@ export async function reQuoteAllSelectedFiles(reasonLabel, shouldRequote) {
             const opts = { material, color, quantity, _printer_model: pm, _slicer_preset_id: sp, orientation, auto_orient: smartPlacementEnabled };
             if (existing?.brand) opts.brand = existing.brand;
             const updated = await quoteSingleFileWithOptions(file, opts, signal);
-            mergeResultsByFilename([orientation ? withResultOrientation(updated, orientation) : updated]);
+            const merged = orientation ? withResultOrientation(updated, orientation) : updated;
+            mergeResultsByFilename([merged]);
+            // Refresh the thumbnail in the row's final pose — the plain
+            // pre-quote rebuild above always renders the original orientation,
+            // which previously left smart-placed rows with a stale thumbnail.
+            const resultOrientation = getResultOrientation(merged) || orientation;
+            if (resultOrientation) {
+                await ensureThumbnailForFile(file, updated.color || color, resultOrientation, () => {});
+            }
         } catch (err) {
             // AbortError: 静默处理
             // Chromium may surface an aborted fetch as TypeError("Failed to fetch")

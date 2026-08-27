@@ -9,7 +9,7 @@ const previewUrl = new URL('../static/js/modules/preview.js', import.meta.url);
 test('inline color changes recolor the open viewer before thumbnail rendering completes', async () => {
     const source = await readFile(shellUrl, 'utf8');
     const recolorIndex = source.indexOf("if (getCurrentPreviewFilename() === filename)");
-    const thumbnailIndex = source.indexOf('await ensureThumbnailForFile(file, hex)', recolorIndex);
+    const thumbnailIndex = source.indexOf('await ensureThumbnailForFile(file, hex, rowOrientation)', recolorIndex);
 
     assert.notEqual(recolorIndex, -1);
     assert.notEqual(thumbnailIndex, -1);

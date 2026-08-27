@@ -662,6 +662,10 @@ async function _handleCardEdit(card, filename, abortSignal) {
             };
             currentResults[idx]._slicer_preset_id = sp;
         }
+        const rowOrientation = getResultOrientation(currentResults[idx]) || orientation;
+        if (idx >= 0 && rowOrientation) {
+            await ensureThumbnailForFile(file, currentColor, rowOrientation, () => {});
+        }
         renderResultsTable();
         recalcSummaryFromCurrentResults();
     } catch (err) {
@@ -814,6 +818,10 @@ async function _handleRowEdit(event, abortSignal) {
                 _slicer_preset_explicit: prevItem?._slicer_preset_explicit || presetChanged,
             };
             currentResults[idx]._slicer_preset_id = sp;
+        }
+        const rowOrientation = getResultOrientation(currentResults[idx]) || orientation;
+        if (idx >= 0 && rowOrientation) {
+            await ensureThumbnailForFile(file, dropdownColor, rowOrientation, () => {});
         }
         renderResultsTable();
         recalcSummaryFromCurrentResults();

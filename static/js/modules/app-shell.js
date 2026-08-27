@@ -23,6 +23,8 @@ export function portalQuoteHistoryModal() {
     return portalModalToBody('quote-history-modal');
 }
 
+import { getResultOrientation } from './orientation-state.js';
+
 export function initColorDropdownUI({ quoteOptions, currentResults, selectedFilesMap, thumbnailMap, dom, ensureThumbnailForFile, recolorCurrentMesh, updatePreviewColor, getCurrentPreviewFilename, refreshOptionsSummary }) {
     function saveFrontMaterialSnapshot() {
         const previous = loadFrontSettingsSnapshot() || {};
@@ -163,7 +165,8 @@ export function initColorDropdownUI({ quoteOptions, currentResults, selectedFile
 
         const file = selectedFilesMap.get(filename);
         if (file) {
-            try { await ensureThumbnailForFile(file, hex); } catch (e) { console.warn('Thumbnail generation failed:', e.message); }
+            const rowOrientation = getResultOrientation((currentResults || []).find((r) => r && r.filename === filename));
+            try { await ensureThumbnailForFile(file, hex, rowOrientation); } catch (e) { console.warn('Thumbnail generation failed:', e.message); }
             const newThumb = thumbnailMap.get(filename);
             if (newThumb) rowCtx.querySelectorAll('button[data-preview-file] img').forEach((img) => { img.src = newThumb; });
             // The viewer may still be parsing the file from FileReader. Retry
