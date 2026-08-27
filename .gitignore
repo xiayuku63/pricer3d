@@ -30,6 +30,8 @@ PrusaSlicer-*.exe
 # Debug artifacts
 .playwright-cli/
 .workbuddy/
+/output/
+/desktop_outputs/
 test_*.png
 test_dropdown.js
 temp_script.py
