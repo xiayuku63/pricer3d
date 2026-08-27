@@ -6,7 +6,7 @@ Thin layer that validates request parameters and delegates to app.services.quote
 import logging
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel, Field
 
 from app.deps import get_current_user
@@ -40,6 +40,43 @@ async def cancel_quote_batch(
 
     cancelled = cancel_batch(payload.batch_id.strip(), int(current_user["id"]))
     return {"cancelled": bool(cancelled)}
+
+
+class ArtifactDeleteRequest(BaseModel):
+    """Delete on-disk quote artifacts (model + G-code job dirs). With
+    clear_all the user's whole direct-upload tree is removed. Quote history
+    rows are intentionally kept — free quota counts them."""
+
+    paths: List[str] = Field(default_factory=list, max_length=200)
+    clear_all: bool = False
+
+
+@router.post("/api/quote/artifacts/delete")
+async def delete_quote_artifacts(
+    payload: ArtifactDeleteRequest,
+    background_tasks: BackgroundTasks,
+    current_user=Depends(get_current_user),
+):
+    from app.services.artifact_cleanup import (
+        delete_directories,
+        list_user_direct_upload_dirs,
+        resolve_job_dir,
+    )
+
+    uid = int(current_user["id"])
+    if payload.clear_all:
+        dirs = list_user_direct_upload_dirs(uid)
+    else:
+        dirs = []
+        for saved_path in payload.paths:
+            job_dir = resolve_job_dir(saved_path, uid)
+            if job_dir:
+                dirs.append(job_dir)
+
+    unique_dirs = sorted(set(dirs))
+    background_tasks.add_task(delete_directories, unique_dirs)
+    return {"queued": len(unique_dirs)}
+
 
 
 

@@ -386,6 +386,10 @@ async def build_quote_payload(
         for key in ("euler_angles_deg", "rotation_matrix", "auto_orient_score", "selected_face_area"):
             if item.get(key) is None and breakdown.get(key) is not None:
                 item[key] = breakdown[key]
+        # Let the client ask the server to clean this file's artifacts when
+        # the row is deleted (POST /api/quote/artifacts/delete).
+        if item.get("saved_path") is None and item.get("_saved_path"):
+            item["saved_path"] = item["_saved_path"]
 
     success_items = [item for item in results if item.get("status") == "success"]
     failed_items = [item for item in results if item.get("status") == "failed"]

@@ -68,7 +68,7 @@ import {
     initQuote, quoteSingleFileWithOptions, quoteSelectedFiles, abortActiveRecalc,
     mergeResultsByFilename, normalizeResultsWithCurrentOptions,
     reQuoteAllSelectedFiles, renderResultsTable, recalcSummaryFromCurrentResults,
-    stopActiveQuote, clearAllResults, cancelActiveQuoteBatch,
+    stopActiveQuote, clearAllResults, cancelActiveQuoteBatch, deleteMyArtifacts,
     handleRowEditChange, refreshOptionsSummary, setOpenLoginModalRef,
     refreshBatchMaterialDropdown, refreshBatchColorDropdown, batchApplyToAll,
     refreshBatchBrandDropdown,
@@ -462,6 +462,7 @@ document.addEventListener('DOMContentLoaded', () => {
     _bind(document.getElementById('clear-all-results-btn'), 'click', () => {
         abortActiveRecalc();
         clearAllResults();
+        deleteMyArtifacts();
         showToast(t('quote.clearedAllToast'), 'info');
     });
     if (batchQuantity) {

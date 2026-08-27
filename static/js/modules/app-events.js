@@ -676,6 +676,7 @@ export function initResultsAreaEvents({
         recalcSummaryFromCurrentResults,
         quoteSingleFileWithOptions,
         mergeResultsByFilename,
+        deleteArtifacts,
         openMaterialCompare,
         exportCSV,
         exportExcel,
@@ -693,6 +694,8 @@ export function initResultsAreaEvents({
             const deleteBtn = event.target.closest('[data-delete-file]');
             if (deleteBtn) {
                 const filename = deleteBtn.getAttribute('data-delete-file');
+                const deletedRow = currentResults.find((item) => item && item.filename === filename);
+                if (deletedRow && deletedRow.saved_path) deleteArtifacts([deletedRow.saved_path]);
                 selectedFilesMap.delete(filename);
                 thumbnailMap.delete(filename);
                 setCurrentResults(currentResults.filter((item) => item && item.filename !== filename));
@@ -772,6 +775,8 @@ export function initResultsAreaEvents({
             const deleteBtn = event.target.closest('[data-delete-file]');
             if (deleteBtn) {
                 const filename = deleteBtn.getAttribute('data-delete-file');
+                const deletedRow = currentResults.find((item) => item && item.filename === filename);
+                if (deletedRow && deletedRow.saved_path) deleteArtifacts([deletedRow.saved_path]);
                 selectedFilesMap.delete(filename);
                 thumbnailMap.delete(filename);
                 setCurrentResults(currentResults.filter((item) => item && item.filename !== filename));

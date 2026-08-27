@@ -456,6 +456,27 @@ export function clearAllResults() {
     }
 }
 
+/** Ask the backend to remove on-disk artifacts (model + G-code) for deleted
+ * rows. Fire-and-forget: history rows are intentionally kept (quota). */
+export function deleteArtifacts(paths) {
+    const list = (paths || []).filter(Boolean);
+    if (!authToken || !list.length) return Promise.resolve();
+    return authFetch('/api/quote/artifacts/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paths: list }),
+    }).catch(() => {});
+}
+
+export function deleteMyArtifacts() {
+    if (!authToken) return Promise.resolve();
+    return authFetch('/api/quote/artifacts/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clear_all: true }),
+    }).catch(() => {});
+}
+
 export function mergeResultsByFilename(incomingResults) {
     const idxByFilename = new Map();
     currentResults.forEach((item, idx) => { if (item && item.filename) idxByFilename.set(item.filename, idx); });
