@@ -94,6 +94,10 @@ export function initColorDropdownUI({ quoteOptions, currentResults, selectedFile
             document.body.appendChild(list);
             list.__portalHost = document.body;
         }
+        // Measure hidden and fully detached from the wrapper — an in-flow
+        // measurement beside a bottom-edge trigger used to collapse or
+        // offscreen the open list (same failure class as styled-select).
+        list.style.visibility = 'hidden';
         list.style.position = 'fixed';
         list.style.marginTop = '0';
         list.style.maxHeight = '360px';
@@ -104,31 +108,51 @@ export function initColorDropdownUI({ quoteOptions, currentResults, selectedFile
         list.style.left = '0px';
         list.style.top = '0px';
         list.style.bottom = '';
-        const listRect = list.getBoundingClientRect();
-        const listWidth = Math.min(Math.max(listRect.width, minWidth), viewportMaxWidth);
-        const listHeight = Math.min(list.scrollHeight || listRect.height || 360, 360);
         const gap = 6;
-        const left = Math.max(8, Math.min(rect.left, window.innerWidth - listWidth - 8));
+        const listHeight = Math.min(list.scrollHeight || 360, 360);
         const spaceBelow = window.innerHeight - rect.bottom - gap;
         const spaceAbove = rect.top - gap;
-        const placeBelow = spaceBelow >= listHeight || spaceBelow >= spaceAbove;
-        const availableHeight = Math.max(120, Math.min(listHeight, placeBelow ? spaceBelow : spaceAbove));
+        let top;
+        let availableHeight;
+        if (spaceBelow >= Math.min(listHeight, 64) || spaceBelow >= spaceAbove) {
+            top = rect.bottom + gap;
+            availableHeight = Math.max(120, Math.min(listHeight, spaceBelow));
+        } else {
+            top = Math.max(8, rect.top - listHeight - gap);
+            availableHeight = Math.max(120, Math.min(listHeight, spaceAbove));
+        }
 
         list.style.zIndex = '100';
-        list.style.width = `${listWidth}px`;
+        list.style.top = `${top}px`;
+        list.style.left = `${Math.max(8, rect.left)}px`;
         list.style.maxHeight = `${availableHeight}px`;
-        list.style.left = `${left}px`;
-        list.style.right = '';
-        if (placeBelow) {
-            list.style.top = `${rect.bottom + gap}px`;
-            list.style.bottom = '';
-        } else {
-            list.style.top = '';
-            list.style.bottom = `${window.innerHeight - rect.top + gap}px`;
+        list.style.visibility = '';
+
+        // Keep inside the right viewport edge.
+        const listRect = list.getBoundingClientRect();
+        if (listRect.right > window.innerWidth - 8) {
+            list.style.left = `${Math.max(8, window.innerWidth - listRect.width - 8)}px`;
         }
     }
 
-    function syncColorSelection(wrapper, value) {
+    // Collect every rendered swatch option for this wrapper, wherever the
+    // list currently lives — while open the list is portaled to <body>, so
+    // querying the wrapper alone finds zero options and selection rings go
+    // stale ("highlight stuck on the first option").
+    function getColorItems(wrapper) {
+        const seen = new Set();
+        const out = [];
+        const pushFrom = (root) => root && root.querySelectorAll('.color-dd-item').forEach((el) => {
+            if (!seen.has(el)) { seen.add(el); out.push(el); }
+        });
+        pushFrom(wrapper);
+        document.querySelectorAll('body > .color-dd-list').forEach((list) => {
+            if (list.__portalOrigin && list.__portalOrigin.parentElement === wrapper) pushFrom(list);
+        });
+        return out;
+    }
+
+    function syncColorSelection(wrapper, value, explicitList) {
         if (!wrapper || !value) return;
         const obj = colorToObj(value) || {};
         const swatchHex = obj.hex || '#d1d5db';
@@ -146,13 +170,24 @@ export function initColorDropdownUI({ quoteOptions, currentResults, selectedFile
         if (trigger) trigger.title = value;
         // Active match must handle name-only records (empty hex, e.g. "黑/灰").
         const activeKey = obj.hex ? `h:${String(obj.hex).toLowerCase()}` : `n:${String(obj.name || '').toLowerCase()}`;
-        wrapper.querySelectorAll('.color-dd-item').forEach((item) => {
+        let touchedAny = false;
+        getColorItems(wrapper).forEach((item) => {
+            touchedAny = true;
             const itemObj = { hex: item.getAttribute('data-color-hex') || '', name: item.getAttribute('data-color-name') || '' };
             const itemKey = itemObj.hex ? `h:${itemObj.hex.toLowerCase()}` : `n:${itemObj.name.toLowerCase()}`;
             const selected = itemKey === activeKey;
             item.classList.toggle('color-dd-item-active', selected);
             item.setAttribute('aria-selected', selected ? 'true' : 'false');
         });
+        if (explicitList && !touchedAny) {
+            explicitList.querySelectorAll('.color-dd-item').forEach((item) => {
+                const itemObj = { hex: item.getAttribute('data-color-hex') || '', name: item.getAttribute('data-color-name') || '' };
+                const itemKey = itemObj.hex ? `h:${itemObj.hex.toLowerCase()}` : `n:${itemObj.name.toLowerCase()}`;
+                const selected = itemKey === activeKey;
+                item.classList.toggle('color-dd-item-active', selected);
+                item.setAttribute('aria-selected', selected ? 'true' : 'false');
+            });
+        }
     }
 
     async function applyInlineRecolor(rowCtx, value) {
@@ -216,7 +251,7 @@ export function initColorDropdownUI({ quoteOptions, currentResults, selectedFile
             const hex = item.getAttribute('data-color-hex') || item.getAttribute('data-color-name') || '';
             const wrapper = getWrapper(item);
             if (!wrapper || !hex) return;
-            syncColorSelection(wrapper, hex);
+            syncColorSelection(wrapper, hex, item.closest('.color-dd-list'));
             const list = item.closest('.color-dd-list');
             if (list) closeColorList(list);
 
@@ -264,6 +299,10 @@ export function initColorDropdownUI({ quoteOptions, currentResults, selectedFile
                 list.classList.remove('hidden');
                 wrapper.classList.add('is-open');
                 trigger.setAttribute('aria-expanded', 'true');
+                // Re-sync the rings from the stored value — covers picks made
+                // while the list was portaled and any drift since last render.
+                syncColorSelection(wrapper, wrapper.getAttribute('data-selected-color')
+                    || wrapper.querySelector('.row-color-value')?.value || '', list);
                 positionColorList(trigger, list, wrapper);
             } else {
                 closeColorList(list);
