@@ -391,6 +391,16 @@ async function _quoteSelectedFilesInternal(selectedFiles, useProgress) {
 
 
 // ── Results management ──
+
+/** A (re-)uploaded file invalidates its previous quote row: drop the stale
+ * row so the orientation-preserving merge and _pendingQuoteOptions don't
+ * resurrect the OLD file's placement angle for the new upload. */
+export function clearResultsForFiles(files) {
+    const names = new Set((files || []).map((f) => f && f.name).filter(Boolean));
+    if (!names.size) return;
+    setCurrentResults(currentResults.filter((item) => !(item && names.has(item.filename))));
+}
+
 export function mergeResultsByFilename(incomingResults) {
     const idxByFilename = new Map();
     currentResults.forEach((item, idx) => { if (item && item.filename) idxByFilename.set(item.filename, idx); });

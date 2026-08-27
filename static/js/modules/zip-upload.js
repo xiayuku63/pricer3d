@@ -23,7 +23,7 @@ import {
 import { buildThumbnails } from './preview.js';
 import { t } from './i18n.js';
 import {
-    mergeResultsByFilename,
+    mergeResultsByFilename, clearResultsForFiles,
     quoteSelectedFilesSequentiallyWithProgress, markFileAsCalculating, getInitialQuoteColorMap,
     renderResultsTable, recalcSummaryFromCurrentResults,
 } from './quote.js';
@@ -509,6 +509,9 @@ async function _handleZipUpload(zipFiles, modelFiles, validFiles) {
             }
         }
         if (zipModelFiles.length > 0) {
+            // Re-uploaded files start a fresh quote: drop stale rows so the
+            // previous file's placement angle can't leak into this one.
+            clearResultsForFiles(zipModelFiles);
             const colorByFilename = {};
             const mergedForColor = (typeof currentResults !== 'undefined') ? currentResults : (zipData.results || []);
             mergedForColor.forEach(r => {
@@ -536,6 +539,7 @@ async function _handleZipUpload(zipFiles, modelFiles, validFiles) {
         // Process any remaining model files
         if (modelFiles.length > 0) {
             modelFiles.forEach(function(f) { selectedFilesMap.set(f.name, f); });
+            clearResultsForFiles(modelFiles);
             const initialColors = getInitialQuoteColorMap(modelFiles);
             await buildThumbnails(modelFiles, initialColors, null, ({ file }) => markFileAsCalculating(file, initialColors[file.name]));
             await quoteSelectedFilesSequentiallyWithProgress(modelFiles);
@@ -700,6 +704,7 @@ function _showZipPreviewModal(previewData) {
  */
 async function _handleModelUpload(modelFiles) {
     modelFiles.forEach((file) => selectedFilesMap.set(file.name, file));
+    clearResultsForFiles(modelFiles);
     dom.fileNameDisplay.classList.add('text-indigo-600', 'font-medium');
 
     renderFilePreviewChips(modelFiles);
