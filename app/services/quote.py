@@ -346,6 +346,19 @@ async def build_quote_payload(
     tasks = [process_one(f) for f in files]
     results = await asyncio.gather(*tasks)
 
+    # Surface the smart-placement result on the item itself. The quote
+    # checkbox and /api/orientation/auto-learned share
+    # get_smart_orientation_for_slicing; exposing the same fields here lets
+    # the frontend re-render thumbnails in the placed pose
+    # (getResultOrientation reads top-level euler_angles_deg).
+    for item in results:
+        breakdown = item.get("cost_breakdown")
+        if not isinstance(breakdown, dict):
+            continue
+        for key in ("euler_angles_deg", "rotation_matrix", "auto_orient_score", "selected_face_area"):
+            if item.get(key) is None and breakdown.get(key) is not None:
+                item[key] = breakdown[key]
+
     success_items = [item for item in results if item.get("status") == "success"]
     failed_items = [item for item in results if item.get("status") == "failed"]
 

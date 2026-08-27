@@ -33,6 +33,7 @@ class QuoteFileResult(BaseModel):
     printer_model: Optional[str] = Field(default=None, alias="_printer_model")
     auto_orient_score: Optional[float] = None
     euler_angles_deg: Optional[dict] = None
+    rotation_matrix: Optional[list] = None
     selected_face_area: Optional[float] = None
     tune_report: Optional[str] = None
 

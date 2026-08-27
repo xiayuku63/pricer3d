@@ -220,6 +220,9 @@ def calculate_cost(
                 orientation_info = {
                     "auto_orient_score": orient_result.get("score"),
                     "euler_angles_deg": orient_result.get("euler_angles_deg"),
+                    # Same contract as /api/orientation/auto-learned, so both
+                    # smart-placement entries expose identical payloads.
+                    "rotation_matrix": orient_result.get("rotation_matrix"),
                     "selected_face_area": (
                         orient_result.get("face", {}).get("area") if orient_result.get("face") else None
                     ),
