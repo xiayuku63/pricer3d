@@ -25,6 +25,24 @@ class FormulaValidateRequest(BaseModel):
 router = APIRouter()
 
 
+class QuoteCancelRequest(BaseModel):
+    batch_id: str = Field(..., min_length=6, max_length=80)
+
+
+@router.post("/api/quote/cancel")
+async def cancel_quote_batch(
+    payload: QuoteCancelRequest,
+    current_user=Depends(get_current_user),
+):
+    """Stop button: mark an in-flight quote batch cancelled; its remaining
+    files are skipped and never persisted."""
+    from app.quote_batch import cancel_batch
+
+    cancelled = cancel_batch(payload.batch_id.strip(), int(current_user["id"]))
+    return {"cancelled": bool(cancelled)}
+
+
+
 @router.post("/api/quote", response_model=QuoteResponse)
 async def get_quote(
     request: Request,

@@ -1,7 +1,7 @@
 // -- Quote API & results management --
 import {
     authToken, quoteOptions, selectedFilesMap,
-    currentResults, setCurrentResults,
+    currentResults, setCurrentResults, thumbnailMap,
     MATERIAL_OPTIONS, authFetch,
     getColorsForMaterial, pickAllowedColor,
     getActivePrinterCompoundId,
@@ -30,10 +30,29 @@ export function abortActiveRecalc() {
     }
 }
 
+let _quoteBatchId = null;
+
 function _newAbortController() {
     abortActiveRecalc();
     _globalAbortController = new AbortController();
+    _quoteBatchId = (self.crypto && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : `b_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     return _globalAbortController;
+}
+
+/** Stop button, part 2: the fetch abort alone does NOT stop the backend
+ * (Windows/uvicorn never surfaces the disconnect), so tell the server the
+ * batch is cancelled; workers skip every file that has not started. */
+export function cancelActiveQuoteBatch() {
+    const batchId = _quoteBatchId;
+    abortActiveRecalc();
+    if (!batchId) return Promise.resolve();
+    return authFetch('/api/quote/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ batch_id: batchId }),
+    }).catch(() => {});
 }
 
 // ── Quote API ──
@@ -149,6 +168,7 @@ export async function quoteSingleFileWithOptions(file, options, signal) {
         formData.append('entity_colors_json', JSON.stringify(options.entity_colors));
     }
     const fetchOpts = { method: 'POST', body: formData };
+    if (_quoteBatchId) fetchOpts.headers = { 'X-Quote-Batch-Id': _quoteBatchId };
     if (signal) fetchOpts.signal = signal;
     const response = await authFetch('/api/quote', fetchOpts);
     const data = await response.json();
@@ -399,6 +419,41 @@ export function clearResultsForFiles(files) {
     const names = new Set((files || []).map((f) => f && f.name).filter(Boolean));
     if (!names.size) return;
     setCurrentResults(currentResults.filter((item) => !(item && names.has(item.filename))));
+}
+
+export function stopActiveQuote() {
+    abortActiveRecalc();
+    let stopped = 0;
+    currentResults.forEach((item) => {
+        if (!item) return;
+        if (!(item._calculating || item._recalculating)) return;
+        item._calculating = false;
+        item._recalculating = false;
+        if (item.status !== 'success') {
+            item.status = 'failed';
+            item.error = t('quote.quoteStopped');
+            stopped += 1;
+        }
+    });
+    hideProgress();
+    if (stopped) {
+        renderResultsTable();
+        recalcSummaryFromCurrentResults();
+    }
+    showToast(t('quote.quoteStoppedToast', { count: stopped }), 'info');
+    return stopped;
+}
+
+export function clearAllResults() {
+    selectedFilesMap.clear();
+    thumbnailMap.clear();
+    setCurrentResults([]);
+    renderResultsTable();
+    recalcSummaryFromCurrentResults();
+    if (_dom.fileNameDisplay) {
+        _dom.fileNameDisplay.textContent = t('quote.noFileSelected');
+        _dom.fileNameDisplay.classList.remove('text-indigo-600', 'font-medium');
+    }
 }
 
 export function mergeResultsByFilename(incomingResults) {

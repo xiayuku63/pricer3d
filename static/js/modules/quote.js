@@ -34,7 +34,7 @@ import {
     quoteSelectedFilesSequentially, quoteSelectedFilesSequentiallyWithProgress,
     markFileAsCalculating, getInitialQuoteColorMap,
     mergeResultsByFilename, normalizeResultsWithCurrentOptions, reQuoteAllSelectedFiles,
-    clearResultsForFiles,
+    clearResultsForFiles, stopActiveQuote, clearAllResults,
     abortActiveRecalc, getSlicerConfigSnapshot, getAffectedFilenamesForSlicerConfigChange,
     getAffectedFilenamesForSlicerPresetChange,
 } from './quote-api.js';
@@ -60,7 +60,7 @@ export {
     quoteSelectedFilesWithProgress,
     quoteSelectedFilesSequentially, quoteSelectedFilesSequentiallyWithProgress,
     markFileAsCalculating, getInitialQuoteColorMap,
-    mergeResultsByFilename, clearResultsForFiles,
+    mergeResultsByFilename, clearResultsForFiles, stopActiveQuote, clearAllResults,
     normalizeResultsWithCurrentOptions,
     reQuoteAllSelectedFiles,
     abortActiveRecalc,

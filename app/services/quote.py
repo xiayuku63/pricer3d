@@ -25,6 +25,7 @@ from app.config import (
 from app.db import get_db_session
 from app.deps import get_membership_effective, is_member_user
 from app.models_orm import QuoteHistory, User
+from app.quote_batch import batch_cancelled
 from calculator.cost import process_single_file
 from app.material_resolver import merge_user_material_with_catalog
 
@@ -305,8 +306,30 @@ async def build_quote_payload(
 
     _semaphore = asyncio.Semaphore(max(1, QUOTE_CONCURRENCY))
 
+    batch_id = (request.headers.get("x-quote-batch-id") or "").strip() if request is not None else ""
+    if batch_id:
+        from app.quote_batch import register_batch
+        register_batch(batch_id, int(current_user["id"]))
+
     async def process_one(file):
         async with _semaphore:
+            # Stopped via the stop button (batch flag) or disconnected?
+            # Skip this file and everything queued behind it. In-flight
+            # slices already entered to_thread cannot be interrupted, but
+            # abandoned work must not start and must not reach history.
+            batch_stopped = bool(batch_id) and batch_cancelled(batch_id, int(current_user["id"]))
+            disconnected = False
+            if not batch_stopped and request is not None:
+                disconnected = await request.is_disconnected()
+            if batch_stopped or disconnected:
+                return {
+                    "filename": file.filename or "unknown",
+                    "status": "cancelled",
+                    "error": "客户端已断开，报价已取消",
+                    "cost_cny": 0,
+                    "weight_g": 0,
+                    "estimated_time_h": 0,
+                }
             try:
                 result = await asyncio.to_thread(
                     _process_single_file_sync,
@@ -344,7 +367,12 @@ async def build_quote_payload(
                 }
 
     tasks = [process_one(f) for f in files]
-    results = await asyncio.gather(*tasks)
+    try:
+        results = await asyncio.gather(*tasks)
+    finally:
+        if batch_id:
+            from app.quote_batch import release_batch
+            release_batch(batch_id)
 
     # Surface the smart-placement result on the item itself. The quote
     # checkbox and /api/orientation/auto-learned share
@@ -501,10 +529,13 @@ def _process_single_file_sync(
 
 
 def save_quote_history(user_id: int, results: list) -> None:
-    """Save quote results to history table."""
+    """Save quote results to history table. Cancelled items are skipped —
+    work abandoned by a client disconnect is not a quote the user ever saw."""
     now = datetime.now(timezone.utc).isoformat()
     with get_db_session() as db:
         for item in results:
+            if item.get("status") == "cancelled":
+                continue
             raw_pm = item.get("_printer_model") or item.get("printer_model") or ""
             slicer_preset_id = item.get("_slicer_preset_id") or item.get("slicer_preset_id")
 

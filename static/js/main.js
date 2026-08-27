@@ -65,9 +65,10 @@ import {
     refreshMembershipStatus, toggleMembershipOrders, confirmPayment, closePaymentModal,
 } from './modules/membership.js';
 import {
-    initQuote, quoteSingleFileWithOptions, quoteSelectedFiles,
+    initQuote, quoteSingleFileWithOptions, quoteSelectedFiles, abortActiveRecalc,
     mergeResultsByFilename, normalizeResultsWithCurrentOptions,
     reQuoteAllSelectedFiles, renderResultsTable, recalcSummaryFromCurrentResults,
+    stopActiveQuote, clearAllResults, cancelActiveQuoteBatch,
     handleRowEditChange, refreshOptionsSummary, setOpenLoginModalRef,
     refreshBatchMaterialDropdown, refreshBatchColorDropdown, batchApplyToAll,
     refreshBatchBrandDropdown,
@@ -77,7 +78,7 @@ import {
     openMaterialCompare,
 } from './modules/quote.js';
 import {
-    setupEnhancedDragDrop, renderFilePreviewChips,
+    setupEnhancedDragDrop, renderFilePreviewChips, showToast,
 } from './modules/upload.js';
 import {
     initPreview, buildStlThumbnail, buildNonStlThumbnail,
@@ -457,6 +458,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (batchApplyBtn) batchApplyBtn.addEventListener('click', batchApplyToAll);
     _bind(document.getElementById('batch-recalculate-btn'), 'click', () => reQuoteAllSelectedFiles(t('quote.recalculate')));
+    _bind(document.getElementById('stop-quote-btn'), 'click', () => { stopActiveQuote(); cancelActiveQuoteBatch(); });
+    _bind(document.getElementById('clear-all-results-btn'), 'click', () => {
+        abortActiveRecalc();
+        clearAllResults();
+        showToast(t('quote.clearedAllToast'), 'info');
+    });
     if (batchQuantity) {
         batchQuantity.addEventListener('change', _onBatchChange('quantity'));
         batchQuantity.addEventListener('keydown', (e) => {
