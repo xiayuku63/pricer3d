@@ -1,5 +1,6 @@
-"""Stop-button semantics: files that never started must be cancelled and
-must not reach quote history (integration through build_quote_payload)."""
+"""Stop-button semantics: after a batch cancel NO file may report success
+— queued files are skipped and in-flight files (slicing hard-killed) have
+their results discarded — and none may reach quote history."""
 
 import asyncio
 import sys
@@ -73,10 +74,13 @@ def test_stop_cancels_queued_files_and_skips_history(tmp_path, monkeypatch):
     assert cancelled is True
 
     statuses = {r["filename"]: r["status"] for r in payload["results"]}
-    assert statuses["p0.stl"] == "success", "started files complete"
-    assert statuses["p1.stl"] == "success"
+    # In-flight files were superseded by the cancel (their slicing is
+    # hard-killed): results must be discarded, never reported as success.
+    assert statuses["p0.stl"] == "cancelled", "in-flight files must not report success after cancel"
+    assert statuses["p1.stl"] == "cancelled"
     assert statuses["p4.stl"] == "cancelled", "queued files must be cancelled, not quoted"
     assert statuses["p5.stl"] == "cancelled"
+    assert payload["success_count"] == 0
 
     save_quote_history(user["id"], payload["results"])
     with get_db_session() as db:
@@ -84,6 +88,4 @@ def test_stop_cancels_queued_files_and_skips_history(tmp_path, monkeypatch):
             r.filename
             for r in db.query(QuoteHistory).filter(QuoteHistory.user_id == user["id"]).all()
         }
-    assert "p0.stl" in names
-    assert "p4.stl" not in names and "p5.stl" not in names, \
-        "cancelled files must never reach quote history"
+    assert not names, f"cancelled files must never reach quote history, got {names}"

@@ -357,6 +357,19 @@ async def build_quote_payload(
                 )
                 if isinstance(result, dict) and effective_brand:
                     result["brand"] = effective_brand
+                # The slice may have been hard-killed mid-flight by a batch
+                # cancel (stop button / replacing recalc). Never let a
+                # killed-or-queued file's result — including the geometric
+                # estimation fallback — count as success or reach history.
+                if batch_id and batch_cancelled(batch_id, int(current_user["id"])):
+                    return {
+                        "filename": file.filename or "unknown",
+                        "status": "cancelled",
+                        "error": "客户端已断开，报价已取消",
+                        "cost_cny": 0,
+                        "weight_g": 0,
+                        "estimated_time_h": 0,
+                    }
                 return result
             except Exception as e:
                 fname = file.filename or "unknown"
