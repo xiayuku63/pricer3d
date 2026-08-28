@@ -16,6 +16,9 @@ let _activeElevatedTargetClass = false;
 let _targetClickEl = null;
 let _targetClickHandler = null;
 let _running = false;
+let _activeStepTarget = null;
+let _activeStepPosition = 'bottom';
+let _repositionHandler = null;
 
 // ── State accessors (used by index.js) ──
 export function getSteps()          { return _steps; }
@@ -28,6 +31,7 @@ export function setRunning(v)       { _running = v; }
 // ── Welcome modal ──
 export function showWelcome() {
     _running = true;
+    _lockScroll();
 
     const backdrop = document.createElement('div');
     backdrop.className = 'onb-welcome-backdrop';
@@ -139,6 +143,13 @@ export async function showStep() {
     });
 
     if (targetEl && _isVisible(targetEl)) {
+        // Bring the guided control into view first — the background page is
+        // scroll-locked while the hint is shown, so the user must be able to
+        // see the target without scrolling.
+        if (typeof targetEl.scrollIntoView === 'function') {
+            targetEl.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+        }
+
         // Highlight element
         const rect = targetEl.getBoundingClientRect();
         _highlightEl = document.createElement('div');
@@ -160,10 +171,20 @@ export async function showStep() {
 
         _bindTargetAdvance(step, targetEl);
 
+        // Track the current target so highlight/tooltip can follow it while
+        // the user scrolls the page or a scrollable panel underneath.
+        _activeStepTarget = targetEl;
+        _activeStepPosition = step.position || 'bottom';
+        _watchScrollAndResize();
+        _lockScroll();
+
         // Show tooltip
         _showTooltip(step, rect);
     } else {
+        _activeStepTarget = null;
         // Target not found — show centered tooltip
+        _overlayEl.classList.add('onb-overlay--dim');
+        _lockScroll();
         _showTooltipCentered(step);
     }
 }
@@ -233,8 +254,8 @@ function _showTooltipCentered(step) {
     const isLast = _currentStep === _steps.length - 1;
 
     _tooltipEl = document.createElement('div');
-    _tooltipEl.className = 'onb-tooltip';
-    _tooltipEl.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10000;';
+    _tooltipEl.className = 'onb-tooltip onb-tooltip-centered';
+    _tooltipEl.style.cssText = 'top:50%;left:50%;transform:translate(-50%,-50%);';
     _tooltipEl.innerHTML = `
         <div class="onb-tooltip-header">
             <div class="onb-tooltip-step">${stepNum}</div>
@@ -271,40 +292,41 @@ function _positionTooltip(targetRect, position) {
     const gap = 16;
     const ttRect = _tooltipEl.getBoundingClientRect();
     const vw = window.innerWidth;
+    const vh = window.innerHeight;
 
     let top, left;
     let arrowClass = '';
 
     switch (position) {
         case 'bottom':
-            top = targetRect.bottom + gap + window.scrollY;
+            top = targetRect.bottom + gap;
             left = targetRect.left + targetRect.width / 2 - ttRect.width / 2;
             arrowClass = 'onb-arrow onb-arrow-bottom';
             break;
         case 'top':
-            top = targetRect.top - ttRect.height - gap + window.scrollY;
+            top = targetRect.top - ttRect.height - gap;
             left = targetRect.left + targetRect.width / 2 - ttRect.width / 2;
             arrowClass = 'onb-arrow onb-arrow-top';
             break;
         case 'right':
-            top = targetRect.top + targetRect.height / 2 - ttRect.height / 2 + window.scrollY;
+            top = targetRect.top + targetRect.height / 2 - ttRect.height / 2;
             left = targetRect.right + gap;
             arrowClass = 'onb-arrow onb-arrow-right';
             break;
         case 'left':
-            top = targetRect.top + targetRect.height / 2 - ttRect.height / 2 + window.scrollY;
+            top = targetRect.top + targetRect.height / 2 - ttRect.height / 2;
             left = targetRect.left - ttRect.width - gap;
             arrowClass = 'onb-arrow onb-arrow-left';
             break;
         default:
-            top = targetRect.bottom + gap + window.scrollY;
+            top = targetRect.bottom + gap;
             left = targetRect.left + targetRect.width / 2 - ttRect.width / 2;
             arrowClass = 'onb-arrow onb-arrow-bottom';
     }
 
-    // Clamp to viewport
+    // Clamp to viewport so the tooltip stays usable while scrolling
     left = Math.max(12, Math.min(left, vw - ttRect.width - 12));
-    top = Math.max(12, top);
+    top = Math.max(12, Math.min(top, vh - ttRect.height - 12));
 
     _tooltipEl.style.top = top + 'px';
     _tooltipEl.style.left = left + 'px';
@@ -319,23 +341,23 @@ function _addArrow(targetRect, position) {
     switch (position) {
         case 'bottom':
             arrow.classList.add('onb-arrow-bottom');
-            arrow.style.top = (ttRect.top + window.scrollY - 6) + 'px';
-            arrow.style.left = (targetRect.left + targetRect.width / 2 - 6 + window.scrollX) + 'px';
+            arrow.style.top = (ttRect.top - 6) + 'px';
+            arrow.style.left = (targetRect.left + targetRect.width / 2 - 6) + 'px';
             break;
         case 'top':
             arrow.classList.add('onb-arrow-top');
-            arrow.style.top = (ttRect.bottom + window.scrollY - 6) + 'px';
-            arrow.style.left = (targetRect.left + targetRect.width / 2 - 6 + window.scrollX) + 'px';
+            arrow.style.top = (ttRect.bottom - 6) + 'px';
+            arrow.style.left = (targetRect.left + targetRect.width / 2 - 6) + 'px';
             break;
         case 'right':
             arrow.classList.add('onb-arrow-right');
-            arrow.style.top = (targetRect.top + targetRect.height / 2 - 6 + window.scrollY) + 'px';
-            arrow.style.left = (ttRect.left + window.scrollX - 6) + 'px';
+            arrow.style.top = (targetRect.top + targetRect.height / 2 - 6) + 'px';
+            arrow.style.left = (ttRect.left - 6) + 'px';
             break;
         case 'left':
             arrow.classList.add('onb-arrow-left');
-            arrow.style.top = (targetRect.top + targetRect.height / 2 - 6 + window.scrollY) + 'px';
-            arrow.style.left = (ttRect.right + window.scrollX - 6) + 'px';
+            arrow.style.top = (targetRect.top + targetRect.height / 2 - 6) + 'px';
+            arrow.style.left = (ttRect.right - 6) + 'px';
             break;
     }
     document.body.appendChild(arrow);
@@ -377,9 +399,40 @@ function _bindTargetAdvance(step, targetEl) {
     targetEl.addEventListener('click', _targetClickHandler);
 }
 
+// ── Scroll / resize tracking ──
+// Keeps the highlight and tooltip anchored to the guided control while the
+// background (or a scrollable panel like the User Center modal) is scrolling.
+function _watchScrollAndResize() {
+    if (_repositionHandler) return;
+    _repositionHandler = _repositionCurrentStep;
+    // Capture phase catches scroll events from nested scrollable containers
+    // as well as the window.
+    window.addEventListener('scroll', _repositionHandler, true);
+    window.addEventListener('resize', _repositionHandler);
+}
+
+function _unwatchScrollAndResize() {
+    if (!_repositionHandler) return;
+    window.removeEventListener('scroll', _repositionHandler, true);
+    window.removeEventListener('resize', _repositionHandler);
+    _repositionHandler = null;
+}
+
+function _repositionCurrentStep() {
+    if (!_activeStepTarget || !_isVisible(_activeStepTarget)) return;
+    const rect = _activeStepTarget.getBoundingClientRect();
+    _positionHighlight(rect);
+    if (_tooltipEl && !_tooltipEl.classList.contains('onb-tooltip-centered')) {
+        _positionTooltip(rect, _activeStepPosition || 'bottom');
+        document.querySelectorAll('.onb-arrow').forEach(el => el.remove());
+        _addArrow(rect, _activeStepPosition || 'bottom');
+    }
+}
+
 function finish() {
     _running = false;
     _removeUI();
+    _unlockScroll();
 
     // Mark as completed
     if (currentUser) {
@@ -396,6 +449,8 @@ function finish() {
 
 // ── Cleanup ──
 function _removeUI() {
+    _unwatchScrollAndResize();
+    _activeStepTarget = null;
     if (_overlayEl) { _overlayEl.remove(); _overlayEl = null; }
     if (_highlightEl) { _highlightEl.remove(); _highlightEl = null; }
     if (_tooltipEl) { _tooltipEl.remove(); _tooltipEl = null; }
@@ -425,4 +480,15 @@ function _isVisible(el) {
 
 function _sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// ── Scroll lock ──
+function _lockScroll() {
+    document.body.classList.add('onb-scroll-lock');
+    document.documentElement.classList.add('onb-scroll-lock');
+}
+
+function _unlockScroll() {
+    document.body.classList.remove('onb-scroll-lock');
+    document.documentElement.classList.remove('onb-scroll-lock');
 }

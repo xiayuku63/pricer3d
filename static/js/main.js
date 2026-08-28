@@ -97,7 +97,7 @@ import { initZipUpload, handleFileSelection } from './modules/zip-upload.js';
 import { initLiveClock } from './modules/live-clock.js';
 import { collectAppDomRefs } from './modules/app-dom.js';
 import {
-    initColorDropdownUI, initMobileNavigation, initAppLifecycle,
+    initColorDropdownUI, initMobileNavigation, initAppLifecycle, initModalEscapeHandling,
     portalModalToBody, portalUserCenterModal, portalPreviewModal, portalQuoteHistoryModal,
 } from './modules/app-shell.js';
 import { initSettingsAreaEvents, initResultsAreaEvents } from './modules/app-events.js';
@@ -369,6 +369,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ── Slicer preset form: save-as button (direct save with auto-generated name)
     _bind(dom.genPresetSaveasBtn, 'click', saveAsNewPreset);
 
+    initModalEscapeHandling();
     initColorDropdownUI({
         quoteOptions,
         currentResults,

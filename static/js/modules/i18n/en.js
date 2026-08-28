@@ -303,6 +303,8 @@ export default {
   'material.typeCustom': 'Custom Type',
 
   // ── Settings ──
+  'settings.passwordMinLength': 'Password must be at least 8 characters',
+  'settings.passwordMatch': 'Passwords match',
   'settings.title': 'User Center',
   'settings.profile': 'Profile',
   'settings.pricing': 'Pricing',
@@ -489,6 +491,7 @@ export default {
   'preview.addEntityColor': 'Add color',
 
   // ── Orientation ──
+  'orientation.markedAndQuoted': 'Marked — quote refreshed for the current orientation',
   'orientation.autoOrient': 'Manual Place',
   'orientation.autoPlace': 'Auto Orient',
   'orientation.exit': 'Exit Lay Mode',

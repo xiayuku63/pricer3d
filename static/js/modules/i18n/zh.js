@@ -298,6 +298,8 @@ export default {
   'material.typeCustom': '自定义类型',
 
   // ── Settings / 用户中心 ──
+  'settings.passwordMinLength': '密码至少需要 8 个字符',
+  'settings.passwordMatch': '两次输入的密码一致',
   'settings.title': '用户中心',
   'settings.profile': '个人资料',
   'settings.pricing': '定价配置',
@@ -494,6 +496,7 @@ export default {
   'orientation.requestFailedLogin': '请求失败，请登录后重试',
   'orientation.requestFailed': '请求失败',
   'orientation.submitting': '提交中...',
+  'orientation.markedAndQuoted': '已标记，报价已按当前朝向刷新',
   'orientation.marked': '已标记',
   'orientation.markFailed': '标记失败: {msg}',
   'orientation.learnedSuccess': '智能摆放✓',

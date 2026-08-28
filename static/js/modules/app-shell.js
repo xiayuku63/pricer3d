@@ -23,6 +23,25 @@ export function portalQuoteHistoryModal() {
     return portalModalToBody('quote-history-modal');
 }
 
+/** Escape closes the topmost visible modal (accessibility basics). Skip when
+ * a dropdown layer is open — those handle Escape themselves and must close
+ * first. Modal close buttons follow the `*-close-btn` naming; the click
+ * dispatch reuses each modal's own close path (state cleanup included). */
+export function initModalEscapeHandling() {
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        if (document.querySelector('.combo-d:not(.hidden), .styled-select-list:not(.hidden), .color-dd-list:not(.hidden)')) return;
+        const openModals = [...document.querySelectorAll('[id$="-modal"]:not(.hidden)')];
+        if (!openModals.length) return;
+        const top = openModals[openModals.length - 1];
+        const closeBtn = top.querySelector('[id$="-close-btn"]') || top.querySelector('.modal-icon-close');
+        if (closeBtn) {
+            e.preventDefault();
+            closeBtn.click();
+        }
+    });
+}
+
 import { getResultOrientation } from './orientation-state.js';
 
 export function initColorDropdownUI({ quoteOptions, currentResults, selectedFilesMap, thumbnailMap, dom, ensureThumbnailForFile, recolorCurrentMesh, updatePreviewColor, getCurrentPreviewFilename, refreshOptionsSummary }) {

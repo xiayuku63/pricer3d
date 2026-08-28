@@ -16,6 +16,7 @@ import subprocess
 import shutil
 import tempfile
 import threading
+import time
 import uuid
 import zipfile
 import xml.etree.ElementTree as ET
@@ -42,12 +43,34 @@ _3MF_MESH_EXTENSIONS = {".stl", ".obj", ".ply", ".off"}
 
 # STEP conversion is the dominant cost of non-STL preview.  Preview, quote,
 # orientation, and slicing can all request the same uploaded bytes, so keep a
-# process-local normalized STL cache keyed by source content.  The cache lives
-# under the system temp directory and is intentionally not returned as a
-# temporary artifact owned by one request.
-_MODEL_CACHE_ROOT = Path(tempfile.gettempdir()) / f"pricer3d_model_cache_{os.getpid()}"
+# normalized STL cache keyed by source content. The cache lives under the
+# system temp directory and is intentionally not returned as a temporary
+# artifact owned by one request. It is shared across processes: cache keys
+# are content-addressed and entries are written atomically (temp dir +
+# os.replace), so concurrent servers/workers can safely reuse it.
+_MODEL_CACHE_ROOT = Path(tempfile.gettempdir()) / "pricer3d_model_cache"
 _MODEL_CACHE_GUARD = threading.Lock()
 _MODEL_CACHE_LOCKS: dict[str, threading.Lock] = {}
+_STALE_CACHE_DIR_PREFIX = "pricer3d_model_cache_"
+_STALE_CACHE_DIR_MAX_AGE_S = 7 * 24 * 3600
+
+
+def _cleanup_stale_model_cache_dirs() -> None:
+    """Best-effort removal of superseded per-PID cache directories left by
+    older builds (pricer3d_model_cache_<pid>), which were never cleaned."""
+    try:
+        now = time.time()
+        for entry in Path(tempfile.gettempdir()).glob(f"{_STALE_CACHE_DIR_PREFIX}*"):
+            try:
+                if now - entry.stat().st_mtime > _STALE_CACHE_DIR_MAX_AGE_S:
+                    shutil.rmtree(entry, ignore_errors=True)
+            except OSError:
+                continue
+    except OSError:
+        pass
+
+
+_cleanup_stale_model_cache_dirs()
 
 
 def _model_cache_lock(key: str) -> threading.Lock:
