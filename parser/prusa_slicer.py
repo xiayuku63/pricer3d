@@ -15,9 +15,10 @@ import shutil
 import subprocess
 import tempfile
 import threading
+import contextvars
 from contextlib import nullcontext
 from functools import lru_cache
-from typing import Optional
+from typing import Dict, Optional
 
 from app.printer_gcode import lifecycle_settings
 from parser.slice_cache import (
@@ -34,6 +35,52 @@ logger = logging.getLogger(__name__)
 # same image concurrently. Serialize AppImage launches to prevent extraction
 # races while leaving native binaries and WSL commands unconstrained.
 _APPIMAGE_EXECUTION_LOCK = threading.Lock()
+
+# ── In-flight slice registry (batch-scoped hard-kill) ──
+# The quote service stamps each per-file task with its batch id via
+# set_slice_batch(); run_prusa_slice registers every spawned PrusaSlicer
+# process under that id. cancel_batch() then kills still-running processes
+# instead of letting abandoned slices burn CPU for minutes.
+_current_slice_batch: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    "current_slice_batch", default=None
+)
+_active_slices: Dict[int, dict] = {}
+_active_slices_lock = threading.Lock()
+
+
+def set_slice_batch(batch_id: Optional[str]):
+    """Stamp the current task/thread with a quote batch id."""
+    return _current_slice_batch.set(str(batch_id) if batch_id else None)
+
+
+def _register_active_slice(pid: int, info: dict) -> None:
+    with _active_slices_lock:
+        _active_slices[pid] = info
+
+
+def _unregister_active_slice(pid: int) -> None:
+    with _active_slices_lock:
+        _active_slices.pop(pid, None)
+
+
+def kill_slices_for_batch(batch_id: Optional[str]) -> int:
+    """Hard-kill every still-running slicing process spawned under batch_id.
+    Returns the number of processes killed."""
+    if not batch_id:
+        return 0
+    with _active_slices_lock:
+        entries = [e for e in _active_slices.values() if e.get("batch_id") == str(batch_id)]
+    killed = 0
+    for entry in entries:
+        proc = entry.get("proc")
+        if proc is None or proc.poll() is not None:
+            continue
+        try:
+            _kill_slicer_process_tree(proc, entry.get("cmd") or [], entry.get("output") or "")
+            killed += 1
+        except Exception:
+            logger.debug("kill_slices_for_batch: failed to kill pid %s", entry.get("pid"), exc_info=True)
+    return killed
 
 
 @lru_cache(maxsize=1)
@@ -872,6 +919,13 @@ def run_prusa_slice(
                 text=False,
                 **_popen_kwargs,
             )
+            _register_active_slice(proc.pid, {
+                "pid": proc.pid,
+                "proc": proc,
+                "cmd": list(cmd),
+                "output": output_gcode_path,
+                "batch_id": _current_slice_batch.get(),
+            })
             try:
                 stdout_b, stderr_b = proc.communicate(timeout=timeout_s)
             except subprocess.TimeoutExpired:
@@ -881,6 +935,8 @@ def run_prusa_slice(
                 except Exception:
                     pass
                 raise RuntimeError(f"PrusaSlicer timed out ({timeout_s}s) for {os.path.basename(model_path)}")
+            finally:
+                _unregister_active_slice(proc.pid)
 
         stdout = _safe_decode(stdout_b).strip()
         stderr = _safe_decode(stderr_b).strip()

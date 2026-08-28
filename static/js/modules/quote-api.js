@@ -32,6 +32,20 @@ export function abortActiveRecalc() {
 
 let _quoteBatchId = null;
 
+/** A new quote run replaces the previous one: abort its fetches AND ask the
+ * server to cancel + hard-kill any in-flight slicing under the old batch —
+ * the browser-side abort alone never reaches the backend on Windows. */
+async function _replaceQuoteBatch() {
+    const batchId = _quoteBatchId;
+    abortActiveRecalc();
+    if (!batchId) return;
+    await authFetch('/api/quote/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ batch_id: batchId }),
+    }).catch(() => {});
+}
+
 function _newAbortController() {
     abortActiveRecalc();
     _globalAbortController = new AbortController();
@@ -250,6 +264,7 @@ function _pendingQuoteOptions(file) {
 export async function quoteSelectedFilesSequentially(selectedFiles, useProgress = false) {
     const files = Array.from(selectedFiles || []);
     if (!files.length) return;
+    await _replaceQuoteBatch();
     const controller = _newAbortController();
     const signal = controller.signal;
 
@@ -542,8 +557,8 @@ export async function reQuoteAllSelectedFiles(reasonLabel, shouldRequote) {
     if (errorMsg) errorMsg.textContent = '';
     if (errorContainer) errorContainer.classList.add('hidden');
 
-    // 中断上一个重算
-    abortActiveRecalc();
+    // 中断上一个重算：fetch abort + 服务端取消并硬杀在途切片
+    await _replaceQuoteBatch();
     const controller = _newAbortController();
     const signal = controller.signal;
 

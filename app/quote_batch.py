@@ -32,10 +32,15 @@ def batch_cancelled(batch_id: str, user_id: int) -> bool:
 
 
 def cancel_batch(batch_id: str, user_id: int) -> bool:
-    """Mark a batch cancelled. Returns True when a batch owned by this user
-    was actually cancelled."""
+    """Mark a batch cancelled and hard-kill its in-flight slicing processes.
+    Returns True when a batch owned by this user was actually cancelled."""
     with _lock:
-        if _active.get(batch_id) == int(user_id):
-            _active.pop(batch_id, None)
-            return True
-        return False
+        if _active.get(batch_id) != int(user_id):
+            return False
+        _active.pop(batch_id, None)
+    # Kill still-running PrusaSlicer processes spawned under this batch —
+    # cooperative between-file checks alone leave in-flight slices running.
+    from parser.prusa_slicer import kill_slices_for_batch
+
+    kill_slices_for_batch(batch_id)
+    return True

@@ -313,9 +313,13 @@ async def build_quote_payload(
 
     async def process_one(file):
         async with _semaphore:
-            # Stopped via the stop button (batch flag) or disconnected?
-            # Skip this file and everything queued behind it. In-flight
-            # slices already entered to_thread cannot be interrupted, but
+            if batch_id:
+                from parser.prusa_slicer import set_slice_batch
+
+                set_slice_batch(batch_id)
+            # Stopped via the stop button / replaced by a newer batch (batch
+            # flag) or disconnected? Skip this file and everything queued
+            # behind it. In-flight slices are hard-killed by cancel_batch();
             # abandoned work must not start and must not reach history.
             batch_stopped = bool(batch_id) and batch_cancelled(batch_id, int(current_user["id"]))
             disconnected = False
