@@ -140,3 +140,57 @@ async def validate_formula(payload: FormulaValidateRequest, current_user=Depends
         "total": {"ok": total_ok, "error": total_err, "used_vars": total_vars},
         "aliases": FORMULA_ALIAS_TO_CANONICAL,
     }
+
+
+@router.post("/api/quote/jobs")
+async def create_quote_job_route(
+    files: List[UploadFile] = File(...),
+    material: str = Form("PLA", min_length=1, max_length=40),
+    brand: Optional[str] = Form(default=None, max_length=40),
+    layer_height: float = Form(0.2, ge=0.05, le=1.0),
+    infill: int = Form(20, ge=0, le=100),
+    wall_count: int = Form(3, ge=1, le=20),
+    slicer_preset_id: Optional[int] = Form(default=None),
+    quantity: int = Form(1, ge=1, le=5000),
+    color: str = Form("White", min_length=1, max_length=40),
+    use_prusaslicer: Optional[bool] = Form(default=None),
+    printer_model: Optional[str] = Form(default=None),
+    auto_orient: Optional[bool] = Form(default=False),
+    entity_colors_json: Optional[str] = Form(default=None, max_length=20000),
+    current_user=Depends(get_current_user),
+):
+    """Async quoting: spool files, enqueue a job, return its id immediately."""
+    from app.services.quote_jobs import create_quote_job
+
+    job_id = create_quote_job(
+        files=files,
+        material=material,
+        brand=brand,
+        layer_height=layer_height,
+        infill=infill,
+        wall_count=wall_count,
+        slicer_preset_id=slicer_preset_id,
+        quantity=quantity,
+        color=color,
+        use_prusaslicer=use_prusaslicer,
+        printer_model=printer_model,
+        auto_orient=auto_orient,
+        entity_colors_json=entity_colors_json,
+        current_user=current_user,
+    )
+    return {"code": 0, "message": "ok", "data": {"job_id": job_id}}
+
+
+@router.get("/api/quote/jobs/{job_id}")
+async def get_quote_job_route(job_id: str, current_user=Depends(get_current_user)):
+    from app.services.quote_jobs import get_quote_job
+
+    return {"code": 0, "message": "ok", "data": get_quote_job(job_id, int(current_user["id"]))}
+
+
+@router.post("/api/quote/jobs/{job_id}/cancel")
+async def cancel_quote_job_route(job_id: str, current_user=Depends(get_current_user)):
+    from app.services.quote_jobs import cancel_quote_job
+
+    cancelled = cancel_quote_job(job_id, int(current_user["id"]))
+    return {"code": 0, "message": "ok", "data": {"cancelled": cancelled}}

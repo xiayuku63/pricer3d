@@ -257,6 +257,80 @@ function _pendingQuoteOptions(file) {
     };
 }
 
+/** Opt-in async quoting (P2-15): uploads spool to a server-side job and the
+ * client polls progress. Enable with localStorage pricer3d_use_quote_jobs=1. */
+function _useQuoteJobs() {
+    try { return localStorage.getItem('pricer3d_use_quote_jobs') === '1'; } catch { return false; }
+}
+
+async function _quoteFilesViaJob(files, useProgress, signal) {
+    const fd = new FormData();
+    files.forEach((f) => fd.append('files', f, f.name));
+    const opts = _pendingQuoteOptions(files[0]);
+    fd.append('material', opts.material);
+    if (opts.brand) fd.append('brand', opts.brand);
+    fd.append('color', opts.color);
+    fd.append('quantity', String(opts.quantity));
+    if (opts._printer_model) fd.append('printer_model', opts._printer_model);
+    if (opts._slicer_preset_id !== undefined && opts._slicer_preset_id !== null) {
+        fd.append('slicer_preset_id', String(opts._slicer_preset_id));
+    }
+    if (opts.auto_orient) fd.append('auto_orient', 'true');
+    if (opts.entity_colors && Object.keys(opts.entity_colors).length) {
+        fd.append('entity_colors_json', JSON.stringify(opts.entity_colors));
+    }
+
+    const createRes = await authFetch('/api/quote/jobs', { method: 'POST', body: fd });
+    if (!createRes.ok) throw new Error('报价任务创建失败');
+    const created = (await createRes.json()).data;
+    const jobId = created.job_id;
+
+    if (useProgress) showProgress(`报价任务已提交（${files.length} 个文件）...`);
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    let mergedCount = 0;
+    for (;;) {
+        if (signal.aborted) {
+            try { await authFetch(`/api/quote/jobs/${jobId}/cancel`, { method: 'POST' }); } catch {}
+            throw new DOMException('Aborted', 'AbortError');
+        }
+        await sleep(700);
+        let state;
+        try {
+            const pollRes = await authFetch(`/api/quote/jobs/${jobId}`);
+            if (!pollRes.ok) continue;
+            state = (await pollRes.json()).data;
+        } catch { continue; }
+        const items = state.items || [];
+        const done = items.filter((i) => i.status !== 'pending' && i.status !== 'running');
+        for (let i = mergedCount; i < done.length; i++) {
+            const it = done[i];
+            if (it.result) {
+                mergeResultsByFilename([it.result]);
+                const file = files.find((f) => f.name === it.filename);
+                if (file && it.result.color) {
+                    await ensureThumbnailForFile(file, it.result.color, getResultOrientation(it.result), () => {});
+                }
+            } else {
+                mergeResultsByFilename([{ filename: it.filename, status: 'failed', error: it.error || '报价失败' }]);
+            }
+        }
+        mergedCount = done.length;
+        renderResultsTable();
+        recalcSummaryFromCurrentResults();
+        if (useProgress) updateProgress((done.length / Math.max(1, state.total_files)) * 100);
+        if (['success', 'partial', 'failed', 'cancelled'].includes(state.status)) {
+            recalcSummaryFromCurrentResults();
+            if (useProgress) {
+                if (state.status === 'success') showProgressSuccess(`报价完成，共处理 ${state.total_files} 个文件`);
+                else if (state.status === 'cancelled') showProgressError('报价已取消');
+                else showProgressError('报价完成（部分失败），请检查结果表');
+                hideProgress();
+            }
+            return state;
+        }
+    }
+}
+
 /** Quote files through a small worker pool (default 2) so rows still
  * transition calculating → done one by one, while slicing latency no longer
  * serializes N files into N sequential round-trips. 429 responses back off
@@ -267,6 +341,17 @@ export async function quoteSelectedFilesSequentially(selectedFiles, useProgress 
     await _replaceQuoteBatch();
     const controller = _newAbortController();
     const signal = controller.signal;
+
+    if (_useQuoteJobs()) {
+        try {
+            await _quoteFilesViaJob(files, useProgress, signal);
+        } catch (err) {
+            if (err.name === 'AbortError' || signal.aborted) return;
+            if (useProgress) { showProgressError('报价任务失败'); hideProgress(); }
+            throw err;
+        }
+        return;
+    }
 
     files.forEach((file) => {
         const existing = currentResults.find((item) => item && item.filename === file.name);

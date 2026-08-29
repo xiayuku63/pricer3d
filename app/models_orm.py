@@ -336,3 +336,34 @@ class Material(Base):
     updated_at = Column(String, nullable=False)
 
     __table_args__ = (UniqueConstraint("brand_id", "type_id", "name"),)
+
+
+class QuoteJob(Base):
+    """Asynchronous quote job (P2-15): created by POST /api/quote/jobs,
+    executed by a background worker pool, polled by the client."""
+
+    __tablename__ = "quote_jobs"
+
+    id = Column(String(36), primary_key=True)  # uuid4; doubles as batch id
+    user_id = Column(Integer, nullable=False, index=True)
+    status = Column(String(16), nullable=False, default="pending")  # pending/running/success/partial/failed/cancelled
+    total_files = Column(Integer, nullable=False, default=0)
+    params_json = Column(Text)  # frozen quote parameters (material, color, ...)
+    error = Column(Text)
+    created_at = Column(String, nullable=False, index=True)
+    updated_at = Column(String, nullable=False)
+
+
+class QuoteJobItem(Base):
+    """Per-file state and result for a quote job."""
+
+    __tablename__ = "quote_job_items"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    job_id = Column(String(36), nullable=False, index=True)
+    filename = Column(String, nullable=False)
+    source_path = Column(String)  # spooled upload path, removed after completion
+    status = Column(String(16), nullable=False, default="pending")  # pending/running/success/failed/cancelled
+    error = Column(Text)
+    result_json = Column(Text)
+    updated_at = Column(String, nullable=False)
