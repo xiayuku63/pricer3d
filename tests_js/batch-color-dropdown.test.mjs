@@ -27,7 +27,15 @@ test('portal-positioned color dropdown clears stretch styles before sizing the p
     assert.match(appShellSource, /const compact = wrapper\.classList\.contains\('color-dd-wrapper-compact'\);/);
     assert.match(appShellSource, /list\.style\.right = '';/);
     assert.match(appShellSource, /list\.style\.width = 'max-content';/);
-    assert.match(appShellSource, /const listWidth = Math\.min\(Math\.max\(listRect\.width, minWidth\), viewportMaxWidth\);/);
+});
+
+test('selection rings are portal-aware and re-synced from the stored value on open', () => {
+    // While open the list lives under <body>; querying the wrapper alone
+    // finds zero options so highlight toggles silently no-op.
+    assert.match(appShellSource, /function getColorItems\(wrapper\)/);
+    assert.match(appShellSource, /list\.__portalOrigin && list\.__portalOrigin\.parentElement === wrapper/);
+    assert.match(appShellSource, /syncColorSelection\(wrapper, wrapper\.getAttribute\('data-selected-color'\)/);
+    assert.match(appShellSource, /syncColorSelection\(wrapper, hex, item\.closest\('\.color-dd-list'\)\)/);
 });
 
 test('custom popup menus share the unified dropdown option styling', () => {

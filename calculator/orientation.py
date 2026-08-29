@@ -266,14 +266,26 @@ def apply_orientation_to_mesh(
 
 
 def get_smart_orientation_for_slicing(model_path: str) -> dict:
-    """Run the canonical smart-placement strategy used by preview and quoting."""
-    return get_best_face_for_slicing(model_path, method="geometry_v2")
+    """Run the canonical smart-placement strategy used by preview and quoting.
+
+    Results are content-address cached (calculator.orientation_cache): the
+    hull-clustering + candidate scoring costs seconds and is deterministic
+    for identical geometry, so re-quotes with different print params skip it.
+    """
+    from calculator.orientation_cache import orientation_cache_lookup, orientation_cache_store
+
+    cached = orientation_cache_lookup(model_path)
+    if cached is not None:
+        logger.info("朝向缓存命中: %s", os.path.basename(model_path))
+        return cached
+    result = get_best_face_for_slicing(model_path, method="geometry_v2")
+    orientation_cache_store(model_path, result)
+    return result
 
 
 def get_best_face_for_slicing(
     model_path: str,
     method: str = "coplanar",
-    sa_config: Optional[dict] = None,
 ) -> dict:
     """Auto-select a print orientation using geometry V2, coplanar, or SA.
 
@@ -292,8 +304,6 @@ def get_best_face_for_slicing(
         model_path: Path to STL/3MF model file
         method: "geometry_v2"/"auto" for the fast automatic strategy,
                 "coplanar" for the legacy strategy, or "sa".
-        sa_config: Optional kwargs dict passed to optimize_orientation_sa()
-                   (only used when method="sa")
 
     Returns:
         {
@@ -308,11 +318,6 @@ def get_best_face_for_slicing(
             # SA-only fields: cost, cost_components, sa_history
         }
     """
-    if method == "sa":
-        from calculator.orientation_sa import optimize_orientation_sa
-
-        return optimize_orientation_sa(model_path, **(sa_config or {}))
-
     if method in {"learned", "geometry_v2", "auto"}:
         return _geometry_best_face(model_path)
 

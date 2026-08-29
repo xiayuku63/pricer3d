@@ -1,12 +1,13 @@
 """Quote history export services (CSV / XLSX / PDF)."""
 
+import asyncio
 import csv
 import io
 import logging
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, field_validator
 
@@ -37,6 +38,13 @@ _EXPORT_COLUMNS = [
 ]
 
 
+# Export cap: history grows unbounded, and query.all() built the whole result
+# set in memory — cap it so CSV/XLSX assembly stays bounded.
+MAX_EXPORT_ROWS = 5000
+
+
+router = APIRouter()
+
 def _build_export_query(db, user_id: int, material: Optional[str], date_from: Optional[str], date_to: Optional[str]):
     """Build filtered query for quote history export."""
     query = db.query(QuoteHistory).filter(QuoteHistory.user_id == user_id)
@@ -47,7 +55,7 @@ def _build_export_query(db, user_id: int, material: Optional[str], date_from: Op
     if date_to:
         date_to_end = date_to if "T" in date_to else f"{date_to}T23:59:59"
         query = query.filter(QuoteHistory.created_at <= date_to_end)
-    return query.order_by(QuoteHistory.id.desc())
+    return query.order_by(QuoteHistory.id.desc()).limit(MAX_EXPORT_ROWS)
 
 
 def _row_to_export_list(row) -> list:
@@ -72,6 +80,7 @@ def _row_to_export_list(row) -> list:
     ]
 
 
+@router.get("/api/quote/export")
 async def export_quote_history(
     request: Request,
     format: str,
@@ -175,6 +184,7 @@ async def export_quote_history(
         raise HTTPException(status_code=500, detail=f"导出失败: {str(e)}")
 
 
+@router.get("/api/quote/export-pdf")
 async def export_quote_pdf(
     request: Request,
     ids: str,
@@ -317,6 +327,7 @@ class PdfInlineRequest(BaseModel):
     items: List[PdfInlineItem]
 
 
+@router.post("/api/quote/export-pdf-inline")
 async def export_pdf_inline(
     payload: PdfInlineRequest,
     request: Request,
@@ -349,7 +360,8 @@ async def export_pdf_inline(
     discount_pct = max(0.0, min(90.0, discount_pct))
 
     items = [item.model_dump() for item in payload.items]
-    pdf_bytes = generate_pdf_quote(
+    pdf_bytes = await asyncio.to_thread(
+        generate_pdf_quote,
         items=items,
         brand_name=brand_name,
         brand_logo_url=brand_logo_url,

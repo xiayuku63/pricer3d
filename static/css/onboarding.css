@@ -2,6 +2,13 @@
    Onboarding Guide – lightweight overlay + tooltip
    ══════════════════════════════════════════════ */
 
+/* Lock the background page while a guide prompt is visible */
+html.onb-scroll-lock,
+body.onb-scroll-lock {
+    overflow: hidden !important;
+    overscroll-behavior: none;
+}
+
 /* Full-screen backdrop overlay */
 .onb-overlay {
     position: fixed;
@@ -10,38 +17,71 @@
     pointer-events: none;
     transition: opacity 0.25s ease;
 }
-.onb-overlay::before {
+/* Fallback dim used only when no target element exists (centered tooltip) */
+.onb-overlay--dim::before {
     content: '';
     position: absolute;
     inset: 0;
     background: rgba(0, 0, 0, 0.55);
 }
 
-/* Cut-out hole around the highlighted element */
+/* Cut-out hole around the highlighted element.
+   The oversized box-shadow dims everything except the target, so the guided
+   control stays fully visible while the page keeps scrolling underneath. */
 .onb-highlight {
     position: absolute;
-    border-radius: 8px;
-    box-shadow: 0 0 0 4000px rgba(0, 0, 0, 0.55);
+    border-radius: 10px;
+    box-shadow:
+        0 0 0 9999px rgba(0, 0, 0, 0.55),
+        0 0 12px rgba(99, 102, 241, 0.3);
     z-index: 9999;
     transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
     pointer-events: none;
 }
+/* Blinking spotlight ring around the clickable target */
 .onb-highlight::after {
     content: '';
     position: absolute;
     inset: -3px;
-    border: 2.5px solid #818cf8;
-    border-radius: 10px;
-    animation: onb-pulse 1.8s ease-in-out infinite;
+    border: 3px solid #818cf8;
+    border-radius: 12px;
+    animation: onb-ring-blink 1.15s ease-in-out infinite;
 }
-@keyframes onb-pulse {
-    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(129, 140, 248, 0.4); }
-    50% { opacity: 0.7; box-shadow: 0 0 0 6px rgba(129, 140, 248, 0); }
+@keyframes onb-ring-blink {
+    0%, 45% {
+        opacity: 1;
+        border-color: #a5b4fc;
+        box-shadow:
+            0 0 0 1px rgba(129, 140, 248, 0.35),
+            0 0 20px 4px rgba(129, 140, 248, 0.7);
+    }
+    50%, 100% {
+        opacity: 0.15;
+        border-color: rgba(129, 140, 248, 0.35);
+        box-shadow: none;
+    }
+}
+
+/* Blinking glow on the guided control itself ("click me" cue) */
+.onb-target-active {
+    position: relative;
+    z-index: 9999 !important;
+    animation: onb-target-blink 1.15s ease-in-out infinite;
+}
+@keyframes onb-target-blink {
+    0%, 45% {
+        filter:
+            drop-shadow(0 0 3px rgba(129, 140, 248, 0.95))
+            drop-shadow(0 0 12px rgba(129, 140, 248, 0.7));
+    }
+    50%, 100% {
+        filter: none;
+    }
 }
 
 /* Tooltip card */
 .onb-tooltip {
-    position: absolute;
+    position: fixed;
     z-index: 10000;
     max-width: 380px;
     min-width: 280px;
@@ -144,7 +184,7 @@
 
 /* Arrow / pointer between tooltip and highlight */
 .onb-arrow {
-    position: absolute;
+    position: fixed;
     width: 12px;
     height: 12px;
     background: #fff;
@@ -271,12 +311,6 @@
     padding: 10px 20px;
     font-size: 14px;
     border-radius: 8px;
-}
-
-/* Ensure highlighted element is above overlay */
-.onb-target-active {
-    position: relative;
-    z-index: 9999 !important;
 }
 
 /* Lift dropdown panels that contain a guided target above the overlay. */

@@ -23,7 +23,7 @@ import {
 import { buildThumbnails } from './preview.js';
 import { t } from './i18n.js';
 import {
-    mergeResultsByFilename,
+    mergeResultsByFilename, clearResultsForFiles,
     quoteSelectedFilesSequentiallyWithProgress, markFileAsCalculating, getInitialQuoteColorMap,
     renderResultsTable, recalcSummaryFromCurrentResults,
 } from './quote.js';
@@ -85,6 +85,52 @@ export async function handleFileSelection(newFiles) {
 }
 
 // ── Internal helpers ──
+
+/**
+ * POST a FormData with real upload progress (fetch cannot report it).
+ * Resolves with the parsed JSON body; rejects with an Error carrying
+ * { status, body } for non-2xx responses.
+ */
+function _uploadFormData({ url, formData, headers = {}, onProgress = null, signal = null }) {
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', url, true);
+        Object.entries(headers).forEach(([key, value]) => {
+            try { xhr.setRequestHeader(key, value); } catch (_) { /* invalid header — skip */ }
+        });
+        if (signal) {
+            if (signal.aborted) { xhr.abort(); return; }
+            signal.addEventListener('abort', () => xhr.abort(), { once: true });
+        }
+        if (onProgress && xhr.upload) {
+            xhr.upload.onprogress = (event) => {
+                if (event.lengthComputable && event.total > 0) {
+                    onProgress(Math.min(99, Math.round((event.loaded / event.total) * 100)));
+                }
+            };
+        }
+        xhr.onload = () => {
+            let body = null;
+            try { body = JSON.parse(xhr.responseText); } catch (_) { body = null; }
+            if (xhr.status >= 200 && xhr.status < 300) {
+                resolve(body);
+            } else {
+                const message = (body && (body.message || body.detail || body.error)) || `HTTP ${xhr.status}`;
+                const error = new Error(message);
+                error.status = xhr.status;
+                error.body = body;
+                reject(error);
+            }
+        };
+        xhr.onerror = () => reject(new Error(t('zipPreview.networkError') || '网络错误，上传失败'));
+        xhr.onabort = () => {
+            const error = new Error(t('zipPreview.cancelled') || '上传已取消');
+            error.aborted = true;
+            reject(error);
+        };
+        xhr.send(formData);
+    });
+}
 
 function _hideError() {
     if (dom.errorContainer) dom.errorContainer.classList.add('hidden');
@@ -302,26 +348,19 @@ async function _handleZipUpload(zipFiles, modelFiles, validFiles) {
     showProgress(t('zipPreview.parsing') || '解析 ZIP 文件...');
 
     try {
-        // ── Step 1: Call preview endpoint ──
+        // ── Step 1: Call preview endpoint (XHR — fetch cannot report upload
+        // progress, and a 100MB ZIP otherwise looks frozen while uploading) ──
         const previewFormData = new FormData();
         previewFormData.append('file', zipFiles[0]);
 
-        const previewResp = await fetch('/api/quote/zip/preview', {
-            method: 'POST',
+        const previewData = await _uploadFormData({
+            url: '/api/quote/zip/preview',
+            formData: previewFormData,
             headers: { 'Authorization': `Bearer ${authToken}` },
-            body: previewFormData,
+            onProgress: (pct) => {
+                updateProgress(pct, (t('zipPreview.uploading') || '上传中') + ' ' + pct + '%');
+            },
         });
-
-        if (!previewResp.ok) {
-            let errMsg = 'ZIP 上传失败';
-            try {
-                const errData = await previewResp.json();
-                errMsg = errData.message || errData.detail || errData.error || errMsg;
-            } catch (_) {}
-            throw new Error(errMsg);
-        }
-
-        const previewData = await previewResp.json();
         updateProgress(100, '清单与模型解析完成');
 
         // ── Step 2: Show preview modal and wait for user confirmation ──
@@ -470,6 +509,9 @@ async function _handleZipUpload(zipFiles, modelFiles, validFiles) {
             }
         }
         if (zipModelFiles.length > 0) {
+            // Re-uploaded files start a fresh quote: drop stale rows so the
+            // previous file's placement angle can't leak into this one.
+            clearResultsForFiles(zipModelFiles);
             const colorByFilename = {};
             const mergedForColor = (typeof currentResults !== 'undefined') ? currentResults : (zipData.results || []);
             mergedForColor.forEach(r => {
@@ -497,6 +539,7 @@ async function _handleZipUpload(zipFiles, modelFiles, validFiles) {
         // Process any remaining model files
         if (modelFiles.length > 0) {
             modelFiles.forEach(function(f) { selectedFilesMap.set(f.name, f); });
+            clearResultsForFiles(modelFiles);
             const initialColors = getInitialQuoteColorMap(modelFiles);
             await buildThumbnails(modelFiles, initialColors, null, ({ file }) => markFileAsCalculating(file, initialColors[file.name]));
             await quoteSelectedFilesSequentiallyWithProgress(modelFiles);
@@ -661,6 +704,7 @@ function _showZipPreviewModal(previewData) {
  */
 async function _handleModelUpload(modelFiles) {
     modelFiles.forEach((file) => selectedFilesMap.set(file.name, file));
+    clearResultsForFiles(modelFiles);
     dom.fileNameDisplay.classList.add('text-indigo-600', 'font-medium');
 
     renderFilePreviewChips(modelFiles);

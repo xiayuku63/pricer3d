@@ -1,7 +1,7 @@
 // -- Quote API & results management --
 import {
     authToken, quoteOptions, selectedFilesMap,
-    currentResults, setCurrentResults,
+    currentResults, setCurrentResults, thumbnailMap,
     MATERIAL_OPTIONS, authFetch,
     getColorsForMaterial, pickAllowedColor,
     getActivePrinterCompoundId,
@@ -30,10 +30,43 @@ export function abortActiveRecalc() {
     }
 }
 
+let _quoteBatchId = null;
+
+/** A new quote run replaces the previous one: abort its fetches AND ask the
+ * server to cancel + hard-kill any in-flight slicing under the old batch —
+ * the browser-side abort alone never reaches the backend on Windows. */
+async function _replaceQuoteBatch() {
+    const batchId = _quoteBatchId;
+    abortActiveRecalc();
+    if (!batchId) return;
+    await authFetch('/api/quote/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ batch_id: batchId }),
+    }).catch(() => {});
+}
+
 function _newAbortController() {
     abortActiveRecalc();
     _globalAbortController = new AbortController();
+    _quoteBatchId = (self.crypto && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : `b_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     return _globalAbortController;
+}
+
+/** Stop button, part 2: the fetch abort alone does NOT stop the backend
+ * (Windows/uvicorn never surfaces the disconnect), so tell the server the
+ * batch is cancelled; workers skip every file that has not started. */
+export function cancelActiveQuoteBatch() {
+    const batchId = _quoteBatchId;
+    abortActiveRecalc();
+    if (!batchId) return Promise.resolve();
+    return authFetch('/api/quote/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ batch_id: batchId }),
+    }).catch(() => {});
 }
 
 // ── Quote API ──
@@ -149,10 +182,15 @@ export async function quoteSingleFileWithOptions(file, options, signal) {
         formData.append('entity_colors_json', JSON.stringify(options.entity_colors));
     }
     const fetchOpts = { method: 'POST', body: formData };
+    if (_quoteBatchId) fetchOpts.headers = { 'X-Quote-Batch-Id': _quoteBatchId };
     if (signal) fetchOpts.signal = signal;
     const response = await authFetch('/api/quote', fetchOpts);
     const data = await response.json();
-    if (!response.ok) throw new Error(data.detail || data.error || t('quote.requestFailed'));
+    if (!response.ok) {
+        const error = new Error(data.message || data.detail || data.error || t('quote.requestFailed'));
+        error.status = response.status;
+        throw error;
+    }
     return data.results && data.results.length > 0 ? data.results[0] : { filename: file.name, status: "failed", error: "空响应" };
 }
 
@@ -219,10 +257,14 @@ function _pendingQuoteOptions(file) {
     };
 }
 
-/** Quote files one by one so each result row can transition from calculating to done. */
+/** Quote files through a small worker pool (default 2) so rows still
+ * transition calculating → done one by one, while slicing latency no longer
+ * serializes N files into N sequential round-trips. 429 responses back off
+ * once instead of failing the row. */
 export async function quoteSelectedFilesSequentially(selectedFiles, useProgress = false) {
     const files = Array.from(selectedFiles || []);
     if (!files.length) return;
+    await _replaceQuoteBatch();
     const controller = _newAbortController();
     const signal = controller.signal;
 
@@ -232,11 +274,11 @@ export async function quoteSelectedFilesSequentially(selectedFiles, useProgress 
     });
     if (useProgress) showProgress(`逐项计算报价 (${files.length} 个文件)...`);
 
-    for (let index = 0; index < files.length; index += 1) {
-        if (signal.aborted) break;
-        const file = files[index];
-        const percentBefore = (index / files.length) * 100;
-        if (useProgress) updateProgress(percentBefore, `${index + 1}/${files.length} - ${file.name} - ${t('quote.calculating')}`);
+    let nextIndex = 0;
+    let completed = 0;
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    const runOne = async (file) => {
         markFileAsCalculating(file);
         try {
             const updated = await quoteSingleFileWithOptions(file, _pendingQuoteOptions(file), signal);
@@ -245,17 +287,54 @@ export async function quoteSelectedFilesSequentially(selectedFiles, useProgress 
                 await ensureThumbnailForFile(file, updated.color, getResultOrientation(updated), () => {});
             }
         } catch (error) {
-            if (error.name === 'AbortError' || signal.aborted) break;
-            mergeResultsByFilename([{
-                filename: file.name,
-                status: 'failed',
-                error: error.message || t('quote.requestFailed'),
-            }]);
+            if (error.status === 429 && !signal.aborted) {
+                // Server rate limit (30/min per IP): back off, then retry once.
+                await sleep(3000);
+                if (!signal.aborted) {
+                    try {
+                        const updated = await quoteSingleFileWithOptions(file, _pendingQuoteOptions(file), signal);
+                        mergeResultsByFilename([updated]);
+                        if (updated?.color) {
+                            await ensureThumbnailForFile(file, updated.color, getResultOrientation(updated), () => {});
+                        }
+                    } catch (retryError) {
+                        if (retryError.name === 'AbortError' || signal.aborted) return;
+                        mergeResultsByFilename([{
+                            filename: file.name,
+                            status: 'failed',
+                            error: retryError.message || t('quote.requestFailed'),
+                        }]);
+                    }
+                }
+            } else if (error.name === 'AbortError' || signal.aborted) {
+                return;
+            } else {
+                mergeResultsByFilename([{
+                    filename: file.name,
+                    status: 'failed',
+                    error: error.message || t('quote.requestFailed'),
+                }]);
+            }
         }
+        completed += 1;
         renderResultsTable();
         recalcSummaryFromCurrentResults();
-        if (useProgress) updateProgress(((index + 1) / files.length) * 100, `${index + 1}/${files.length} - ${file.name}`);
-    }
+        if (useProgress) updateProgress((completed / files.length) * 100, `${completed}/${files.length} - ${file.name}`);
+    };
+
+    const worker = async () => {
+        while (!signal.aborted) {
+            const index = nextIndex;
+            nextIndex += 1;
+            if (index >= files.length) return;
+            await runOne(files[index]);
+        }
+    };
+
+    const poolSize = Math.min(2, files.length);
+    const workers = [];
+    for (let i = 0; i < poolSize; i += 1) workers.push(worker());
+    await Promise.all(workers);
 
     if (useProgress && !signal.aborted) {
         showProgressSuccess(`报价完成，共处理 ${files.length} 个文件`);
@@ -347,6 +426,72 @@ async function _quoteSelectedFilesInternal(selectedFiles, useProgress) {
 
 
 // ── Results management ──
+
+/** A (re-)uploaded file invalidates its previous quote row: drop the stale
+ * row so the orientation-preserving merge and _pendingQuoteOptions don't
+ * resurrect the OLD file's placement angle for the new upload. */
+export function clearResultsForFiles(files) {
+    const names = new Set((files || []).map((f) => f && f.name).filter(Boolean));
+    if (!names.size) return;
+    setCurrentResults(currentResults.filter((item) => !(item && names.has(item.filename))));
+}
+
+export function stopActiveQuote() {
+    abortActiveRecalc();
+    let stopped = 0;
+    currentResults.forEach((item) => {
+        if (!item) return;
+        if (!(item._calculating || item._recalculating)) return;
+        item._calculating = false;
+        item._recalculating = false;
+        if (item.status !== 'success') {
+            item.status = 'failed';
+            item.error = t('quote.quoteStopped');
+            stopped += 1;
+        }
+    });
+    hideProgress();
+    if (stopped) {
+        renderResultsTable();
+        recalcSummaryFromCurrentResults();
+    }
+    showToast(t('quote.quoteStoppedToast', { count: stopped }), 'info');
+    return stopped;
+}
+
+export function clearAllResults() {
+    selectedFilesMap.clear();
+    thumbnailMap.clear();
+    setCurrentResults([]);
+    renderResultsTable();
+    recalcSummaryFromCurrentResults();
+    if (_dom.fileNameDisplay) {
+        _dom.fileNameDisplay.textContent = t('quote.noFileSelected');
+        _dom.fileNameDisplay.classList.remove('text-indigo-600', 'font-medium');
+    }
+}
+
+/** Ask the backend to remove on-disk artifacts (model + G-code) for deleted
+ * rows. Fire-and-forget: history rows are intentionally kept (quota). */
+export function deleteArtifacts(paths) {
+    const list = (paths || []).filter(Boolean);
+    if (!authToken || !list.length) return Promise.resolve();
+    return authFetch('/api/quote/artifacts/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paths: list }),
+    }).catch(() => {});
+}
+
+export function deleteMyArtifacts() {
+    if (!authToken) return Promise.resolve();
+    return authFetch('/api/quote/artifacts/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clear_all: true }),
+    }).catch(() => {});
+}
+
 export function mergeResultsByFilename(incomingResults) {
     const idxByFilename = new Map();
     currentResults.forEach((item, idx) => { if (item && item.filename) idxByFilename.set(item.filename, idx); });
@@ -412,8 +557,8 @@ export async function reQuoteAllSelectedFiles(reasonLabel, shouldRequote) {
     if (errorMsg) errorMsg.textContent = '';
     if (errorContainer) errorContainer.classList.add('hidden');
 
-    // 中断上一个重算
-    abortActiveRecalc();
+    // 中断上一个重算：fetch abort + 服务端取消并硬杀在途切片
+    await _replaceQuoteBatch();
     const controller = _newAbortController();
     const signal = controller.signal;
 
@@ -462,7 +607,15 @@ export async function reQuoteAllSelectedFiles(reasonLabel, shouldRequote) {
             const opts = { material, color, quantity, _printer_model: pm, _slicer_preset_id: sp, orientation, auto_orient: smartPlacementEnabled };
             if (existing?.brand) opts.brand = existing.brand;
             const updated = await quoteSingleFileWithOptions(file, opts, signal);
-            mergeResultsByFilename([orientation ? withResultOrientation(updated, orientation) : updated]);
+            const merged = orientation ? withResultOrientation(updated, orientation) : updated;
+            mergeResultsByFilename([merged]);
+            // Refresh the thumbnail in the row's final pose — the plain
+            // pre-quote rebuild above always renders the original orientation,
+            // which previously left smart-placed rows with a stale thumbnail.
+            const resultOrientation = getResultOrientation(merged) || orientation;
+            if (resultOrientation) {
+                await ensureThumbnailForFile(file, updated.color || color, resultOrientation, () => {});
+            }
         } catch (err) {
             // AbortError: 静默处理
             // Chromium may surface an aborted fetch as TypeError("Failed to fetch")

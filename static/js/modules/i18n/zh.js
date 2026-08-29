@@ -169,6 +169,11 @@ export default {
   'quote.modelCountLimit': '免费用户：已用 {used}/{limit} 个模型（剩余 {remaining}）',
   'quote.uploadModels': '上传 3D 模型（stl/stp/step/obj/3mf 单文件不超过100MB，ZIP不超过500MB）',
   'quote.noDataUpload': '暂无数据，请在表格底部上传并自动报价',
+  'quote.stopQuote': '停止报价',
+  'quote.deleteAll': '全部删除',
+  'quote.quoteStopped': '已停止',
+  'quote.quoteStoppedToast': '已停止报价：{count} 个未完成文件已取消',
+  'quote.clearedAllToast': '已清空全部报价结果',
   'quote.exportCSV': '导出 CSV',
   'quote.exportExcel': '导出 Excel',
   'quote.exportPdf': '导出 PDF',
@@ -193,6 +198,8 @@ export default {
   // ── ZIP Preview / ZIP预览 ──
   'zipPreview.title': 'ZIP 文件预览',
   'zipPreview.parsing': '正在解析 ZIP 文件中的清单与模型...',
+  'zipPreview.uploading': '上传中',
+  'zipPreview.networkError': '网络错误，上传失败',
   'zipPreview.slicing': '开始切片...',
   'zipPreview.oneZipOnly': '一次只能上传一个 ZIP 文件',
   'zipPreview.cancelled': '已取消 ZIP 切片',
@@ -291,6 +298,8 @@ export default {
   'material.typeCustom': '自定义类型',
 
   // ── Settings / 用户中心 ──
+  'settings.passwordMinLength': '密码至少需要 8 个字符',
+  'settings.passwordMatch': '两次输入的密码一致',
   'settings.title': '用户中心',
   'settings.profile': '个人资料',
   'settings.pricing': '定价配置',
@@ -487,6 +496,7 @@ export default {
   'orientation.requestFailedLogin': '请求失败，请登录后重试',
   'orientation.requestFailed': '请求失败',
   'orientation.submitting': '提交中...',
+  'orientation.markedAndQuoted': '已标记，报价已按当前朝向刷新',
   'orientation.marked': '已标记',
   'orientation.markFailed': '标记失败: {msg}',
   'orientation.learnedSuccess': '智能摆放✓',

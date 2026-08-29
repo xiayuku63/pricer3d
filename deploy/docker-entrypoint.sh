@@ -5,8 +5,29 @@ echo "[pricer3d] Starting pricer3d (PrusaSlicer only)..."
 echo "[pricer3d] Data dir:  ${DB_PATH:-/app/data/app.db}"
 echo "[pricer3d] Env:       ${APP_ENV:-development}"
 
+# Apply Alembic migrations (best-effort — the app's runtime init_db remains
+# the safety net for fresh databases and missed columns).
+echo "[pricer3d] Applying DB migrations..."
+/app/venv/bin/python3 -m alembic upgrade head 2>&1 \
+  || echo "[pricer3d] WARNING: alembic upgrade failed — continuing with runtime schema init"
+
 # Ensure desktop output directory exists
 mkdir -p /app/desktop_outputs 2>/dev/null || true
+
+# PrusaSlicer AppImage: prefer the build-time extraction; older images fall
+# back to a one-time extraction at startup. Either way the slicer runs
+# without --appimage-extract-and-run, unlocking concurrent slicing.
+if [ -z "$PRUSA_EXTRACTED_APPIMAGE_DIR" ] && [ -x /usr/local/bin/prusa-slicer.AppImage ]; then
+  _EXTRACT_DIR=/tmp/prusaslicer-extracted
+  if [ ! -x "$_EXTRACT_DIR/AppRun" ]; then
+    echo "[pricer3d] One-time AppImage extraction..."
+    (cd /tmp && env -u APPIMAGE_EXTRACT_AND_RUN /usr/local/bin/prusa-slicer.AppImage --appimage-extract >/dev/null 2>&1 \
+      && mv /tmp/squashfs-root "$_EXTRACT_DIR") || true
+  fi
+  if [ -x "$_EXTRACT_DIR/AppRun" ]; then
+    export PRUSA_EXTRACTED_APPIMAGE_DIR="$_EXTRACT_DIR"
+  fi
+fi
 
 # Background cleanup loop — runs daily
 (

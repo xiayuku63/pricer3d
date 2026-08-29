@@ -12,7 +12,7 @@ export function buildRowDropdownsHtml(item) {
     const selectedPrinter = printerModels.find((printer) => printer.id === selectedPrinterId);
     const selectedNozzle = getResultNozzleDiameter(item, selectedPrinter);
     const pmOptions = printerModels.map(p =>
-        `<option value="${p.id}" ${p.id === selectedPrinterId ? 'selected' : ''}>${p.name}</option>`
+        `<option value="${escapeHtml(p.id)}" ${p.id === selectedPrinterId ? 'selected' : ''}>${escapeHtml(p.name)}</option>`
     ).join('');
     const nozzles = selectedPrinter?.nozzles?.length
         ? selectedPrinter.nozzles
@@ -31,7 +31,7 @@ export function buildRowDropdownsHtml(item) {
             ? (presets.find((preset) => String(preset.name || '').trim() === getStandardPresetNameForNozzle(selectedNozzle))?.id || '')
             : '');
     const presetOptions = ['<option value="">' + t('quote.presetNone') + '</option>',
-        ...presets.map(p => `<option value="${p.id}" ${String(p.id) === String(selectedPresetId || '') ? 'selected' : ''}>${p.name || '#' + p.id}</option>`)
+        ...presets.map(p => `<option value="${p.id}" ${String(p.id) === String(selectedPresetId || '') ? 'selected' : ''}>${escapeHtml(p.name || '#' + p.id)}</option>`)
     ].join('');
     return { pmOptions, nozzleOptions, presetOptions };
 }
@@ -43,7 +43,7 @@ function buildChecklistHtml(item) {
         + (src.printer_model ? t('quote.printerModel') + ':' + src.printer_model + ' ' : '')
         + (src.nozzle ? t('quote.nozzleDiameter') + ':' + src.nozzle + 'mm | ' : '')
         + '层高:' + src.layer_height + 'mm 墙层数:' + src.wall_count + ' 填充:' + src.infill + '%';
-    return ` <span class="inline-block whitespace-nowrap text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1 cursor-help" title="${tip}">\u{1F4CB}${t('quote.badgeChecklist')}</span>`;
+    return ` <span class="inline-block whitespace-nowrap text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1 cursor-help" title="${escapeHtml(tip)}">\u{1F4CB}${t('quote.badgeChecklist')}</span>`;
 }
 
 function buildBomDataBadgeHtml(item) {
@@ -55,7 +55,7 @@ function buildBomDataBadgeHtml(item) {
     if (src.color) parts.push(t('quote.color') + ':' + src.color);
     if (src.quantity) parts.push(t('quote.quantity') + ':' + src.quantity);
     const tip = t('quote.usedBomData') + (parts.length ? '：' + parts.join(' | ') : '');
-    return ` <span class="inline-block whitespace-nowrap text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1 cursor-help" title="${tip}">📋${t('quote.badgeBomData')}</span>`;
+    return ` <span class="inline-block whitespace-nowrap text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1 cursor-help" title="${escapeHtml(tip)}">📋${t('quote.badgeBomData')}</span>`;
 }
 
 function buildDefaultBadgeHtml() {

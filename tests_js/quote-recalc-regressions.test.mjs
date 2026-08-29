@@ -59,7 +59,9 @@ test('card edit captures currentColor before the result is updated', async () =>
     const handlerEnd = source.indexOf('// ── 导出功能', handlerStart);
     const handler = source.slice(handlerStart, handlerEnd);
     const declaration = handler.indexOf('const currentColor =');
-    const stateUpdate = handler.indexOf('currentResults[idx] = { ...currentResults[idx], color: currentColor');
+    // Optimistic block now carries brand/material/quantity too; keep the
+    // ordering intent: currentColor is read BEFORE the state update uses it.
+    const stateUpdate = handler.indexOf('color: currentColor,');
 
     assert.notEqual(declaration, -1);
     assert.notEqual(stateUpdate, -1);

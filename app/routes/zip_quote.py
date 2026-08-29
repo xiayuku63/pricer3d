@@ -6,7 +6,7 @@ Thin layer that validates request parameters and delegates to app.services.zip_q
 import logging
 from typing import Optional
 
-from fastapi import Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 
 from app.deps import get_current_user
 from app.services.zip_quote import (
@@ -19,6 +19,9 @@ from app.services.zip_quote import (
 logger = logging.getLogger(__name__)
 
 
+router = APIRouter()
+
+@router.post("/api/quote/zip/preview")
 async def zip_preview(
     request: Request,
     file: UploadFile = File(...),
@@ -39,6 +42,7 @@ async def zip_preview(
         raise HTTPException(status_code=500, detail=f"ZIP 预览失败 ({str(e)})")
 
 
+@router.post("/api/quote/zip")
 async def zip_quote(
     request: Request,
     file: Optional[UploadFile] = File(default=None),
@@ -78,6 +82,7 @@ async def zip_quote(
         raise HTTPException(status_code=500, detail=f"INTERNAL_ERROR: ZIP 报价失败 ({str(e)})")
 
 
+@router.get("/api/quote/zip/file")
 async def download_zip_model(
     file_path: str,
     current_user=Depends(get_current_user),
@@ -86,6 +91,7 @@ async def download_zip_model(
     return _download_zip_model(file_path, current_user)
 
 
+@router.get("/api/quote/zip/template")
 async def download_zip_template(request: Request):
     """GET /api/quote/zip/template"""
     return _download_zip_template(request)

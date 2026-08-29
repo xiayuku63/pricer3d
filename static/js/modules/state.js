@@ -319,8 +319,13 @@ function _buildColorWheelPanel(hex) {
 // ── Utility: color (no palette lookups — uses hex from data directly) ──
 export function colorToObj(c) {
     if (!c) return null;
-    // Object with hex → use directly
-    if (typeof c === 'object' && c.hex) return { name: c.name || c.hex, hex: c.hex };
+    // Object with a name keeps its identity even when hex is empty (multi-
+    // material records like "黑/灰" have no single swatch but must stay
+    // selectable and matchable).
+    if (typeof c === 'object') {
+        if (!c.hex && !c.name) return null;
+        return { name: String(c.name || c.hex || ''), hex: c.hex || '' };
+    }
     // String: hex → use as both name and hex; bare name → name only, no swatch
     if (typeof c === 'string') {
         const t = c.trim();
@@ -596,6 +601,10 @@ export function renderColorDropdown(name, selectedColor, compact, brand) {
         });
     }
     const safe = match || normColors[0];
+    // Name-only records (empty hex, e.g. "黑/灰") keep their name as the
+    // stored value so a re-render can match them again; hex-less swatches
+    // fall back to gray.
+    const safeValue = safe.hex || safe.name;
     const safeHex = safe.hex || '#d1d5db';
     const safeBorder = _getSwatchBorderColor(safeHex);
     const swatchSize = compact ? 'w-3.5 h-3.5' : 'w-5 h-5';
@@ -603,26 +612,29 @@ export function renderColorDropdown(name, selectedColor, compact, brand) {
     const triggerClass = compact
         ? 'color-dd-trigger color-dd-trigger-compact tw-popup-trigger text-[11px]'
         : 'color-dd-trigger color-dd-trigger-default tw-popup-trigger text-sm';
+    const colorKeyOf = (c) => (c.hex ? `h:${String(c.hex).toLowerCase()}` : `n:${String(c.name || '').toLowerCase()}`);
+    const safeKey = colorKeyOf(safe);
     const items = normColors.map((color) => {
-        const hex = color.hex || '#d1d5db';
-        const swatchBorder = _getSwatchBorderColor(hex);
-        const isSelected = hex.toLowerCase() === safeHex.toLowerCase();
+        const hex = color.hex || '';
+        const swatchHex = hex || '#d1d5db';
+        const swatchBorder = _getSwatchBorderColor(swatchHex);
+        const isSelected = colorKeyOf(color) === safeKey;
         const activeClass = isSelected ? ' color-dd-item-active' : '';
-        return '<button type="button" class="color-dd-item color-dd-item-swatch-only tw-dropdown-option flex items-center justify-center w-full px-2 py-2' + activeClass + '" data-color-hex="' + hex + '" role="option" aria-selected="' + (isSelected ? 'true' : 'false') + '" aria-label="' + hex + '" title="' + hex + '">'
-            + '<span class="color-dd-item-swatch ' + swatchSize + ' rounded-sm border flex-shrink-0" style="background:' + hex + ';border-color:' + swatchBorder + ';"></span>'
+        return '<button type="button" class="color-dd-item color-dd-item-swatch-only tw-dropdown-option flex items-center justify-center w-full px-2 py-2' + activeClass + '" data-color-hex="' + hex + '" data-color-name="' + escapeHtml(color.name || '') + '" role="option" aria-selected="' + (isSelected ? 'true' : 'false') + '" aria-label="' + escapeHtml(color.name || hex) + '" title="' + escapeHtml(color.name || hex) + '">'
+            + '<span class="color-dd-item-swatch ' + swatchSize + ' rounded-sm border flex-shrink-0" style="background:' + swatchHex + ';border-color:' + swatchBorder + ';"></span>'
             + '</button>';
     }).join('');
-    const html = '<div class="' + wrapperClass + '" data-selected-color="' + safeHex + '">'
-        + '<button type="button" class="' + triggerClass + '" data-color-trigger="1" aria-haspopup="listbox" aria-expanded="false" aria-label="' + safeHex + '" title="' + safeHex + '">'
+    const html = '<div class="' + wrapperClass + '" data-selected-color="' + escapeHtml(safeValue) + '">'
+        + '<button type="button" class="' + triggerClass + '" data-color-trigger="1" aria-haspopup="listbox" aria-expanded="false" aria-label="' + escapeHtml(safeValue) + '" title="' + escapeHtml(safeValue) + '">'
         + '<span class="color-dd-swatch ' + swatchSize + ' rounded-sm border flex-shrink-0" style="background:' + safeHex + ';border-color:' + safeBorder + ';"></span>'
-        + (compact ? '' : '<span class="color-dd-trigger-label flex-1 text-left font-mono text-xs tw-text-secondary">' + safeHex + '</span>')
+        + (compact ? '' : '<span class="color-dd-trigger-label flex-1 text-left font-mono text-xs tw-text-secondary">' + escapeHtml(safeValue) + '</span>')
         + '<svg class="color-dd-chevron w-4 h-4 tw-text-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>'
         + '</button>'
         + '<div class="color-dd-list color-dd-list-swatch-only tw-dropdown-panel hidden" role="listbox">'
         + items
         + '</div>'
-        + '<input type="hidden" class="row-color-value" value="' + safeHex + '"></div>';
-    return { html, selected: safeHex };
+        + '<input type="hidden" class="row-color-value" value="' + escapeHtml(safeValue) + '"></div>';
+    return { html, selected: safeValue };
 }
 
 // ── Mutators (used by settings) ──

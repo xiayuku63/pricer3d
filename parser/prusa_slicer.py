@@ -15,9 +15,10 @@ import shutil
 import subprocess
 import tempfile
 import threading
+import contextvars
 from contextlib import nullcontext
 from functools import lru_cache
-from typing import Optional
+from typing import Dict, Optional
 
 from app.printer_gcode import lifecycle_settings
 from parser.slice_cache import (
@@ -34,6 +35,52 @@ logger = logging.getLogger(__name__)
 # same image concurrently. Serialize AppImage launches to prevent extraction
 # races while leaving native binaries and WSL commands unconstrained.
 _APPIMAGE_EXECUTION_LOCK = threading.Lock()
+
+# ── In-flight slice registry (batch-scoped hard-kill) ──
+# The quote service stamps each per-file task with its batch id via
+# set_slice_batch(); run_prusa_slice registers every spawned PrusaSlicer
+# process under that id. cancel_batch() then kills still-running processes
+# instead of letting abandoned slices burn CPU for minutes.
+_current_slice_batch: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    "current_slice_batch", default=None
+)
+_active_slices: Dict[int, dict] = {}
+_active_slices_lock = threading.Lock()
+
+
+def set_slice_batch(batch_id: Optional[str]):
+    """Stamp the current task/thread with a quote batch id."""
+    return _current_slice_batch.set(str(batch_id) if batch_id else None)
+
+
+def _register_active_slice(pid: int, info: dict) -> None:
+    with _active_slices_lock:
+        _active_slices[pid] = info
+
+
+def _unregister_active_slice(pid: int) -> None:
+    with _active_slices_lock:
+        _active_slices.pop(pid, None)
+
+
+def kill_slices_for_batch(batch_id: Optional[str]) -> int:
+    """Hard-kill every still-running slicing process spawned under batch_id.
+    Returns the number of processes killed."""
+    if not batch_id:
+        return 0
+    with _active_slices_lock:
+        entries = [e for e in _active_slices.values() if e.get("batch_id") == str(batch_id)]
+    killed = 0
+    for entry in entries:
+        proc = entry.get("proc")
+        if proc is None or proc.poll() is not None:
+            continue
+        try:
+            _kill_slicer_process_tree(proc, entry.get("cmd") or [], entry.get("output") or "")
+            killed += 1
+        except Exception:
+            logger.debug("kill_slices_for_batch: failed to kill pid %s", entry.get("pid"), exc_info=True)
+    return killed
 
 
 @lru_cache(maxsize=1)
@@ -104,6 +151,22 @@ def prusa_executable() -> Optional[str]:
             logger.warning("Ignoring .env PRUSA_EXECUTABLE='%s' because WSL-only mode is enforced", _env_file)
         elif os.path.isfile(_env_file):
             return _env_file
+
+    # Pre-extracted AppImage (set by the Docker image/entrypoint): running the
+    # extracted AppRun avoids the per-slice --appimage-extract-and-run cost and
+    # the process-wide serialization lock it requires.
+    _extracted_dir = os.getenv("PRUSA_EXTRACTED_APPIMAGE_DIR", "").strip()
+    if _extracted_dir:
+        for _candidate in (
+            os.path.join(_extracted_dir, "AppRun"),
+            os.path.join(_extracted_dir, "usr", "bin", "prusa-slicer"),
+        ):
+            if os.path.isfile(_candidate):
+                return _candidate
+        logger.warning(
+            "PRUSA_EXTRACTED_APPIMAGE_DIR='%s' set but no AppRun/prusa-slicer found inside; falling back",
+            _extracted_dir,
+        )
 
     if _sys.platform == "win32":
         _wsl = shutil.which("wsl.exe") or shutil.which("wsl")
@@ -268,13 +331,20 @@ def parse_prusa_gcode_stats(gcode_path: str) -> dict:
         if len(values) > 1:
             result["filament_g_by_extruder"] = values
 
-    # Parse time: "estimated printing time (normal mode) = Xh Ym Zs" or "Xm Ys"
-    if m := re.search(r"; estimated printing time \(normal mode\) = (\d+)h (\d+)m (\d+)s", content):
-        result["time_s"] = int(m.group(1)) * 3600 + int(m.group(2)) * 60 + int(m.group(3))
-        result["time_str"] = f"{m.group(1)}h {m.group(2)}m {m.group(3)}s"
-    elif m := re.search(r"; estimated printing time \(normal mode\) = (\d+)m (\d+)s", content):
-        result["time_s"] = int(m.group(1)) * 60 + int(m.group(2))
-        result["time_str"] = f"{m.group(1)}m {m.group(2)}s"
+    # Parse time: "estimated printing time (normal mode) = [Xd] [Xh] Xm [Xs]".
+    # PrusaSlicer prints a "1d 2h 3m" segment once the estimate exceeds 24h,
+    # so tokenize every <number><unit> pair instead of matching fixed shapes.
+    if m := re.search(r"; estimated printing time \(normal mode\) = ([^\r\n]+)", content):
+        time_str = m.group(1).strip()
+        units = {"d": 86400, "h": 3600, "m": 60, "s": 1}
+        total_s = 0
+        matched = False
+        for value, unit in re.findall(r"(\d+)\s*([dhms])", time_str):
+            total_s += int(value) * units[unit]
+            matched = True
+        if matched:
+            result["time_s"] = total_s
+            result["time_str"] = time_str
 
     return result
 
@@ -635,6 +705,57 @@ def generate_slice_config(
 # ── Slice ──
 
 _SLICE_TIMEOUT = int(os.getenv("PRUSA_SLICE_TIMEOUT", "120"))
+# Large models legitimately slice for minutes at fine layer heights; scale the
+# base timeout with input size instead of failing everything above 120s.
+_SLICE_TIMEOUT_PER_MB = float(os.getenv("PRUSA_SLICE_TIMEOUT_PER_MB", "2"))
+_SLICE_TIMEOUT_MAX = int(os.getenv("PRUSA_SLICE_TIMEOUT_MAX", "900"))
+
+
+def _slice_timeout_for(model_path: str) -> int:
+    try:
+        size_mb = os.path.getsize(model_path) / (1024 * 1024)
+    except OSError:
+        size_mb = 0.0
+    return min(_SLICE_TIMEOUT_MAX, _SLICE_TIMEOUT + int(size_mb * _SLICE_TIMEOUT_PER_MB))
+
+
+def _kill_slicer_process_tree(proc: subprocess.Popen, cmd: list[str], output_gcode_path: str) -> None:
+    """Kill the slicer and its children.
+
+    A bare proc.kill() only terminates the launcher: on Windows the WSL relay
+    dies but the Linux-side prusa-slicer keeps burning CPU, and on Linux the
+    AppImage wrapper outlives the runtime. Kill the whole tree; for WSL also
+    pkill by the unique output basename (per-slice marker) to reach inside the
+    VM without disturbing concurrent slices.
+    """
+    import signal
+    import sys as _sys
+
+    try:
+        if _sys.platform == "win32":
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                capture_output=True,
+                timeout=10,
+            )
+            if cmd and "wsl" in os.path.basename(cmd[0].replace('"', "")).lower():
+                marker = os.path.basename(output_gcode_path)
+                if marker:
+                    subprocess.run(
+                        ["wsl.exe", "--", "pkill", "-9", "-f", marker],
+                        capture_output=True,
+                        timeout=10,
+                    )
+        else:
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except (ProcessLookupError, PermissionError, OSError):
+                proc.kill()
+    except Exception:
+        try:
+            proc.kill()
+        except Exception:
+            pass
 
 
 def run_prusa_slice(
@@ -779,17 +900,55 @@ def run_prusa_slice(
         except OSError:
             pass
 
-        # WSL stderr may contain UTF-16LE proxy warnings mixed with
-        # UTF-8 program output → read as bytes, decode robustly
+        import sys as _sys
+
+        # Group the slicer so the whole tree can be killed on timeout
+        # (start_new_session on Linux, a new process group on Windows).
+        _popen_kwargs: dict = {}
+        if _sys.platform == "win32":
+            _popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+        else:
+            _popen_kwargs["start_new_session"] = True
+
+        timeout_s = _slice_timeout_for(model_path)
         with prusa_execution_lock(exe):
-            proc = subprocess.run(cmd, capture_output=True, text=False, timeout=_SLICE_TIMEOUT)
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=False,
+                **_popen_kwargs,
+            )
+            _register_active_slice(proc.pid, {
+                "pid": proc.pid,
+                "proc": proc,
+                "cmd": list(cmd),
+                "output": output_gcode_path,
+                "batch_id": _current_slice_batch.get(),
+            })
+            try:
+                stdout_b, stderr_b = proc.communicate(timeout=timeout_s)
+            except subprocess.TimeoutExpired:
+                _kill_slicer_process_tree(proc, cmd, output_gcode_path)
+                try:
+                    proc.communicate(timeout=5)
+                except Exception:
+                    pass
+                raise RuntimeError(f"PrusaSlicer timed out ({timeout_s}s) for {os.path.basename(model_path)}")
+            finally:
+                _unregister_active_slice(proc.pid)
 
-        stdout = _safe_decode(proc.stdout).strip()
-        stderr = _safe_decode(proc.stderr).strip()
+        stdout = _safe_decode(stdout_b).strip()
+        stderr = _safe_decode(stderr_b).strip()
 
-        if proc.returncode != 0 and not os.path.exists(output_gcode_path):
+        if proc.returncode != 0:
+            # A non-zero exit must fail even when a partial G-code file was
+            # written before the crash — parsing it would silently underquote.
             error_msg = stderr or stdout or f"exit code {proc.returncode}"
             raise RuntimeError(f"PrusaSlicer failed: {error_msg[:400]}")
+
+        if not os.path.exists(output_gcode_path):
+            raise RuntimeError("PrusaSlicer produced no G-code output")
 
         if stderr:
             logger.debug(f"PrusaSlicer stderr: {stderr[:200]}")

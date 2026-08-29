@@ -4,6 +4,7 @@ Environment-driven settings are now managed by app.settings (pydantic-settings).
 This module re-exports them for backward compatibility.
 """
 
+import os
 import re
 from .settings import get_settings
 from .material_seed import DEFAULT_COLOR_PALETTE, DEFAULT_MATERIALS as SEEDED_DEFAULT_MATERIALS
@@ -41,6 +42,8 @@ SMTP_USE_SSL = _settings.smtp_use_ssl
 
 RESEND_API_KEY = _settings.resend_api_key
 SHOW_DEV_CODES = _settings.show_dev_codes
+ENABLE_DEV_ADMIN_LOGIN = _settings.enable_dev_admin_login
+TRUST_PROXY = _settings.trust_proxy
 
 TERMS_VERSION = _settings.terms_version
 PRIVACY_VERSION = _settings.privacy_version
@@ -56,6 +59,7 @@ DB_PATH = _settings.db_path
 AUTH_RATE_LIMIT_PER_MIN = _settings.auth_rate_limit_per_min
 QUOTE_RATE_LIMIT_PER_MIN = _settings.quote_rate_limit_per_min
 CAPTCHA_RATE_LIMIT_PER_MIN = _settings.captcha_rate_limit_per_min
+ZIP_QUOTE_CONCURRENCY = max(1, _settings.zip_quote_concurrency)
 CAPTCHA_TTL_SECONDS = _settings.captcha_ttl_seconds
 CAPTCHA_LENGTH = _settings.captcha_length
 CAPTCHA_MAX_ATTEMPTS = _settings.captcha_max_attempts
@@ -77,7 +81,10 @@ AUDIT_RETENTION_DAYS = _settings.audit_retention_days
 QUOTE_CONCURRENCY = _settings.quote_concurrency
 
 # ── 朝向学习配置 ──
-ORIENT_LEARNING_AUTO_RETRAIN = True  # 是否自动重训
+# 自动重训默认关闭：learner 模型目前不参与报价决策（candidates 的
+# learned_prob 恒为 None），自动重训只消耗 IO/CPU。开启请设
+# ORIENT_LEARNING_AUTO_RETRAIN=1。
+ORIENT_LEARNING_AUTO_RETRAIN = os.getenv("ORIENT_LEARNING_AUTO_RETRAIN", "0").strip().lower() in {"1", "true", "yes", "on"}
 ORIENT_LEARNING_MIN_NEW_SAMPLES = 10  # 新样本数阈值
 ORIENT_LEARNING_MIN_POSITIVE = 3  # 最少正样本数
 

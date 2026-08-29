@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 from pathlib import Path
 
-from app.services import history
+from app import routes_history as history
 
 
 class _FakeQuery:

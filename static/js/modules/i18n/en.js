@@ -174,6 +174,11 @@ export default {
   'quote.modelCountLimit': 'Free: {used}/{limit} models used ({remaining} remaining)',
   'quote.uploadModels': 'Upload 3D models (stl/stp/step/obj/3mf up to 100MB, ZIP up to 500MB)',
   'quote.noDataUpload': 'No data. Upload files below for auto-quote.',
+  'quote.stopQuote': 'Stop quoting',
+  'quote.deleteAll': 'Delete all',
+  'quote.quoteStopped': 'Stopped',
+  'quote.quoteStoppedToast': 'Quoting stopped: {count} pending file(s) cancelled',
+  'quote.clearedAllToast': 'All quote results cleared',
   'quote.exportCSV': 'Export CSV',
   'quote.exportExcel': 'Export Excel',
   'quote.exportPdf': 'Export PDF',
@@ -198,6 +203,8 @@ export default {
   // ── ZIP Preview ──
   'zipPreview.title': 'ZIP File Preview',
   'zipPreview.parsing': 'Parsing checklist and models from ZIP...',
+  'zipPreview.uploading': 'Uploading',
+  'zipPreview.networkError': 'Network error, upload failed',
   'zipPreview.slicing': 'Starting slicing...',
   'zipPreview.oneZipOnly': 'Only one ZIP file at a time',
   'zipPreview.cancelled': 'ZIP slicing cancelled',
@@ -296,6 +303,8 @@ export default {
   'material.typeCustom': 'Custom Type',
 
   // ── Settings ──
+  'settings.passwordMinLength': 'Password must be at least 8 characters',
+  'settings.passwordMatch': 'Passwords match',
   'settings.title': 'User Center',
   'settings.profile': 'Profile',
   'settings.pricing': 'Pricing',
@@ -482,6 +491,7 @@ export default {
   'preview.addEntityColor': 'Add color',
 
   // ── Orientation ──
+  'orientation.markedAndQuoted': 'Marked — quote refreshed for the current orientation',
   'orientation.autoOrient': 'Manual Place',
   'orientation.autoPlace': 'Auto Orient',
   'orientation.exit': 'Exit Lay Mode',

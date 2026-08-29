@@ -1,4 +1,4 @@
-import { loadFrontSettingsSnapshot, saveFrontSettingsSnapshot } from './state.js';
+import { loadFrontSettingsSnapshot, saveFrontSettingsSnapshot, colorToObj } from './state.js';
 
 // The page shell uses backdrop-filter, which creates a containing block for fixed
 // descendants. Portal these modals to body so their fixed positioning is relative
@@ -22,6 +22,27 @@ export function portalPreviewModal() {
 export function portalQuoteHistoryModal() {
     return portalModalToBody('quote-history-modal');
 }
+
+/** Escape closes the topmost visible modal (accessibility basics). Skip when
+ * a dropdown layer is open — those handle Escape themselves and must close
+ * first. Modal close buttons follow the `*-close-btn` naming; the click
+ * dispatch reuses each modal's own close path (state cleanup included). */
+export function initModalEscapeHandling() {
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        if (document.querySelector('.combo-d:not(.hidden), .styled-select-list:not(.hidden), .color-dd-list:not(.hidden)')) return;
+        const openModals = [...document.querySelectorAll('[id$="-modal"]:not(.hidden)')];
+        if (!openModals.length) return;
+        const top = openModals[openModals.length - 1];
+        const closeBtn = top.querySelector('[id$="-close-btn"]') || top.querySelector('.modal-icon-close');
+        if (closeBtn) {
+            e.preventDefault();
+            closeBtn.click();
+        }
+    });
+}
+
+import { getResultOrientation } from './orientation-state.js';
 
 export function initColorDropdownUI({ quoteOptions, currentResults, selectedFilesMap, thumbnailMap, dom, ensureThumbnailForFile, recolorCurrentMesh, updatePreviewColor, getCurrentPreviewFilename, refreshOptionsSummary }) {
     function saveFrontMaterialSnapshot() {
@@ -92,6 +113,10 @@ export function initColorDropdownUI({ quoteOptions, currentResults, selectedFile
             document.body.appendChild(list);
             list.__portalHost = document.body;
         }
+        // Measure hidden and fully detached from the wrapper — an in-flow
+        // measurement beside a bottom-edge trigger used to collapse or
+        // offscreen the open list (same failure class as styled-select).
+        list.style.visibility = 'hidden';
         list.style.position = 'fixed';
         list.style.marginTop = '0';
         list.style.maxHeight = '360px';
@@ -102,75 +127,116 @@ export function initColorDropdownUI({ quoteOptions, currentResults, selectedFile
         list.style.left = '0px';
         list.style.top = '0px';
         list.style.bottom = '';
-        const listRect = list.getBoundingClientRect();
-        const listWidth = Math.min(Math.max(listRect.width, minWidth), viewportMaxWidth);
-        const listHeight = Math.min(list.scrollHeight || listRect.height || 360, 360);
         const gap = 6;
-        const left = Math.max(8, Math.min(rect.left, window.innerWidth - listWidth - 8));
+        const listHeight = Math.min(list.scrollHeight || 360, 360);
         const spaceBelow = window.innerHeight - rect.bottom - gap;
         const spaceAbove = rect.top - gap;
-        const placeBelow = spaceBelow >= listHeight || spaceBelow >= spaceAbove;
-        const availableHeight = Math.max(120, Math.min(listHeight, placeBelow ? spaceBelow : spaceAbove));
+        let top;
+        let availableHeight;
+        if (spaceBelow >= Math.min(listHeight, 64) || spaceBelow >= spaceAbove) {
+            top = rect.bottom + gap;
+            availableHeight = Math.max(120, Math.min(listHeight, spaceBelow));
+        } else {
+            top = Math.max(8, rect.top - listHeight - gap);
+            availableHeight = Math.max(120, Math.min(listHeight, spaceAbove));
+        }
 
         list.style.zIndex = '100';
-        list.style.width = `${listWidth}px`;
+        list.style.top = `${top}px`;
+        list.style.left = `${Math.max(8, rect.left)}px`;
         list.style.maxHeight = `${availableHeight}px`;
-        list.style.left = `${left}px`;
-        list.style.right = '';
-        if (placeBelow) {
-            list.style.top = `${rect.bottom + gap}px`;
-            list.style.bottom = '';
-        } else {
-            list.style.top = '';
-            list.style.bottom = `${window.innerHeight - rect.top + gap}px`;
+        list.style.visibility = '';
+
+        // Keep inside the right viewport edge.
+        const listRect = list.getBoundingClientRect();
+        if (listRect.right > window.innerWidth - 8) {
+            list.style.left = `${Math.max(8, window.innerWidth - listRect.width - 8)}px`;
         }
     }
 
-    function syncColorSelection(wrapper, hex) {
-        if (!wrapper || !hex) return;
+    // Collect every rendered swatch option for this wrapper, wherever the
+    // list currently lives — while open the list is portaled to <body>, so
+    // querying the wrapper alone finds zero options and selection rings go
+    // stale ("highlight stuck on the first option").
+    function getColorItems(wrapper) {
+        const seen = new Set();
+        const out = [];
+        const pushFrom = (root) => root && root.querySelectorAll('.color-dd-item').forEach((el) => {
+            if (!seen.has(el)) { seen.add(el); out.push(el); }
+        });
+        pushFrom(wrapper);
+        document.querySelectorAll('body > .color-dd-list').forEach((list) => {
+            if (list.__portalOrigin && list.__portalOrigin.parentElement === wrapper) pushFrom(list);
+        });
+        return out;
+    }
+
+    function syncColorSelection(wrapper, value, explicitList) {
+        if (!wrapper || !value) return;
+        const obj = colorToObj(value) || {};
+        const swatchHex = obj.hex || '#d1d5db';
         const valueInput = wrapper.querySelector('.row-color-value');
-        if (valueInput) valueInput.value = hex;
-        wrapper.setAttribute('data-selected-color', hex);
+        if (valueInput) valueInput.value = value;
+        wrapper.setAttribute('data-selected-color', value);
         const triggerSwatch = wrapper.querySelector('.color-dd-swatch');
         if (triggerSwatch) {
-            triggerSwatch.style.background = hex;
-            triggerSwatch.style.borderColor = getSwatchBorderColor(hex);
+            triggerSwatch.style.background = swatchHex;
+            triggerSwatch.style.borderColor = getSwatchBorderColor(swatchHex);
         }
         const triggerLabel = wrapper.querySelector('.color-dd-trigger-label');
-        if (triggerLabel) triggerLabel.textContent = hex;
+        if (triggerLabel) triggerLabel.textContent = value;
         const trigger = wrapper.querySelector('.color-dd-trigger');
-        if (trigger) trigger.title = hex;
-        wrapper.querySelectorAll('.color-dd-item').forEach((item) => {
-            const selected = String(item.getAttribute('data-color-hex') || '').toLowerCase() === String(hex).toLowerCase();
+        if (trigger) trigger.title = value;
+        // Active match must handle name-only records (empty hex, e.g. "黑/灰").
+        const activeKey = obj.hex ? `h:${String(obj.hex).toLowerCase()}` : `n:${String(obj.name || '').toLowerCase()}`;
+        let touchedAny = false;
+        getColorItems(wrapper).forEach((item) => {
+            touchedAny = true;
+            const itemObj = { hex: item.getAttribute('data-color-hex') || '', name: item.getAttribute('data-color-name') || '' };
+            const itemKey = itemObj.hex ? `h:${itemObj.hex.toLowerCase()}` : `n:${itemObj.name.toLowerCase()}`;
+            const selected = itemKey === activeKey;
             item.classList.toggle('color-dd-item-active', selected);
             item.setAttribute('aria-selected', selected ? 'true' : 'false');
         });
+        if (explicitList && !touchedAny) {
+            explicitList.querySelectorAll('.color-dd-item').forEach((item) => {
+                const itemObj = { hex: item.getAttribute('data-color-hex') || '', name: item.getAttribute('data-color-name') || '' };
+                const itemKey = itemObj.hex ? `h:${itemObj.hex.toLowerCase()}` : `n:${itemObj.name.toLowerCase()}`;
+                const selected = itemKey === activeKey;
+                item.classList.toggle('color-dd-item-active', selected);
+                item.setAttribute('aria-selected', selected ? 'true' : 'false');
+            });
+        }
     }
 
-    async function applyInlineRecolor(rowCtx, hex) {
+    async function applyInlineRecolor(rowCtx, value) {
         const filename = rowCtx.getAttribute('data-row-file') || rowCtx.getAttribute('data-card-file');
         if (!filename) return;
         const idx = currentResults.findIndex((item) => item && item.filename === filename);
-        if (idx >= 0) currentResults[idx].color = hex;
+        // Keep the picked identity (may be a name-only record) in the result,
+        // but tint meshes/thumbnails with a resolvable hex.
+        const renderHex = colorToObj(value)?.hex || '#d1d5db';
+        if (idx >= 0) currentResults[idx].color = value;
 
         // Recolor the open viewer immediately. The thumbnail render is async,
         // so waiting for it can lose a race with the viewer's FileReader.
         if (getCurrentPreviewFilename() === filename) {
             try {
-                if (!updatePreviewColor?.(filename, hex)) recolorCurrentMesh(hex);
+                if (!updatePreviewColor?.(filename, renderHex)) recolorCurrentMesh(renderHex);
             } catch (e) { console.warn('3D preview recolor failed:', e.message); }
         }
 
         const file = selectedFilesMap.get(filename);
         if (file) {
-            try { await ensureThumbnailForFile(file, hex); } catch (e) { console.warn('Thumbnail generation failed:', e.message); }
+            const rowOrientation = getResultOrientation((currentResults || []).find((r) => r && r.filename === filename));
+            try { await ensureThumbnailForFile(file, renderHex, rowOrientation); } catch (e) { console.warn('Thumbnail generation failed:', e.message); }
             const newThumb = thumbnailMap.get(filename);
             if (newThumb) rowCtx.querySelectorAll('button[data-preview-file] img').forEach((img) => { img.src = newThumb; });
             // The viewer may still be parsing the file from FileReader. Retry
             // after the thumbnail work so that late-loaded meshes use the new
             // color too.
             if (getCurrentPreviewFilename() === filename) {
-                if (!updatePreviewColor?.(filename, hex)) recolorCurrentMesh(hex);
+                if (!updatePreviewColor?.(filename, renderHex)) recolorCurrentMesh(renderHex);
             }
         }
     }
@@ -199,10 +265,12 @@ export function initColorDropdownUI({ quoteOptions, currentResults, selectedFile
         const item = event.target.closest('.color-dd-item');
         if (item) {
             event.stopPropagation();
-            const hex = item.getAttribute('data-color-hex');
+            // Name-only records (empty hex) are valid picks — fall back to
+            // data-color-name so "黑/灰" style entries stay selectable.
+            const hex = item.getAttribute('data-color-hex') || item.getAttribute('data-color-name') || '';
             const wrapper = getWrapper(item);
             if (!wrapper || !hex) return;
-            syncColorSelection(wrapper, hex);
+            syncColorSelection(wrapper, hex, item.closest('.color-dd-list'));
             const list = item.closest('.color-dd-list');
             if (list) closeColorList(list);
 
@@ -250,6 +318,10 @@ export function initColorDropdownUI({ quoteOptions, currentResults, selectedFile
                 list.classList.remove('hidden');
                 wrapper.classList.add('is-open');
                 trigger.setAttribute('aria-expanded', 'true');
+                // Re-sync the rings from the stored value — covers picks made
+                // while the list was portaled and any drift since last render.
+                syncColorSelection(wrapper, wrapper.getAttribute('data-selected-color')
+                    || wrapper.querySelector('.row-color-value')?.value || '', list);
                 positionColorList(trigger, list, wrapper);
             } else {
                 closeColorList(list);

@@ -4,7 +4,7 @@ import os
 import logging
 from typing import Optional
 
-from fastapi import Request, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Request, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from jose import JWTError, jwt
@@ -37,6 +37,9 @@ class SlicerPresetGenerateRequest(BaseModel):
     layer_height: Optional[float] = Field(default=None, ge=0.05, le=1.0, description="层高(mm)")
 
 
+router = APIRouter()
+
+@router.get("/api/slicer/presets/{preset_id}")
 async def api_get_slicer_preset(preset_id: int, current_user=Depends(get_current_user)):
     """Return a single preset with parsed parameters for form editing."""
     from .slicer_presets import get_slicer_preset_by_id
@@ -84,6 +87,7 @@ def _parse_ini_params(content: str) -> dict:
     return params
 
 
+@router.get("/api/slicer/presets")
 async def api_list_slicer_presets(current_user=Depends(get_current_user)):
     try:
         items = list_slicer_presets(int(current_user["id"]))
@@ -111,6 +115,7 @@ async def api_list_slicer_presets(current_user=Depends(get_current_user)):
         raise HTTPException(status_code=500, detail=f"INTERNAL_ERROR: 获取预设失败 ({str(e)})")
 
 
+@router.post("/api/slicer/presets/generate")
 async def api_generate_slicer_preset(
     payload: SlicerPresetGenerateRequest, request: Request, current_user=Depends(get_current_user)
 ):
@@ -159,6 +164,7 @@ async def api_generate_slicer_preset(
     return {"status": "ok", "preset": saved}
 
 
+@router.post("/api/slicer/presets")
 async def api_upsert_slicer_preset(
     request: Request,
     file: UploadFile = File(...),
@@ -196,6 +202,7 @@ async def api_upsert_slicer_preset(
     return {"status": "ok", "preset": saved}
 
 
+@router.get("/api/slicer/presets/{preset_id}/download")
 async def api_download_slicer_preset(preset_id: int, token: str):
     try:
         payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
@@ -228,6 +235,7 @@ async def api_download_slicer_preset(preset_id: int, token: str):
     return FileResponse(config_saved_path, filename=f"{safe_preset_name}{preset['ext']}")
 
 
+@router.delete("/api/slicer/presets/{preset_id}")
 async def api_delete_slicer_preset(preset_id: int, request: Request, current_user=Depends(get_current_user)):
     if preset_id == 0:
         raise HTTPException(status_code=400, detail="系统预设不可删除")
@@ -259,6 +267,7 @@ async def api_delete_slicer_preset(preset_id: int, request: Request, current_use
     return {"status": "ok"}
 
 
+@router.get("/api/slicer/printers")
 async def api_list_printers(request: Request):
     """Return available printer models (built-in + optional user presets)."""
     from .printers import PRINTER_MODELS

@@ -30,6 +30,18 @@ RUN wget -q -O /usr/local/bin/prusa-slicer.AppImage \
     && chmod +x /usr/local/bin/prusa-slicer.AppImage \
     && ln -sf /usr/local/bin/prusa-slicer.AppImage /usr/local/bin/prusa-slicer
 
+# Extract the AppImage once at build time. Running the extracted AppRun
+# directly removes the per-slice --appimage-extract-and-run cost (tens of MB
+# of IO per invocation) and the process-wide serialization lock it needs —
+# without this, QUOTE_CONCURRENCY effectively degrades to 1.
+# APPIMAGE_EXTRACT_AND_RUN would make the runtime ignore --appimage-extract,
+# so it is unset for this one command.
+RUN cd /opt \
+    && env -u APPIMAGE_EXTRACT_AND_RUN /usr/local/bin/prusa-slicer.AppImage --appimage-extract >/dev/null 2>&1 \
+    && mv squashfs-root prusaslicer-extracted \
+    && test -x /opt/prusaslicer-extracted/AppRun
+ENV PRUSA_EXTRACTED_APPIMAGE_DIR=/opt/prusaslicer-extracted
+
 WORKDIR /app
 COPY requirements.txt .
 

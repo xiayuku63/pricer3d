@@ -39,12 +39,21 @@ def slice_cache_root() -> Path:
     return Path(configured).expanduser() if configured else _DEFAULT_CACHE_ROOT
 
 
-def _hash_file(path: str) -> str:
+@lru_cache(maxsize=32)
+def _hash_file_memotized(path: str, mtime_ns: int, size: int) -> str:
     digest = hashlib.sha256()
     with open(path, "rb") as source:
         for chunk in iter(lambda: source.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _hash_file(path: str) -> str:
+    # The quote pipeline hashes the same file repeatedly (orientation retries,
+    # model cache + slice cache keys). Memoize on (path, mtime, size) — a file
+    # with unchanged mtime and size cannot have a different digest.
+    stat = os.stat(path)
+    return _hash_file_memotized(path, stat.st_mtime_ns, stat.st_size)
 
 
 @lru_cache(maxsize=8)

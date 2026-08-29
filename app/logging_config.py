@@ -15,12 +15,16 @@ LOG_BACKUP_COUNT = int(os.getenv("LOG_BACKUP_COUNT", "10") or "10")
 def setup_logging() -> logging.Logger:
     os.makedirs(LOG_DIR, exist_ok=True)
 
-    logger = logging.getLogger("pricer3d")
-    logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
+    # Handlers go on the ROOT logger: business modules use
+    # logging.getLogger(__name__) ("app.*", "calculator.*", "parser.*"), which
+    # propagate to root — attaching only to "pricer3d" silently dropped all
+    # business logs from the files.
+    root = logging.getLogger()
+    root.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
 
     # Avoid duplicate handlers on reload
-    if logger.handlers:
-        return logger
+    if root.handlers:
+        return logging.getLogger("pricer3d")
 
     # File handler with rotation
     access_log = os.path.join(LOG_DIR, "access.log")
@@ -57,11 +61,11 @@ def setup_logging() -> logging.Logger:
     console_handler.setLevel(logging.WARNING)
     console_handler.setFormatter(error_fmt)
 
-    logger.addHandler(access_handler)
-    logger.addHandler(error_handler)
-    logger.addHandler(console_handler)
+    root.addHandler(access_handler)
+    root.addHandler(error_handler)
+    root.addHandler(console_handler)
 
-    return logger
+    return logging.getLogger("pricer3d")
 
 
 def log_request(

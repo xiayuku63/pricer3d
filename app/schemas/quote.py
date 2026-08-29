@@ -29,10 +29,12 @@ class QuoteFileResult(BaseModel):
     infill: int = 20
     effective_weight_g: float = 0.0
     cost_breakdown: Optional[dict] = None
+    saved_path: Optional[str] = None
     slicer_preset_id: Optional[int] = Field(default=None, alias="_slicer_preset_id")
     printer_model: Optional[str] = Field(default=None, alias="_printer_model")
     auto_orient_score: Optional[float] = None
     euler_angles_deg: Optional[dict] = None
+    rotation_matrix: Optional[list] = None
     selected_face_area: Optional[float] = None
     tune_report: Optional[str] = None
 

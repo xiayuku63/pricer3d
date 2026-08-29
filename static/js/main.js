@@ -65,9 +65,10 @@ import {
     refreshMembershipStatus, toggleMembershipOrders, confirmPayment, closePaymentModal,
 } from './modules/membership.js';
 import {
-    initQuote, quoteSingleFileWithOptions, quoteSelectedFiles,
+    initQuote, quoteSingleFileWithOptions, quoteSelectedFiles, abortActiveRecalc,
     mergeResultsByFilename, normalizeResultsWithCurrentOptions,
     reQuoteAllSelectedFiles, renderResultsTable, recalcSummaryFromCurrentResults,
+    stopActiveQuote, clearAllResults, cancelActiveQuoteBatch, deleteMyArtifacts,
     handleRowEditChange, refreshOptionsSummary, setOpenLoginModalRef,
     refreshBatchMaterialDropdown, refreshBatchColorDropdown, batchApplyToAll,
     refreshBatchBrandDropdown,
@@ -77,7 +78,7 @@ import {
     openMaterialCompare,
 } from './modules/quote.js';
 import {
-    setupEnhancedDragDrop, renderFilePreviewChips,
+    setupEnhancedDragDrop, renderFilePreviewChips, showToast,
 } from './modules/upload.js';
 import {
     initPreview, buildStlThumbnail, buildNonStlThumbnail,
@@ -96,7 +97,7 @@ import { initZipUpload, handleFileSelection } from './modules/zip-upload.js';
 import { initLiveClock } from './modules/live-clock.js';
 import { collectAppDomRefs } from './modules/app-dom.js';
 import {
-    initColorDropdownUI, initMobileNavigation, initAppLifecycle,
+    initColorDropdownUI, initMobileNavigation, initAppLifecycle, initModalEscapeHandling,
     portalModalToBody, portalUserCenterModal, portalPreviewModal, portalQuoteHistoryModal,
 } from './modules/app-shell.js';
 import { initSettingsAreaEvents, initResultsAreaEvents } from './modules/app-events.js';
@@ -368,6 +369,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ── Slicer preset form: save-as button (direct save with auto-generated name)
     _bind(dom.genPresetSaveasBtn, 'click', saveAsNewPreset);
 
+    initModalEscapeHandling();
     initColorDropdownUI({
         quoteOptions,
         currentResults,
@@ -457,6 +459,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (batchApplyBtn) batchApplyBtn.addEventListener('click', batchApplyToAll);
     _bind(document.getElementById('batch-recalculate-btn'), 'click', () => reQuoteAllSelectedFiles(t('quote.recalculate')));
+    _bind(document.getElementById('stop-quote-btn'), 'click', () => { stopActiveQuote(); cancelActiveQuoteBatch(); });
+    _bind(document.getElementById('clear-all-results-btn'), 'click', () => {
+        abortActiveRecalc();
+        clearAllResults();
+        deleteMyArtifacts();
+        showToast(t('quote.clearedAllToast'), 'info');
+    });
     if (batchQuantity) {
         batchQuantity.addEventListener('change', _onBatchChange('quantity'));
         batchQuantity.addEventListener('keydown', (e) => {

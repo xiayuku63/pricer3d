@@ -23,7 +23,9 @@ test('initial quote files transition one by one from calculating to API result',
     assert.match(api, /status: 'pending'/);
     assert.match(api, /_calculating: true/);
     assert.match(api, /export function markFileAsCalculating/);
-    assert.match(api, /for \(let index = 0; index < files\.length; index \+= 1\)/);
+    // Bounded worker pool: every file still goes calculating → result row
+    assert.match(api, /const worker = async \(\) => \{/);
+    assert.match(api, /const poolSize = Math\.min\(2, files\.length\)/);
     assert.match(api, /await quoteSingleFileWithOptions\(file, _pendingQuoteOptions\(file\), signal\)/);
     assert.match(api, /mergeResultsByFilename\(\[updated\]\)/);
     assert.match(api, /renderResultsTable\(\);\s*recalcSummaryFromCurrentResults\(\)/);

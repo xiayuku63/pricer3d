@@ -6,10 +6,11 @@ Thin layer that validates request parameters and delegates to app.services.quote
 import logging
 from typing import List, Optional
 
-from fastapi import Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel, Field
 
 from app.deps import get_current_user
+from app.schemas.quote import QuoteResponse
 from app.services.quote import build_quote_payload
 from calculator.cost import FORMULA_ALIAS_TO_CANONICAL, validate_formula_expression
 
@@ -21,6 +22,65 @@ class FormulaValidateRequest(BaseModel):
     total_cost_formula: str = Field(..., min_length=1, max_length=800)
 
 
+router = APIRouter()
+
+
+class QuoteCancelRequest(BaseModel):
+    batch_id: str = Field(..., min_length=6, max_length=80)
+
+
+@router.post("/api/quote/cancel")
+async def cancel_quote_batch(
+    payload: QuoteCancelRequest,
+    current_user=Depends(get_current_user),
+):
+    """Stop button: mark an in-flight quote batch cancelled; its remaining
+    files are skipped and never persisted."""
+    from app.quote_batch import cancel_batch
+
+    cancelled = cancel_batch(payload.batch_id.strip(), int(current_user["id"]))
+    return {"cancelled": bool(cancelled)}
+
+
+class ArtifactDeleteRequest(BaseModel):
+    """Delete on-disk quote artifacts (model + G-code job dirs). With
+    clear_all the user's whole direct-upload tree is removed. Quote history
+    rows are intentionally kept — free quota counts them."""
+
+    paths: List[str] = Field(default_factory=list, max_length=200)
+    clear_all: bool = False
+
+
+@router.post("/api/quote/artifacts/delete")
+async def delete_quote_artifacts(
+    payload: ArtifactDeleteRequest,
+    background_tasks: BackgroundTasks,
+    current_user=Depends(get_current_user),
+):
+    from app.services.artifact_cleanup import (
+        delete_directories,
+        list_user_direct_upload_dirs,
+        resolve_job_dir,
+    )
+
+    uid = int(current_user["id"])
+    if payload.clear_all:
+        dirs = list_user_direct_upload_dirs(uid)
+    else:
+        dirs = []
+        for saved_path in payload.paths:
+            job_dir = resolve_job_dir(saved_path, uid)
+            if job_dir:
+                dirs.append(job_dir)
+
+    unique_dirs = sorted(set(dirs))
+    background_tasks.add_task(delete_directories, unique_dirs)
+    return {"queued": len(unique_dirs)}
+
+
+
+
+@router.post("/api/quote", response_model=QuoteResponse)
 async def get_quote(
     request: Request,
     files: List[UploadFile] = File(...),
@@ -41,7 +101,6 @@ async def get_quote(
     entity_colors_json: Optional[str] = Form(default=None, max_length=20000),
     current_user=Depends(get_current_user),
 ):
-    logger.warning("ROUTE_DEBUG auto_orient=%s type=%s", auto_orient, type(auto_orient).__name__)
     try:
         return await build_quote_payload(
             request=request,
@@ -70,6 +129,7 @@ async def get_quote(
         raise HTTPException(status_code=500, detail=f"INTERNAL_ERROR: 报价请求失败 ({str(e)})")
 
 
+@router.post("/api/formula/validate", response_model=dict)
 async def validate_formula(payload: FormulaValidateRequest, current_user=Depends(get_current_user)):
     unit_ok, unit_err, unit_vars = validate_formula_expression(payload.unit_cost_formula)
     total_ok, total_err, total_vars = validate_formula_expression(payload.total_cost_formula)

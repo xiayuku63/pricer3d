@@ -31,7 +31,7 @@ async def security_middleware(request: Request, call_next):
     client_ip = get_client_ip(request)
 
     # Rate limiting by endpoint
-    if path in {"/api/auth/login", "/api/auth/register"} and method == "POST":
+    if path in {"/api/auth/login", "/api/auth/register", "/api/auth/admin-login"} and method == "POST":
         if not rate_limiter.is_allowed(f"auth:{client_ip}", AUTH_RATE_LIMIT_PER_MIN):
             resp = error_response(42900, "请求过于频繁，请稍后再试", 429)
             resp.headers["X-Request-ID"] = request.state.request_id

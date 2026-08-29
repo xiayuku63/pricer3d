@@ -5,7 +5,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import Request, Depends, HTTPException
+from fastapi import APIRouter, Request, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from .config import DEFAULT_MATERIALS, DEFAULT_PRICING_CONFIG, APP_DEFAULTS_KEY, AUDIT_RETENTION_DAYS
@@ -29,6 +29,9 @@ class AdminMembershipUpdateRequest(BaseModel):
 # ---------- Defaults ----------
 
 
+router = APIRouter()
+
+@router.get("/api/admin/defaults")
 async def admin_get_defaults(current_user=Depends(get_current_user)):
     require_admin(current_user)
     from .database import get_app_defaults
@@ -36,6 +39,7 @@ async def admin_get_defaults(current_user=Depends(get_current_user)):
     return get_app_defaults()
 
 
+@router.post("/api/admin/defaults/from-me")
 async def admin_set_defaults_from_me(request: Request, current_user=Depends(get_current_user)):
     require_admin(current_user)
     with get_db_session() as db:
@@ -84,6 +88,7 @@ async def admin_set_defaults_from_me(request: Request, current_user=Depends(get_
 # ---------- Users ----------
 
 
+@router.get("/api/admin/users")
 async def admin_list_users(
     q: str = "",
     limit: int = 50,
@@ -138,6 +143,7 @@ async def admin_list_users(
     return {"total": total or 0, "limit": safe_limit, "offset": safe_offset, "items": items}
 
 
+@router.post("/api/admin/users/{user_id}/membership")
 async def admin_update_user_membership(
     user_id: int,
     payload: AdminMembershipUpdateRequest,
@@ -173,6 +179,7 @@ async def admin_update_user_membership(
 # ---------- Audit ----------
 
 
+@router.get("/api/admin/audit")
 async def admin_list_audit(
     q: str = "",
     action: str = "",
@@ -241,6 +248,7 @@ async def admin_list_audit(
 # ---------- Metrics ----------
 
 
+@router.get("/api/admin/metrics")
 async def admin_metrics(current_user=Depends(get_current_user)):
     require_admin(current_user)
     return metrics.snapshot()
@@ -249,6 +257,7 @@ async def admin_metrics(current_user=Depends(get_current_user)):
 # ---------- Cleanup ----------
 
 
+@router.post("/api/admin/maintenance/cleanup")
 async def admin_cleanup(request: Request, current_user=Depends(get_current_user)):
     require_admin(current_user)
     now = time.time()
@@ -304,6 +313,7 @@ async def admin_cleanup(request: Request, current_user=Depends(get_current_user)
 # ---------- Backup ----------
 
 
+@router.post("/api/admin/maintenance/backup")
 async def admin_backup_create(request: Request, current_user=Depends(get_current_user)):
     require_admin(current_user)
     try:
@@ -316,11 +326,13 @@ async def admin_backup_create(request: Request, current_user=Depends(get_current
         raise HTTPException(status_code=500, detail=f"备份失败: {str(e)}")
 
 
+@router.get("/api/admin/maintenance/backup")
 async def admin_backup_list(current_user=Depends(get_current_user)):
     require_admin(current_user)
     return {"items": list_backups()}
 
 
+@router.post("/api/admin/maintenance/backup/cleanup")
 async def admin_backup_cleanup(request: Request, current_user=Depends(get_current_user)):
     require_admin(current_user)
     deleted = cleanup_old_backups()

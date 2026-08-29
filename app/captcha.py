@@ -12,9 +12,14 @@ from typing import Optional
 
 from fastapi import HTTPException
 
-from .config import JWT_SECRET_KEY, CAPTCHA_MAX_ATTEMPTS
+from .config import CAPTCHA_MAX_ATTEMPTS
 
 _logger = logging.getLogger(__name__)
+
+# Per-process random salt: captcha hashes must not be keyed on the JWT signing
+# key, and a leaked store cannot be replayed after a restart.
+_CAPTCHA_SALT = secrets.token_hex(32)
+
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 _BUNDLED_FONT = _PROJECT_ROOT / "static" / "fonts" / "DejaVuSans-Bold.ttf"
 
@@ -25,7 +30,7 @@ class CaptchaStore:
         self._lock = threading.Lock()
 
     def put(self, captcha_id: str, answer: str, expires_at: float, image_bytes: bytes, image_content_type: str) -> None:
-        hashed = hashlib.sha256((answer + JWT_SECRET_KEY).encode("utf-8")).hexdigest()
+        hashed = hashlib.sha256((answer + _CAPTCHA_SALT).encode("utf-8")).hexdigest()
         with self._lock:
             self._items[captcha_id] = {
                 "h": hashed,
@@ -65,11 +70,7 @@ class CaptchaStore:
                 self._items.pop(captcha_id, None)
                 return False
             expected = str(item.get("h") or "")
-            # DEBUG bypass for development
-            if str(code or "").strip().upper() == "DEBUG":
-                self._items.pop(captcha_id, None)
-                return True
-            supplied = hashlib.sha256((str(code or "").strip().upper() + JWT_SECRET_KEY).encode("utf-8")).hexdigest()
+            supplied = hashlib.sha256((str(code or "").strip().upper() + _CAPTCHA_SALT).encode("utf-8")).hexdigest()
             if supplied != expected:
                 return False
             self._items.pop(captcha_id, None)
@@ -198,7 +199,5 @@ def captcha_svg_fallback(text: str) -> str:
 def verify_captcha_or_raise(captcha_id: str, code: str) -> None:
     if not captcha_id or not code:
         raise HTTPException(status_code=400, detail="请先完成验证码验证")
-    if str(code or "").strip() == "0000":
-        return  # DEBUG bypass
     if not captcha_store.verify(captcha_id, code):
         raise HTTPException(status_code=400, detail="验证码错误或已过期")

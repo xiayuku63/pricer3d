@@ -34,6 +34,8 @@ import {
     quoteSelectedFilesSequentially, quoteSelectedFilesSequentiallyWithProgress,
     markFileAsCalculating, getInitialQuoteColorMap,
     mergeResultsByFilename, normalizeResultsWithCurrentOptions, reQuoteAllSelectedFiles,
+    clearResultsForFiles, stopActiveQuote, clearAllResults, cancelActiveQuoteBatch,
+    deleteArtifacts, deleteMyArtifacts,
     abortActiveRecalc, getSlicerConfigSnapshot, getAffectedFilenamesForSlicerConfigChange,
     getAffectedFilenamesForSlicerPresetChange,
 } from './quote-api.js';
@@ -59,7 +61,8 @@ export {
     quoteSelectedFilesWithProgress,
     quoteSelectedFilesSequentially, quoteSelectedFilesSequentiallyWithProgress,
     markFileAsCalculating, getInitialQuoteColorMap,
-    mergeResultsByFilename,
+    mergeResultsByFilename, clearResultsForFiles, stopActiveQuote, clearAllResults, cancelActiveQuoteBatch,
+    deleteArtifacts, deleteMyArtifacts,
     normalizeResultsWithCurrentOptions,
     reQuoteAllSelectedFiles,
     abortActiveRecalc,
@@ -629,8 +632,18 @@ async function _handleCardEdit(card, filename, abortSignal) {
     const prevItem = idx >= 0 ? { ...currentResults[idx] } : null;
     const currentColor = idx >= 0 ? (currentResults[idx].color || quoteOptions.color) : quoteOptions.color;
     if (idx >= 0) {
-        // Immediately update color in currentResults so preview sees the correct color
-        currentResults[idx] = { ...currentResults[idx], color: currentColor, _recalculating: true };
+        // Sync every user-edited field, not just color — mid-recalc re-renders
+        // would otherwise repaint the row with the previous material/brand.
+        currentResults[idx] = {
+            ...currentResults[idx],
+            brand,
+            material,
+            quantity,
+            color: currentColor,
+            status: 'success',
+            _recalculating: true,
+            cost_cny: 0,
+        };
     }
     renderResultsTable();
 
@@ -660,6 +673,10 @@ async function _handleCardEdit(card, filename, abortSignal) {
                 _slicer_preset_explicit: prevItem?._slicer_preset_explicit || presetChanged,
             };
             currentResults[idx]._slicer_preset_id = sp;
+        }
+        const rowOrientation = getResultOrientation(currentResults[idx]) || orientation;
+        if (idx >= 0 && rowOrientation) {
+            await ensureThumbnailForFile(file, currentColor, rowOrientation, () => {});
         }
         renderResultsTable();
         recalcSummaryFromCurrentResults();
@@ -781,8 +798,18 @@ async function _handleRowEdit(event, abortSignal) {
     const idx = currentResults.findIndex((i) => i.filename === filename);
     const prevItem = idx >= 0 ? { ...currentResults[idx] } : null;
     if (idx >= 0) {
-        // Immediately update color in currentResults so previewByFilename sees the new color
-        currentResults[idx] = { ...currentResults[idx], color, status: 'success', _recalculating: true, cost_cny: 0 };
+        // Sync every user-edited field (color alone let mid-recalc re-renders
+        // repaint the row with the previous material/brand/quantity).
+        currentResults[idx] = {
+            ...currentResults[idx],
+            brand,
+            material,
+            quantity,
+            color,
+            status: 'success',
+            _recalculating: true,
+            cost_cny: 0,
+        };
     }
     recalcSummaryFromCurrentResults();
 
@@ -813,6 +840,10 @@ async function _handleRowEdit(event, abortSignal) {
                 _slicer_preset_explicit: prevItem?._slicer_preset_explicit || presetChanged,
             };
             currentResults[idx]._slicer_preset_id = sp;
+        }
+        const rowOrientation = getResultOrientation(currentResults[idx]) || orientation;
+        if (idx >= 0 && rowOrientation) {
+            await ensureThumbnailForFile(file, dropdownColor, rowOrientation, () => {});
         }
         renderResultsTable();
         recalcSummaryFromCurrentResults();

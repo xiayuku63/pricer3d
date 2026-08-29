@@ -6,7 +6,7 @@ import os
 import uuid
 from typing import List, Optional
 
-from fastapi import Request, Depends, HTTPException
+from fastapi import APIRouter, Request, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from .config import DEFAULT_MATERIALS, DEFAULT_PRICING_CONFIG
@@ -66,6 +66,9 @@ class UserSettingsUpdate(BaseModel):
     default_brand: Optional[str] = None
 
 
+router = APIRouter()
+
+@router.get("/api/user/settings")
 async def get_user_settings(current_user=Depends(get_current_user)):
     try:
         with get_db_session() as db:
@@ -104,6 +107,7 @@ async def get_user_settings(current_user=Depends(get_current_user)):
         raise HTTPException(status_code=500, detail=f"INTERNAL_ERROR: 获取用户配置失败 ({str(e)})")
 
 
+@router.put("/api/user/settings")
 async def update_user_settings(payload: UserSettingsUpdate, request: Request, current_user=Depends(get_current_user)):
     seen_material_keys = set()
     for item in payload.materials:
@@ -216,6 +220,7 @@ class ChangePasswordRequest(BaseModel):
     captcha_code: Optional[str] = Field(default=None, max_length=10)
 
 
+@router.post("/api/users/change-password")
 async def change_password(req: ChangePasswordRequest, request: Request, current_user=Depends(get_current_user)):
     from .auth import verify_password, get_password_hash, get_user_by_id
     from .utils import validate_password_or_raise
@@ -250,6 +255,7 @@ async def change_password(req: ChangePasswordRequest, request: Request, current_
 
 
 # ── Export settings ──
+@router.get("/api/user/settings/export")
 async def export_user_settings(current_user=Depends(get_current_user)):
     """Export all user settings as a JSON file for backup."""
     try:
@@ -289,6 +295,7 @@ class ImportSettingsRequest(BaseModel):
     default_slicer_preset_id: Optional[int] = None
 
 
+@router.post("/api/user/settings/import")
 async def import_user_settings(
     payload: ImportSettingsRequest, request: Request, current_user=Depends(get_current_user)
 ):
@@ -345,6 +352,7 @@ class ResetSectionRequest(BaseModel):
     section: str = Field(..., pattern="^(materials|pricing|printer|slicer|all)$")
 
 
+@router.post("/api/user/settings/reset")
 async def reset_user_section(payload: ResetSectionRequest, request: Request, current_user=Depends(get_current_user)):
     """Reset one or all sections of user settings to system defaults."""
     try:
@@ -400,6 +408,7 @@ class BrandSettingsUpdate(BaseModel):
     brand_note: Optional[str] = Field(default=None, max_length=1000)
 
 
+@router.get("/api/user/brand-settings")
 async def get_brand_settings(current_user=Depends(get_current_user)):
     """获取当前用户的品牌定制设置"""
     try:
@@ -422,6 +431,7 @@ async def get_brand_settings(current_user=Depends(get_current_user)):
         raise HTTPException(status_code=500, detail=f"获取品牌设置失败 ({str(e)})")
 
 
+@router.put("/api/user/brand-settings")
 async def update_brand_settings(payload: BrandSettingsUpdate, request: Request, current_user=Depends(get_current_user)):
     """更新品牌定制设置（仅会员可用）"""
     if not is_member_user(current_user):
@@ -462,6 +472,7 @@ _ALLOWED_LOGO_TYPES = {"image/png", "image/jpeg", "image/svg+xml"}
 _MAX_LOGO_SIZE_BYTES = 2 * 1024 * 1024  # 2MB
 
 
+@router.post("/api/user/brand-logo")
 async def upload_brand_logo(request: Request, current_user=Depends(get_current_user)):
     """上传品牌 Logo 图片（仅会员可用）"""
     if not is_member_user(current_user):
@@ -513,6 +524,7 @@ async def upload_brand_logo(request: Request, current_user=Depends(get_current_u
     return {"url": url}
 
 
+@router.delete("/api/user/brand-logo")
 async def delete_brand_logo(request: Request, current_user=Depends(get_current_user)):
     """删除品牌 Logo（仅会员可用）"""
     if not is_member_user(current_user):

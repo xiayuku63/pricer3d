@@ -9,12 +9,12 @@ const previewUrl = new URL('../static/js/modules/preview.js', import.meta.url);
 test('inline color changes recolor the open viewer before thumbnail rendering completes', async () => {
     const source = await readFile(shellUrl, 'utf8');
     const recolorIndex = source.indexOf("if (getCurrentPreviewFilename() === filename)");
-    const thumbnailIndex = source.indexOf('await ensureThumbnailForFile(file, hex)', recolorIndex);
+    const thumbnailIndex = source.indexOf('await ensureThumbnailForFile(file, renderHex, rowOrientation)', recolorIndex);
 
     assert.notEqual(recolorIndex, -1);
     assert.notEqual(thumbnailIndex, -1);
     assert.ok(recolorIndex < thumbnailIndex);
-    assert.ok(source.indexOf('recolorCurrentMesh(hex);', thumbnailIndex) !== -1);
+    assert.ok(source.indexOf('recolorCurrentMesh(renderHex);', thumbnailIndex) !== -1);
     assert.doesNotMatch(source.slice(recolorIndex, thumbnailIndex), /previewModal.*classList/);
 });
 

@@ -30,12 +30,16 @@ PrusaSlicer-*.exe
 # Debug artifacts
 .playwright-cli/
 .workbuddy/
+/output/
+/desktop_outputs/
 test_*.png
 test_dropdown.js
 temp_script.py
 fix_dropdown.py
 nul
 tmp_material_*.gcode
+/0
+/D:Projects*
 
 # Local-only manual test artifacts
 .local-tests/

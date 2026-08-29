@@ -3,7 +3,7 @@
 import json
 import os
 
-from fastapi import HTTPException
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse
 
 import time
@@ -22,6 +22,9 @@ from .legal_content import render_terms_page, render_privacy_page
 _START_TIME = time.time()
 
 
+router = APIRouter()
+
+@router.get("/", response_class=HTMLResponse)
 async def index():
     """Assemble index.html from partials."""
     partials_dir = "static/partials"
@@ -52,11 +55,13 @@ async def index():
     return "".join(parts)
 
 
+@router.get("/register", response_class=HTMLResponse)
 async def register_page():
     with open("static/register.html", "r", encoding="utf-8") as f:
         return f.read()
 
 
+@router.get("/legal/terms", response_class=HTMLResponse)
 def legal_terms():
     return render_terms_page(
         version=TERMS_VERSION,
@@ -67,6 +72,7 @@ def legal_terms():
     )
 
 
+@router.get("/legal/privacy", response_class=HTMLResponse)
 def legal_privacy():
     return render_privacy_page(
         version=PRIVACY_VERSION,
@@ -77,11 +83,13 @@ def legal_privacy():
     )
 
 
+@router.get("/admin/users", response_class=HTMLResponse)
 async def admin_users_page():
     with open("static/admin_users.html", "r", encoding="utf-8") as f:
         return f.read()
 
 
+@router.get("/pay/mock", response_class=HTMLResponse)
 def pay_mock(order_no: str = ""):
     safe_order_no = (order_no or "").strip()[:80]
     return f"""
@@ -163,6 +171,7 @@ def pay_mock(order_no: str = ""):
 """
 
 
+@router.get("/healthz")
 def healthz():
     import shutil
 
@@ -175,6 +184,7 @@ def healthz():
     }
 
 
+@router.get("/readyz")
 def readyz():
     import shutil
 
@@ -197,6 +207,7 @@ def readyz():
         raise HTTPException(status_code=503, detail="服务未就绪")
 
 
+@router.get("/api/version")
 def version():
     """Return application version and deploy time from VERSION file."""
     version_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "VERSION")
@@ -216,6 +227,7 @@ def version():
     return result
 
 
+@router.get("/printer-params", response_class=HTMLResponse)
 def printer_params_page():
     """打印机参数管理页面"""
     import os
@@ -225,6 +237,7 @@ def printer_params_page():
         return HTMLResponse(f.read())
 
 
+@router.get("/materials", response_class=HTMLResponse)
 def materials_page():
     """材料管理页面"""
     import os
@@ -234,6 +247,7 @@ def materials_page():
         return HTMLResponse(f.read())
 
 
+@router.get("/quote", response_class=HTMLResponse)
 def quote_page():
     """报价计算页面（带材料选择器）"""
     import os

@@ -645,7 +645,6 @@
 | `partials/color-editor-modal.html` | ~4 处 |
 | `partials/quote-history-modal.html` | ~6 处 |
 | `partials/zip-preview-modal.html` | ~4 处 |
-| `html/config.html` | ~8 处 |
 | `css/table-enhancements.css` | ~15 处 |
 | `css/mobile.css` | ~10 处 |
 | **总计** | **~156 处** |

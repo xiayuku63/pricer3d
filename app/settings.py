@@ -1,7 +1,11 @@
 """Application settings — loaded from env vars via pydantic-settings."""
 
+import logging
+import secrets
 from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -41,6 +45,16 @@ class Settings(BaseSettings):
 
     # ── Dev ──
     show_dev_codes: bool = False
+    # Dev-only backdoors (admin quick login) are disabled unless explicitly opted in,
+    # even when APP_ENV is not "production" — fail-closed by default.
+    enable_dev_admin_login: bool = False
+
+    # ── Proxy ──
+    # Trust X-Real-IP / X-Forwarded-For from the reverse proxy for client IP
+    # resolution (rate limiting, audit). Keep true when deployed behind the
+    # bundled nginx; set false when the app port is directly exposed, otherwise
+    # clients can spoof these headers and bypass IP rate limits.
+    trust_proxy: bool = True
 
     # ── Payment ──
     payment_provider: str = "mock"
@@ -78,6 +92,8 @@ class Settings(BaseSettings):
 
     # ── Quote ──
     quote_concurrency: int = 4
+    # ZIP 流水线并发（切片是瓶颈；AppImage 预解压后不再有全局锁）
+    zip_quote_concurrency: int = 3
 
     # ── Admin ──
     admin_usernames: str = "admin"
@@ -123,10 +139,16 @@ def get_settings() -> Settings:
     global _settings
     if _settings is None:
         _settings = Settings()
-        # Provide dev defaults for secrets when unset
-        if not _settings.jwt_secret_key:
-            _settings.jwt_secret_key = "dev-only-insecure-secret-change-me"
-        if not _settings.payment_webhook_secret:
-            _settings.payment_webhook_secret = "dev-only-insecure-secret-change-me"
+        # In non-production, generate random secrets when unset so a missing .env
+        # never silently signs tokens with a publicly known key. Production keeps
+        # the empty value and fails validation below.
+        if not _settings.jwt_secret_key and not _settings.is_production:
+            _settings.jwt_secret_key = secrets.token_urlsafe(48)
+            logger.warning(
+                "JWT_SECRET_KEY 未配置：已生成临时随机密钥，重启后所有已签发 token 将失效。"
+                "生产环境必须在 .env 中显式配置。"
+            )
+        if not _settings.payment_webhook_secret and not _settings.is_production:
+            _settings.payment_webhook_secret = secrets.token_urlsafe(48)
         _settings._validate_secrets()
     return _settings

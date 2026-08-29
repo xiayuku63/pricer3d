@@ -25,6 +25,7 @@ from app.config import (
 from app.db import get_db_session
 from app.deps import get_membership_effective, is_member_user
 from app.models_orm import QuoteHistory, User
+from app.quote_batch import batch_cancelled
 from calculator.cost import process_single_file
 from app.material_resolver import merge_user_material_with_catalog
 
@@ -305,8 +306,34 @@ async def build_quote_payload(
 
     _semaphore = asyncio.Semaphore(max(1, QUOTE_CONCURRENCY))
 
+    batch_id = (request.headers.get("x-quote-batch-id") or "").strip() if request is not None else ""
+    if batch_id:
+        from app.quote_batch import register_batch
+        register_batch(batch_id, int(current_user["id"]))
+
     async def process_one(file):
         async with _semaphore:
+            if batch_id:
+                from parser.prusa_slicer import set_slice_batch
+
+                set_slice_batch(batch_id)
+            # Stopped via the stop button / replaced by a newer batch (batch
+            # flag) or disconnected? Skip this file and everything queued
+            # behind it. In-flight slices are hard-killed by cancel_batch();
+            # abandoned work must not start and must not reach history.
+            batch_stopped = bool(batch_id) and batch_cancelled(batch_id, int(current_user["id"]))
+            disconnected = False
+            if not batch_stopped and request is not None:
+                disconnected = await request.is_disconnected()
+            if batch_stopped or disconnected:
+                return {
+                    "filename": file.filename or "unknown",
+                    "status": "cancelled",
+                    "error": "客户端已断开，报价已取消",
+                    "cost_cny": 0,
+                    "weight_g": 0,
+                    "estimated_time_h": 0,
+                }
             try:
                 result = await asyncio.to_thread(
                     _process_single_file_sync,
@@ -330,6 +357,19 @@ async def build_quote_payload(
                 )
                 if isinstance(result, dict) and effective_brand:
                     result["brand"] = effective_brand
+                # The slice may have been hard-killed mid-flight by a batch
+                # cancel (stop button / replacing recalc). Never let a
+                # killed-or-queued file's result — including the geometric
+                # estimation fallback — count as success or reach history.
+                if batch_id and batch_cancelled(batch_id, int(current_user["id"])):
+                    return {
+                        "filename": file.filename or "unknown",
+                        "status": "cancelled",
+                        "error": "客户端已断开，报价已取消",
+                        "cost_cny": 0,
+                        "weight_g": 0,
+                        "estimated_time_h": 0,
+                    }
                 return result
             except Exception as e:
                 fname = file.filename or "unknown"
@@ -344,7 +384,29 @@ async def build_quote_payload(
                 }
 
     tasks = [process_one(f) for f in files]
-    results = await asyncio.gather(*tasks)
+    try:
+        results = await asyncio.gather(*tasks)
+    finally:
+        if batch_id:
+            from app.quote_batch import release_batch
+            release_batch(batch_id)
+
+    # Surface the smart-placement result on the item itself. The quote
+    # checkbox and /api/orientation/auto-learned share
+    # get_smart_orientation_for_slicing; exposing the same fields here lets
+    # the frontend re-render thumbnails in the placed pose
+    # (getResultOrientation reads top-level euler_angles_deg).
+    for item in results:
+        breakdown = item.get("cost_breakdown")
+        if not isinstance(breakdown, dict):
+            continue
+        for key in ("euler_angles_deg", "rotation_matrix", "auto_orient_score", "selected_face_area"):
+            if item.get(key) is None and breakdown.get(key) is not None:
+                item[key] = breakdown[key]
+        # Let the client ask the server to clean this file's artifacts when
+        # the row is deleted (POST /api/quote/artifacts/delete).
+        if item.get("saved_path") is None and item.get("_saved_path"):
+            item["saved_path"] = item["_saved_path"]
 
     success_items = [item for item in results if item.get("status") == "success"]
     failed_items = [item for item in results if item.get("status") == "failed"]
@@ -488,10 +550,13 @@ def _process_single_file_sync(
 
 
 def save_quote_history(user_id: int, results: list) -> None:
-    """Save quote results to history table."""
+    """Save quote results to history table. Cancelled items are skipped —
+    work abandoned by a client disconnect is not a quote the user ever saw."""
     now = datetime.now(timezone.utc).isoformat()
     with get_db_session() as db:
         for item in results:
+            if item.get("status") == "cancelled":
+                continue
             raw_pm = item.get("_printer_model") or item.get("printer_model") or ""
             slicer_preset_id = item.get("_slicer_preset_id") or item.get("slicer_preset_id")
 
@@ -578,5 +643,10 @@ def save_quote_history(user_id: int, results: list) -> None:
                 infill=infill_val,
                 brand=str(brand)[:40] if brand else None,
                 cost_breakdown=cost_breakdown_str,
+                slicer_fallback=int(bool((breakdown or {}).get("slicer_fallback"))) if breakdown else 0,
+                slicer_error=(breakdown or {}).get("slicer_error") if breakdown else None,
+                slicer_estimated_time_s=float((breakdown or {}).get("slicer_estimated_time_s", 0) or 0)
+                if (breakdown or {}).get("slicer_estimated_time_s")
+                else None,
             )
             db.add(entry)
